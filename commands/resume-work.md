@@ -118,6 +118,10 @@ After analysis, present a **concise summary**:
 ```markdown
 ## Project Resumed: [Project Name]
 
+### Quick Checks
+- [ ] Pulled latest? (`git pull`)
+- [ ] Commands synced? (`cd ~/Development/projects/claude-config && git pull`)
+
 ### Quick Overview
 [One sentence: what this project does]
 

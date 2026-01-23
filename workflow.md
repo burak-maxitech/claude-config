@@ -23,16 +23,19 @@
 ```bash
 # 1. Open Terminal
 
-# 2. Navigate to project
+# 2. Pull latest commands (in case you updated from another machine)
+cd ~/Development/projects/claude-config && git pull && cd -
+
+# 3. Navigate to project
 cd ~/projects/[project-name]
 
-# 3. Check for Claude updates
+# 4. Check for Claude updates
 claude update
 
-# 4. Launch Claude Code
+# 5. Launch Claude Code
 claude
 
-# 5. Get up to speed
+# 6. Get up to speed
 /resume-work
 ```
 
@@ -102,10 +105,19 @@ claude
 # Save your progress
 /update-docs
 
-# Then commit your work
+# Commit your project work
 git add .
 git commit -m "feat: [description]"
 git push
+
+# If Claude modified any commands or workflow, sync those too
+cd ~/Development/projects/claude-config
+git status
+# If changes exist:
+git add .
+git commit -m "Updated [what changed]"
+git push
+cd -
 ```
 
 **What `/update-docs` does:**
@@ -351,35 +363,48 @@ project/
 
 ## New Machine Setup
 
-### First Time Setup (One Machine)
-
-```bash
-# 1. Create GitHub repo (github.com/Burkico/claude-config - Private)
-
-# 2. Clone and set up
-cd ~
-git clone git@github.com:Burkico/claude-config.git
-
-# 3. Symlink to Claude's directory
-ln -s ~/Development/projects/claude-config/commands ~/.claude/commands
-```
-
-### Setup on Additional Machines
+### Mac/Linux Setup
 
 ```bash
 # 1. Clone the repo
-cd ~
-git clone git@github.com:Burkico/claude-config.git
+cd ~/Development/projects  # or wherever you keep repos
+git clone https://github.com/burak-maxitech/claude-config.git
 
-# 2. Symlink commands
+# 2. Symlink to Claude's directory
 ln -s ~/Development/projects/claude-config/commands ~/.claude/commands
+
+# 3. Verify
+ls ~/.claude/commands/
 ```
+
+### Windows Setup
+
+```cmd
+# 1. Open Command Prompt or PowerShell as Administrator (required for symlinks)
+
+# 2. Clone the repo (adjust path to where you keep projects)
+cd %USERPROFILE%\Development\projects
+git clone https://github.com/burak-maxitech/claude-config.git
+
+# 3. Create symlink (note: link comes before target on Windows)
+mklink /D "%USERPROFILE%\.claude\commands" "%USERPROFILE%\Development\projects\claude-config\commands"
+
+# 4. Verify
+dir "%USERPROFILE%\.claude\commands"
+```
+
+**Windows Notes:**
+- Must run as Administrator to create symlinks
+- Use `\` not `/` for paths
+- Symlink syntax is reversed: `mklink /D [link] [target]`
 
 ### Syncing Changes
 
 After Claude or you edit any files:
 ```bash
-cd ~/Development/projects/claude-config
+cd ~/Development/projects/claude-config   # Mac/Linux
+cd %USERPROFILE%\Development\projects\claude-config   # Windows
+
 git add .
 git commit -m "Updated [what changed]"
 git push
@@ -387,7 +412,9 @@ git push
 
 On other machines:
 ```bash
-cd ~/Development/projects/claude-config
+cd ~/Development/projects/claude-config   # Mac/Linux
+cd %USERPROFILE%\Development\projects\claude-config   # Windows
+
 git pull
 ```
 
@@ -439,6 +466,8 @@ Commands are stored in:
 ├── workflow.md          # This file
 └── README.md
 ```
+
+GitHub repo: `burak-maxitech/claude-config` (private)
 
 Symlinked to: `~/.claude/commands`
 
