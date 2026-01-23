@@ -22,14 +22,14 @@ cd ~
 git clone git@github.com:Burkico/claude-config.git
 
 # 2. Symlink commands to Claude's directory
-ln -s ~/claude-config/commands ~/.claude/commands
+ln -s ~/Development/projects/claude-config/commands ~/.claude/commands
 ```
 
 ## Syncing Changes
 
 After Claude or you edit any files:
 ```bash
-cd ~/claude-config
+cd ~/Development/projects/claude-config
 git add .
 git commit -m "Updated [what changed]"
 git push
@@ -37,7 +37,7 @@ git push
 
 On other machines:
 ```bash
-cd ~/claude-config
+cd ~/Development/projects/claude-config
 git pull
 ```
 
