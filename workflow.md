@@ -29,13 +29,16 @@ cd ~/Development/projects/claude-config && git pull && cd -
 # 3. Navigate to project
 cd ~/projects/[project-name]
 
-# 4. Check for Claude updates
+# 4. (Optional) Pull latest project changes
+git pull
+
+# 5. Check for Claude updates
 claude update
 
-# 5. Launch Claude Code
+# 6. Launch Claude Code
 claude
 
-# 6. Get up to speed
+# 7. Get up to speed
 /resume-work
 ```
 
