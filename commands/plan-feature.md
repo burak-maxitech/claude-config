@@ -32,21 +32,22 @@ ELSE:
 
 ---
 
-## Step 2: Read Project Context
+## Step 2: Read Project Context (Parallel)
 
-### If CLAUDE.md exists, read it for:
-- Current project status
-- Completed components
-- Architecture decisions already made
-- Tech stack already chosen
-- Known issues/blockers
+### Check Auto-Memory First
+Claude Code's auto-memory (`~/.claude/projects/<project-path>/memory/MEMORY.md`) is automatically loaded into your context. If it contains tech stack, architecture, and key paths — you already have stable project facts. Focus your reading on evolving state in CLAUDE.md.
 
-### If docs/*.md (PRD files) exist, read them for:
-- Existing architecture
-- Data models
-- API specifications
-- Configuration patterns
-- Integration details
+### Read all context in a single parallel call:
+- `CLAUDE.md` — current status, completed components, architecture decisions, tech stack, known issues/blockers
+- `README.md` — project overview, structure (skim if auto-memory covers this)
+- `docs/` folder listing — identify PRD files, architecture docs, API specs
+- Plan file from `$ARGUMENTS` (if provided)
+
+This is a single turn — do NOT read these sequentially.
+
+### After the parallel read:
+- Read any PRD/spec files referenced in CLAUDE.md "Key Documentation"
+- Note existing data models, API specs, configuration patterns, integration details
 
 ### Use this context to:
 - Skip questions already answered by existing docs
@@ -195,7 +196,7 @@ After all relevant categories are covered, provide:
 2. **Architecture overview** based on decisions
 3. **Open questions** still to resolve
 4. **Risks identified**
-5. **Suggested phases** for implementation
+5. **Implementation phases** — numbered, with specific deliverables per phase
 
 ### For EXISTING PROJECT:
 1. **Summary** of new feature requirements
@@ -203,29 +204,67 @@ After all relevant categories are covered, provide:
 3. **Files to modify** vs new files to create
 4. **Risks** specific to integration
 5. **Impact on existing functionality**
+6. **Implementation phases** — numbered, with specific deliverables per phase
 
 ### Then ask:
 > "Ready to proceed with implementation, or dig deeper on anything?"
 
-**Only after I confirm -> begin implementation.**
+**Only after I confirm -> proceed to Plan Mode.**
 
 ---
 
-## After Interview Complete
+## After Interview Complete: Enter Plan Mode
 
-Once I confirm ready to proceed:
+Once I confirm ready to proceed, transition into a formal implementation plan:
 
-1. **Update CLAUDE.md** with:
-   - New feature added to "In Progress" or "Next Steps"
-   - Key decisions added to "Key Decisions" table
-   - Any new blockers/issues identified
+### Step 1: Enter Plan Mode
+Use `EnterPlanMode` to switch into planning mode. This gives you access to explore the codebase in detail and design a concrete implementation approach.
 
-2. **Optionally update PRD** with:
-   - New feature specifications
-   - Updated architecture if changed
-   - New API endpoints/data models
+### Step 2: Write the Implementation Plan
+In plan mode, create a detailed plan that includes:
+1. **Phase breakdown** — each phase from the interview summary becomes a plan section
+2. **File-level changes** — for each phase, list specific files to create/modify with what changes
+3. **Dependencies** — which phases depend on others
+4. **Risk mitigations** — concrete steps to address each identified risk
+5. **Testing approach** — what to test at each phase
 
-3. **Begin implementation** following the plan
+### Step 3: Exit Plan Mode for Approval
+Use `ExitPlanMode` to present the plan to the user for approval. The user will review and either approve or request changes.
+
+**Do NOT begin implementation until the plan is approved via ExitPlanMode.**
+
+---
+
+## After Plan Approved: Hydrate Task List
+
+Once the user approves the plan, **create a live task tracker** from the implementation phases:
+
+### Create Tasks with TaskCreate
+For each implementation phase/step in the approved plan:
+1. Create a task with `TaskCreate`:
+   - **subject** — imperative form (e.g., "Create user authentication endpoint")
+   - **description** — include specific files, changes, and acceptance criteria from the plan
+   - **activeForm** — present continuous (e.g., "Creating user authentication endpoint")
+2. Set `blockedBy` dependencies between sequential phases
+3. Mark the first task as `in_progress` to begin
+
+### Rules
+- **One task per logical unit of work** — don't create a task per file, create a task per deliverable
+- **Limit to ~10 tasks max** — group small steps if there are many phases
+- **Include testing tasks** — add a task for writing tests after each major phase
+- **Skip documentation tasks** — `/update-docs` handles that at end of session
+
+### Then update CLAUDE.md:
+1. New feature added to "In Progress"
+2. Key decisions added to "Key Decisions" table
+3. Any new blockers/issues identified
+
+### Optionally update PRD with:
+- New feature specifications
+- Updated architecture if changed
+- New API endpoints/data models
+
+### Begin implementation following the task list.
 
 ---
 
@@ -247,10 +286,12 @@ Once I confirm ready to proceed:
 
 ## Start Now
 
-1. Detect project state (GREENFIELD vs EXISTING)
-2. Read CLAUDE.md and docs/*.md for context
-3. Read plan file if provided in `$ARGUMENTS`
+1. Check auto-memory for existing project context
+2. Detect project state (GREENFIELD vs EXISTING)
+3. Read CLAUDE.md, README.md, docs/*.md, and plan file (if provided) **in parallel**
 4. Announce planning mode
 5. Begin interview with first batch of questions
+6. After interview → `EnterPlanMode` → write implementation plan → `ExitPlanMode` for approval
+7. After approval → hydrate tasks with `TaskCreate` → begin implementation
 
 $ARGUMENTS

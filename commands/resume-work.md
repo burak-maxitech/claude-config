@@ -14,73 +14,48 @@ You are resuming work on this project after a break (hours, days, or weeks). You
 
 ---
 
-## Step 1: Read Documentation (In This Order)
+## Step 0: Check Auto-Memory
 
-### 1.1 CLAUDE.md (Start Here - Required)
-**Location:** `CLAUDE.md` in project root
+Claude Code's auto-memory (`~/.claude/projects/<project-path>/memory/MEMORY.md`) is **automatically loaded** into your context at session start. Before reading project docs:
 
-This is your **primary context file**. Read it completely to understand:
-- Project overview and purpose
-- Current status (what's complete, in progress, not started)
-- Recent session history (what happened last time)
-- Next steps (prioritized task list)
-- Key decisions made (and why)
-- Known issues and blockers
-- Architecture summary
+1. **Check if auto-memory already has project context** — it may contain tech stack, key paths, common commands, and architecture patterns synced by `/update-docs`
+2. **If auto-memory has good coverage**, you can skim README.md rather than deep-reading it — focus your attention on CLAUDE.md for evolving state
+3. **If auto-memory is empty or missing**, proceed normally and note that `/update-docs` should be run at end of session to populate it
 
-### 1.2 README.md (Required)
-**Location:** `README.md` in project root
+---
 
-Understand:
-- Project purpose and features
-- Tech stack
-- Project structure
-- How to run/test locally
-- Links to other documentation
+## Step 1: Read Documentation (Parallel)
 
-### 1.3 docs/*.md Files (As Needed)
-**Location:** `docs/` folder
+**Read all core documentation files in a single parallel call:**
 
-Scan for PRD and specification files:
-- Full architecture details
-- API specifications
-- Data models
-- Configuration details
-- Any project-specific documentation
+Use parallel tool calls to read these simultaneously:
+- `CLAUDE.md` — primary context file (project overview, status, session history, next steps, decisions, blockers, architecture)
+- `README.md` — project purpose, tech stack, structure, setup instructions (skim if auto-memory already covers this)
+- `docs/` folder listing — identify what documentation files exist
 
-**Prioritize reading:**
-- Files referenced in CLAUDE.md "Key Documentation" section
-- PRD files (contain detailed requirements)
+This is a single turn — do NOT read these sequentially.
+
+### After the parallel read:
+- If CLAUDE.md references specific docs/ files in "Key Documentation," read those next
+- PRD files (contain detailed requirements) — read if present
+- `docs/session-history.md` — archived session logs (only read if you need context older than 3 sessions)
 - Skip sample/example data files unless needed
 
 ---
 
-## Step 2: Analyze Current Codebase
+## Step 2: Analyze Current Codebase (Parallel)
 
-After reading documentation, quickly scan:
+**Run all git commands and structure scan in a single parallel call:**
 
-### 2.1 Project Structure
-```bash
-# Get folder overview
-ls -la
-ls -la */
-```
+Execute these simultaneously (all are independent):
+- `git log --oneline -10` — recent commits
+- `git diff --stat HEAD~5` — what files changed recently
+- `git status` — any uncommitted changes
+- `ls -la` and `ls -la */` — verify project structure matches docs
 
-Verify structure matches what's documented.
+This is a single turn — do NOT run these sequentially.
 
-### 2.2 Recent Changes (If Git Available)
-```bash
-# Recent commits
-git log --oneline -10
-
-# What files changed recently
-git diff --stat HEAD~5
-
-# Any uncommitted changes
-git status
-```
-
-### 2.3 Key Files
+### After the parallel scan:
 Based on CLAUDE.md "In Progress" and "Next Steps," identify and briefly review:
 - Files currently being worked on
 - Files that need modification next
@@ -155,6 +130,36 @@ After analysis, present a **concise summary**:
 
 ---
 
+## Step 5: Hydrate Task List
+
+After presenting the summary and before starting work, **load CLAUDE.md tasks into the live task tracker** using TaskCreate:
+
+### 5.1 Create Tasks from "In Progress"
+For each item in CLAUDE.md's `## In Progress` section:
+- Create a task with `TaskCreate` (subject = the task description, status starts as `pending`)
+- Include relevant file paths in the task description
+
+### 5.2 Create Tasks from "Next Steps"
+For each item in CLAUDE.md's `## Next Steps` section:
+- Create a task with `TaskCreate`
+- Use the priority order to set `blockedBy` dependencies where tasks are sequential (e.g., task 2 blocked by task 1 if they depend on each other)
+- Skip items that are clearly future/aspirational — only hydrate actionable tasks
+
+### 5.3 Create Tasks from "Known Issues / Blockers"
+For any active blockers:
+- Create a task and set it as `blockedBy` on the tasks it blocks
+
+### 5.4 Rules
+- **Do NOT hydrate completed items** — those are already in `## Completed`
+- **Keep task subjects concise** — imperative form (e.g., "Add user authentication endpoint")
+- **Set activeForm** on each task (e.g., "Adding user authentication endpoint")
+- **Mark the recommended task as `in_progress`** once the user confirms direction
+- **Limit to ~10 tasks max** — if there are more, only hydrate the top priorities
+
+This gives the user a live, interactive task tracker for the session instead of a static markdown list.
+
+---
+
 ## Guidelines
 
 ### Be Concise
@@ -195,7 +200,7 @@ Provide additional details:
 - Complete file tree
 - All environment variables needed
 - Detailed breakdown of each component's state
-- Full session history (not just last session)
+- Full session history — read `docs/session-history.md` if it exists, combined with CLAUDE.md sessions
 
 ---
 
@@ -219,6 +224,7 @@ Once you've presented the summary and user confirms direction:
 | Last session was weeks ago | Read more thoroughly, verify code state |
 | User specifies task | Skip recommendation, focus on their request |
 | Blockers exist | Surface them immediately before starting work |
+| Need older context | Check `docs/session-history.md` for archived sessions |
 
 ---
 

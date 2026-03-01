@@ -416,6 +416,22 @@ When documentation structure exists, update to reflect current state.
    - Other supporting docs
 3. **Update relevant files** based on code changes
 
+## Part 0: Drain Task List into CLAUDE.md
+
+Before updating documentation, **capture any task progress from the current session's live task tracker:**
+
+1. **Run `TaskList`** to get all tasks and their statuses
+2. **For each completed task:**
+   - Add it to CLAUDE.md's `## Completed` section as `- [x] [task subject] - [files modified]`
+   - Remove it from `## In Progress` or `## Next Steps` if it appears there
+3. **For each in-progress task:**
+   - Ensure it's listed in `## In Progress` with current state
+4. **For pending tasks that were created during the session:**
+   - Add them to `## Next Steps` in priority order
+5. **Skip tasks that already exist in CLAUDE.md** — don't duplicate
+
+This ensures work tracked via TaskCreate/TaskUpdate during the session is persisted back to CLAUDE.md for the next session's `/resume-work`.
+
 ## Part 1: Update CLAUDE.md
 
 ### 1.0 Update Timestamp
@@ -488,6 +504,32 @@ Update with any new issues found:
 - [Priority 2 for next time]
 ```
 
+### 1.9 Archive Old Sessions
+After adding the new session entry, manage CLAUDE.md file size:
+
+1. **Count session entries** under `## Session History`
+2. **If more than 3 entries exist:**
+   a. Identify all session entries except the **last 3** (most recent)
+   b. Create or update `docs/session-history.md`:
+      - If the file doesn't exist, create it with this header:
+        ```markdown
+        # Session History Archive
+
+        > Auto-managed by `/update-docs`. Recent sessions are in [CLAUDE.md](../CLAUDE.md).
+
+        ---
+        ```
+      - Append the older sessions to the archive file in chronological order
+      - Do NOT duplicate sessions already in the archive — only move sessions not yet archived
+   c. Remove the archived session entries from CLAUDE.md
+   d. Add or update a reference line at the top of `## Session History`:
+      ```markdown
+      > Full history: [docs/session-history.md](docs/session-history.md) (Sessions 1–N)
+      ```
+      Where N is the last archived session number.
+3. **Keep the archive file in chronological order** (oldest first)
+4. **Update the session range** in the reference link each time new sessions are archived
+
 ## Part 2: Update README.md
 
 ### 2.1 Project Overview
@@ -540,6 +582,33 @@ Update to reflect actual docs/ contents:
 - Don't modify sample data files unless requested
 - Don't rename existing files
 - Keep project-specific naming conventions
+
+## Part 4: Sync Auto-Memory
+
+Claude Code maintains a persistent auto-memory directory (`~/.claude/projects/<project-path>/memory/`) that is automatically loaded into every conversation. Use it as a **stable quick-reference layer** alongside CLAUDE.md's evolving status.
+
+### 4.1 What to Sync to Auto-Memory `MEMORY.md`
+Extract **stable, slow-changing facts** from the project and write/update them:
+- Project name, repo, one-line description
+- Tech stack and key framework versions
+- Common commands (build, test, run, lint)
+- Key file paths and entry points
+- Architecture pattern (e.g., "Next.js app router + Prisma + PostgreSQL")
+- Environment variable names (not values)
+- Project-specific conventions (naming, folder structure patterns)
+
+### 4.2 What NOT to Sync
+Do not duplicate evolving state — that stays in CLAUDE.md:
+- Session history, in-progress items, next steps
+- Blockers, decisions log, completion status
+- Anything that changes every session
+
+### 4.3 Sync Rules
+1. **Read existing auto-memory first** — check `~/.claude/projects/` for this project's memory directory
+2. **Update, don't overwrite** — merge new facts into existing memory, don't replace the whole file
+3. **Keep it concise** — auto-memory MEMORY.md is truncated after 200 lines; prioritize density
+4. **Only sync when facts change** — if tech stack, commands, or structure haven't changed, skip this step
+5. **Create topic files** for detailed notes (e.g., `debugging.md`, `patterns.md`) and link from MEMORY.md
 
 ---
 
@@ -624,6 +693,9 @@ Provide complete content for each file created or significantly modified.
 - [ ] Relevant docs/*.md files updated
 - [ ] All files consistent with each other
 - [ ] No valuable context removed
+- [ ] Session history archived if more than 3 entries (old sessions moved to docs/session-history.md)
+- [ ] Auto-memory synced with stable project facts (if changed)
+- [ ] Task list drained — completed/in-progress/pending tasks synced back to CLAUDE.md
 - [ ] Project-specific files preserved
 
 ---

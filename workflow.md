@@ -43,10 +43,11 @@ claude
 ```
 
 **What `/resume-work` does:**
-- Reads CLAUDE.md for context
-- Shows current status
-- Identifies last session's work
-- Recommends next task
+- Checks auto-memory for stable project facts already in context
+- Reads CLAUDE.md, README.md, and docs/ in parallel (single turn)
+- Runs all git commands in parallel (log, diff, status)
+- Shows current status + recommends next task
+- Hydrates a live task list from CLAUDE.md using TaskCreate
 
 ---
 
@@ -66,39 +67,49 @@ claude
 ```
 
 **What `/plan-feature` does:**
+- Checks auto-memory, then reads all docs in parallel
 - Auto-detects if greenfield or existing project
-- Reads existing docs for context
-- Asks 3-5 questions at a time
-- Covers all edge cases before coding
+- Asks 3-5 questions at a time, covers all edge cases
+- Enters Plan Mode → writes formal implementation plan → requires approval via ExitPlanMode
+- Hydrates approved plan into live tasks with TaskCreate (with dependencies)
 - Updates CLAUDE.md with decisions
 
 #### Code Quality Checks
 
 ```bash
+# Review uncommitted changes (default - most common)
+/code-review
+
 # Review specific files
 /code-review src/services/gmail_service.py
 
-# Review recent changes
-/code-review [files changed in this session]
+# Review staged changes before commit
+/code-review --staged
 
-# Find dead code and cleanup opportunities
+# Review a pull request
+/code-review 123
+
+# Find dead code and cleanup opportunities (parallel scan)
 /code-cleanup
 
-# Or focus on specific area
+# Focus on specific area or category
 /code-cleanup src/services/
+/code-cleanup --deps --code
 ```
 
 **What `/code-review` does:**
-- Checks correctness, security, performance
-- Identifies bugs and edge cases
-- Suggests improvements
-- Acknowledges what's done well
+- Auto-detects review target (uncommitted changes, staged, PR, or specified files)
+- Scans codebase conventions before reviewing (error handling, naming, imports, test patterns)
+- Checks correctness, security, performance, maintainability
+- Outputs severity summary (Critical/Important/Suggestions count) with mandatory `file:line` references
+- Flags convention violations against project patterns
 
 **What `/code-cleanup` does:**
-- Finds unused files and dead code
-- Identifies unused dependencies
-- Spots obsolete patterns
-- Categorizes by safety (safe/likely safe/investigate)
+- Scans multiple categories in parallel using subagents
+- Produces a summary dashboard (item counts, removable lines, risk levels)
+- Lists "Quick Wins" for zero-risk bulk deletions
+- Categorizes findings by safety (Safe to Delete / Likely Safe / Needs Investigation)
+- Supports filters (`--code`, `--deps`, `--css`, `--tests`, `--aggressive`)
 
 ---
 
@@ -124,10 +135,11 @@ cd -
 ```
 
 **What `/update-docs` does:**
-- Updates CLAUDE.md with session history
-- Records what was accomplished
-- Updates status table
-- Sets up context for next session
+- Drains live task list — syncs completed/in-progress/pending tasks back to CLAUDE.md
+- Updates CLAUDE.md with session history, status, and next steps
+- Archives old sessions (>3) to `docs/session-history.md` to keep CLAUDE.md lean
+- Syncs stable project facts to auto-memory for instant context in future sessions
+- Updates README.md and docs/*.md as needed
 
 ---
 
@@ -137,11 +149,16 @@ cd -
 
 **When:** Start of every session
 
-**Flags:**
-- `/resume-work` - Standard summary
-- `/resume-work deep` - Verbose mode, full details
+**Usage:**
+- `/resume-work` - Standard summary (parallel doc reads + git scan)
+- `/resume-work deep` - Verbose mode (includes full session history from archive, complete file tree, all env vars)
 
-**Output:** Status summary + recommended next task
+**Features:**
+- Checks auto-memory for pre-loaded project context
+- Reads all docs and runs all git commands in parallel (2 turns total)
+- Hydrates CLAUDE.md tasks into live task tracker via TaskCreate
+
+**Output:** Status summary + recommended next task + live task list
 
 ---
 
@@ -159,7 +176,9 @@ cd -
 - **GREENFIELD** - Full architecture interview (new projects)
 - **EXISTING** - Integration-focused interview (adding to existing code)
 
-**Output:** Exhaustive requirements gathered, then implementation
+**Flow:** Interview → EnterPlanMode → implementation plan → ExitPlanMode (approval) → TaskCreate (hydrate tasks) → begin coding
+
+**Output:** Exhaustive requirements gathered, formal plan approved, live task list created
 
 ---
 
@@ -173,7 +192,10 @@ cd -
 - **UPDATE** - Refreshes existing documentation
 
 **Updates:**
+- Drains live task list back into CLAUDE.md (completed → Completed, pending → Next Steps)
 - CLAUDE.md - Session history, status, next steps
+- Archives sessions >3 to `docs/session-history.md`
+- Syncs stable facts to auto-memory (`~/.claude/projects/.../memory/MEMORY.md`)
 - README.md - Project overview, setup
 - docs/*.md - PRD and specifications
 
@@ -185,20 +207,29 @@ cd -
 
 **Usage:**
 ```bash
+/code-review                             # Review uncommitted changes (default)
 /code-review src/file.py                 # Review specific file
 /code-review src/services/               # Review directory
-/code-review                             # Review recent changes
+/code-review 123                         # Review PR #123 via gh
+/code-review --staged                    # Review only staged changes
+/code-review --last-commit               # Review the last commit
 ```
+
+**Features:**
+- Auto-detects review target from arguments
+- Scans codebase conventions first (error handling, naming, imports, test patterns)
+- Flags convention violations alongside standard issues
+- Every finding includes mandatory `file_path:line_number` reference
 
 **Checks:**
 - Correctness & bugs
 - Security vulnerabilities
 - Performance issues
-- Maintainability
+- Maintainability & convention consistency
 - Error handling
 - Test coverage gaps
 
-**Output:** Critical / Important / Suggestions / What's Good
+**Output:** Severity summary table (counts) → Critical / Important / Suggestions / Convention Violations / What's Good
 
 ---
 
@@ -208,9 +239,21 @@ cd -
 
 **Usage:**
 ```bash
-/code-cleanup                            # Full codebase scan
+/code-cleanup                            # Full codebase scan (parallel agents)
 /code-cleanup src/                       # Specific directory
+/code-cleanup --code                     # Dead code only
+/code-cleanup --deps                     # Unused dependencies only
+/code-cleanup --css                      # Unused CSS only
+/code-cleanup --tests                    # Test cleanup only
+/code-cleanup --files                    # Unused files only
+/code-cleanup --aggressive               # Move "Likely Safe" into "Safe to Delete"
+/code-cleanup src/ --code --deps         # Combined: scoped + filtered
 ```
+
+**Features:**
+- Launches parallel subagents to scan multiple categories simultaneously
+- Produces a summary dashboard (item counts, removable lines, risk levels)
+- Lists "Quick Wins" for zero-risk bulk-approvable deletions
 
 **Finds:**
 - Unused files and dead code
@@ -220,7 +263,7 @@ cd -
 - Configuration cruft
 - Stale tests
 
-**Output:** Safe to Delete / Likely Safe / Needs Investigation
+**Output:** Summary dashboard → Quick Wins → Safe to Delete / Likely Safe / Needs Investigation
 
 ---
 
@@ -328,11 +371,19 @@ Every project should have:
 
 ```
 project/
-├── README.md           # Public overview, setup guide
-├── CLAUDE.md           # Session context (AI reads this first)
+├── README.md                  # Public overview, setup guide
+├── CLAUDE.md                  # Session context (AI reads this first)
 └── docs/
-    ├── [project]-prd.md    # Full specifications
-    └── [other docs].md     # Supporting documentation
+    ├── [project]-prd.md       # Full specifications
+    ├── session-history.md     # Archived sessions (auto-managed by /update-docs)
+    └── [other docs].md        # Supporting documentation
+```
+
+Additionally, Claude Code maintains auto-memory at:
+```
+~/.claude/projects/<project-path>/memory/
+├── MEMORY.md                  # Stable project facts (auto-synced by /update-docs)
+└── [topic].md                 # Detailed topic notes (optional)
 ```
 
 | File | Purpose | Updated |
@@ -340,6 +391,8 @@ project/
 | **README.md** | Quick start, public docs | When features ship |
 | **CLAUDE.md** | AI context, session tracking | Every session |
 | **docs/*.md** | Detailed specs, PRD | When requirements change |
+| **docs/session-history.md** | Archived session logs (>3 sessions) | Automatically by `/update-docs` |
+| **auto-memory MEMORY.md** | Stable facts (tech stack, commands, paths) | When project fundamentals change |
 
 ---
 
@@ -448,10 +501,13 @@ Ctrl+C                           # Exit Claude
 | Issue | Solution |
 |-------|----------|
 | Claude doesn't know project context | Run `/resume-work` first |
-| Lost track of what was done | Check CLAUDE.md Session History |
+| Lost track of what was done | Check CLAUDE.md Session History or `docs/session-history.md` for older sessions |
 | Starting fresh on old project | Run `/update-docs` to rebuild context |
 | Too many questions in `/plan-feature` | Say "let's skip that" or "good enough" |
-| `/code-cleanup` too aggressive | Only delete "Safe to Delete" items |
+| `/code-cleanup` too aggressive | Only delete "Safe to Delete" items, or avoid `--aggressive` flag |
+| `/code-review` reviewing too much | Use `--staged` or specify files instead of running with no args |
+| Auto-memory out of date | Run `/update-docs` — it syncs stable facts automatically |
+| CLAUDE.md too long | `/update-docs` auto-archives sessions >3 to `docs/session-history.md` |
 
 ---
 
@@ -485,7 +541,16 @@ Symlinked to: `~/.claude/commands`
 | | Merged plan-feature and plan-feature-addon commands |
 | | Integrated code-review and code-cleanup |
 | | Set up GitHub sync across machines |
+| Feb 2026 | Optimized all commands for Claude Opus 4.6 capabilities |
+| | `/resume-work` — parallel doc reads, parallel git scans, auto-memory awareness, task hydration |
+| | `/update-docs` — task list drain, session history archiving, auto-memory sync |
+| | `/plan-feature` — parallel context loading, Plan Mode integration, task hydration from plan |
+| | `/code-review` — git-aware diffing (uncommitted/staged/PR/last-commit), convention detection, enforced file:line refs |
+| | `/code-cleanup` — parallel subagent scanning, summary dashboard, Quick Wins, scope filters (--code/--deps/--css/--aggressive) |
+| | Added `docs/session-history.md` auto-archiving across all commands |
+| | Added auto-memory integration across all commands |
+| | Added TaskCreate/TaskUpdate live task tracking across workflow |
 
 ---
 
-*Last updated: January 2025*
+*Last updated: February 2026*
