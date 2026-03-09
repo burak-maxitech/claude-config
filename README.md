@@ -5,36 +5,76 @@ My personal Claude Code configuration: custom commands, skills, subagents, and w
 ## Contents
 ```
 claude-config/
-├── .claude/                           # Single symlink → ~/.claude
+├── .claude/                           # Subdirs symlinked into ~/.claude
 │   ├── agents/                        # Subagent definitions (Sonnet-routed)
-│   │   ├── cleanup-files-code.md
 │   │   ├── cleanup-deps-config.md
+│   │   ├── cleanup-files-code.md
 │   │   └── cleanup-styles-tests.md
 │   ├── commands/                      # Custom slash commands
-│   │   ├── resume-work.md
-│   │   ├── update-docs.md
+│   │   ├── code-review.md
 │   │   ├── plan-feature.md
-│   │   └── code-review.md
+│   │   ├── resume-work.md
+│   │   └── update-docs.md
+│   ├── settings.local.json            # Shared Claude Code settings
 │   └── skills/                        # Skills (commands + bundled references)
 │       └── code-cleanup/
 │           ├── SKILL.md
 │           └── references/
-│               ├── scan-files-code.md
 │               ├── scan-deps-config.md
+│               ├── scan-files-code.md
 │               └── scan-styles-tests.md
-├── workflow.md                        # Personal workflow guide
+├── .gitignore
+├── Workflow.md                        # Personal workflow guide
 └── README.md
 ```
 
 ## Setup on a New Machine
+
+> **Why individual symlinks?** Claude Code stores config files in `~/.claude` (like `settings.local.json`, credentials, etc.) that would get overwritten if you symlinked the entire folder. Symlinking the three subdirectories keeps your local config intact.
+
+### Mac/Linux
+
 ```bash
 # 1. Clone this repo
-cd ~
-git clone git@github.com:Burkico/claude-config.git
+cd ~/Development/projects  # or wherever you keep repos
+git clone https://github.com/burak-maxitech/claude-config.git
 
-# 2. Symlink the entire .claude directory
-ln -s ~/Development/projects/claude-config/.claude ~/.claude
+# 2. Remove existing subdirectories (if they exist)
+rm -rf ~/.claude/commands ~/.claude/skills ~/.claude/agents
+
+# 3. Symlink subdirectories individually
+ln -s ~/Development/projects/claude-config/.claude/commands ~/.claude/commands
+ln -s ~/Development/projects/claude-config/.claude/skills ~/.claude/skills
+ln -s ~/Development/projects/claude-config/.claude/agents ~/.claude/agents
+
+# 4. Verify
+ls -la ~/.claude/ | grep "^l"
 ```
+
+### Windows (PowerShell 7+ as Administrator)
+
+```powershell
+# 1. Clone the repo
+cd $env:USERPROFILE\Development\projects
+git clone https://github.com/burak-maxitech/claude-config.git
+
+# 2. Remove old symlinks (if they exist)
+Remove-Item "$env:USERPROFILE\.claude\commands" -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:USERPROFILE\.claude\skills" -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:USERPROFILE\.claude\agents" -Force -ErrorAction SilentlyContinue
+
+# 3. Create symlinks
+New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\commands" -Target "$env:USERPROFILE\Development\projects\claude-config\.claude\commands"
+New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\skills" -Target "$env:USERPROFILE\Development\projects\claude-config\.claude\skills"
+New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\agents" -Target "$env:USERPROFILE\Development\projects\claude-config\.claude\agents"
+
+# 4. Verify
+Get-ChildItem "$env:USERPROFILE\.claude" | Where-Object { $_.LinkType -eq "SymbolicLink" } | Format-Table Name, Target
+```
+
+**Windows Notes:**
+- Must run PowerShell as Administrator to create symlinks
+- Do NOT symlink the entire `~/.claude` folder — it contains local config and credentials
 
 ## Syncing Changes
 
@@ -74,4 +114,4 @@ The `.claude/agents/` folder contains subagent definitions used by skills. These
 | `cleanup-deps-config` | `/code-cleanup` | Scans for unused deps and config cruft |
 | `cleanup-styles-tests` | `/code-cleanup` | Scans for unused CSS and stale tests |
 
-See `workflow.md` for full usage guide.
+See `Workflow.md` for full usage guide.

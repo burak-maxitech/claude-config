@@ -26,19 +26,23 @@
 # 2. Pull latest commands (in case you updated from another machine)
 cd ~/Development/projects/claude-config && git pull && cd -
 
-# 3. Navigate to project
+# 3. Verify config symlinks are in place
+ls -d ~/.claude/commands ~/.claude/skills ~/.claude/agents 2>/dev/null || echo "MISSING SYMLINKS — see Setup section"
+# Windows (PowerShell): Get-ChildItem ~\.claude | Where-Object { $_.LinkType -eq "SymbolicLink" }
+
+# 4. Navigate to project
 cd ~/projects/[project-name]
 
-# 4. (Optional) Pull latest project changes
+# 5. (Optional) Pull latest project changes
 git pull
 
-# 5. Check for Claude updates
+# 6. Check for Claude updates
 claude update
 
-# 6. Launch Claude Code
+# 7. Launch Claude Code
 claude
 
-# 7. Get up to speed
+# 8. Get up to speed
 /resume-work
 ```
 
@@ -419,6 +423,8 @@ Additionally, Claude Code maintains auto-memory at:
 
 ## New Machine Setup
 
+> **Why individual symlinks?** Claude Code stores config files in `~/.claude` (like `settings.local.json`, credentials, etc.) that would get overwritten if you symlinked the entire folder. Symlinking the three subdirectories keeps your local config intact.
+
 ### Mac/Linux Setup
 
 ```bash
@@ -426,40 +432,49 @@ Additionally, Claude Code maintains auto-memory at:
 cd ~/Development/projects  # or wherever you keep repos
 git clone https://github.com/burak-maxitech/claude-config.git
 
-# 2. Symlink the entire .claude directory
-ln -s ~/Development/projects/claude-config/.claude ~/.claude
+# 2. Remove existing subdirectories (if they exist)
+rm -rf ~/.claude/commands ~/.claude/skills ~/.claude/agents
 
-# 3. Verify
-ls ~/.claude/commands/
-```
-
-### Windows Setup
-
-```cmd
-# 1. Open Command Prompt or PowerShell as Administrator (required for symlinks)
-
-# 2. Clone the repo (adjust path to where you keep projects)
-cd %USERPROFILE%\Development\projects
-git clone https://github.com/burak-maxitech/claude-config.git
-
-# 3. Create symlink (note: link comes before target on Windows)
-mklink /D "%USERPROFILE%\.claude" "%USERPROFILE%\Development\projects\claude-config\.claude"
+# 3. Symlink subdirectories individually
+ln -s ~/Development/projects/claude-config/.claude/commands ~/.claude/commands
+ln -s ~/Development/projects/claude-config/.claude/skills ~/.claude/skills
+ln -s ~/Development/projects/claude-config/.claude/agents ~/.claude/agents
 
 # 4. Verify
-dir "%USERPROFILE%\.claude\commands"
+ls -la ~/.claude/ | grep "^l"
+```
+
+### Windows Setup (PowerShell 7+ as Administrator)
+
+```powershell
+# 1. Clone the repo
+cd $env:USERPROFILE\Development\projects
+git clone https://github.com/burak-maxitech/claude-config.git
+
+# 2. Remove old symlinks (if they exist)
+Remove-Item "$env:USERPROFILE\.claude\commands" -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:USERPROFILE\.claude\skills" -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:USERPROFILE\.claude\agents" -Force -ErrorAction SilentlyContinue
+
+# 3. Create symlinks
+New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\commands" -Target "$env:USERPROFILE\Development\projects\claude-config\.claude\commands"
+New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\skills" -Target "$env:USERPROFILE\Development\projects\claude-config\.claude\skills"
+New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\agents" -Target "$env:USERPROFILE\Development\projects\claude-config\.claude\agents"
+
+# 4. Verify
+Get-ChildItem "$env:USERPROFILE\.claude" | Where-Object { $_.LinkType -eq "SymbolicLink" } | Format-Table Name, Target
 ```
 
 **Windows Notes:**
-- Must run as Administrator to create symlinks
-- Use `\` not `/` for paths
-- Symlink syntax is reversed: `mklink /D [link] [target]`
+- Must run PowerShell as Administrator to create symlinks
+- Do NOT symlink the entire `~/.claude` folder — it contains local config and credentials
 
 ### Syncing Changes
 
 After Claude or you edit any files:
 ```bash
 cd ~/Development/projects/claude-config   # Mac/Linux
-cd %USERPROFILE%\Development\projects\claude-config   # Windows
+cd $env:USERPROFILE\Development\projects\claude-config   # Windows (PowerShell)
 
 git add .
 git commit -m "Updated [what changed]"
@@ -469,7 +484,7 @@ git push
 On other machines:
 ```bash
 cd ~/Development/projects/claude-config   # Mac/Linux
-cd %USERPROFILE%\Development\projects\claude-config   # Windows
+cd $env:USERPROFILE\Development\projects\claude-config   # Windows (PowerShell)
 
 git pull
 ```
@@ -519,19 +534,21 @@ Commands are stored in:
 ├── .claude/
 │   ├── agents/              # Subagent definitions
 │   ├── commands/            # Slash commands
-│   │   ├── resume-work.md
-│   │   ├── update-docs.md
+│   │   ├── code-review.md
 │   │   ├── plan-feature.md
-│   │   └── code-review.md
+│   │   ├── resume-work.md
+│   │   └── update-docs.md
+│   ├── settings.local.json  # Shared Claude Code settings
 │   └── skills/              # Skills (commands + references)
 │       └── code-cleanup/
-├── workflow.md              # This file
+├── .gitignore
+├── Workflow.md              # This file
 └── README.md
 ```
 
 GitHub repo: `burak-maxitech/claude-config` (private)
 
-Symlinked to: `~/.claude` (entire directory)
+Symlinked to: `~/.claude/commands`, `~/.claude/skills`, `~/.claude/agents` (individual subdirectories)
 
 ---
 
