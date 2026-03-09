@@ -18,7 +18,7 @@
 
 ## Daily Workflow
 
-### Starting a Session
+### Starting a Session on Mac
 
 ```bash
 # 1. Open Terminal
@@ -28,10 +28,36 @@ cd ~/Development/projects/claude-config && git pull && cd -
 
 # 3. Verify config symlinks are in place
 ls -d ~/.claude/commands ~/.claude/skills ~/.claude/agents 2>/dev/null || echo "MISSING SYMLINKS — see Setup section"
-# Windows (PowerShell): Get-ChildItem ~\.claude | Where-Object { $_.LinkType -eq "SymbolicLink" }
 
 # 4. Navigate to project
 cd ~/projects/[project-name]
+
+# 5. (Optional) Pull latest project changes
+git pull
+
+# 6. Check for Claude updates
+claude update
+
+# 7. Launch Claude Code
+claude
+
+# 8. Get up to speed
+/resume-work
+```
+
+### Starting a Session on PC
+
+```powershell
+# 1. Open PowerShell or Terminal
+
+# 2. Pull latest commands (in case you updated from another machine)
+cd C:\Development\projects\claude-config; git pull; cd -
+
+# 3. Verify config symlinks are in place
+Get-ChildItem ~\.claude | Where-Object { $_.LinkType -eq "SymbolicLink" } | Format-Table Name, Target
+
+# 4. Navigate to project
+cd C:\Development\projects\[project-name]
 
 # 5. (Optional) Pull latest project changes
 git pull
