@@ -426,8 +426,8 @@ Additionally, Claude Code maintains auto-memory at:
 cd ~/Development/projects  # or wherever you keep repos
 git clone https://github.com/burak-maxitech/claude-config.git
 
-# 2. Symlink to Claude's directory
-ln -s ~/Development/projects/claude-config/commands ~/.claude/commands
+# 2. Symlink the entire .claude directory
+ln -s ~/Development/projects/claude-config/.claude ~/.claude
 
 # 3. Verify
 ls ~/.claude/commands/
@@ -443,7 +443,7 @@ cd %USERPROFILE%\Development\projects
 git clone https://github.com/burak-maxitech/claude-config.git
 
 # 3. Create symlink (note: link comes before target on Windows)
-mklink /D "%USERPROFILE%\.claude\commands" "%USERPROFILE%\Development\projects\claude-config\commands"
+mklink /D "%USERPROFILE%\.claude" "%USERPROFILE%\Development\projects\claude-config\.claude"
 
 # 4. Verify
 dir "%USERPROFILE%\.claude\commands"
@@ -516,19 +516,22 @@ Ctrl+C                           # Exit Claude
 Commands are stored in:
 ```
 ~/Development/projects/claude-config/
-├── commands/
-│   ├── resume-work.md
-│   ├── update-docs.md
-│   ├── plan-feature.md
-│   ├── code-review.md
-│   └── code-cleanup.md
-├── workflow.md          # This file
+├── .claude/
+│   ├── agents/              # Subagent definitions
+│   ├── commands/            # Slash commands
+│   │   ├── resume-work.md
+│   │   ├── update-docs.md
+│   │   ├── plan-feature.md
+│   │   └── code-review.md
+│   └── skills/              # Skills (commands + references)
+│       └── code-cleanup/
+├── workflow.md              # This file
 └── README.md
 ```
 
 GitHub repo: `burak-maxitech/claude-config` (private)
 
-Symlinked to: `~/.claude/commands`
+Symlinked to: `~/.claude` (entire directory)
 
 ---
 
