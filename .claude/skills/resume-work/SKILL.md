@@ -1,6 +1,16 @@
+---
+name: resume-work
+description: "Resumes development on a project after a break. Reads docs, scans git state, identifies next task, and hydrates live task tracker. Use at the start of every coding session."
+disable-model-invocation: true
+allowed-tools: Read, Grep, Glob, Bash(git:*), Bash(ls:*), TaskCreate, TaskGet, TaskList
+argument-hint: "[deep]"
+---
+
 # /resume-work - Resume Development Session
 
 Get up to speed on this project and continue development from where we left off.
+
+**Companion command:** `/update-docs` - Use at the end of sessions to save progress.
 
 ---
 
@@ -18,8 +28,8 @@ You are resuming work on this project after a break (hours, days, or weeks). You
 
 Claude Code's auto-memory (`~/.claude/projects/<project-path>/memory/MEMORY.md`) is **automatically loaded** into your context at session start. Before reading project docs:
 
-1. **Check if auto-memory already has project context** — it may contain tech stack, key paths, common commands, and architecture patterns synced by `/update-docs`
-2. **If auto-memory has good coverage**, you can skim README.md rather than deep-reading it — focus your attention on CLAUDE.md for evolving state
+1. **Check if auto-memory already has project context** -- it may contain tech stack, key paths, common commands, and architecture patterns synced by `/update-docs`
+2. **If auto-memory has good coverage**, you can skim README.md rather than deep-reading it -- focus your attention on CLAUDE.md for evolving state
 3. **If auto-memory is empty or missing**, proceed normally and note that `/update-docs` should be run at end of session to populate it
 
 ---
@@ -29,16 +39,16 @@ Claude Code's auto-memory (`~/.claude/projects/<project-path>/memory/MEMORY.md`)
 **Read all core documentation files in a single parallel call:**
 
 Use parallel tool calls to read these simultaneously:
-- `CLAUDE.md` — primary context file (project overview, status, session history, next steps, decisions, blockers, architecture)
-- `README.md` — project purpose, tech stack, structure, setup instructions (skim if auto-memory already covers this)
-- `docs/` folder listing — identify what documentation files exist
+- `CLAUDE.md` -- primary context file (project overview, status, session history, next steps, decisions, blockers, architecture)
+- `README.md` -- project purpose, tech stack, structure, setup instructions (skim if auto-memory already covers this)
+- `docs/` folder listing -- identify what documentation files exist
 
-This is a single turn — do NOT read these sequentially.
+This is a single turn -- do NOT read these sequentially.
 
 ### After the parallel read:
 - If CLAUDE.md references specific docs/ files in "Key Documentation," read those next
-- PRD files (contain detailed requirements) — read if present
-- `docs/session-history.md` — archived session logs (only read if you need context older than 3 sessions)
+- PRD files (contain detailed requirements) -- read if present
+- `docs/session-history.md` -- archived session logs (only read if you need context older than 3 sessions)
 - Skip sample/example data files unless needed
 
 ---
@@ -48,12 +58,12 @@ This is a single turn — do NOT read these sequentially.
 **Run all git commands and structure scan in a single parallel call:**
 
 Execute these simultaneously (all are independent):
-- `git log --oneline -10` — recent commits
-- `git diff --stat HEAD~5` — what files changed recently
-- `git status` — any uncommitted changes
-- `ls -la` and `ls -la */` — verify project structure matches docs
+- `git log --oneline -10` -- recent commits
+- `git diff --stat HEAD~5` -- what files changed recently
+- `git status` -- any uncommitted changes
+- `ls -la` and `ls -la */` -- verify project structure matches docs
 
-This is a single turn — do NOT run these sequentially.
+This is a single turn -- do NOT run these sequentially.
 
 ### After the parallel scan:
 Based on CLAUDE.md "In Progress" and "Next Steps," identify and briefly review:
@@ -86,77 +96,21 @@ From CLAUDE.md "Next Steps":
 
 ---
 
-## Step 4: Present Summary to User
+## Step 4: Present Summary
 
-After analysis, present a **concise summary**:
-
-```markdown
-## Project Resumed: [Project Name]
-
-### Quick Checks
-- [ ] Pulled latest? (`git pull`)
-- [ ] Commands synced? (`cd ~/Development/projects/claude-config && git pull`)
-
-### Quick Overview
-[One sentence: what this project does]
-
-### Current State
-| Component | Status | Notes |
-|-----------|--------|-------|
-| [Key area 1] | Complete/In Progress/Not Started | [Brief note] |
-| [Key area 2] | Complete/In Progress/Not Started | [Brief note] |
-
-### Last Session ([Date])
-- [Key accomplishment 1]
-- [Key accomplishment 2]
-- [Any incomplete work]
-
-### Ready to Continue
-**Recommended next task:** [Specific task from Next Steps]
-
-**Files likely to be modified:**
-- `path/to/file1.py` - [why]
-- `path/to/file2.py` - [why]
-
-### Blockers/Issues (if any)
-- [Any blockers from CLAUDE.md]
-
----
-
-**Ready to continue. What would you like to work on?**
-- [ ] Continue with recommended task
-- [ ] Something else (please specify)
-```
+Read `references/summary-template.md` and present the summary to the user using that template.
 
 ---
 
 ## Step 5: Hydrate Task List
 
-After presenting the summary and before starting work, **load CLAUDE.md tasks into the live task tracker** using TaskCreate:
+Read `references/task-hydration.md` and follow its rules to load CLAUDE.md tasks into the live task tracker.
 
-### 5.1 Create Tasks from "In Progress"
-For each item in CLAUDE.md's `## In Progress` section:
-- Create a task with `TaskCreate` (subject = the task description, status starts as `pending`)
-- Include relevant file paths in the task description
+---
 
-### 5.2 Create Tasks from "Next Steps"
-For each item in CLAUDE.md's `## Next Steps` section:
-- Create a task with `TaskCreate`
-- Use the priority order to set `blockedBy` dependencies where tasks are sequential (e.g., task 2 blocked by task 1 if they depend on each other)
-- Skip items that are clearly future/aspirational — only hydrate actionable tasks
+## Step 6: Validate CLAUDE.md Structure
 
-### 5.3 Create Tasks from "Known Issues / Blockers"
-For any active blockers:
-- Create a task and set it as `blockedBy` on the tasks it blocks
-
-### 5.4 Rules
-- **Do NOT hydrate completed items** — those are already in `## Completed`
-- **Keep task subjects concise** — imperative form (e.g., "Add user authentication endpoint")
-- **Set activeForm** on each task (e.g., "Adding user authentication endpoint")
-- **Mark the recommended task as `in_progress`** once the user confirms direction
-- **Limit to ~10 tasks max** — if there are more, only hydrate the top priorities
-
-This gives the user a live, interactive task tracker for the session instead of a static markdown list.
+Cross-reference CLAUDE.md against the section contract at `../update-docs/references/claude-md-sections.md`. If sections are missing or malformed, note this in the summary and suggest running `/update-docs` to fix it.
 
 ---
 
@@ -200,7 +154,7 @@ Provide additional details:
 - Complete file tree
 - All environment variables needed
 - Detailed breakdown of each component's state
-- Full session history — read `docs/session-history.md` if it exists, combined with CLAUDE.md sessions
+- Full session history -- read `docs/session-history.md` if it exists, combined with CLAUDE.md sessions
 
 ---
 

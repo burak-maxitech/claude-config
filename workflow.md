@@ -27,7 +27,7 @@
 cd ~/Development/projects/claude-config && git pull && cd -
 
 # 3. Verify config symlinks are in place
-ls -d ~/.claude/commands ~/.claude/skills ~/.claude/agents 2>/dev/null || echo "MISSING SYMLINKS — see Setup section"
+ls -d ~/.claude/skills ~/.claude/agents 2>/dev/null || echo "MISSING SYMLINKS — see Setup section"
 
 # 4. Navigate to project
 cd ~/projects/[project-name]
@@ -449,7 +449,7 @@ Additionally, Claude Code maintains auto-memory at:
 
 ## New Machine Setup
 
-> **Why individual symlinks?** Claude Code stores config files in `~/.claude` (like `settings.local.json`, credentials, etc.) that would get overwritten if you symlinked the entire folder. Symlinking the three subdirectories keeps your local config intact.
+> **Why individual symlinks?** Claude Code stores config files in `~/.claude` (like `settings.local.json`, credentials, etc.) that would get overwritten if you symlinked the entire folder. Symlinking the subdirectories keeps your local config intact.
 
 ### Mac/Linux Setup
 
@@ -459,10 +459,9 @@ cd ~/Development/projects  # or wherever you keep repos
 git clone https://github.com/burak-maxitech/claude-config.git
 
 # 2. Remove existing subdirectories (if they exist)
-rm -rf ~/.claude/commands ~/.claude/skills ~/.claude/agents
+rm -rf ~/.claude/skills ~/.claude/agents
 
 # 3. Symlink subdirectories individually
-ln -s ~/Development/projects/claude-config/.claude/commands ~/.claude/commands
 ln -s ~/Development/projects/claude-config/.claude/skills ~/.claude/skills
 ln -s ~/Development/projects/claude-config/.claude/agents ~/.claude/agents
 
@@ -478,12 +477,10 @@ cd $env:USERPROFILE\Development\projects
 git clone https://github.com/burak-maxitech/claude-config.git
 
 # 2. Remove old symlinks (if they exist)
-Remove-Item "$env:USERPROFILE\.claude\commands" -Force -ErrorAction SilentlyContinue
 Remove-Item "$env:USERPROFILE\.claude\skills" -Force -ErrorAction SilentlyContinue
 Remove-Item "$env:USERPROFILE\.claude\agents" -Force -ErrorAction SilentlyContinue
 
 # 3. Create symlinks
-New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\commands" -Target "$env:USERPROFILE\Development\projects\claude-config\.claude\commands"
 New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\skills" -Target "$env:USERPROFILE\Development\projects\claude-config\.claude\skills"
 New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\agents" -Target "$env:USERPROFILE\Development\projects\claude-config\.claude\agents"
 
@@ -559,14 +556,13 @@ Commands are stored in:
 ~/Development/projects/claude-config/
 ├── .claude/
 │   ├── agents/              # Subagent definitions
-│   ├── commands/            # Slash commands
-│   │   ├── code-review.md
-│   │   ├── plan-feature.md
-│   │   ├── resume-work.md
-│   │   └── update-docs.md
 │   ├── settings.local.json  # Shared Claude Code settings
 │   └── skills/              # Skills (commands + references)
-│       └── code-cleanup/
+│       ├── code-cleanup/
+│       ├── code-review/
+│       ├── plan-feature/
+│       ├── resume-work/
+│       └── update-docs/
 ├── .gitignore
 ├── Workflow.md              # This file
 └── README.md
@@ -574,7 +570,7 @@ Commands are stored in:
 
 GitHub repo: `burak-maxitech/claude-config` (private)
 
-Symlinked to: `~/.claude/commands`, `~/.claude/skills`, `~/.claude/agents` (individual subdirectories)
+Symlinked to: `~/.claude/skills`, `~/.claude/agents` (individual subdirectories)
 
 ---
 

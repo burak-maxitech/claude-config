@@ -10,19 +10,40 @@ claude-config/
 │   │   ├── cleanup-deps-config.md
 │   │   ├── cleanup-files-code.md
 │   │   └── cleanup-styles-tests.md
-│   ├── commands/                      # Custom slash commands
-│   │   ├── code-review.md
-│   │   ├── plan-feature.md
-│   │   ├── resume-work.md
-│   │   └── update-docs.md
 │   ├── settings.local.json            # Shared Claude Code settings
 │   └── skills/                        # Skills (commands + bundled references)
-│       └── code-cleanup/
+│       ├── code-cleanup/
+│       │   ├── SKILL.md
+│       │   └── references/
+│       │       ├── scan-deps-config.md
+│       │       ├── scan-files-code.md
+│       │       └── scan-styles-tests.md
+│       ├── code-review/
+│       │   ├── SKILL.md
+│       │   └── references/
+│       │       ├── output-format.md
+│       │       └── review-checklist.md
+│       ├── plan-feature/
+│       │   ├── SKILL.md
+│       │   └── references/
+│       │       ├── interview-rules.md
+│       │       ├── mode-greenfield.md
+│       │       ├── mode-existing.md
+│       │       └── plan-and-tasks.md
+│       ├── resume-work/
+│       │   ├── SKILL.md
+│       │   └── references/
+│       │       ├── summary-template.md
+│       │       └── task-hydration.md
+│       └── update-docs/
 │           ├── SKILL.md
 │           └── references/
-│               ├── scan-deps-config.md
-│               ├── scan-files-code.md
-│               └── scan-styles-tests.md
+│               ├── claude-md-sections.md
+│               ├── doc-structure-rules.md
+│               ├── mode-create.md
+│               ├── mode-refactor.md
+│               ├── mode-update.md
+│               └── verification-checklists.md
 ├── .gitignore
 ├── Workflow.md                        # Personal workflow guide
 └── README.md
@@ -30,7 +51,7 @@ claude-config/
 
 ## Setup on a New Machine
 
-> **Why individual symlinks?** Claude Code stores config files in `~/.claude` (like `settings.local.json`, credentials, etc.) that would get overwritten if you symlinked the entire folder. Symlinking the three subdirectories keeps your local config intact.
+> **Why individual symlinks?** Claude Code stores config files in `~/.claude` (like `settings.local.json`, credentials, etc.) that would get overwritten if you symlinked the entire folder. Symlinking the subdirectories keeps your local config intact.
 
 ### Mac/Linux
 
@@ -40,10 +61,9 @@ cd ~/Development/projects  # or wherever you keep repos
 git clone https://github.com/burak-maxitech/claude-config.git
 
 # 2. Remove existing subdirectories (if they exist)
-rm -rf ~/.claude/commands ~/.claude/skills ~/.claude/agents
+rm -rf ~/.claude/skills ~/.claude/agents
 
 # 3. Symlink subdirectories individually
-ln -s ~/Development/projects/claude-config/.claude/commands ~/.claude/commands
 ln -s ~/Development/projects/claude-config/.claude/skills ~/.claude/skills
 ln -s ~/Development/projects/claude-config/.claude/agents ~/.claude/agents
 
@@ -59,12 +79,10 @@ cd $env:USERPROFILE\Development\projects
 git clone https://github.com/burak-maxitech/claude-config.git
 
 # 2. Remove old symlinks (if they exist)
-Remove-Item "$env:USERPROFILE\.claude\commands" -Force -ErrorAction SilentlyContinue
 Remove-Item "$env:USERPROFILE\.claude\skills" -Force -ErrorAction SilentlyContinue
 Remove-Item "$env:USERPROFILE\.claude\agents" -Force -ErrorAction SilentlyContinue
 
 # 3. Create symlinks
-New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\commands" -Target "$env:USERPROFILE\Development\projects\claude-config\.claude\commands"
 New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\skills" -Target "$env:USERPROFILE\Development\projects\claude-config\.claude\skills"
 New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\agents" -Target "$env:USERPROFILE\Development\projects\claude-config\.claude\agents"
 
@@ -96,13 +114,13 @@ git pull
 
 | Command | Purpose | Format |
 |---------|---------|--------|
-| `/resume-work` | Start session - get up to speed | Command |
-| `/plan-feature` | Interview before building features | Command |
-| `/code-review` | Review code quality | Command |
+| `/resume-work` | Start session - get up to speed | Skill |
+| `/plan-feature` | Interview before building features | Skill |
+| `/code-review` | Review code quality | Skill |
 | `/code-cleanup` | Find dead code & cruft (parallel subagents) | Skill |
-| `/update-docs` | End session - save progress | Command |
+| `/update-docs` | End session - save progress | Skill |
 
-**Commands** are single markdown files in `.claude/commands/`. **Skills** are directories in `.claude/skills/` that can bundle reference files, use YAML frontmatter for tool permissions, and dispatch subagents.
+**Skills** are directories in `.claude/skills/` that bundle reference files, use YAML frontmatter for tool permissions, and can dispatch subagents.
 
 ## Subagents
 
