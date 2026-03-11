@@ -100,8 +100,7 @@ When no documentation exists, generate all files from codebase analysis.
 
 ## Completed
 
-- [x] [Detected completed features]
-- [x] [Another completed item]
+Initial setup completed — documentation generated from codebase analysis.
 
 ---
 
@@ -126,6 +125,8 @@ When no documentation exists, generate all files from codebase analysis.
 |----------|-----------|
 | [Detected pattern/choice] | [Inferred or documented reason] |
 | [Another decision] | [Reason] |
+
+<!-- Reference files (docs/completed-work.md, docs/key-decisions.md, docs/session-history.md) will be created by /update-docs as content accumulates -->
 
 ---
 
@@ -156,19 +157,12 @@ When no documentation exists, generate all files from codebase analysis.
 
 ## Session History
 
-### Session 1 - [DATE]
-**What happened:**
+### Last Session (Session 1) - [DATE]
 - Initial documentation created from codebase analysis
+- Created CLAUDE.md, README.md, docs/PRD.md
+- Next: review generated docs, add missing context, begin development
 
-**Files created/modified:**
-- CLAUDE.md (created)
-- README.md (created)
-- docs/PRD.md (created)
-
-**Next session should:**
-- Review and verify generated documentation
-- Add missing context
-- Begin development on [suggested area]
+<!-- docs/session-history.md will be created by /update-docs on subsequent sessions -->
 ```
 
 ## Create: docs/PRD.md Template

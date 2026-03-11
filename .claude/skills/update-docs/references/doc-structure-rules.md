@@ -7,8 +7,13 @@ All projects should have this documentation system:
 | File | Location | Purpose | Audience |
 |------|----------|---------|----------|
 | **README.md** | Root | Public overview, setup guide, quick reference | Developers, new team members |
-| **CLAUDE.md** | Root | Session context, progress tracking, working notes | AI coding assistants |
+| **CLAUDE.md** | Root | Lean session context (~17k chars), active status, working notes | AI coding assistants |
 | **docs/*.md** | docs/ | PRD, specifications, detailed documentation | Detailed implementation reference |
+| **docs/completed-work.md** | docs/ | Full completed task checklist (overflow from CLAUDE.md) | Reference |
+| **docs/key-decisions.md** | docs/ | Full decision log (overflow from CLAUDE.md) | Reference |
+| **docs/session-history.md** | docs/ | Detailed session logs archive (overflow from CLAUDE.md) | Reference |
+
+**Size targets:** CLAUDE.md should be ~17k chars, hard limit 40k chars. When sections grow large, offload detail to the reference files above and keep only summaries + links in CLAUDE.md.
 
 ## Handling docs/ Folder
 
@@ -36,6 +41,6 @@ Therefore:
 - **ALWAYS preserve context that helps an AI understand the project**
 - **ADD new information, don't replace unless necessary**
 - **When in doubt, keep it - more context is better than less**
-- **Expand and enrich existing sections rather than condensing them**
+- **Context preservation applies to the WHOLE documentation system** (CLAUDE.md + reference files + docs/), not to CLAUDE.md alone. Moving content from CLAUDE.md to a reference file (e.g., `docs/completed-work.md`) is preservation, not removal.
 - **During REFACTOR: Move content to appropriate files, don't delete it**
 - **Preserve existing file names in docs/ - don't rename project-specific files**

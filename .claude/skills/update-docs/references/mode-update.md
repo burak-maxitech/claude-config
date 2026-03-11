@@ -19,7 +19,8 @@ Before updating documentation, **capture any task progress from the current sess
 
 1. **Run `TaskList`** to get all tasks and their statuses
 2. **For each completed task:**
-   - Add it to CLAUDE.md's `## Completed` section as `- [x] [task subject] - [files modified]`
+   - Add it to `docs/completed-work.md` as `- [x] [task subject] - [files modified]`
+   - Update CLAUDE.md's `## Completed` summary line (increment count)
    - Remove it from `## In Progress` or `## Next Steps` if it appears there
 3. **For each in-progress task:**
    - Ensure it's listed in `## In Progress` with current state
@@ -30,6 +31,72 @@ Before updating documentation, **capture any task progress from the current sess
 This ensures work tracked via TaskCreate/TaskUpdate during the session is persisted back to CLAUDE.md for the next session's `/resume-work`.
 
 **If `--skip-tasks` is in `$ARGUMENTS`, skip this step entirely.**
+
+## Part 0.5: One-Time Migration (if needed)
+
+**Check if CLAUDE.md still has the old bloated format.** This migration runs once per project to transition from the old structure (full checklists, full decision tables, multiple session entries) to the new lean structure.
+
+**Detection:** Run this migration if ANY of these are true:
+- `## Completed` section contains more than 2 `- [x]` checkbox lines
+- `## Key Decisions` table has more than 25 rows
+- `## Session History` contains more than 1 `### Session` entry
+- CLAUDE.md is over 25k characters
+
+**Migration steps:**
+
+### Migrate Completed Section
+1. Extract all `- [x]` items from CLAUDE.md's `## Completed`
+2. Create `docs/completed-work.md` (if it doesn't exist) with header:
+   ```markdown
+   # Completed Work
+
+   > Full checklist of completed tasks. Referenced from [CLAUDE.md](../CLAUDE.md).
+
+   ---
+   ```
+3. Append all extracted items to `docs/completed-work.md`
+4. Replace CLAUDE.md's `## Completed` content with:
+   ```markdown
+   [N] tasks completed across [areas]. See [docs/completed-work.md](docs/completed-work.md) for full checklist.
+   ```
+
+### Migrate Key Decisions
+1. Extract all rows from CLAUDE.md's `## Key Decisions` table
+2. Create `docs/key-decisions.md` (if it doesn't exist) with header:
+   ```markdown
+   # Key Decisions
+
+   > Full decision log. Referenced from [CLAUDE.md](../CLAUDE.md).
+
+   | Decision | Rationale |
+   |----------|-----------|
+   ```
+3. Append all rows to `docs/key-decisions.md`
+4. Keep only the ~20 most important architectural decisions in CLAUDE.md (API gotchas, naming conventions, critical tech choices). Remove implementation details.
+5. Add link: `> Full decision log: [docs/key-decisions.md](docs/key-decisions.md)`
+
+### Migrate Session History
+1. Extract all `### Session` entries from CLAUDE.md's `## Session History`
+2. Create `docs/session-history.md` (if it doesn't exist) with header:
+   ```markdown
+   # Session History Archive
+
+   > Auto-managed by `/update-docs`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
+
+   ---
+   ```
+3. Append ALL session entries to `docs/session-history.md` (in chronological order, skip duplicates)
+4. Replace CLAUDE.md's `## Session History` with only the last session as a 3-5 bullet summary:
+   ```markdown
+   > Full history: [docs/session-history.md](docs/session-history.md)
+
+   ### Last Session (Session [N]) - [DATE]
+   - [3-5 bullet points from the most recent session]
+   ```
+
+**After migration, continue with the normal update process below.**
+
+---
 
 ## Part 1: Update CLAUDE.md
 
@@ -55,10 +122,24 @@ Update phase/task statuses based on code changes:
 - Add new rows for new components
 
 ### 1.3 Completed Section
-Move items from "In Progress" to "Completed" when done:
-```markdown
-- [x] [What was finished] - [files modified]
-```
+When items are completed:
+1. **Append the detailed entry to `docs/completed-work.md`:**
+   - If the file doesn't exist, create it with header:
+     ```markdown
+     # Completed Work
+
+     > Full checklist of completed tasks. Referenced from [CLAUDE.md](../CLAUDE.md).
+
+     ---
+     ```
+   - Append: `- [x] [What was finished] - [files modified]`
+2. **Keep CLAUDE.md's `## Completed` section as a brief summary:**
+   ```markdown
+   ## Completed
+
+   [N] tasks completed across [areas]. See [docs/completed-work.md](docs/completed-work.md) for full checklist.
+   ```
+   Update the count and areas description as needed. Do NOT maintain a full checkbox list in CLAUDE.md.
 
 ### 1.4 In Progress Section
 Update current work state:
@@ -74,10 +155,22 @@ Refresh prioritized task list:
 - Include relevant file paths
 
 ### 1.6 Key Decisions Made
-Add any new decisions:
-```markdown
-| [New decision] | [Why we chose this] |
-```
+When adding new decisions:
+1. **Always append to `docs/key-decisions.md`:**
+   - If the file doesn't exist, create it with header:
+     ```markdown
+     # Key Decisions
+
+     > Full decision log. Referenced from [CLAUDE.md](../CLAUDE.md).
+
+     | Decision | Rationale |
+     |----------|-----------|
+     ```
+   - Append: `| [New decision] | [Why we chose this] |`
+2. **Only add to CLAUDE.md's condensed table if it's a truly important architectural decision** — API gotchas, naming conventions, critical tech choices, patterns that affect multiple files.
+   - Do NOT add implementation details like "removed field X", "renamed method Y", or one-off fixes to CLAUDE.md.
+   - Keep CLAUDE.md's Key Decisions table to ~20 rows max. If it grows beyond that, remove the least important entries (they're preserved in `docs/key-decisions.md`).
+   - Include a link at the bottom: `> Full decision log: [docs/key-decisions.md](docs/key-decisions.md)`
 
 ### 1.7 Known Issues / Blockers
 Update with any new issues found:
@@ -86,48 +179,52 @@ Update with any new issues found:
 - Mark "None currently" if empty
 
 ### 1.8 Session History
-**Add new session entry at the end:**
-```markdown
-### Session [N] - [DATE]
-**What happened:**
-- [Accomplishment 1]
-- [Accomplishment 2]
-- [Any issues encountered]
+Session history is split between CLAUDE.md (brief) and docs/session-history.md (detailed).
 
-**Files created/modified:**
-- `path/to/file.py` - [what changed]
-- `path/to/another.js` - [what changed]
+**1. Write the DETAILED session log to `docs/session-history.md`:**
+   - If the file doesn't exist, create it with this header:
+     ```markdown
+     # Session History Archive
 
-**Next session should:**
-- [Priority 1 for next time]
-- [Priority 2 for next time]
-```
+     > Auto-managed by `/update-docs`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
 
-### 1.9 Archive Old Sessions
-After adding the new session entry, manage CLAUDE.md file size:
+     ---
+     ```
+   - Append the full detailed entry:
+     ```markdown
+     ### Session [N] - [DATE]
+     **What happened:**
+     - [Accomplishment 1]
+     - [Accomplishment 2]
+     - [Any issues encountered]
 
-1. **Count session entries** under `## Session History`
-2. **If more than 3 entries exist:**
-   a. Identify all session entries except the **last 3** (most recent)
-   b. Create or update `docs/session-history.md`:
-      - If the file doesn't exist, create it with this header:
-        ```markdown
-        # Session History Archive
+     **Files created/modified:**
+     - `path/to/file.py` - [what changed]
+     - `path/to/another.js` - [what changed]
 
-        > Auto-managed by `/update-docs`. Recent sessions are in [CLAUDE.md](../CLAUDE.md).
+     **Next session should:**
+     - [Priority 1 for next time]
+     - [Priority 2 for next time]
+     ```
 
-        ---
-        ```
-      - Append the older sessions to the archive file in chronological order
-      - Do NOT duplicate sessions already in the archive — only move sessions not yet archived
-   c. Remove the archived session entries from CLAUDE.md
-   d. Add or update a reference line at the top of `## Session History`:
-      ```markdown
-      > Full history: [docs/session-history.md](docs/session-history.md) (Sessions 1–N)
-      ```
-      Where N is the last archived session number.
-3. **Keep the archive file in chronological order** (oldest first)
-4. **Update the session range** in the reference link each time new sessions are archived
+**2. Write only a brief summary to CLAUDE.md's `## Session History`:**
+   - Replace (not append) the previous last-session block with the new one:
+     ```markdown
+     ## Session History
+
+     > Full history: [docs/session-history.md](docs/session-history.md)
+
+     ### Last Session (Session [N]) - [DATE]
+     - [3-5 bullet points summarizing key accomplishments and state]
+     ```
+   - CLAUDE.md should only ever contain ONE session block (the most recent).
+   - All previous sessions live exclusively in `docs/session-history.md`.
+
+### 1.9 Size Check
+After all updates, check CLAUDE.md file size:
+1. If CLAUDE.md exceeds **35k characters**, warn the user:
+   > "CLAUDE.md is [X]k chars — approaching the 40k limit. Consider condensing sections or moving more content to reference files."
+2. Target is ~17k chars. If significantly over, suggest specific sections to trim.
 
 ## Part 2: Update README.md
 

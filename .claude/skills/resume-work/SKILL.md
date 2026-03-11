@@ -39,7 +39,7 @@ Claude Code's auto-memory (`~/.claude/projects/<project-path>/memory/MEMORY.md`)
 **Read all core documentation files in a single parallel call:**
 
 Use parallel tool calls to read these simultaneously:
-- `CLAUDE.md` -- primary context file (project overview, status, session history, next steps, decisions, blockers, architecture)
+- `CLAUDE.md` -- primary context file (lean ~17k chars: project overview, status, last session summary, next steps, condensed decisions, blockers, architecture)
 - `README.md` -- project purpose, tech stack, structure, setup instructions (skim if auto-memory already covers this)
 - `docs/` folder listing -- identify what documentation files exist
 
@@ -48,8 +48,13 @@ This is a single turn -- do NOT read these sequentially.
 ### After the parallel read:
 - If CLAUDE.md references specific docs/ files in "Key Documentation," read those next
 - PRD files (contain detailed requirements) -- read if present
-- `docs/session-history.md` -- archived session logs (only read if you need context older than 3 sessions)
+- **Do NOT read these reference files by default** (only read if specifically needed):
+  - `docs/session-history.md` -- detailed session logs archive (only read if you need context older than the last session summary in CLAUDE.md)
+  - `docs/completed-work.md` -- full completed task checklist (only read if you need to verify what was done)
+  - `docs/key-decisions.md` -- full decision log (only read if you need decision context beyond the condensed table in CLAUDE.md)
 - Skip sample/example data files unless needed
+
+**Note:** CLAUDE.md now contains only summaries + links for Completed, Key Decisions, and Session History. The detailed content lives in the reference files above. The last session summary in CLAUDE.md (3-5 bullets) is usually sufficient context.
 
 ---
 
@@ -78,10 +83,10 @@ Based on CLAUDE.md "In Progress" and "Next Steps," identify and briefly review:
 Based on your analysis, determine:
 
 ### 3.1 What Was Last Worked On
-From CLAUDE.md session history:
+From CLAUDE.md's last session summary (3-5 bullet points):
 - Last session's accomplishments
-- Files that were modified
 - Any incomplete work
+- If more detail is needed, read `docs/session-history.md`
 
 ### 3.2 What's Next
 From CLAUDE.md "Next Steps":
@@ -149,12 +154,17 @@ If CLAUDE.md or other docs are missing/incomplete:
 
 If user runs `/resume-work deep` or `/resume-work --verbose`:
 
+Read the reference files for full context:
+- `docs/session-history.md` -- full session history archive
+- `docs/completed-work.md` -- complete task checklist
+- `docs/key-decisions.md` -- full decision log
+
 Provide additional details:
 - Full architecture diagram
 - Complete file tree
 - All environment variables needed
 - Detailed breakdown of each component's state
-- Full session history -- read `docs/session-history.md` if it exists, combined with CLAUDE.md sessions
+- Full session history from `docs/session-history.md` combined with CLAUDE.md's last session
 
 ---
 
@@ -179,6 +189,9 @@ Once you've presented the summary and user confirms direction:
 | User specifies task | Skip recommendation, focus on their request |
 | Blockers exist | Surface them immediately before starting work |
 | Need older context | Check `docs/session-history.md` for archived sessions |
+| Need full completed list | Check `docs/completed-work.md` |
+| Need full decision log | Check `docs/key-decisions.md` |
+| CLAUDE.md seems too lean | That's intentional — detail lives in docs/ reference files |
 
 ---
 
