@@ -44,9 +44,14 @@ claude-config/
 │               ├── mode-refactor.md
 │               ├── mode-update.md
 │               └── verification-checklists.md
+├── docs/                              # Reference files (overflow from CLAUDE.md)
+│   ├── completed-work.md
+│   ├── key-decisions.md
+│   └── session-history.md
 ├── .gitignore
-├── Workflow.md                        # Personal workflow guide
-└── README.md
+├── CLAUDE.md                          # AI session context
+├── README.md                          # This file
+└── Workflow.md                        # Personal workflow guide
 ```
 
 ## Setup on a New Machine
@@ -131,5 +136,14 @@ The `.claude/agents/` folder contains subagent definitions used by skills. These
 | `cleanup-files-code` | `/code-cleanup` | Scans for unused files and dead code |
 | `cleanup-deps-config` | `/code-cleanup` | Scans for unused deps and config cruft |
 | `cleanup-styles-tests` | `/code-cleanup` | Scans for unused CSS and stale tests |
+
+## Documentation
+
+| File | Purpose |
+|------|---------|
+| [README.md](README.md) | Public overview, setup instructions (this file) |
+| [CLAUDE.md](CLAUDE.md) | AI session context, status tracking, architecture |
+| [Workflow.md](Workflow.md) | Detailed personal workflow guide |
+| [docs/](docs/) | Reference files (session history, decisions, completed work) |
 
 See `Workflow.md` for full usage guide.
