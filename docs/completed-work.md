@@ -31,6 +31,7 @@
 - [x] GitHub sync workflow (push/pull across machines)
 - [x] Workflow.md — Detailed personal workflow guide
 - [x] Startup scripts (`start-claude.sh`, `start-claude.ps1`) — Single-command session startup with interactive project picker
+- [x] Fixed PowerShell script filename bug in Workflow.md and README.md, added Unblock-File first-run note
 
 ## Documentation
 - [x] README.md — Public project overview with setup, commands table, subagents table

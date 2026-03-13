@@ -101,8 +101,11 @@ alias claude-start="~/Development/projects/claude-config/.claude/scripts/start-c
 ```
 ```powershell
 # Windows — add to $PROFILE
-function claude-start { & "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\Start-ClaudeSession.ps1" @args }
+function claude-start { & "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1" @args }
 ```
+
+> **Windows first run:** You may need to unblock the script first:
+> `Unblock-File "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1"`
 
 **What the script does (5 steps):**
 1. Pulls latest claude-config (syncs skills/agents across machines)

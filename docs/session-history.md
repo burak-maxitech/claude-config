@@ -135,3 +135,17 @@
 - Test startup scripts on Mac/Linux
 - Add more skills as new workflow needs emerge
 - Consider adding hooks for automated pre-commit workflows
+
+### Session 6 - 2026-03-12
+**What happened:**
+- Fixed PowerShell script filename bug in Workflow.md and README.md — both referenced `Start-ClaudeSession.ps1` instead of the actual filename `start-claude.ps1`
+- Added `Unblock-File` note for Windows first-run setup in Workflow.md
+
+**Files created/modified:**
+- `Workflow.md` - Fixed PowerShell alias filename, added Unblock-File note
+- `README.md` - Fixed Quick Start PowerShell filename
+
+**Next session should:**
+- Test startup scripts on Mac/Linux
+- Add more skills as new workflow needs emerge
+- Consider adding hooks for automated pre-commit workflows
