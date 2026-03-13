@@ -94,13 +94,13 @@ The startup scripts automate all the manual steps above into a single command:
 ~\Development\projects\claude-config\.claude\scripts\start-claude.ps1
 ```
 
-**Tip:** Create a shell alias for even quicker access:
+**Tip:** Create a shell alias for even quicker access. Paste the line into your shell config file (not the terminal) so it persists across sessions:
 ```bash
-# Mac/Linux — add to ~/.bashrc or ~/.zshrc
+# Mac/Linux — paste this line into ~/.zshrc (or ~/.bashrc), then run: source ~/.zshrc
 alias claude-start="~/Development/projects/claude-config/.claude/scripts/start-claude.sh"
 ```
 ```powershell
-# Windows — add to $PROFILE
+# Windows — paste this line into $PROFILE (run `notepad $PROFILE` to open it)
 function claude-start { & "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1" @args }
 ```
 

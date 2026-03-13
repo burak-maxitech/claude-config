@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-03-13 (Session 8)
+Last Updated: 2026-03-13 (Session 9)
 
 ## Project Overview
 
@@ -117,7 +117,5 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 8) - 2026-03-13
-- Fixed incorrect symlink fix suggestions in `start-claude.sh` (wrong paths and missing agents symlink)
-- Added `chmod +x` first-run note for Mac/Linux in Workflow.md
-- Changed `disable-model-invocation` to `false` in update-docs skill for programmatic invocation
+### Last Session (Session 9) - 2026-03-13
+- Clarified shell alias instructions in Workflow.md — now explicitly says to paste into config file (not terminal) and includes reload/open commands

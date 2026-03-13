@@ -33,6 +33,7 @@
 - [x] Startup scripts (`start-claude.sh`, `start-claude.ps1`) — Single-command session startup with interactive project picker
 - [x] Fixed PowerShell script filename bug in Workflow.md and README.md, added Unblock-File first-run note
 - [x] Changed startup scripts to show tip instead of auto-running `/resume-work`; fixed remaining PS1 filename refs in Workflow.md
+- [x] Clarified shell alias instructions in Workflow.md — explicit "paste into config file" wording with reload/open hints
 
 ## Documentation
 - [x] README.md — Public project overview with setup, commands table, subagents table

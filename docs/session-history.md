@@ -186,3 +186,16 @@
 - Consider changing disable-model-invocation to false on remaining 4 skills
 - Add more skills as new workflow needs emerge
 - Consider adding hooks for automated pre-commit workflows
+
+### Session 9 - 2026-03-13
+**What happened:**
+- Clarified shell alias instructions in Workflow.md — made it explicit that the alias line must be pasted into the shell config file (e.g., `~/.zshrc`), not run directly in the terminal
+- Added `source ~/.zshrc` reload hint for Mac/Linux and `notepad $PROFILE` hint for Windows
+
+**Files created/modified:**
+- `Workflow.md` - Clarified alias persistence instructions (lines 97-105)
+
+**Next session should:**
+- Consider changing disable-model-invocation to false on remaining 4 skills
+- Add more skills as new workflow needs emerge
+- Consider adding hooks for automated pre-commit workflows
