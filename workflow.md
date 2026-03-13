@@ -18,59 +18,71 @@
 
 ## Daily Workflow
 
-### Starting a Session on Mac
+### Starting a Session (Automated)
 
+The startup scripts automate the entire session startup sequence — syncing config, verifying symlinks, pulling project changes, checking for Claude updates, and launching with `/resume-work`.
+
+**Mac/Linux:**
 ```bash
-# 1. Open Terminal
+# From anywhere:
+~/Development/projects/claude-config/.claude/scripts/start-claude.sh my-project
 
-# 2. Pull latest commands (in case you updated from another machine)
-cd ~/Development/projects/claude-config && git pull && cd -
-
-# 3. Verify config symlinks are in place
-ls -d ~/.claude/skills ~/.claude/agents 2>/dev/null || echo "MISSING SYMLINKS — see Setup section"
-
-# 4. Navigate to project
-cd ~/projects/[project-name]
-
-# 5. (Optional) Pull latest project changes
-git pull
-
-# 6. Check for Claude updates
-claude update
-
-# 7. Launch Claude Code
-claude
-
-# 8. Get up to speed
-/resume-work
+# Or without arguments to pick interactively:
+~/Development/projects/claude-config/.claude/scripts/start-claude.sh
 ```
 
-### Starting a Session on PC
-
+**Windows (PowerShell):**
 ```powershell
-# 1. Open PowerShell or Terminal
+# From anywhere:
+~\Development\projects\claude-config\.claude\scripts\Start-ClaudeSession.ps1 my-project
 
-# 2. Pull latest commands (in case you updated from another machine)
-cd C:\Development\projects\claude-config; git pull; cd -
+# Or without arguments to pick interactively:
+~\Development\projects\claude-config\.claude\scripts\Start-ClaudeSession.ps1
+```
 
-# 3. Verify config symlinks are in place
-Get-ChildItem ~\.claude | Where-Object { $_.LinkType -eq "SymbolicLink" } | Format-Table Name, Target
+**Tip:** Create a shell alias for quick access:
+```bash
+# Mac/Linux — add to ~/.bashrc or ~/.zshrc
+alias claude-start="~/Development/projects/claude-config/.claude/scripts/start-claude.sh"
+```
+```powershell
+# Windows — add to $PROFILE
+function claude-start { & "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\Start-ClaudeSession.ps1" @args }
+```
 
-# 4. Navigate to project
-cd C:\Development\projects\[project-name]
+**What the startup script does (5 steps):**
+1. Pulls latest claude-config (syncs skills/agents across machines)
+2. Verifies `~/.claude` symlinks are in place
+3. Navigates to project and pulls latest changes
+4. Checks for Claude Code updates
+5. Launches Claude Code with `/resume-work`
 
-# 5. (Optional) Pull latest project changes
+### Starting a Session (Manual)
+
+<details>
+<summary>If you prefer the manual steps:</summary>
+
+**Mac/Linux:**
+```bash
+cd ~/Development/projects/claude-config && git pull && cd -
+cd ~/projects/[project-name]
 git pull
-
-# 6. Check for Claude updates
 claude update
-
-# 7. Launch Claude Code
 claude
-
-# 8. Get up to speed
 /resume-work
 ```
+
+**Windows (PowerShell):**
+```powershell
+cd C:\Development\projects\claude-config; git pull; cd -
+cd C:\Development\projects\[project-name]
+git pull
+claude update
+claude
+/resume-work
+```
+
+</details>
 
 **What `/resume-work` does:**
 - Checks auto-memory for stable project facts already in context
@@ -556,6 +568,9 @@ Commands are stored in:
 ~/Development/projects/claude-config/
 ├── .claude/
 │   ├── agents/              # Subagent definitions
+│   ├── scripts/             # Session startup scripts
+│   │   ├── start-claude.sh          # Mac/Linux startup
+│   │   └── start-claude.ps1        # Windows startup
 │   ├── settings.local.json  # Shared Claude Code settings
 │   └── skills/              # Skills (commands + references)
 │       ├── code-cleanup/
@@ -592,7 +607,9 @@ Symlinked to: `~/.claude/skills`, `~/.claude/agents` (individual subdirectories)
 | | Added `docs/session-history.md` auto-archiving across all commands |
 | | Added auto-memory integration across all commands |
 | | Added TaskCreate/TaskUpdate live task tracking across workflow |
+| Mar 2026 | Added startup scripts (`start-claude.sh`, `start-claude.ps1`) to automate session startup |
+| | Replaced manual 8-step startup with single-command script (5 automated steps + `/resume-work`) |
 
 ---
 
-*Last updated: February 2026*
+*Last updated: March 2026*

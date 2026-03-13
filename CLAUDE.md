@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-03-12 (Session 4)
+Last Updated: 2026-03-12 (Session 5)
 
 ## Project Overview
 
@@ -64,6 +64,7 @@ Nothing currently in progress.
 | Commit checkpoint in /update-docs | Prompt to commit after docs update; never auto-commit; --skip-commit to suppress |
 | Compact guidance after both skills | Suggest /compact after resume-work and update-docs to free context |
 | Health check in /resume-work deep mode | Run tests/build in deep mode to catch broken state before coding |
+| Startup scripts (.claude/scripts/) | Single-command session startup replacing 8 manual steps; cross-platform |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -76,6 +77,9 @@ claude-config/
 │   │   ├── cleanup-deps-config.md
 │   │   ├── cleanup-files-code.md
 │   │   └── cleanup-styles-tests.md
+│   ├── scripts/             # Session startup scripts
+│   │   ├── start-claude.sh          # Mac/Linux
+│   │   └── start-claude.ps1        # Windows (PowerShell)
 │   ├── settings.local.json  # Shared Claude Code settings
 │   └── skills/              # Skills (SKILL.md + references/)
 │       ├── code-cleanup/
@@ -111,8 +115,8 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 4) - 2026-03-12
-- Improved `/resume-work`: context freshness detection, quick health check (deep mode), bidirectional task integrity pre-check, uncommitted changes warning, compact tip
-- Improved `/update-docs`: drain validation, commit checkpoint (Part 5), `--skip-commit` flag, post-verification compact suggestion
-- Committed and pushed all session 3+4 changes (639cfb3)
-- Ran `/update-docs` to capture session 4 changes
+### Last Session (Session 5) - 2026-03-12
+- Added startup scripts (`start-claude.sh`, `start-claude.ps1`) to `.claude/scripts/`
+- Updated Workflow.md: replaced manual 8-step startup with automated script usage, added alias tips
+- Updated README.md: added scripts to directory tree, added Quick Start section
+- Updated CLAUDE.md architecture tree to include scripts directory

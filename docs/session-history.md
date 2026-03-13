@@ -110,3 +110,26 @@
 - Test improved skills on a real codebase
 - Add more skills as new workflow needs emerge
 - Consider adding hooks for automated pre-commit workflows
+
+### Session 5 - 2026-03-12
+**What happened:**
+- Added startup scripts (`start-claude.sh` for Mac/Linux, `start-claude.ps1` for Windows) to `.claude/scripts/`
+- Scripts automate 5-step session startup: sync config, verify symlinks, pull project, update Claude, launch with `/resume-work`
+- Updated Workflow.md: replaced manual 8-step startup with automated script usage, added shell alias tips, collapsed manual steps into details block
+- Updated README.md: added scripts to directory tree, added Quick Start section
+- Updated CLAUDE.md architecture tree to include scripts directory
+- Ran `/update-docs` to capture session 5 changes
+
+**Files created/modified:**
+- `.claude/scripts/start-claude.sh` - NEW: Mac/Linux session startup script
+- `.claude/scripts/start-claude.ps1` - NEW: Windows PowerShell session startup script
+- `Workflow.md` - Replaced manual startup with script usage, added alias tips, updated version history
+- `README.md` - Added scripts to tree, added Quick Start section
+- `CLAUDE.md` - Updated timestamp, architecture tree, key decisions, session history
+- `docs/key-decisions.md` - Added startup scripts decision
+- `docs/session-history.md` - Added Session 5 entry
+
+**Next session should:**
+- Test startup scripts on Mac/Linux
+- Add more skills as new workflow needs emerge
+- Consider adding hooks for automated pre-commit workflows

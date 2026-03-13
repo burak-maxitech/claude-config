@@ -10,6 +10,9 @@ claude-config/
 │   │   ├── cleanup-deps-config.md
 │   │   ├── cleanup-files-code.md
 │   │   └── cleanup-styles-tests.md
+│   ├── scripts/                       # Session startup scripts
+│   │   ├── start-claude.sh            # Mac/Linux startup
+│   │   └── start-claude.ps1           # Windows startup (PowerShell)
 │   ├── settings.local.json            # Shared Claude Code settings
 │   └── skills/                        # Skills (commands + bundled references)
 │       ├── code-cleanup/
@@ -99,6 +102,20 @@ Get-ChildItem "$env:USERPROFILE\.claude" | Where-Object { $_.LinkType -eq "Symbo
 **Windows Notes:**
 - Must run PowerShell as Administrator to create symlinks
 - Do NOT symlink the entire `~/.claude` folder — it contains local config and credentials
+
+## Quick Start
+
+After setup, use the startup scripts to begin a coding session with a single command:
+
+```bash
+# Mac/Linux
+~/Development/projects/claude-config/.claude/scripts/start-claude.sh my-project
+
+# Windows (PowerShell)
+~\Development\projects\claude-config\.claude\scripts\Start-ClaudeSession.ps1 my-project
+```
+
+Run without arguments to see available projects and pick interactively. The script syncs config, verifies symlinks, pulls project changes, checks for Claude updates, and launches Claude Code with `/resume-work`.
 
 ## Syncing Changes
 

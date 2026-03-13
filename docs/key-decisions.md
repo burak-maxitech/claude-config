@@ -34,3 +34,4 @@
 | Commit checkpoint in /update-docs (Part 5) | Prompt to commit after all docs are updated; never auto-commit; --skip-commit flag to suppress for scripted workflows |
 | Compact guidance after resume-work and update-docs | Both skills consume significant context; suggest /compact afterward to free space before real work |
 | Quick health check in /resume-work deep mode | Detect and run test/build commands (package.json, Makefile, etc.) to catch broken state before starting to code; only in deep mode to keep default fast |
+| Startup scripts in .claude/scripts/ | Single-command session startup replacing 8 manual steps; cross-platform (bash + PowerShell); includes interactive project picker |
