@@ -88,10 +88,10 @@ The startup scripts automate all the manual steps above into a single command:
 **Windows (PowerShell):**
 ```powershell
 # With project name:
-~\Development\projects\claude-config\.claude\scripts\Start-ClaudeSession.ps1 my-project
+~\Development\projects\claude-config\.claude\scripts\start-claude.ps1 my-project
 
 # Or interactive project picker:
-~\Development\projects\claude-config\.claude\scripts\Start-ClaudeSession.ps1
+~\Development\projects\claude-config\.claude\scripts\start-claude.ps1
 ```
 
 **Tip:** Create a shell alias for even quicker access:
@@ -112,7 +112,7 @@ function claude-start { & "$env:USERPROFILE\Development\projects\claude-config\.
 2. Verifies `~/.claude` symlinks are in place
 3. Navigates to project and pulls latest changes
 4. Checks for Claude Code updates
-5. Launches Claude Code with `/resume-work`
+5. Launches Claude Code (tip: run `/resume-work` to get up to speed)
 
 **What `/resume-work` does:**
 - Checks auto-memory for stable project facts already in context
@@ -638,7 +638,7 @@ Symlinked to: `~/.claude/skills`, `~/.claude/agents` (individual subdirectories)
 | | Added auto-memory integration across all commands |
 | | Added TaskCreate/TaskUpdate live task tracking across workflow |
 | Mar 2026 | Added startup scripts (`start-claude.sh`, `start-claude.ps1`) to automate session startup |
-| | Replaced manual 8-step startup with single-command script (5 automated steps + `/resume-work`) |
+| | Replaced manual 8-step startup with single-command script (5 automated steps); shows tip to run `/resume-work` |
 
 ---
 
