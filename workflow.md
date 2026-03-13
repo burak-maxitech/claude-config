@@ -104,6 +104,9 @@ alias claude-start="~/Development/projects/claude-config/.claude/scripts/start-c
 function claude-start { & "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1" @args }
 ```
 
+> **Mac/Linux first run:** Make the script executable first:
+> `chmod +x ~/Development/projects/claude-config/.claude/scripts/start-claude.sh`
+
 > **Windows first run:** You may need to unblock the script first:
 > `Unblock-File "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1"`
 

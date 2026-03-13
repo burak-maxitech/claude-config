@@ -65,8 +65,8 @@ for item in "$HOME/.claude"/*; do
 done
 if [ "$FOUND_SYMLINKS" = false ]; then
     echo -e "  ${DIM}Warning: No symlinks found in ~/.claude. Skills may not load.${RESET}"
-    echo -e "  ${GRAY}Fix: ln -s $CONFIG_REPO/commands ~/.claude/commands${RESET}"
-    echo -e "  ${GRAY}Fix: ln -s $CONFIG_REPO/skills ~/.claude/skills${RESET}"
+    echo -e "  ${GRAY}Fix: ln -s $CONFIG_REPO/.claude/skills ~/.claude/skills${RESET}"
+    echo -e "  ${GRAY}Fix: ln -s $CONFIG_REPO/.claude/agents ~/.claude/agents${RESET}"
 fi
 
 # --- Step 3: Navigate to project and pull ---

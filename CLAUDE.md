@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-03-12 (Session 7)
+Last Updated: 2026-03-13 (Session 8)
 
 ## Project Overview
 
@@ -117,7 +117,7 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 7) - 2026-03-12
-- Changed startup scripts to launch `claude` without auto-running `/resume-work` — now shows a tip instead
-- Fixed remaining PowerShell filename references in Workflow.md (`Start-ClaudeSession.ps1` → `start-claude.ps1`)
-- Updated docs to reflect new script behavior
+### Last Session (Session 8) - 2026-03-13
+- Fixed incorrect symlink fix suggestions in `start-claude.sh` (wrong paths and missing agents symlink)
+- Added `chmod +x` first-run note for Mac/Linux in Workflow.md
+- Changed `disable-model-invocation` to `false` in update-docs skill for programmatic invocation

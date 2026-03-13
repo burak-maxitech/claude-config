@@ -170,3 +170,19 @@
 - Test startup scripts on Mac/Linux
 - Add more skills as new workflow needs emerge
 - Consider adding hooks for automated pre-commit workflows
+
+### Session 8 - 2026-03-13
+**What happened:**
+- Fixed incorrect symlink fix suggestions in `start-claude.sh` — referenced non-existent `commands/` dir and wrong paths; corrected to `.claude/skills` and `.claude/agents`
+- Added `chmod +x` first-run note for Mac/Linux in Workflow.md (alongside existing Windows `Unblock-File` note)
+- Changed `disable-model-invocation` from `true` to `false` in update-docs SKILL.md to allow programmatic invocation via Skill tool
+
+**Files created/modified:**
+- `.claude/scripts/start-claude.sh` - Fixed symlink fix suggestion paths (lines 68-69)
+- `Workflow.md` - Added Mac/Linux first-run `chmod +x` note
+- `.claude/skills/update-docs/SKILL.md` - Changed disable-model-invocation to false
+
+**Next session should:**
+- Consider changing disable-model-invocation to false on remaining 4 skills
+- Add more skills as new workflow needs emerge
+- Consider adding hooks for automated pre-commit workflows
