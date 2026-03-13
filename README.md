@@ -115,7 +115,7 @@ After setup, use the startup scripts to begin a coding session with a single com
 ~\Development\projects\claude-config\.claude\scripts\start-claude.ps1 my-project
 ```
 
-Run without arguments to see available projects and pick interactively. The script syncs config, verifies symlinks, pulls project changes, checks for Claude updates, and launches Claude Code with `/resume-work`.
+Run without arguments to see available projects and pick interactively. The script syncs config, verifies symlinks, pulls project changes, checks for Claude updates, and launches Claude Code.
 
 ## Syncing Changes
 

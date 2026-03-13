@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-03-12 (Session 6)
+Last Updated: 2026-03-12 (Session 7)
 
 ## Project Overview
 
@@ -66,6 +66,7 @@ Nothing currently in progress.
 | Compact guidance after both skills | Suggest /compact after resume-work and update-docs to free context |
 | Health check in /resume-work deep mode | Run tests/build in deep mode to catch broken state before coding |
 | Startup scripts (.claude/scripts/) | Single-command session startup replacing 8 manual steps; cross-platform |
+| Scripts don't auto-run /resume-work | User controls when to run /resume-work; avoids forced context load on every launch |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -116,6 +117,7 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 6) - 2026-03-12
-- Fixed PowerShell script filename bug in Workflow.md and README.md (`Start-ClaudeSession.ps1` → `start-claude.ps1`)
-- Added `Unblock-File` note for Windows first-run setup in Workflow.md
+### Last Session (Session 7) - 2026-03-12
+- Changed startup scripts to launch `claude` without auto-running `/resume-work` — now shows a tip instead
+- Fixed remaining PowerShell filename references in Workflow.md (`Start-ClaudeSession.ps1` → `start-claude.ps1`)
+- Updated docs to reflect new script behavior

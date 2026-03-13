@@ -94,5 +94,6 @@ fi
 
 # --- Step 5: Launch Claude Code with /resume-work ---
 echo -e "${YELLOW}[5/5] Launching Claude Code...${RESET}"
+echo -e "  ${GRAY}Tip: Run /resume-work to get up to speed.${RESET}"
 echo ""
-claude -p "/resume-work"
+claude

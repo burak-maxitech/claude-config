@@ -149,3 +149,24 @@
 - Test startup scripts on Mac/Linux
 - Add more skills as new workflow needs emerge
 - Consider adding hooks for automated pre-commit workflows
+
+### Session 7 - 2026-03-12
+**What happened:**
+- Changed startup scripts to no longer auto-run `/resume-work` — scripts now launch `claude` and show a tip message instead
+- Fixed remaining PowerShell filename references in Workflow.md (`Start-ClaudeSession.ps1` → `start-claude.ps1`)
+- Updated README.md, Workflow.md, and CLAUDE.md to reflect new script behavior
+
+**Files created/modified:**
+- `.claude/scripts/start-claude.ps1` - Removed `-p "/resume-work"`, added tip message
+- `.claude/scripts/start-claude.sh` - Removed `-p "/resume-work"`, added tip message
+- `Workflow.md` - Fixed PS1 filenames, updated step 5 description, updated version history
+- `README.md` - Updated Quick Start description
+- `CLAUDE.md` - Updated timestamp, session history, key decisions
+- `docs/session-history.md` - Added Session 7 entry
+- `docs/key-decisions.md` - Added script launch behavior decision
+- `docs/completed-work.md` - Added script update entry
+
+**Next session should:**
+- Test startup scripts on Mac/Linux
+- Add more skills as new workflow needs emerge
+- Consider adding hooks for automated pre-commit workflows

@@ -84,5 +84,6 @@ try {
 
 # --- Step 5: Launch Claude Code with /resume-work ---
 Write-Host "[5/5] Launching Claude Code..." -ForegroundColor Yellow
+Write-Host "  Tip: Run /resume-work to get up to speed." -ForegroundColor Gray
 Write-Host ""
-claude -p "/resume-work"
+claude
