@@ -29,3 +29,8 @@
 | Git blame context for critical findings | Understanding intent behind code prevents flagging deliberate tradeoffs as bugs |
 | Large diff guard (500/1000 lines) | Large reviews exhaust context; warn and suggest chunking to maintain review quality |
 | --fix auto-fix in /code-review | Simple findings (unused imports, formatting) can be safely auto-fixed; never auto-fix logic or security issues |
+| Bidirectional task integrity check | Pre-hydration stale task check in /resume-work + post-drain validation in /update-docs prevents silent task data loss between sessions |
+| Context freshness detection in /resume-work | Compare CLAUDE.md "Last Updated" date vs latest git commit; warn user if docs are stale and suggest /update-docs |
+| Commit checkpoint in /update-docs (Part 5) | Prompt to commit after all docs are updated; never auto-commit; --skip-commit flag to suppress for scripted workflows |
+| Compact guidance after resume-work and update-docs | Both skills consume significant context; suggest /compact afterward to free space before real work |
+| Quick health check in /resume-work deep mode | Detect and run test/build commands (package.json, Makefile, etc.) to catch broken state before starting to code; only in deep mode to keep default fast |

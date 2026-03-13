@@ -82,3 +82,31 @@
 - Commit all pending changes (sessions 2 + 3)
 - Test improved skills on a real codebase
 - Consider improving `/resume-work` skill next
+
+### Session 4 - 2026-03-12
+**What happened:**
+- Planned and implemented 5 improvements to `/resume-work` and `/update-docs` skills:
+  1. Bidirectional task integrity check (pre-hydration stale check + post-drain validation)
+  2. Context freshness detection (compare CLAUDE.md date vs git commits)
+  3. Commit checkpoint reminder (Part 5 in update-docs, --skip-commit flag)
+  4. Compact guidance after both skills (free context before real work)
+  5. Quick health check in deep mode (detect and run test/build commands)
+- Committed and pushed all session 3+4 changes together (639cfb3)
+- Ran `/update-docs` to capture session 4 changes
+
+**Files created/modified:**
+- `.claude/skills/resume-work/SKILL.md` - Added Step 2.5 (health check), Step 3.0 (freshness), compact tip, expanded allowed-tools
+- `.claude/skills/resume-work/references/summary-template.md` - Added staleness warning, uncommitted changes check, health check section
+- `.claude/skills/resume-work/references/task-hydration.md` - Added pre-hydration stale task check
+- `.claude/skills/update-docs/SKILL.md` - Added --skip-commit to argument-hint
+- `.claude/skills/update-docs/references/mode-update.md` - Added drain validation, Part 5 commit checkpoint
+- `.claude/skills/update-docs/references/verification-checklists.md` - Added commit checkpoint checklist item, post-verification compact tip
+- `CLAUDE.md` - Updated timestamp, key decisions, session history
+- `docs/completed-work.md` - Added 2 new completed items
+- `docs/key-decisions.md` - Added 5 new decisions
+- `docs/session-history.md` - Added Session 4 entry
+
+**Next session should:**
+- Test improved skills on a real codebase
+- Add more skills as new workflow needs emerge
+- Consider adding hooks for automated pre-commit workflows

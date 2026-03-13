@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-03-12 (Session 3)
+Last Updated: 2026-03-12 (Session 4)
 
 ## Project Overview
 
@@ -59,6 +59,11 @@ Nothing currently in progress.
 | --verify/--security/--fix in /code-review | Verification, OWASP deep dive, and auto-fix as opt-in modes |
 | Git blame context for review findings | Understand intent before flagging; prevents false positives |
 | Large diff guard in /code-review | Warn at 500+ lines, suggest chunking at 1000+ to preserve review quality |
+| Bidirectional task integrity | Pre-hydration stale check + post-drain validation prevents silent task data loss |
+| Context freshness detection in /resume-work | Compare CLAUDE.md date vs git commits; warn if docs are stale |
+| Commit checkpoint in /update-docs | Prompt to commit after docs update; never auto-commit; --skip-commit to suppress |
+| Compact guidance after both skills | Suggest /compact after resume-work and update-docs to free context |
+| Health check in /resume-work deep mode | Run tests/build in deep mode to catch broken state before coding |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -106,8 +111,8 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 3) - 2026-03-12
-- Improved `/plan-feature`: phase gating, test types per phase, commit per phase, context management, rollback strategy
-- Improved `/code-review`: `--verify`, `--security` (OWASP Top 10), `--fix`, git blame context, large diff guard
-- Created new `security-deep-dive.md` reference file
-- Ran `/update-docs` to capture all changes
+### Last Session (Session 4) - 2026-03-12
+- Improved `/resume-work`: context freshness detection, quick health check (deep mode), bidirectional task integrity pre-check, uncommitted changes warning, compact tip
+- Improved `/update-docs`: drain validation, commit checkpoint (Part 5), `--skip-commit` flag, post-verification compact suggestion
+- Committed and pushed all session 3+4 changes (639cfb3)
+- Ran `/update-docs` to capture session 4 changes
