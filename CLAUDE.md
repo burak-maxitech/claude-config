@@ -17,6 +17,7 @@ Last Updated: 2026-03-12 (Session 5)
 |------|--------|
 | Skills (5) | Complete |
 | Subagents (3) | Complete |
+| Startup scripts | Complete |
 | Mac/Linux setup | Complete |
 | Windows setup | Complete |
 | GitHub sync | Complete |
@@ -117,6 +118,6 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 ### Last Session (Session 5) - 2026-03-12
 - Added startup scripts (`start-claude.sh`, `start-claude.ps1`) to `.claude/scripts/`
-- Updated Workflow.md: replaced manual 8-step startup with automated script usage, added alias tips
+- Updated Workflow.md: added scripts as "Quick Start" alternative alongside existing manual steps, added alias tips
 - Updated README.md: added scripts to directory tree, added Quick Start section
-- Updated CLAUDE.md architecture tree to include scripts directory
+- Updated CLAUDE.md architecture tree and key decisions to include scripts

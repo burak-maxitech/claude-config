@@ -115,18 +115,20 @@
 **What happened:**
 - Added startup scripts (`start-claude.sh` for Mac/Linux, `start-claude.ps1` for Windows) to `.claude/scripts/`
 - Scripts automate 5-step session startup: sync config, verify symlinks, pull project, update Claude, launch with `/resume-work`
-- Updated Workflow.md: replaced manual 8-step startup with automated script usage, added shell alias tips, collapsed manual steps into details block
+- Updated Workflow.md: added scripts as "Quick Start" alternative alongside existing manual steps, added shell alias tips
 - Updated README.md: added scripts to directory tree, added Quick Start section
 - Updated CLAUDE.md architecture tree to include scripts directory
+- Fixed Workflow.md: restored manual startup steps after initially replacing them (user feedback: keep both methods visible)
 - Ran `/update-docs` to capture session 5 changes
 
 **Files created/modified:**
 - `.claude/scripts/start-claude.sh` - NEW: Mac/Linux session startup script
 - `.claude/scripts/start-claude.ps1` - NEW: Windows PowerShell session startup script
-- `Workflow.md` - Replaced manual startup with script usage, added alias tips, updated version history
+- `Workflow.md` - Added Quick Start scripts section below manual steps, added alias tips, updated version history
 - `README.md` - Added scripts to tree, added Quick Start section
 - `CLAUDE.md` - Updated timestamp, architecture tree, key decisions, session history
 - `docs/key-decisions.md` - Added startup scripts decision
+- `docs/completed-work.md` - Added startup scripts to Infrastructure section
 - `docs/session-history.md` - Added Session 5 entry
 
 **Next session should:**
