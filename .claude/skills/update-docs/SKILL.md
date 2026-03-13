@@ -3,7 +3,7 @@ name: update-docs
 description: "Manages project documentation (README.md, CLAUDE.md, docs/*.md). Detects state and runs REFACTOR, CREATE, or UPDATE mode. Use when user wants to update docs, save session progress, create documentation, or refactor a monolithic README."
 disable-model-invocation: true
 allowed-tools: Read, Edit, Write, Grep, Glob, Bash(git:*), Bash(ls:*), Bash(find:*), TaskList, TaskGet
-argument-hint: "[scope] [--skip-memory] [--skip-tasks]"
+argument-hint: "[scope] [--skip-memory] [--skip-tasks] [--skip-commit]"
 ---
 
 # /update-docs - Documentation Management Skill

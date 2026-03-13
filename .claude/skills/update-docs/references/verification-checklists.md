@@ -91,4 +91,10 @@ Provide complete content for each file created or significantly modified.
 - [ ] No valuable context removed
 - [ ] Auto-memory synced with stable project facts (if changed)
 - [ ] Task list drained — completed/in-progress/pending tasks synced back
+- [ ] Commit checkpoint offered (unless --skip-commit)
 - [ ] Project-specific files preserved
+
+## Post-Verification Note
+
+If the user plans to continue working after `/update-docs`, suggest:
+> "To free up context consumed by the docs update, consider running `/compact` before continuing work."

@@ -1,8 +1,8 @@
 ---
 name: code-cleanup
-description: Codebase cleanup audit that finds dead code, unused files, stale dependencies, and technical debt. Use when user mentions dead code, unused files, cleanup, technical debt, code hygiene, dependency audit, removing unused CSS, stale imports, or any form of codebase pruning — even casually like "this repo is messy" or "let's clean things up."
+description: Codebase-wide cleanup audit that finds dead code, unused files, stale dependencies, and technical debt. Use when user mentions dead code, unused files, cleanup, technical debt, code hygiene, dependency audit, removing unused CSS, stale imports, or any form of codebase pruning — even casually like "this repo is messy" or "let's clean things up." This is different from /simplify (which reviews recent changes for quality) — this skill audits the entire codebase for things that can be removed.
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(sort:*), Bash(uniq:*), Bash(sed:*), Bash(awk:*), Bash(git:*), Bash(jq:*), Bash(npm:*), Bash(pip:*), Bash(cargo:*), Task
+allowed-tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(sort:*), Bash(uniq:*), Bash(sed:*), Bash(awk:*), Bash(git:*), Bash(jq:*), Bash(npm:*), Bash(pip:*), Bash(cargo:*), Bash(gh:*), Task
 ---
 
 # Code Cleanup — Codebase Cleanup Audit
@@ -123,12 +123,24 @@ If the user passes `--fix`, apply Quick Wins automatically:
 1. Create a cleanup branch: `git checkout -b cleanup/YYYYMMDD`
 2. **Auto-apply Quick Wins only** — delete empty files, remove unused imports, delete `.backup`/`.old` files, remove commented-out blocks >5 lines
 3. For each "Safe to Delete" item, show it and ask for confirmation before removing
-4. Skip "Likely Safe" and "Needs Investigation" entirely (report only)
-5. Stage all changes and commit: `chore: automated cleanup — [count] items removed`
-6. Show a summary diff with `git diff --stat HEAD~1`
-7. Tell the user: "Review the changes on the `cleanup/YYYYMMDD` branch. Merge when satisfied, or `git checkout main && git branch -D cleanup/YYYYMMDD` to discard."
+4. If `--aggressive` is also present, include "Likely Safe" items in step 3 (show and ask for confirmation before removing each one) — never auto-delete "Likely Safe" items
+5. Skip "Needs Investigation" entirely (report only)
+6. Stage all changes and commit: `chore: automated cleanup — [count] items removed`
+7. Show a summary diff with `git diff --stat HEAD~1`
+8. Tell the user: "Review the changes on the `cleanup/YYYYMMDD` branch. Merge when satisfied, or `git checkout main && git branch -D cleanup/YYYYMMDD` to discard."
 
 If the working tree is dirty (uncommitted changes), warn the user and ask whether to stash first.
+
+## Dry-Run Mode (when `--dry-run` is in $ARGUMENTS)
+
+If the user passes `--dry-run`, simulate the fix without deleting anything:
+
+1. Run the full scan as normal
+2. Create a cleanup branch: `git checkout -b cleanup/dry-run-YYYYMMDD`
+3. For each Quick Win and "Safe to Delete" item, stage the removal but do NOT commit yet
+4. Show `git diff --stat` so the user can see the full impact
+5. Reset the branch: `git checkout main && git branch -D cleanup/dry-run-YYYYMMDD`
+6. Tell the user: "This was a dry run — nothing was deleted. Run with `--fix` to apply."
 
 ## Scope Handling
 
@@ -144,7 +156,8 @@ If the working tree is dirty (uncommitted changes), warn the user and ask whethe
 | `--deps` | Only Section 4 (Unused Dependencies) |
 | `--tests` | Only Section 7 (Test Cleanup) |
 | `--fix` | Full scan + auto-apply Quick Wins |
-| `--aggressive` | Move "Likely Safe" → "Safe to Delete" (for well-tested codebases) |
+| `--dry-run` | Full scan + generate cleanup branch with commits, but do NOT delete anything — show what *would* happen via `git diff --stat` |
+| `--aggressive` | In report mode: move "Likely Safe" → "Safe to Delete" in the output. Only actually deletes them if combined with `--fix` (i.e., `--aggressive --fix`). Without `--fix`, it's cosmetic reclassification only |
 | Combined (e.g., `src/ --code --deps`) | Scoped + filtered |
 
 When a single filter is active, skip subagent parallelization and scan directly.

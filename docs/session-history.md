@@ -21,3 +21,64 @@
 **Next session should:**
 - Run `/resume-work` to verify the new doc structure loads correctly
 - Consider adding more skills as workflow needs emerge
+
+### Session 2 - 2026-03-12
+**What happened:**
+- Reviewed uncommitted changes across 5 files in the code-cleanup skill
+- Enhanced `/code-cleanup` SKILL.md: added `--dry-run` mode, clarified `--aggressive` behavior, added `Bash(gh:*)` permission, improved description
+- Added Python package→import name lookup table (30+ entries) to scan-deps-config.md
+- Optimized one-off script detection in scan-files-code.md (batch git log)
+- Made media query dead code detection more conservative in scan-styles-tests.md
+- Added find command permissions to settings.local.json for update-docs and resume-work skills
+- Ran `/update-docs` to capture all changes
+
+**Files created/modified:**
+- `.claude/skills/code-cleanup/SKILL.md` - Added --dry-run mode, --aggressive clarification, gh permission
+- `.claude/skills/code-cleanup/references/scan-deps-config.md` - Python import name lookup table
+- `.claude/skills/code-cleanup/references/scan-files-code.md` - Batch git log optimization
+- `.claude/skills/code-cleanup/references/scan-styles-tests.md` - Conservative media query flagging
+- `.claude/settings.local.json` - Added find command permissions
+- `CLAUDE.md` - Updated timestamp, session history
+- `docs/completed-work.md` - Added 4 new completed items
+- `docs/key-decisions.md` - Added 5 new decisions
+- `docs/session-history.md` - Added Session 2 entry
+
+**Next session should:**
+- Commit all pending changes
+- Continue improving skills based on real-world usage patterns
+
+### Session 3 - 2026-03-12
+**What happened:**
+- Improved `/plan-feature` skill with 5 enhancements from Claude Code best practices:
+  - Phase gating with verification (tests must pass before next phase)
+  - Explicit test types per phase (unit/integration/e2e)
+  - Commit after each phase for rollback-friendly checkpoints
+  - Context management reminder (`/compact` before implementation)
+  - Rollback strategy required in both greenfield and existing mode plans
+- Improved `/code-review` skill with 5 enhancements from community + official Claude docs:
+  - `--verify` mode: run tests/lint to validate findings
+  - `--security` mode: OWASP Top 10 deep-dive checklist
+  - `--fix` mode: auto-fix simple issues (unused imports, formatting)
+  - Git blame context for Critical/Important findings
+  - Large diff guard (warn at 500+, suggest chunking at 1000+ lines)
+- Created new `references/security-deep-dive.md` with full OWASP Top 10 checklist
+- Updated allowed-tools for code-review to support verify/fix modes
+- Ran `/update-docs` to capture all changes
+
+**Files created/modified:**
+- `.claude/skills/plan-feature/references/plan-and-tasks.md` - Phase gating, commit rules, context management
+- `.claude/skills/plan-feature/references/mode-greenfield.md` - Test types, rollback in interview + summary
+- `.claude/skills/plan-feature/references/mode-existing.md` - Test types, rollback section, summary update
+- `.claude/skills/code-review/SKILL.md` - New flags, large diff guard, git blame step, verify/fix steps
+- `.claude/skills/code-review/references/review-checklist.md` - Enhanced security + testing sections
+- `.claude/skills/code-review/references/output-format.md` - Verification + auto-fix output templates
+- `.claude/skills/code-review/references/security-deep-dive.md` - NEW: OWASP Top 10 checklist
+- `CLAUDE.md` - Updated timestamp, key decisions, session history
+- `docs/completed-work.md` - Added 3 new completed items
+- `docs/key-decisions.md` - Added 11 new decisions
+- `docs/session-history.md` - Added Session 3 entry
+
+**Next session should:**
+- Commit all pending changes (sessions 2 + 3)
+- Test improved skills on a real codebase
+- Consider improving `/resume-work` skill next

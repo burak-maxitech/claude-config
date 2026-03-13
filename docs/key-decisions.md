@@ -14,3 +14,18 @@
 | Task hydration via TaskCreate | /resume-work and /plan-feature hydrate CLAUDE.md tasks into live task tracker |
 | Plan Mode integration in /plan-feature | Uses EnterPlanMode/ExitPlanMode for formal plan approval before coding begins |
 | Session history archiving (>3 sessions) | /update-docs auto-archives old sessions to docs/session-history.md to keep CLAUDE.md lean |
+| Python import-name lookup table in scan-deps-config | Many PyPI packages have different import names (e.g., Pillow→PIL); hardcoded table reduces false positives |
+| Batch git log for one-off script detection | Per-file git log is too slow on large repos; single batch command for scripts/tools/migrations |
+| Conservative media query flagging | Media queries are easy to misjudge statically; default to needs_investigation risk level |
+| --dry-run mode for /code-cleanup | Let users preview cleanup impact without deleting anything; builds trust before destructive operations |
+| --aggressive only deletes with --fix | Prevent accidental deletions; --aggressive alone is cosmetic reclassification in the report |
+| Phase gating in /plan-feature | Each phase must pass tests and commit before next phase starts; creates rollback-friendly checkpoints |
+| Test types per phase (unit/integration/e2e) | Explicit test type expectations per phase prevent gaps in coverage and over-testing |
+| Commit per phase in /plan-feature | Descriptive commits at phase boundaries enable clean rollback if later phases fail |
+| Context management reminder before implementation | Long interviews bloat context; /compact before coding preserves plan while freeing space |
+| Rollback strategy required in all plans | Both greenfield and existing modes must specify rollback approach per phase |
+| --verify mode for /code-review | Run tests/lint after review to validate findings; reduces false positives (official Claude docs #1 recommendation) |
+| --security deep dive via OWASP Top 10 | Standard security scan is surface-level; dedicated checklist for thorough security audits |
+| Git blame context for critical findings | Understanding intent behind code prevents flagging deliberate tradeoffs as bugs |
+| Large diff guard (500/1000 lines) | Large reviews exhaust context; warn and suggest chunking to maintain review quality |
+| --fix auto-fix in /code-review | Simple findings (unused imports, formatting) can be safely auto-fixed; never auto-fix logic or security issues |

@@ -22,7 +22,8 @@ claude-config/
 │       │   ├── SKILL.md
 │       │   └── references/
 │       │       ├── output-format.md
-│       │       └── review-checklist.md
+│       │       ├── review-checklist.md
+│       │       └── security-deep-dive.md
 │       ├── plan-feature/
 │       │   ├── SKILL.md
 │       │   └── references/

@@ -33,9 +33,10 @@ You will receive info about whether CSS and tests exist in the project. Skip any
 - Flag defined but never consumed variables
 
 **Method — Dead media queries:**
-- Identify media query breakpoints used in CSS
-- Check if the breakpoints correspond to actual responsive behavior in the app
-- Flag media queries that reference deleted component styles
+- Find media queries whose rulesets reference selectors (classes, IDs) for components that no longer exist in the codebase
+- Do NOT attempt to evaluate whether breakpoints "correspond to actual responsive behavior" — that's too speculative for static analysis
+- Only flag media queries where every selector inside the block is confirmed unused by the class/ID scan above
+- Default risk for all media query findings: `needs_investigation` (media queries are easy to misjudge)
 
 **Do NOT flag:**
 - Utility classes from frameworks (Tailwind, Bootstrap) — these are generated, not authored

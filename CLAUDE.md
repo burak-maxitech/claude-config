@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-03-10
+Last Updated: 2026-03-12 (Session 3)
 
 ## Project Overview
 
@@ -53,6 +53,12 @@ Nothing currently in progress.
 | Task hydration via TaskCreate | Live task tracking from CLAUDE.md content |
 | Plan Mode in /plan-feature | Formal approval before coding begins |
 | Session archiving (>3 sessions) | Auto-archive to docs/session-history.md |
+| --dry-run mode in /code-cleanup | Preview cleanup impact without deleting; builds user trust |
+| --aggressive requires --fix to delete | Cosmetic reclassification only without --fix; prevents accidental deletions |
+| Phase gating in /plan-feature | Tests + commit per phase; rollback-friendly checkpoints |
+| --verify/--security/--fix in /code-review | Verification, OWASP deep dive, and auto-fix as opt-in modes |
+| Git blame context for review findings | Understand intent before flagging; prevents false positives |
+| Large diff guard in /code-review | Warn at 500+ lines, suggest chunking at 1000+ to preserve review quality |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -100,9 +106,8 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 1) - 2026-03-10
-- Created CLAUDE.md with all 10 required sections
-- Created docs/ folder with session-history.md, key-decisions.md, completed-work.md
-- Added Documentation section to README.md with links
-- No content removed from existing files
-- Mode: REFACTOR (split monolithic docs into three-file structure)
+### Last Session (Session 3) - 2026-03-12
+- Improved `/plan-feature`: phase gating, test types per phase, commit per phase, context management, rollback strategy
+- Improved `/code-review`: `--verify`, `--security` (OWASP Top 10), `--fix`, git blame context, large diff guard
+- Created new `security-deep-dive.md` reference file
+- Ran `/update-docs` to capture all changes

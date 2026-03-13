@@ -18,7 +18,7 @@ Scan for files that are never imported, required, or referenced anywhere else in
 **Also flag:**
 - Files with backup/old suffixes: `.old`, `.bak`, `.backup`, `_v2`, `_old`, `_backup`, `.orig`, `Copy of *`
 - Empty files (0 bytes or only whitespace/comments)
-- One-time scripts: files in `scripts/`, `migrations/`, or `tools/` that look like one-offs (check git log — if only one commit touches them and it's >6 months old, flag it)
+- One-time scripts: files in `scripts/`, `migrations/`, or `tools/` that look like one-offs. Batch-check with a single command: `git log --format="%H %ai" --diff-filter=A -- scripts/ tools/ migrations/` to get creation dates for all files in those directories, then filter for files with only one commit touching them that are >6 months old. Avoid running `git log` per-file — it's too slow on large repos.
 - Duplicate files: same content, different names (compare with `md5sum` on a sample)
 
 **Do NOT flag:**

@@ -2,7 +2,7 @@
 name: resume-work
 description: "Resumes development on a project after a break. Reads docs, scans git state, identifies next task, and hydrates live task tracker. Use at the start of every coding session."
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Bash(git:*), Bash(ls:*), TaskCreate, TaskGet, TaskList
+allowed-tools: Read, Grep, Glob, Bash(git:*), Bash(ls:*), Bash(npm:*), Bash(npx:*), Bash(python:*), Bash(make:*), Bash(cargo:*), TaskCreate, TaskGet, TaskList
 argument-hint: "[deep]"
 ---
 
@@ -78,9 +78,37 @@ Based on CLAUDE.md "In Progress" and "Next Steps," identify and briefly review:
 
 ---
 
+## Step 2.5: Quick Health Check (deep mode only)
+
+**Only run this step when `/resume-work deep` is used. Skip entirely in default mode.**
+
+Verify the project actually works before starting to code:
+
+1. **Detect test/build commands** by checking for:
+   - `package.json` → look for `scripts.test`, `scripts.build`
+   - `Makefile` → look for `test` or `check` targets
+   - `pyproject.toml` → look for `[tool.pytest]` or test scripts
+   - `Cargo.toml` → Rust project (use `cargo test`, `cargo build`)
+2. **If a quick test command exists**, run it and report pass/fail
+3. **If a quick build command exists**, run it and report pass/fail
+4. **If no commands found**, skip silently — do not warn about missing commands
+
+Keep this fast: use `--no-build` or equivalent flags where possible. The goal is a quick smoke test, not a full CI run.
+
+---
+
 ## Step 3: Identify Continuation Point
 
 Based on your analysis, determine:
+
+### 3.0 Context Freshness Check
+Compare CLAUDE.md's "Last Updated" date with the latest git commit:
+- Run `git log -1 --format=%ci` to get the latest commit date
+- Parse the "Last Updated" date from CLAUDE.md
+- **If commits are newer than the "Last Updated" date**, flag a warning:
+  > "CLAUDE.md was last updated [date], but there are [N] commits since then. Documentation may be stale."
+- Suggest: "Consider running `/update-docs` after reviewing to refresh documentation."
+- **If dates match or CLAUDE.md is newer**, no warning needed
 
 ### 3.1 What Was Last Worked On
 From CLAUDE.md's last session summary (3-5 bullet points):
@@ -165,6 +193,15 @@ Provide additional details:
 - All environment variables needed
 - Detailed breakdown of each component's state
 - Full session history from `docs/session-history.md` combined with CLAUDE.md's last session
+
+---
+
+## Context Management Tip
+
+After presenting the summary and before starting work, suggest:
+> "To free up context consumed by this resume scan, consider running `/compact focus on [recommended task]` before starting work."
+
+Only suggest this if the summary was substantial (deep mode, or multiple reference files were read).
 
 ---
 

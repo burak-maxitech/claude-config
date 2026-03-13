@@ -9,13 +9,16 @@ Review the code against all 7 categories below. For diff-based reviews, focus on
 - Error handling gaps (unhappy paths)
 - State management issues
 
-## 2. Security
+## 2. Security (standard scan — for deep dive use `--security`)
 - Input validation and sanitization
 - Authentication/authorization flaws
 - Injection vulnerabilities (SQL, XSS, command injection)
 - Sensitive data exposure (logs, errors, responses)
+- Hardcoded secrets, API keys, or credentials (grep for common patterns: `password=`, `api_key=`, `secret`, `token`)
 - Insecure dependencies or configurations
 - CSRF, SSRF, or other web vulnerabilities if applicable
+
+> For OWASP Top 10 deep dive, use `--security` flag (loads `references/security-deep-dive.md`)
 
 ## 3. Performance
 - Unnecessary computations or redundant operations
@@ -49,3 +52,5 @@ Review the code against all 7 categories below. For diff-based reviews, focus on
 - Untestable code structures
 - Missing test coverage for critical paths
 - Brittle test patterns if tests are included
+- Tests that don't actually assert anything meaningful (assertion-free tests)
+- Tests tightly coupled to implementation details (will break on refactor)

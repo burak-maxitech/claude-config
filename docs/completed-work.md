@@ -10,6 +10,13 @@
 - [x] `/update-docs` — Session end with task drain, session archiving, auto-memory sync, CREATE/REFACTOR/UPDATE modes
 - [x] `/code-review` — Code review with auto-detect (uncommitted/staged/PR/last-commit), convention scanning, file:line refs
 - [x] `/code-cleanup` — Parallel subagent scanning with summary dashboard, Quick Wins, scope filters
+- [x] `/code-cleanup` enhancements — Added `--dry-run` mode, clarified `--aggressive` behavior, added `Bash(gh:*)` permission, improved description to distinguish from `/simplify`
+- [x] `scan-deps-config` subagent — Added Python package→import name lookup table (30+ common mismatches)
+- [x] `scan-files-code` subagent — Optimized one-off script detection to batch `git log` instead of per-file
+- [x] `scan-styles-tests` subagent — Made media query dead code detection more conservative (default risk: needs_investigation)
+- [x] `/plan-feature` enhancements — Phase gating with verification, test types per phase, commit after each phase, context management reminder, rollback strategy in plan template
+- [x] `/code-review` enhancements — Added `--verify` (run tests/lint), `--security` (OWASP Top 10 deep dive), `--fix` (auto-fix simple issues), git blame context for findings, large diff guard (500/1000 line thresholds)
+- [x] `security-deep-dive.md` — New reference file with full OWASP Top 10 checklist for `/code-review --security`
 
 ## Subagents
 - [x] `cleanup-files-code` — Scans for unused files and dead code

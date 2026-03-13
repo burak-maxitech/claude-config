@@ -10,6 +10,18 @@ Present this summary after completing Steps 0-3. Fill in all bracketed placehold
 ### Quick Checks
 - [ ] Pulled latest? (`git pull`)
 - [ ] Commands synced? (`cd ~/Development/projects/claude-config && git pull`)
+- [ ] Uncommitted changes? [Yes: N files / No]
+
+### Staleness Warning (if applicable)
+> ⚠ CLAUDE.md was last updated [date], but there are [N] commits since then. Documentation may be stale. Consider running `/update-docs` after reviewing.
+
+*(Only show this section if commits are newer than CLAUDE.md's "Last Updated" date. Remove entirely if docs are fresh.)*
+
+### Health Check (deep mode only)
+- Tests: [PASS / FAIL / Skipped]
+- Build: [PASS / FAIL / Skipped]
+
+*(Only show this section when `/resume-work deep` is used. Remove entirely in default mode.)*
 
 ### Quick Overview
 [One sentence: what this project does]

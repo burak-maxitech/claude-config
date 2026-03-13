@@ -32,6 +32,17 @@ This ensures work tracked via TaskCreate/TaskUpdate during the session is persis
 
 **If `--skip-tasks` is in `$ARGUMENTS`, skip this step entirely.**
 
+### Drain Validation
+
+After draining, verify completeness:
+
+1. **Run `TaskList`** again to confirm all tasks have been processed
+2. **Ad-hoc tasks** (tasks created during the session that don't map to existing CLAUDE.md sections):
+   - If completed → add to `docs/completed-work.md`
+   - If pending/in-progress → add to `## Next Steps` in CLAUDE.md
+3. **Report drain summary** to the user:
+   > "Task drain complete: [N] completed, [M] in-progress, [K] pending synced to docs."
+
 ## Part 0.5: One-Time Migration (if needed)
 
 **Check if CLAUDE.md still has the old bloated format.** This migration runs once per project to transition from the old structure (full checklists, full decision tables, multiple session entries) to the new lean structure.
@@ -307,3 +318,18 @@ Do not duplicate evolving state — that stays in CLAUDE.md:
 3. **Keep it concise** — auto-memory MEMORY.md is truncated after 200 lines; prioritize density
 4. **Only sync when facts change** — if tech stack, commands, or structure haven't changed, skip this step
 5. **Create topic files** for detailed notes (e.g., `debugging.md`, `patterns.md`) and link from MEMORY.md
+
+## Part 5: Commit Checkpoint
+
+After all documentation updates are complete, remind the user to commit.
+
+**If `--skip-commit` is in `$ARGUMENTS`, skip this step entirely.**
+
+1. **Run `git status`** to show all uncommitted files (staged and unstaged)
+2. **If there are uncommitted changes:**
+   - Show the list of modified/untracked files
+   - Suggest a conventional commit message based on what was done this session, e.g.:
+     > Suggested commit: `docs: update session progress and documentation`
+   - **Ask the user:** "Would you like to commit these changes?"
+   - **Never auto-commit** — always wait for user confirmation
+3. **If there are no uncommitted changes**, skip silently

@@ -22,7 +22,40 @@ You will receive the detected package manager and config file paths. Use them to
 **For Python (requirements.txt / pyproject.toml / Pipfile):**
 - Extract package names from the dependency file
 - For each, grep for `import package_name` and `from package_name` across all `.py` files
-- Note: Python package names often differ from import names (e.g., `Pillow` → `from PIL import`). Check common aliases
+- **IMPORTANT**: Python package names often differ from import names. Use this lookup table for the most common mismatches before falling back to the raw package name:
+
+  | PyPI Package | Import Name(s) |
+  |---|---|
+  | Pillow | PIL |
+  | beautifulsoup4 | bs4 |
+  | python-dateutil | dateutil |
+  | scikit-learn | sklearn |
+  | scikit-image | skimage |
+  | opencv-python / opencv-contrib-python | cv2 |
+  | PyYAML | yaml |
+  | python-dotenv | dotenv |
+  | attrs | attr |
+  | google-cloud-storage | google.cloud.storage |
+  | google-auth | google.auth |
+  | python-jose | jose |
+  | python-multipart | multipart |
+  | Pygments | pygments |
+  | msgpack-python | msgpack |
+  | pycryptodome | Crypto |
+  | py-cpuinfo | cpuinfo |
+  | ruamel.yaml | ruamel.yaml (same, but note the dot) |
+  | python-magic | magic |
+  | python-Levenshtein | Levenshtein |
+  | pymongo | pymongo (same, but submodules like bson come bundled) |
+  | psycopg2-binary / psycopg2 | psycopg2 |
+  | mysqlclient | MySQLdb |
+  | ujson | ujson (same, but sometimes installed as `python-ujson`) |
+  | Faker | faker |
+  | Jinja2 | jinja2 |
+  | MarkupSafe | markupsafe |
+  | Werkzeug | werkzeug |
+
+  For packages not in this table, try both the raw package name and the name with hyphens replaced by underscores.
 - Check if the package is used in scripts, Dockerfiles, or CI configs
 
 **For Rust (Cargo.toml):**

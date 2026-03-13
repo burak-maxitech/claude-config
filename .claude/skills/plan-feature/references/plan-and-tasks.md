@@ -11,7 +11,12 @@ In plan mode, create a detailed plan that includes:
 2. **File-level changes** — for each phase, list specific files to create/modify with what changes
 3. **Dependencies** — which phases depend on others
 4. **Risk mitigations** — concrete steps to address each identified risk
-5. **Testing approach** — what to test at each phase
+5. **Test types per phase** — for each phase, explicitly list which test types apply:
+   - **Unit tests** — isolated function/module tests (most phases)
+   - **Integration tests** — tests that verify component interactions (phases with API/DB/service boundaries)
+   - **E2E tests** — full user-flow tests (phases that complete a user-facing feature)
+   - Not every phase needs all three — specify only what's relevant
+6. **Rollback strategy** — for each phase, note how to safely undo if something goes wrong (e.g., revert commit, drop migration, feature flag off)
 
 ## Step 3: Exit Plan Mode for Approval
 Use `ExitPlanMode` to present the plan to the user for approval. The user will review and either approve or request changes.
@@ -39,6 +44,18 @@ For each implementation phase/step in the approved plan:
 - **Include testing tasks** — add a task for writing tests after each major phase
 - **Skip documentation tasks** — `/update-docs` handles that at end of session
 
+### Phase Gating — Verify Before Proceeding
+Each phase is **gated**: do NOT start the next phase until the current phase passes its gate check.
+
+**Gate check after completing each phase:**
+1. Run all tests relevant to the phase (unit, integration, e2e as specified in the plan)
+2. Verify all tests pass — if any fail, fix before moving on
+3. **Commit the phase** with a descriptive message: `feat(<scope>): phase N — <what was delivered>`
+4. Update the task status to `completed`
+5. Only then mark the next task as `in_progress`
+
+This ensures each phase is a stable, rollback-friendly checkpoint. If Phase N+1 goes wrong, you can revert to the Phase N commit cleanly.
+
 ### Then update CLAUDE.md:
 1. New feature added to "In Progress"
 2. Key decisions added to "Key Decisions" table
@@ -49,4 +66,7 @@ For each implementation phase/step in the approved plan:
 - Updated architecture if changed
 - New API endpoints/data models
 
-### Begin implementation following the task list.
+### Context Management Before Implementation
+If the interview was long (many question rounds), run `/compact` before starting implementation to free up context space. The plan and tasks are persisted — you won't lose anything.
+
+### Begin implementation following the task list, respecting phase gates.

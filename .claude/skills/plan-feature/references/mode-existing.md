@@ -27,9 +27,15 @@ Focus on integration, skip architecture already decided:
 - Dependencies on other planned work?
 
 ## Testing Strategy
-- New test cases needed?
+- New test cases needed? Which types — unit, integration, e2e?
 - Which existing tests might break?
 - Integration test considerations?
+- What testing frameworks are already in use?
+
+## Rollback & Safety
+- Rollback strategy if something goes wrong? (revert commit, feature flag, migration rollback)
+- Can we ship behind a feature flag for gradual rollout?
+- What's the blast radius if this breaks in production?
 
 ---
 
@@ -40,9 +46,9 @@ After all categories are covered, provide:
 1. **Summary** of new feature requirements
 2. **Integration points** with existing code
 3. **Files to modify** vs new files to create
-4. **Risks** specific to integration
+4. **Risks** specific to integration, with rollback strategy per phase
 5. **Impact on existing functionality**
-6. **Implementation phases** — numbered, with specific deliverables per phase
+6. **Implementation phases** — numbered, with specific deliverables and test types (unit/integration/e2e) per phase
 
 ### Then ask:
 > "Ready to proceed with implementation, or dig deeper on anything?"

@@ -4,7 +4,11 @@
       "Bash(mkdir:*)",
       "Bash(git:*)",
       "Bash(xargs grep:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(find \"C:/Development/projects/claude-config/.claude/skills/update-docs\" -type f -exec ls -lh {})",
+      "Bash(find \"C:/Development/projects/claude-config/.claude/skills/resume-work\" -type f -exec ls -lh {})",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.anthropic.com)"
     ]
   }
 }
