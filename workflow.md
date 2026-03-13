@@ -18,29 +18,83 @@
 
 ## Daily Workflow
 
-### Starting a Session (Automated)
+### Starting a Session on Mac
 
-The startup scripts automate the entire session startup sequence — syncing config, verifying symlinks, pulling project changes, checking for Claude updates, and launching with `/resume-work`.
+```bash
+# 1. Open Terminal
+
+# 2. Pull latest commands (in case you updated from another machine)
+cd ~/Development/projects/claude-config && git pull && cd -
+
+# 3. Verify config symlinks are in place
+ls -d ~/.claude/skills ~/.claude/agents 2>/dev/null || echo "MISSING SYMLINKS — see Setup section"
+
+# 4. Navigate to project
+cd ~/projects/[project-name]
+
+# 5. (Optional) Pull latest project changes
+git pull
+
+# 6. Check for Claude updates
+claude update
+
+# 7. Launch Claude Code
+claude
+
+# 8. Get up to speed
+/resume-work
+```
+
+### Starting a Session on PC
+
+```powershell
+# 1. Open PowerShell or Terminal
+
+# 2. Pull latest commands (in case you updated from another machine)
+cd C:\Development\projects\claude-config; git pull; cd -
+
+# 3. Verify config symlinks are in place
+Get-ChildItem ~\.claude | Where-Object { $_.LinkType -eq "SymbolicLink" } | Format-Table Name, Target
+
+# 4. Navigate to project
+cd C:\Development\projects\[project-name]
+
+# 5. (Optional) Pull latest project changes
+git pull
+
+# 6. Check for Claude updates
+claude update
+
+# 7. Launch Claude Code
+claude
+
+# 8. Get up to speed
+/resume-work
+```
+
+### Quick Start with Startup Scripts
+
+The startup scripts automate all the manual steps above into a single command:
 
 **Mac/Linux:**
 ```bash
-# From anywhere:
+# With project name:
 ~/Development/projects/claude-config/.claude/scripts/start-claude.sh my-project
 
-# Or without arguments to pick interactively:
+# Or interactive project picker:
 ~/Development/projects/claude-config/.claude/scripts/start-claude.sh
 ```
 
 **Windows (PowerShell):**
 ```powershell
-# From anywhere:
+# With project name:
 ~\Development\projects\claude-config\.claude\scripts\Start-ClaudeSession.ps1 my-project
 
-# Or without arguments to pick interactively:
+# Or interactive project picker:
 ~\Development\projects\claude-config\.claude\scripts\Start-ClaudeSession.ps1
 ```
 
-**Tip:** Create a shell alias for quick access:
+**Tip:** Create a shell alias for even quicker access:
 ```bash
 # Mac/Linux — add to ~/.bashrc or ~/.zshrc
 alias claude-start="~/Development/projects/claude-config/.claude/scripts/start-claude.sh"
@@ -50,39 +104,12 @@ alias claude-start="~/Development/projects/claude-config/.claude/scripts/start-c
 function claude-start { & "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\Start-ClaudeSession.ps1" @args }
 ```
 
-**What the startup script does (5 steps):**
+**What the script does (5 steps):**
 1. Pulls latest claude-config (syncs skills/agents across machines)
 2. Verifies `~/.claude` symlinks are in place
 3. Navigates to project and pulls latest changes
 4. Checks for Claude Code updates
 5. Launches Claude Code with `/resume-work`
-
-### Starting a Session (Manual)
-
-<details>
-<summary>If you prefer the manual steps:</summary>
-
-**Mac/Linux:**
-```bash
-cd ~/Development/projects/claude-config && git pull && cd -
-cd ~/projects/[project-name]
-git pull
-claude update
-claude
-/resume-work
-```
-
-**Windows (PowerShell):**
-```powershell
-cd C:\Development\projects\claude-config; git pull; cd -
-cd C:\Development\projects\[project-name]
-git pull
-claude update
-claude
-/resume-work
-```
-
-</details>
 
 **What `/resume-work` does:**
 - Checks auto-memory for stable project facts already in context
