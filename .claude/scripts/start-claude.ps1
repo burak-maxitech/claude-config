@@ -15,7 +15,6 @@ $ConfigRepo = "$ProjectsRoot\claude-config"
 if (-not $ProjectName) {
     Write-Host "`nAvailable projects:" -ForegroundColor Cyan
     Get-ChildItem -Path $ProjectsRoot -Directory |
-        Where-Object { $_.Name -ne "claude-config" } |
         Sort-Object Name |
         ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
     Write-Host ""

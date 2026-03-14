@@ -18,97 +18,14 @@
 
 ## Daily Workflow
 
-### Starting a Session on Mac
+### Quick Start
 
 ```bash
-# 1. Open Terminal
-
-# 2. Pull latest commands (in case you updated from another machine)
-cd ~/Development/projects/claude-config && git pull && cd -
-
-# 3. Verify config symlinks are in place
-ls -d ~/.claude/skills ~/.claude/agents 2>/dev/null || echo "MISSING SYMLINKS — see Setup section"
-
-# 4. Navigate to project
-cd ~/projects/[project-name]
-
-# 5. (Optional) Pull latest project changes
-git pull
-
-# 6. Check for Claude updates
-claude update
-
-# 7. Launch Claude Code
-claude
-
-# 8. Get up to speed
-/resume-work
+cc my-project    # launch directly
+cc               # interactive project picker
 ```
 
-### Starting a Session on PC
-
-```powershell
-# 1. Open PowerShell or Terminal
-
-# 2. Pull latest commands (in case you updated from another machine)
-cd C:\Development\projects\claude-config; git pull; cd -
-
-# 3. Verify config symlinks are in place
-Get-ChildItem ~\.claude | Where-Object { $_.LinkType -eq "SymbolicLink" } | Format-Table Name, Target
-
-# 4. Navigate to project
-cd C:\Development\projects\[project-name]
-
-# 5. (Optional) Pull latest project changes
-git pull
-
-# 6. Check for Claude updates
-claude update
-
-# 7. Launch Claude Code
-claude
-
-# 8. Get up to speed
-/resume-work
-```
-
-### Quick Start with Startup Scripts
-
-The startup scripts automate all the manual steps above into a single command:
-
-**Mac/Linux:**
-```bash
-# With project name:
-~/Development/projects/claude-config/.claude/scripts/start-claude.sh my-project
-
-# Or interactive project picker:
-~/Development/projects/claude-config/.claude/scripts/start-claude.sh
-```
-
-**Windows (PowerShell):**
-```powershell
-# With project name:
-~\Development\projects\claude-config\.claude\scripts\start-claude.ps1 my-project
-
-# Or interactive project picker:
-~\Development\projects\claude-config\.claude\scripts\start-claude.ps1
-```
-
-**Tip:** Create a shell alias for even quicker access. Run this one-liner to permanently add it to your shell config:
-```bash
-# Mac/Linux — run this command once, then restart your terminal (or run: source ~/.zshrc)
-echo 'alias claude-start="~/Development/projects/claude-config/.claude/scripts/start-claude.sh"' >> ~/.zshrc
-```
-```powershell
-# Windows — run this command once, then restart PowerShell
-Add-Content $PROFILE 'function claude-start { & "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1" @args }'
-```
-
-> **Mac/Linux first run:** Make the script executable first:
-> `chmod +x ~/Development/projects/claude-config/.claude/scripts/start-claude.sh`
-
-> **Windows first run:** You may need to unblock the script first:
-> `Unblock-File "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1"`
+> No `cc` alias? See [README.md](README.md#quick-start) for one-time setup.
 
 **What the script does (5 steps):**
 1. Pulls latest claude-config (syncs skills/agents across machines)
@@ -123,6 +40,64 @@ Add-Content $PROFILE 'function claude-start { & "$env:USERPROFILE\Development\pr
 - Runs all git commands in parallel (log, diff, status)
 - Shows current status + recommends next task
 - Hydrates a live task list from CLAUDE.md using TaskCreate
+
+### Manual Steps (what the script does under the hood)
+
+<details>
+<summary>Mac</summary>
+
+```bash
+# 1. Pull latest commands (in case you updated from another machine)
+cd ~/Development/projects/claude-config && git pull && cd -
+
+# 2. Verify config symlinks are in place
+ls -d ~/.claude/skills ~/.claude/agents 2>/dev/null || echo "MISSING SYMLINKS — see Setup section"
+
+# 3. Navigate to project
+cd ~/projects/[project-name]
+
+# 4. (Optional) Pull latest project changes
+git pull
+
+# 5. Check for Claude updates
+claude update
+
+# 6. Launch Claude Code
+claude
+
+# 7. Get up to speed
+/resume-work
+```
+
+</details>
+
+<details>
+<summary>Windows (PowerShell)</summary>
+
+```powershell
+# 1. Pull latest commands (in case you updated from another machine)
+cd C:\Development\projects\claude-config; git pull; cd -
+
+# 2. Verify config symlinks are in place
+Get-ChildItem ~\.claude | Where-Object { $_.LinkType -eq "SymbolicLink" } | Format-Table Name, Target
+
+# 3. Navigate to project
+cd C:\Development\projects\[project-name]
+
+# 4. (Optional) Pull latest project changes
+git pull
+
+# 5. Check for Claude updates
+claude update
+
+# 6. Launch Claude Code
+claude
+
+# 7. Get up to speed
+/resume-work
+```
+
+</details>
 
 ---
 
@@ -494,68 +469,7 @@ Additionally, Claude Code maintains auto-memory at:
 
 ## New Machine Setup
 
-> **Why individual symlinks?** Claude Code stores config files in `~/.claude` (like `settings.local.json`, credentials, etc.) that would get overwritten if you symlinked the entire folder. Symlinking the subdirectories keeps your local config intact.
-
-### Mac/Linux Setup
-
-```bash
-# 1. Clone the repo
-cd ~/Development/projects  # or wherever you keep repos
-git clone https://github.com/burak-maxitech/claude-config.git
-
-# 2. Remove existing subdirectories (if they exist)
-rm -rf ~/.claude/skills ~/.claude/agents
-
-# 3. Symlink subdirectories individually
-ln -s ~/Development/projects/claude-config/.claude/skills ~/.claude/skills
-ln -s ~/Development/projects/claude-config/.claude/agents ~/.claude/agents
-
-# 4. Verify
-ls -la ~/.claude/ | grep "^l"
-```
-
-### Windows Setup (PowerShell 7+ as Administrator)
-
-```powershell
-# 1. Clone the repo
-cd $env:USERPROFILE\Development\projects
-git clone https://github.com/burak-maxitech/claude-config.git
-
-# 2. Remove old symlinks (if they exist)
-Remove-Item "$env:USERPROFILE\.claude\skills" -Force -ErrorAction SilentlyContinue
-Remove-Item "$env:USERPROFILE\.claude\agents" -Force -ErrorAction SilentlyContinue
-
-# 3. Create symlinks
-New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\skills" -Target "$env:USERPROFILE\Development\projects\claude-config\.claude\skills"
-New-Item -ItemType SymbolicLink -Path "$env:USERPROFILE\.claude\agents" -Target "$env:USERPROFILE\Development\projects\claude-config\.claude\agents"
-
-# 4. Verify
-Get-ChildItem "$env:USERPROFILE\.claude" | Where-Object { $_.LinkType -eq "SymbolicLink" } | Format-Table Name, Target
-```
-
-**Windows Notes:**
-- Must run PowerShell as Administrator to create symlinks
-- Do NOT symlink the entire `~/.claude` folder — it contains local config and credentials
-
-### Syncing Changes
-
-After Claude or you edit any files:
-```bash
-cd ~/Development/projects/claude-config   # Mac/Linux
-cd $env:USERPROFILE\Development\projects\claude-config   # Windows (PowerShell)
-
-git add .
-git commit -m "Updated [what changed]"
-git push
-```
-
-On other machines:
-```bash
-cd ~/Development/projects/claude-config   # Mac/Linux
-cd $env:USERPROFILE\Development\projects\claude-config   # Windows (PowerShell)
-
-git pull
-```
+See [README.md](README.md#setup-on-a-new-machine) for clone, symlink, and sync instructions.
 
 ---
 

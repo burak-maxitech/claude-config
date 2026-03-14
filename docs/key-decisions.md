@@ -36,3 +36,6 @@
 | Quick health check in /resume-work deep mode | Detect and run test/build commands (package.json, Makefile, etc.) to catch broken state before starting to code; only in deep mode to keep default fast |
 | Startup scripts in .claude/scripts/ | Single-command session startup replacing 8 manual steps; cross-platform (bash + PowerShell); includes interactive project picker |
 | Scripts don't auto-run /resume-work | User controls when to run /resume-work; avoids forced context load on every launch; tip message shown instead |
+| Setup instructions in README.md only | One-time setup (clone, symlinks, alias) belongs in README.md; Workflow.md links to it to avoid duplication between files |
+| Alias name `cc` for startup script | Short, memorable alias; user preference over longer `claude-start` |
+| Don't filter claude-config from project picker | User may want to work on the config repo itself; no reason to hide it |

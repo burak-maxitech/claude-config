@@ -24,7 +24,6 @@ PROJECT_NAME="${1:-}"
 if [ -z "$PROJECT_NAME" ]; then
     echo -e "\n${CYAN}Available projects:${RESET}"
     find "$PROJECTS_ROOT" -mindepth 1 -maxdepth 1 -type d \
-        ! -name "claude-config" \
         -exec basename {} \; | sort | while read -r dir; do
         echo -e "  ${GRAY}$dir${RESET}"
     done

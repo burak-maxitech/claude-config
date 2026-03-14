@@ -34,6 +34,9 @@
 - [x] Fixed PowerShell script filename bug in Workflow.md and README.md, added Unblock-File first-run note
 - [x] Changed startup scripts to show tip instead of auto-running `/resume-work`; fixed remaining PS1 filename refs in Workflow.md
 - [x] Clarified shell alias instructions in Workflow.md — explicit "paste into config file" wording with reload/open hints
+- [x] Deduplicated setup instructions — removed from Workflow.md, consolidated in README.md with alias setup
+- [x] Reordered Workflow.md — Quick Start (`cc`) first, manual steps collapsed in `<details>` blocks
+- [x] Removed claude-config filter from startup script project pickers
 
 ## Documentation
 - [x] README.md — Public project overview with setup, commands table, subagents table

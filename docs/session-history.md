@@ -199,3 +199,23 @@
 - Consider changing disable-model-invocation to false on remaining 4 skills
 - Add more skills as new workflow needs emerge
 - Consider adding hooks for automated pre-commit workflows
+
+### Session 10 - 2026-03-13
+**What happened:**
+- Removed duplicated "New Machine Setup" section from Workflow.md — replaced 60-line duplicate with one-line link to README.md
+- Fixed alias name from `claude-start` to `cc` in both Workflow.md (Mac + Windows examples)
+- Reordered Workflow.md Daily Workflow section: Quick Start with `cc` first, detailed manual steps collapsed in `<details>` blocks
+- Moved alias setup one-liners from Workflow.md to README.md Quick Start section (one-time setup belongs in README)
+- Simplified Workflow.md Quick Start to just `cc my-project` with link to README for alias setup
+- Removed `claude-config` filter from interactive project picker in both `start-claude.sh` and `start-claude.ps1`
+
+**Files created/modified:**
+- `Workflow.md` - Removed duplicate setup section, fixed alias names, reordered Quick Start first, simplified to `cc` usage
+- `README.md` - Added alias setup one-liners (Mac + Windows) and first-run notes to Quick Start section
+- `.claude/scripts/start-claude.sh` - Removed `! -name "claude-config"` filter from project picker
+- `.claude/scripts/start-claude.ps1` - Removed `$_.Name -ne "claude-config"` filter from project picker
+
+**Next session should:**
+- Add more skills as new workflow needs emerge
+- Consider adding hooks for automated pre-commit workflows
+- Consider changing disable-model-invocation to false on remaining 4 skills

@@ -105,17 +105,30 @@ Get-ChildItem "$env:USERPROFILE\.claude" | Where-Object { $_.LinkType -eq "Symbo
 
 ## Quick Start
 
-After setup, use the startup scripts to begin a coding session with a single command:
+After setup, create a shell alias for quick access:
 
 ```bash
-# Mac/Linux
-~/Development/projects/claude-config/.claude/scripts/start-claude.sh my-project
-
-# Windows (PowerShell)
-~\Development\projects\claude-config\.claude\scripts\start-claude.ps1 my-project
+# Mac/Linux — run once, then restart terminal (or run: source ~/.zshrc)
+echo 'alias cc="~/Development/projects/claude-config/.claude/scripts/start-claude.sh"' >> ~/.zshrc
+```
+```powershell
+# Windows — run once, then restart PowerShell
+Add-Content $PROFILE 'function cc { & "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1" @args }'
 ```
 
-Run without arguments to see available projects and pick interactively. The script syncs config, verifies symlinks, pulls project changes, checks for Claude updates, and launches Claude Code.
+> **Mac/Linux first run:** Make the script executable first:
+> `chmod +x ~/Development/projects/claude-config/.claude/scripts/start-claude.sh`
+
+> **Windows first run:** You may need to unblock the script first:
+> `Unblock-File "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1"`
+
+Then start any session with:
+```bash
+cc my-project    # launch directly
+cc               # interactive project picker
+```
+
+The script syncs config, verifies symlinks, pulls project changes, checks for Claude updates, and launches Claude Code.
 
 ## Syncing Changes
 
