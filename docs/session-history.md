@@ -219,3 +219,18 @@
 - Add more skills as new workflow needs emerge
 - Consider adding hooks for automated pre-commit workflows
 - Consider changing disable-model-invocation to false on remaining 4 skills
+
+### Session 11 - 2026-03-17
+**What happened:**
+- Resumed work after 4-day break using `/resume-work`
+- Reviewed plan-feature skill's `disable-model-invocation` setting (currently `true`)
+- User initiated change to enable model invocation but cancelled before applying
+- No code changes made this session
+
+**Files created/modified:**
+- None (documentation-only update via `/update-docs`)
+
+**Next session should:**
+- Change `disable-model-invocation` to `false` on plan-feature skill (user intention from this session)
+- Add more skills as new workflow needs emerge
+- Consider adding hooks for automated pre-commit workflows

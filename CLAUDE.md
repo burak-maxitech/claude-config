@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-03-13 (Session 10)
+Last Updated: 2026-03-17 (Session 11)
 
 ## Project Overview
 
@@ -119,9 +119,7 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 10) - 2026-03-13
-- Removed duplicated setup section from Workflow.md — now links to README.md instead
-- Fixed alias name from `claude-start` to `cc` in both Mac and Windows examples
-- Reordered Workflow.md: Quick Start first, manual steps collapsed in `<details>` blocks
-- Moved alias setup instructions from Workflow.md to README.md (one-time setup belongs there)
-- Removed claude-config filter from interactive project picker in both startup scripts
+### Last Session (Session 11) - 2026-03-17
+- Resumed work after 4-day break, reviewed current state
+- Reviewed plan-feature skill's `disable-model-invocation` setting (currently `true`)
+- No code changes made this session
