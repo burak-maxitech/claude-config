@@ -89,6 +89,7 @@ Verify the project actually works before starting to code:
    - `Makefile` → look for `test` or `check` targets
    - `pyproject.toml` → look for `[tool.pytest]` or test scripts
    - `Cargo.toml` → Rust project (use `cargo test`, `cargo build`)
+   - Plugin `bin/` helpers on `$PATH` (Claude Code 2.1.91+) → if an enabled plugin ships a `bin/check`, `bin/test`, or `bin/ci` script, it will already be on `$PATH` as a bare command. Prefer it over the ladder above when present, since the plugin author has chosen the canonical command for this project.
 2. **If a quick test command exists**, run it and report pass/fail
 3. **If a quick build command exists**, run it and report pass/fail
 4. **If no commands found**, skip silently — do not warn about missing commands
