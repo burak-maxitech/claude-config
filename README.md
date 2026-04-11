@@ -160,13 +160,24 @@ git pull
 
 ## Subagents
 
-The `.claude/agents/` folder contains subagent definitions used by skills. These run on Sonnet for cost efficiency and have scoped tool permissions. They are not user-invocable — skills dispatch them automatically via the Task tool.
+The `.claude/agents/` folder contains subagent definitions used by skills. These run on Sonnet for cost efficiency and have scoped tool permissions. Skills dispatch them automatically via the Task tool, and you can also reference them by name in `@`-mention typeahead inside the REPL (added in Claude Code 2.1.89).
 
 | Agent | Used By | Purpose |
 |-------|---------|---------|
 | `cleanup-files-code` | `/code-cleanup` | Scans for unused files and dead code |
 | `cleanup-deps-config` | `/code-cleanup` | Scans for unused deps and config cruft |
 | `cleanup-styles-tests` | `/code-cleanup` | Scans for unused CSS and stale tests |
+
+## Interop with Claude Code 2.1 features
+
+These skills are standalone `.claude/` configuration, which is the approach [the official docs recommend](https://code.claude.com/docs/en/plugins#when-to-use-plugins-vs-standalone-configuration) for personal workflows. They coexist happily with installed marketplace plugins — no migration needed.
+
+A few harness-level features worth knowing about when using these skills:
+
+- **Gating destructive `--fix` runs in CI.** `code-cleanup --fix` and `code-review --fix` are intentionally not self-gating (see the note in each SKILL.md). If you run them headlessly via `claude -p` and want an external approval step, configure a `PreToolUse` hook in `~/.claude/settings.json` that returns `"permissionDecision": "defer"` on matching bash patterns (e.g. `Bash(rm:*)`). The session exits with `stop_reason: "tool_deferred"`; resume via `claude -p --resume <session-id>`. Note: `defer` only works when the turn makes a single tool call — useful for a `rm` guard, not for orchestrating a multi-step `--fix` run. See [hooks docs](https://code.claude.com/docs/en/hooks) for the full decision flow.
+- **`disableSkillShellExecution`** (added 2.1.91). Hardens the harness by blocking inline shell from skills and slash commands. **Do not enable this here** — `code-cleanup --fix`, `code-review --verify`, and `resume-work deep` all depend on shell execution and will break. Leave OFF.
+- **Plugin `bin/` on PATH** (added 2.1.91). If you install a marketplace plugin that ships `bin/check` or `bin/test`, `resume-work deep` picks it up automatically in the health check detection ladder.
+- **MCP `maxResultSizeChars`** (added 2.1.91). If a future `code-review` run hits an MCP-backed file reader that truncates, the MCP server can set `_meta["anthropic/maxResultSizeChars"]` up to 500K per tool to return fuller context in one call.
 
 ## Documentation
 
