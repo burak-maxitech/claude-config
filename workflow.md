@@ -163,6 +163,18 @@ claude
 
 ---
 
+### Mid-Session Context Hygiene
+
+Long sessions bloat the context window with tool results, scan outputs, and early exploration that's no longer load-bearing. `/compact` rewrites the conversation into a terse summary while preserving loaded CLAUDE.md, which lets a long session keep going without token exhaustion.
+
+**Run `/compact` proactively — earlier rather than later.** Once the context bar is visibly consumed and the main task ahead is well-defined, compacting immediately is cheaper than waiting until the context is full. A useful form is `/compact focus on <next task>` — Claude keeps the carry-forward summary pointed at what's about to happen next.
+
+This generalizes the compact hints already emitted by `/resume-work` and `/update-docs`. Those two skills suggest compacting after their own substantial work; the same habit applies mid-session whenever a chunk of context (failed approach, large file read, long grep) is no longer needed.
+
+Project-root `CLAUDE.md` survives compaction — Claude re-reads it from disk after `/compact` — so project-wide context is not lost. Nested CLAUDE.md files in subdirectories reload lazily the next time Claude reads a file there. Instructions given only in conversation (not in any CLAUDE.md) may not survive: put anything you want to persist into CLAUDE.md or a `.claude/rules/` file.
+
+---
+
 ### Ending a Session
 
 ```bash
