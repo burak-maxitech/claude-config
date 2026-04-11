@@ -9,7 +9,13 @@
       "Bash(find \"C:/Development/projects/claude-config/.claude/skills/resume-work\" -type f -exec ls -lh {})",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:docs.anthropic.com)",
-      "Skill(update-docs)"
+      "Skill(update-docs)",
+      "Bash(xargs -I {} ls -la {})",
+      "WebFetch(domain:docs.claude.com)",
+      "WebSearch",
+      "Bash(claude --version)",
+      "Bash(wc:*)",
+      "Bash(where claude:*)"
     ]
   }
 }

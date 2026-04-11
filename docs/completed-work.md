@@ -19,6 +19,9 @@
 - [x] `security-deep-dive.md` — New reference file with full OWASP Top 10 checklist for `/code-review --security`
 - [x] `/resume-work` enhancements — Context freshness detection, quick health check (deep mode), bidirectional task integrity pre-check, uncommitted changes warning in summary, compact tip, expanded allowed-tools for build/test commands
 - [x] `/update-docs` enhancements — Drain validation after Part 0, commit checkpoint (Part 5), `--skip-commit` flag, post-verification compact suggestion
+- [x] `/code-cleanup` CI gating recipe — Documented PreToolUse `defer` hook integration in Fix Mode; explains the single-tool-call constraint and resume-via-`claude -p --resume` flow (SKILL.md)
+- [x] `/code-review` CI gating + MCP `maxResultSizeChars` notes — Step 1 sampling notes the MCP `_meta["anthropic/maxResultSizeChars"]` knob (up to 500K) for larger file returns; Step 6 Auto-Fix mirrors the PreToolUse defer recipe from code-cleanup (SKILL.md)
+- [x] `/resume-work` plugin `bin/` detection — Step 2.5 deep-mode health check now prefers `bin/check`, `bin/test`, `bin/ci` helpers shipped by enabled plugins (CC 2.1.91+) over the generic `package.json → Makefile → pyproject.toml → Cargo.toml` ladder (SKILL.md)
 
 ## Subagents
 - [x] `cleanup-files-code` — Scans for unused files and dead code
@@ -45,3 +48,4 @@
 - [x] docs/session-history.md — Session archive
 - [x] docs/key-decisions.md — Architectural decisions log
 - [x] docs/completed-work.md — This file
+- [x] README.md "Interop with Claude Code 2.1 features" section — Documents `disableSkillShellExecution`, plugin `bin/` PATH injection, MCP `maxResultSizeChars` up to 500K, the `PreToolUse defer` recipe for CI gating, and @-mentioned subagents; explicitly notes that standalone skills and installed marketplace plugins coexist per official docs
