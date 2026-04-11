@@ -477,6 +477,20 @@ Additionally, Claude Code maintains auto-memory at:
 - Don't let CLAUDE.md get stale
 - Don't ignore code review suggestions
 
+### Recurring tasks: `/loop`
+
+Claude Code ships a built-in `/loop` skill for running a prompt or slash command on a recurring interval within the current session. Handy for polling a long-running process or running a periodic sanity check without manually re-triggering.
+
+```bash
+/loop 5m /code-cleanup --dry-run   # dry-run cleanup every 5 minutes
+/loop 2m "check deploy status"     # poll a deploy every 2 minutes
+/loop /code-review                 # omit interval — model self-paces
+```
+
+Two important caveats: `/loop` is **session-scoped** — it dies when the Claude Code session closes — and recurring jobs **auto-expire after 3 days** even if the session lives longer. Don't use it as a replacement for a real cron job or scheduled remote agent (see `/schedule` for persistent scheduling).
+
+**Do not build a custom `/loop` skill in this repo.** The built-in already covers this use case; re-implementing it in `.claude/skills/` would be waste.
+
 ---
 
 ## New Machine Setup
