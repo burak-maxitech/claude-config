@@ -57,6 +57,8 @@ Before reviewing, **quickly scan the codebase for established patterns** so you 
 
 Do NOT spend more than one turn on this. Sample quickly, note the patterns, and move on. If the codebase is small (<10 files), you'll naturally see conventions while reviewing — skip this step.
 
+> If a large file is being sampled via an MCP-backed reader and the default result size truncates it, the MCP server can set `_meta["anthropic/maxResultSizeChars"]` per tool (up to 500K chars, added in Claude Code 2.1.91) to return the full file in one call. No skill-side change required; this is a server-side knob to be aware of.
+
 ---
 
 ## Step 2: Review Against Checklist
@@ -119,6 +121,8 @@ After review (and verification if `--verify` also present), auto-fix **only simp
 - Anything marked Critical
 
 After fixing, show a summary of what was changed and run tests again to confirm nothing broke.
+
+> **CI gating note.** This skill does not implement its own pause-for-approval flag. If you want to gate `--fix` edits in a headless run, configure a `PreToolUse` hook in `~/.claude/settings.json` that matches `Edit` (or the specific bash patterns you want to guard) and returns `"permissionDecision": "defer"`. The session exits with `stop_reason: "tool_deferred"` and can be resumed with `claude -p --resume <session-id>`. `defer` only works when the turn makes a single tool call — it guards individual edits, not the whole `--fix` run. See README "Interop with Claude Code 2.1 features" for the full recipe.
 
 ---
 
