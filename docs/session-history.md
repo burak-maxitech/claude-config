@@ -234,3 +234,37 @@
 - Change `disable-model-invocation` to `false` on plan-feature skill (user intention from this session)
 - Add more skills as new workflow needs emerge
 - Consider adding hooks for automated pre-commit workflows
+
+### Session 12 - 2026-04-11
+**What happened:**
+- User asked for a thorough analysis of Claude Code improvements released since the last session (2.1.88 → 2.1.101) and which would make sense to incorporate into the 5 skills.
+- Used plan mode with two parallel Explore agents (skill audit + feature research) plus one Plan agent to produce a tiered implementation blueprint. Plan written to `C:\Users\burak\.claude\plans\toasty-sleeping-charm.md`.
+- Verified 11 candidate features against docs.claude.com (hooks page, plugins page) and the official CHANGELOG at github.com/anthropics/claude-code. `PermissionDenied` hook, `defer` PreToolUse decision, `disableSkillShellExecution`, MCP `maxResultSizeChars`, plugin `bin/` on PATH, and named subagents in @-mention all confirmed. `showThinkingSummaries` and subagent MCP inheritance fix couldn't be verified and were dropped.
+- **Killed the `--gated` flag design** after discovering two blocking constraints in the hooks doc: `defer` only works when Claude makes a single tool call in the turn (quoted verbatim from docs), and it's specifically designed for external SDK/subprocess callers that run `claude -p` and resume via `claude -p --resume`. Skills cannot self-emit defer; only a `PreToolUse` hook can. The correct integration is harness-level config documented in README, not a new skill flag.
+- Shipped 5 commits total (2 original commits 5+6 dropped, commit 7 was a no-op grep):
+  1. `docs: note Claude Code 2.1 features and CI gating recipe` (56a5513) — README interop section added
+  2. `code-cleanup: document CI gating via PreToolUse defer hook` (dd6a7ce) — Fix Mode note
+  3. `code-review: document CI gating and MCP maxResultSizeChars` (644fb0c) — Step 1 + Step 6 notes
+  4. `resume-work: detect plugin bin/ scripts in deep-mode health check` (83f9bb1) — extends the detection ladder
+  5. (this commit) `docs: record session 12 and CC 2.1 adoption decisions`
+- Unexpected findings worth remembering: the user already has `frontend-design` and `feature-dev` plugins installed via the official marketplace; the plugins doc explicitly calls out standalone `.claude/` as the recommended approach for personal workflows, vindicating the symlink model.
+- Did **not** upgrade cleanup subagents to Opus 4.6 — reverses the existing "Subagents on Sonnet" key decision.
+
+**Files created/modified:**
+- `README.md` - Added "Interop with Claude Code 2.1 features" section (+12 lines), updated Subagents section to mention @-mention typeahead
+- `.claude/skills/code-cleanup/SKILL.md` - Added CI gating note in Fix Mode (+2 lines)
+- `.claude/skills/code-review/SKILL.md` - Added MCP maxResultSizeChars tip in Step 1 + CI gating note in Step 6 Auto-Fix (+4 lines)
+- `.claude/skills/resume-work/SKILL.md` - Added plugin bin/ detection to health check ladder in Step 2.5 (+1 line)
+- `CLAUDE.md` - Bumped Last Updated to 2026-04-11, added 3 Key Decisions rows, replaced Session 11 summary with Session 12
+- `docs/session-history.md` - Added Session 12 entry (this entry)
+
+**Files NOT modified (and why):**
+- `.claude/agents/cleanup-*.md` - Planned decline markers were speculative and don't fit the current return-structured-findings agent model
+- `.claude/skills/plan-feature/` - Grep confirmed no stale MCP inheritance caveat to remove; commit 7 was a no-op
+- `.claude/skills/update-docs/` - None of the verified features address its rough edges
+- `docs/completed-work.md`, `docs/key-decisions.md` - Not updated this session; Key Decisions condensed table in CLAUDE.md is the primary landing spot for this round
+
+**Next session should:**
+- Dogfood the `--fix` CI gating recipe: build a minimal PreToolUse defer hook in `~/.claude/settings.json` that matches `Bash(rm:*)`, run `/code-cleanup --fix` on a throwaway scratch repo, and verify the session exits with `stop_reason: "tool_deferred"` and resumes cleanly via `claude -p --resume`. If resume works, consider writing a reference file documenting the exact hook config.
+- Revisit `update-docs` rough edges (partial-mode selection, rollback) independently — none of this round's CC 2.1 features addressed them.
+- Consider the 2.1.98 Monitor tool for streaming background script events — could be useful for watching long-running commands inside `code-cleanup --fix` or `code-review --verify`.

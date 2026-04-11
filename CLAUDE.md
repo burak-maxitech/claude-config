@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-03-17 (Session 11)
+Last Updated: 2026-04-11 (Session 12)
 
 ## Project Overview
 
@@ -69,6 +69,9 @@ Nothing currently in progress.
 | Scripts don't auto-run /resume-work | User controls when to run /resume-work; avoids forced context load on every launch |
 | Setup instructions in README.md only | One-time setup (clone, symlinks, alias) belongs in README; Workflow.md links to it to avoid duplication |
 | Don't filter claude-config from project picker | User may want to work on the config repo itself |
+| CI gating documented, not implemented in-skill | `defer` PermissionDecision only works for single-tool-call turns and is meant for SDK/subprocess callers; skills can't self-gate. Document the PreToolUse recipe in README instead of adding a `--gated` flag. |
+| Plugin `bin/` helpers in resume-work health check | CC 2.1.91 puts enabled plugins' `bin/` on `$PATH`; prefer plugin-provided smoke tests over the generic `package.json → Makefile → pyproject.toml → Cargo.toml` ladder. |
+| Standalone skills + installed marketplace plugins coexist | Claude Code docs explicitly recommend standalone `.claude/` for personal config and plugins for sharing. No migration needed; the symlink model is the recommended personal-workflow pattern. |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -119,7 +122,8 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 11) - 2026-03-17
-- Resumed work after 4-day break, reviewed current state
-- Reviewed plan-feature skill's `disable-model-invocation` setting (currently `true`)
-- No code changes made this session
+### Last Session (Session 12) - 2026-04-11
+- Audited 11 candidate Claude Code features released between 2.1.87 → 2.1.101 against the 5 skills; verified each against the hooks doc, plugins doc, and official CHANGELOG before editing.
+- Shipped 5 commits: README interop section (disableSkillShellExecution, plugin bin/ PATH, defer recipe, MCP maxResultSizeChars, @-mention subagents); code-cleanup + code-review CI gating notes; resume-work plugin-bin detection; code-review MCP maxResultSizeChars note.
+- Dropped the planned in-skill `--gated` flag after discovering `defer` only works for single-tool-call turns and is architecturally meant for external SDK callers, not self-gating from inside a skill. Documentation-layer solution is the right fit.
+- Kept subagents on Sonnet (did not upgrade to Opus 4.6) per the existing cost-efficiency decision.
