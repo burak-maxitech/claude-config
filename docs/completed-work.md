@@ -49,3 +49,6 @@
 - [x] docs/key-decisions.md — Architectural decisions log
 - [x] docs/completed-work.md — This file
 - [x] README.md "Interop with Claude Code 2.1 features" section — Documents `disableSkillShellExecution`, plugin `bin/` PATH injection, MCP `maxResultSizeChars` up to 500K, the `PreToolUse defer` recipe for CI gating, and @-mentioned subagents; explicitly notes that standalone skills and installed marketplace plugins coexist per official docs
+- [x] README.md MCP server setup bullet — Added to the interop section documenting the three MCP scopes (local/project/user), `.mcp.json` at repo root for project scope, the `claude mcp add --transport {http\|sse\|stdio}` CLI, and tool-search context deferral (Session 13)
+- [x] `workflow.md` Mid-Session Context Hygiene subsection — Generalizes the `/compact` habit from the existing resume-work/update-docs suggestions to mid-session use. Softened wording ("earlier rather than later") after verification showed no percentage threshold is in Anthropic docs. Includes the CLAUDE.md-survives-compaction note (Session 13)
+- [x] `workflow.md` Recurring tasks `/loop` reference — Documents the built-in `/loop` skill with session-scope + 3-day auto-expire caveats. Explicit non-goal: do not reimplement as a custom skill (Session 13)

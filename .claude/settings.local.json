@@ -15,7 +15,9 @@
       "WebSearch",
       "Bash(claude --version)",
       "Bash(wc:*)",
-      "Bash(where claude:*)"
+      "Bash(where claude:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)"
     ]
   }
 }

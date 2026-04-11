@@ -268,3 +268,38 @@
 - Dogfood the `--fix` CI gating recipe: build a minimal PreToolUse defer hook in `~/.claude/settings.json` that matches `Bash(rm:*)`, run `/code-cleanup --fix` on a throwaway scratch repo, and verify the session exits with `stop_reason: "tool_deferred"` and resumes cleanly via `claude -p --resume`. If resume works, consider writing a reference file documenting the exact hook config.
 - Revisit `update-docs` rough edges (partial-mode selection, rollback) independently — none of this round's CC 2.1 features addressed them.
 - Consider the 2.1.98 Monitor tool for streaming background script events — could be useful for watching long-running commands inside `code-cleanup --fix` or `code-review --verify`.
+
+### Session 13 - 2026-04-11
+**What happened:**
+- User asked for a thorough review of the external best-practice repo https://github.com/shanraisshan/claude-code-best-practice (actively maintained, daily commits as of April 2026) to identify patterns worth incorporating.
+- Ran plan mode: single Explore agent produced a 40+ file catalog from the external repo; single Plan agent synthesized it against the existing 5 skills + 3 subagents into a tiered recommendation. Plan written to `C:\Users\burak\.claude\plans\toasty-sleeping-charm.md` (overwriting Session 12's plan).
+- **Spot-verification during Phase 3 killed two claims:**
+  1. Direct fetch of `.claude/skills/agent-browser/SKILL.md` from the external repo showed its frontmatter is only `name`, `description`, `allowed-tools` — the same minimal set we already use. The Explore agent's "13 skill frontmatter fields" claim was documentation extrapolation, not observed practice. **Dropped all Tier 2 skill-frontmatter adoptions** (no `paths:`, no `effort:`, no `context: fork`).
+  2. WebFetch of docs.claude.com memory page had no mention of proactive `/compact` at any specific percentage. "50%" was one person's opinion. **Softened the workflow wording** to "earlier rather than later" with no number cited.
+- Direct fetch of `.claude/agents/weather-agent.md` confirmed the external repo's rich agent frontmatter is real (`skills:`, `memory: project`, `hooks:`, camelCase `allowedTools`/`maxTurns`/`permissionMode`), validating the hooks.py dispatcher pattern exists. **Not adopted** — hook infrastructure is blocked on the pending Session 12 `defer` dogfood.
+- WebFetch of docs.claude.com MCP page confirmed `.mcp.json` at repo root is the project-scope config file (quote: *"Project-scoped servers enable team collaboration by storing configurations in a `.mcp.json` file at your project's root directory"*). Local scope lives in `~/.claude.json`; `claude mcp add --transport {http|sse|stdio}` is the recommended add path. Tool-search deferral keeps context cost low, so the "curation/start narrow" community narrative is only partially true — the real ceilings are tool-menu clarity and permission-prompt volume.
+- **Unexpected finding from memory doc (not in the original research):** `.claude/rules/` with `paths:` frontmatter is a real documented feature for path-scoped project rules, and `.claude/rules/` explicitly **supports symlinks for cross-project sharing**. This is different from skills and fits our symlink model cleanly — flagged as a potential future adoption but not shipped this session (would require deciding what rules to write, and nothing pressing).
+- Shipped 3 doc commits (`adf634e`, `5f61209`, `445c357`) all direct to `main`:
+  1. `docs: add MCP server setup bullet to README interop section` — one new bullet, verified scopes, CLI command, tool-search deferral note.
+  2. `docs: add mid-session context hygiene subsection to workflow` — new subsection under Daily Workflow explaining when to `/compact` (earlier rather than later) and noting that project-root CLAUDE.md survives compaction.
+  3. `docs: reference built-in /loop skill in workflow tips` — new subsection under Tips & Best Practices with examples, the session-scope + 3-day auto-expire caveat, and an explicit non-goal of reimplementing `/loop` as a custom skill.
+- Cancelled Tier 2 from the plan entirely (0 commits). Verification removed both T2 candidates before they reached implementation.
+
+**Files created/modified:**
+- `README.md` — Added MCP server setup bullet to "Interop with Claude Code 2.1 features" section (+1 line, fifth bullet)
+- `workflow.md` — Added `### Mid-Session Context Hygiene` subsection between "During Development" and "Ending a Session" (+12 lines); added `### Recurring tasks: /loop` subsection inside "Tips & Best Practices" after Don'ts list (+14 lines)
+- `CLAUDE.md` — Bumped Last Updated to Session 13, added 1 Key Decisions row ("Verify every external-repo claim before shipping"), replaced Session 12 summary with Session 13 summary
+- `docs/session-history.md` — This entry
+- `docs/key-decisions.md` — Appended 11-item skip-list appendix from the plan (see "## Considered and Skipped in Session 13" section)
+- `docs/completed-work.md` — Added 3 entries for the shipped docs
+- `.claude/settings.local.json` — Harness auto-added `WebFetch(domain:raw.githubusercontent.com)` and `WebFetch(domain:api.github.com)` permissions from this session's verification fetches
+
+**Files NOT modified (and why):**
+- No skill `SKILL.md` files — Tier 2 was cancelled after verification
+- No subagent `.md` files — no hook or memory adoption this session
+- No `.claude/rules/` directory created — feature is compelling but there's nothing urgent to put in it; document in key-decisions as "considered, deferred"
+
+**Next session should:**
+- **Still owed: Session 12 `defer` hook dogfood.** This has now been explicitly deferred twice (Session 12 after-work + Session 13 scope decision). It's the correct next hook experiment and blocks any broader hook adoption.
+- After the dogfood, consider whether `.claude/rules/` (symlink-compatible path-scoped rules) is worth adopting — e.g., a shared `.claude/rules/repo-conventions.md` that can be symlinked into other projects.
+- Revisit `update-docs` rough edges (partial-mode selection, rollback) — still not addressed.
