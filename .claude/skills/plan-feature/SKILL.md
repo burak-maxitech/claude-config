@@ -109,9 +109,9 @@ Based on the detected mode, read the relevant reference file:
 Follow the interview process:
 1. Read all available context (CLAUDE.md, PRD, plan file)
 2. Analyze what's specified vs what's ambiguous or missing
-3. **Drive the interview with the `AskUserQuestion` tool** — batch 3-5 questions per call, each with 2-4 multi-choice options plus an "Other / explain" escape. Fall back to numbered chat Q&A only if `AskUserQuestion` is unavailable.
+3. Drive the interview per `references/interview-rules.md`
 4. **Wait for answers before continuing**
-5. Probe deeper on vague or "Other" answers — re-ask with refined options
+5. Probe deeper on vague answers — re-ask with refined options
 6. Continue until all relevant categories are covered
 7. Summarize understanding and confirm before proceeding
 

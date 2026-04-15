@@ -335,3 +335,6 @@
 - **Still owed: Session 12 `defer` hook dogfood.** Three sessions deferred now. Build the minimal `~/.claude/settings.json` `PreToolUse` hook matching `Bash(rm:*)`, run `/code-cleanup --fix` on a throwaway repo, verify `stop_reason: "tool_deferred"` and resume via `claude -p --resume <session-id>`.
 - Pick up the 2 deferred medium-value gaps if useful: README `auto mode` documentation, `update-docs` compaction-preservation section.
 - Revisit `update-docs` rough edges (partial-mode selection, rollback) — still not addressed since Session 12.
+
+**Post-commit polish (same-day, post `4d444b0`):**
+- `/simplify` flagged that the new Step 5 item 3 in `plan-feature/SKILL.md` duplicated ~70 words of `references/interview-rules.md` content. Collapsed item 3 to a one-line pointer and stripped the leaked `"Other"` qualifier from item 5 — net –2 lines, restores the SKILL.md ↔ references/ separation the skill was designed around. Confirmed clean by a follow-up `/code-review`. `/code-cleanup` was invoked but declined to run — this repo has no code stack, so 6 of 7 cleanup categories don't apply; surfaced the judgment to the user instead of burning subagents.
