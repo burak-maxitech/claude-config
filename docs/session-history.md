@@ -303,3 +303,35 @@
 - **Still owed: Session 12 `defer` hook dogfood.** This has now been explicitly deferred twice (Session 12 after-work + Session 13 scope decision). It's the correct next hook experiment and blocks any broader hook adoption.
 - After the dogfood, consider whether `.claude/rules/` (symlink-compatible path-scoped rules) is worth adopting — e.g., a shared `.claude/rules/repo-conventions.md` that can be symlinked into other projects.
 - Revisit `update-docs` rough edges (partial-mode selection, rollback) — still not addressed.
+
+### Session 14 - 2026-04-14
+**What happened:**
+- User asked whether the official Claude Code best-practices doc (https://code.claude.com/docs/en/best-practices) revealed any discrepancies or improvements for the 5 custom skills.
+- WebFetched the full doc and ran a verification pass against the skill files: `Grep` confirmed zero references to `AskUserQuestion`, `/clear`, `/btw`, `/rewind`, "fresh session", `auto mode`, `--permission-mode`, or `--allowedTools` anywhere in `~/.claude/skills/` or the repo. Also confirmed `plan-feature` had no triviality escape hatch.
+- Reported the audit as 4 high-value gaps + 2 medium gaps + 3 already-aligned items + 1 considered-but-rejected change. User asked to implement the high-value gaps.
+- **Shipped one commit (`a94fbda`) covering all 4 high-value gaps:**
+  1. `plan-feature/SKILL.md` — new Step 0 triviality check that proposes skipping the skill if the request fits in one sentence and 1-2 files; cites the doc verbatim.
+  2. `plan-feature/SKILL.md` + `plan-feature/references/interview-rules.md` — interview now driven by the `AskUserQuestion` tool with multi-choice options + "Other / explain" escape; numbered chat Q&A is the documented fallback. `AskUserQuestion` added to `allowed-tools` frontmatter. "Start Now" list renumbered (caught and fixed a duplicate `3.` before commit).
+  3. `code-review/SKILL.md` — header tip recommending `/clear` or fresh `claude` session for non-trivial reviews, with carve-outs for `--last-commit` and quick passes.
+  4. `code-review/SKILL.md` + `code-cleanup/SKILL.md` — `--fix` outputs end with `Esc Esc` / `/rewind` recovery line. For `code-cleanup`, kept the existing `git branch -D` instruction and added `/rewind` as the finer-grained option.
+- The single audit commit replaced the typical 4-separate-commits pattern from Sessions 12-13 because all four changes share the same source citation (the official doc) and all touch skill behavior; one commit reads cleaner in `git log`.
+
+**Files created/modified:**
+- `.claude/skills/plan-feature/SKILL.md` — added Step 0 (triviality check), added `AskUserQuestion` to `allowed-tools`, updated Step 5 interview directive, renumbered "Start Now" (+18 lines net)
+- `.claude/skills/plan-feature/references/interview-rules.md` — new "Tool: use `AskUserQuestion`" section, rewrote 8 rules into 9 rules around multi-choice prompting (+15 lines net)
+- `.claude/skills/code-review/SKILL.md` — header fresh-session tip + `--fix` `/rewind` footer (+5 lines)
+- `.claude/skills/code-cleanup/SKILL.md` — `/rewind` footer added to step 8 of Fix Mode alongside the existing `git branch -D` (+1 line net)
+- `CLAUDE.md` — bumped Last Updated to Session 14, added 2 Key Decisions rows, replaced Session 13 summary with Session 14 summary
+- `docs/session-history.md` — this entry
+- `docs/key-decisions.md` — appended 5 detailed rows (4 shipped decisions + 1 considered-and-rejected for the `@import` choice)
+- `docs/completed-work.md` — appended 5 entries
+
+**Files NOT modified (and why):**
+- `README.md` — Medium gap #5 (auto mode for headless `claude -p` runs) was identified but deferred. The existing `defer` recipe at line 177 is correct as far as it goes; adding `auto mode` as a complementary first-line option is worth doing but wasn't requested in this round.
+- `update-docs` skill files — Medium gap #6 (CLAUDE.md compaction-preservation hints) also deferred; would add an optional `## Compaction Preferences` section to `claude-md-sections.md` contract. Not requested.
+- The 3 cleanup-* subagent files — no audit findings touched them.
+
+**Next session should:**
+- **Still owed: Session 12 `defer` hook dogfood.** Three sessions deferred now. Build the minimal `~/.claude/settings.json` `PreToolUse` hook matching `Bash(rm:*)`, run `/code-cleanup --fix` on a throwaway repo, verify `stop_reason: "tool_deferred"` and resume via `claude -p --resume <session-id>`.
+- Pick up the 2 deferred medium-value gaps if useful: README `auto mode` documentation, `update-docs` compaction-preservation section.
+- Revisit `update-docs` rough edges (partial-mode selection, rollback) — still not addressed since Session 12.

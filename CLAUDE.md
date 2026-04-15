@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-04-11 (Session 13)
+Last Updated: 2026-04-14 (Session 14)
 
 ## Project Overview
 
@@ -73,6 +73,8 @@ Nothing currently in progress.
 | Plugin `bin/` helpers in resume-work health check | CC 2.1.91 puts enabled plugins' `bin/` on `$PATH`; prefer plugin-provided smoke tests over the generic `package.json → Makefile → pyproject.toml → Cargo.toml` ladder. |
 | Standalone skills + installed marketplace plugins coexist | Claude Code docs explicitly recommend standalone `.claude/` for personal config and plugins for sharing. No migration needed; the symlink model is the recommended personal-workflow pattern. |
 | Verify every external-repo claim before shipping | Session 13 research on shanraisshan/claude-code-best-practice surfaced 14 candidate patterns. Spot-verification via direct raw.githubusercontent.com fetches found the catalog had conflated skills `paths:` with `.claude/rules/` `paths:`, and that "curation/start narrow" and "/compact at 50%" were community wisdom, not Anthropic guidance. Ship only what docs.claude.com confirms; soften or drop the rest. |
+| `plan-feature` Step 0 triviality check + `AskUserQuestion`-driven interview | Session 14 audit against code.claude.com/docs/en/best-practices. Doc explicitly recommends `AskUserQuestion` for the interview pattern and explicitly tells users to skip planning for one-sentence changes ("typo, log line, rename"). Step 0 returns control to the user before the interview overhead; interview itself uses multi-choice prompts with an "Other / explain" escape. Falls back to numbered Q&A when `AskUserQuestion` is unavailable. |
+| Surface `/rewind` in destructive `--fix` output | Same Session 14 audit. Doc treats checkpointing as a core safety net for risky operations. Both `code-cleanup --fix` and `code-review --fix` now end with a one-liner pointing the user at `Esc Esc` / `/rewind`. For `code-cleanup`, the existing `git branch -D` instruction stays as the coarse-grained option and `/rewind` is added for finer-grained per-edit undo. |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -123,9 +125,9 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 13) - 2026-04-11
-- Reviewed external best-practice repo (shanraisshan/claude-code-best-practice, actively maintained) and catalogued 14 candidate patterns via an Explore agent.
-- Spot-verified load-bearing claims by direct raw.githubusercontent.com fetches + docs.claude.com; two claims were fabricated (skills `paths:` frontmatter; "/compact at 50%" as Anthropic guidance) and were dropped or softened before shipping.
-- Shipped 3 documentation commits: README MCP server setup bullet (verified scopes: local/project/user; `.mcp.json` for project scope; `claude mcp add` CLI); workflow mid-session context hygiene subsection (general "compact earlier rather than later" guidance); workflow `/loop` reference with the 3-day auto-expire caveat.
-- Skipped 11 patterns with reasons recorded in `docs/key-decisions.md`: full hooks.py dispatcher, agent-scoped hooks, Command→Agent→Skill labeling, skills `paths:`/`effort:`/`context:`, subagent `memory:`, multiple CLAUDE.md hierarchy, deny-first settings, etc.
-- **Session 12 `defer` hook dogfood still pending** — explicitly deferred from this session so it runs as its own isolated test, unbundled from any new hook infrastructure.
+### Last Session (Session 14) - 2026-04-14
+- Audited the 5 custom skills against the official best-practices doc at code.claude.com/docs/en/best-practices. Verified 4 high-value gaps via grep against the skill files (no `AskUserQuestion`, no `/clear` / `/btw` / `/rewind` references, no triviality escape hatch in plan-feature, no `auto mode` / `--allowedTools` mentions in README).
+- Shipped one commit (`a94fbda`) with all four fixes: `plan-feature` Step 0 triviality check, `plan-feature` interview rerouted through `AskUserQuestion` (with fallback + multi-choice rules), `code-review` fresh-session tip in header, `/rewind` recovery footer on both `--fix` modes (`code-review` + `code-cleanup`). All four citations point back to the official doc.
+- Validated three things as **already aligned** with the doc and needing no change: the overflow-to-`docs/` model (doc explicitly says "skills load on demand without bloating every conversation"), `code-cleanup`'s parallel subagents (matches doc's "subagents are one of the most powerful tools available"), and `plan-feature` phase gating with tests + commit per phase.
+- Considered and **rejected** swapping CLAUDE.md's markdown links for `@import` syntax — would defeat the whole point of the overflow system, which is precisely *not* loading `docs/key-decisions.md` every session.
+- **Session 12 `defer` hook dogfood still pending** — carried forward through three sessions now (12 → 13 → 14); remains the correct next hook experiment.
