@@ -1,15 +1,22 @@
 # Interview Rules & Question Types
 
+## Tool: use `AskUserQuestion`
+
+Drive the interview with the **`AskUserQuestion`** tool, not freeform numbered prompts in chat. Per the official best-practices doc, this is the recommended interview pattern — the user gets a structured multi-choice UI, several questions can be batched in one turn, and answers come back cleanly attributed to each question.
+
+When `AskUserQuestion` is unavailable in the current environment, fall back to numbered Q&A in plain text — the rules below apply either way.
+
 ## Rules
 
-1. **Ask 3-5 numbered questions at a time**
-2. Be specific to the plan/feature content - no generic questions
-3. **Reference existing code/docs** when relevant (EXISTING mode)
-4. **Skip questions already answered** by CLAUDE.md or PRD
-5. Probe deeper on vague answers: "Can you be more specific about...?"
-6. Note open questions when I say "I don't know"
-7. Circle back if new answers affect earlier topics
-8. After each category: "Anything else on [category] before we move on?"
+1. **Batch 3-5 questions per `AskUserQuestion` call** (or per chat turn in fallback mode)
+2. For each question, supply **2-4 multi-choice options** that cover the realistic answer space, plus an "Other / explain" option for anything you didn't anticipate. This is faster for the user than typing freeform answers and surfaces options they may not have considered.
+3. Be specific to the plan/feature content — no generic questions
+4. **Reference existing code/docs** when relevant (EXISTING mode)
+5. **Skip questions already answered** by CLAUDE.md or PRD
+6. Probe deeper on vague or "Other" answers: ask a follow-up question with refined options
+7. Note open questions when the user picks "I don't know" / "skip"
+8. Circle back if new answers invalidate earlier ones — re-ask with updated options
+9. After each category, ask one wrap-up question: "Anything else on [category] before we move on?" (yes / no / specific concern)
 
 ## Question Types
 

@@ -127,7 +127,7 @@ If the user passes `--fix`, apply Quick Wins automatically:
 5. Skip "Needs Investigation" entirely (report only)
 6. Stage all changes and commit: `chore: automated cleanup — [count] items removed`
 7. Show a summary diff with `git diff --stat HEAD~1`
-8. Tell the user: "Review the changes on the `cleanup/YYYYMMDD` branch. Merge when satisfied, or `git checkout main && git branch -D cleanup/YYYYMMDD` to discard."
+8. Tell the user: "Review the changes on the `cleanup/YYYYMMDD` branch. Merge when satisfied, or `git checkout main && git branch -D cleanup/YYYYMMDD` to discard the whole branch. For finer-grained undo (single deletion, single edit), press `Esc Esc` or run `/rewind` — Claude's edits are checkpointed automatically and `/rewind` persists across sessions."
 
 If the working tree is dirty (uncommitted changes), warn the user and ask whether to stash first.
 

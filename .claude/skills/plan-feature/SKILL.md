@@ -2,7 +2,7 @@
 name: plan-feature
 description: "Interviews the user exhaustively about a feature before implementation. Detects GREENFIELD vs EXISTING project state, runs a structured interview, then enters plan mode and hydrates tasks."
 disable-model-invocation: false
-allowed-tools: Read, Glob, Grep, Bash(git:*), Bash(ls:*), EnterPlanMode, ExitPlanMode, TaskCreate, TaskUpdate, Edit, Write
+allowed-tools: Read, Glob, Grep, Bash(git:*), Bash(ls:*), EnterPlanMode, ExitPlanMode, AskUserQuestion, TaskCreate, TaskUpdate, Edit, Write
 argument-hint: "[plan-file-path]"
 ---
 
@@ -13,6 +13,19 @@ Interview me exhaustively about a feature before any implementation begins.
 **Companion skills:**
 - `/resume-work` - Start of session context
 - `/update-docs` - End of session documentation
+
+---
+
+## Step 0: Triviality Check
+
+Before anything else, gauge the size of the request. If the user's description fits in **one sentence and one or two files** — typo fixes, log-line additions, variable renames, single-function tweaks — the planning interview is overhead, not value.
+
+In that case, respond:
+> "This sounds small enough to do directly without the planning interview. Want me to just make the change? Re-run `/plan-feature` if it turns out larger than expected."
+
+Then stop the skill. Only continue to Step 1 if the user confirms they want the full interview, or if the request is clearly multi-file / architecture-touching / introduces a new pattern.
+
+Per the official best-practices guidance: *"For tasks where the scope is clear and the fix is small (typo, log line, rename) ask Claude to do it directly... If you could describe the diff in one sentence, skip the plan."*
 
 ---
 
@@ -96,9 +109,9 @@ Based on the detected mode, read the relevant reference file:
 Follow the interview process:
 1. Read all available context (CLAUDE.md, PRD, plan file)
 2. Analyze what's specified vs what's ambiguous or missing
-3. **Ask questions in batches of 3-5 at a time**
-4. **Wait for my answers before continuing**
-5. Probe deeper on vague answers
+3. **Drive the interview with the `AskUserQuestion` tool** — batch 3-5 questions per call, each with 2-4 multi-choice options plus an "Other / explain" escape. Fall back to numbered chat Q&A only if `AskUserQuestion` is unavailable.
+4. **Wait for answers before continuing**
+5. Probe deeper on vague or "Other" answers — re-ask with refined options
 6. Continue until all relevant categories are covered
 7. Summarize understanding and confirm before proceeding
 
@@ -118,14 +131,15 @@ After the user confirms ready to proceed, read `references/plan-and-tasks.md` an
 
 ## Start Now
 
-1. Check auto-memory for existing project context
-2. Detect project state (GREENFIELD vs EXISTING)
-3. Read CLAUDE.md, README.md, docs/*.md, and plan file (if provided) **in parallel**
-4. Announce planning mode
-5. Read `references/interview-rules.md`
-6. Read mode-specific reference (`references/mode-greenfield.md` or `references/mode-existing.md`)
-7. Begin interview with first batch of questions
-8. After interview → `EnterPlanMode` → write implementation plan → `ExitPlanMode` for approval
-9. After approval → read `references/plan-and-tasks.md` → hydrate tasks with `TaskCreate` → begin implementation
+1. **Triviality check** — if the request fits in one sentence and 1-2 files, suggest skipping the skill and stop
+2. Check auto-memory for existing project context
+3. Detect project state (GREENFIELD vs EXISTING)
+4. Read CLAUDE.md, README.md, docs/*.md, and plan file (if provided) **in parallel**
+5. Announce planning mode
+6. Read `references/interview-rules.md`
+7. Read mode-specific reference (`references/mode-greenfield.md` or `references/mode-existing.md`)
+8. Begin interview with first batch of questions (via `AskUserQuestion` when available)
+9. After interview → `EnterPlanMode` → write implementation plan → `ExitPlanMode` for approval
+10. After approval → read `references/plan-and-tasks.md` → hydrate tasks with `TaskCreate` → begin implementation
 
 $ARGUMENTS

@@ -10,6 +10,8 @@ argument-hint: "[file/dir/PR#/--staged/--last-commit] [--security] [--verify] [-
 
 Review this code like a senior engineer with 15+ years of experience. Be thorough but practical — focus on issues that matter, not pedantic style preferences.
 
+> **Fresh-session tip.** For non-trivial reviews — especially of code Claude just wrote in this same session — run `/clear` first or invoke `/code-review` from a fresh `claude` session. Per the official best-practices doc's Writer/Reviewer pattern: *"a fresh context improves code review since Claude won't be biased toward code it just wrote."* Skip this for quick passes on diffs you wrote by hand or for `--last-commit` reviews where you genuinely want session context.
+
 ---
 
 ## Step 0: Determine Review Target
@@ -120,7 +122,9 @@ After review (and verification if `--verify` also present), auto-fix **only simp
 - Performance optimizations (tradeoffs involved)
 - Anything marked Critical
 
-After fixing, show a summary of what was changed and run tests again to confirm nothing broke.
+After fixing, show a summary of what was changed and run tests again to confirm nothing broke. End the summary with this line:
+
+> **If anything looks wrong, press `Esc Esc` or run `/rewind` to undo these edits.** Checkpoints are created automatically before each edit and persist across sessions.
 
 > **CI gating note.** This skill does not implement its own pause-for-approval flag. If you want to gate `--fix` edits in a headless run, configure a `PreToolUse` hook in `~/.claude/settings.json` that matches `Edit` (or the specific bash patterns you want to guard) and returns `"permissionDecision": "defer"`. The session exits with `stop_reason: "tool_deferred"` and can be resumed with `claude -p --resume <session-id>`. `defer` only works when the turn makes a single tool call — it guards individual edits, not the whole `--fix` run. See README "Interop with Claude Code 2.1 features" for the full recipe.
 
