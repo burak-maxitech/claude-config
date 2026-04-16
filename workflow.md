@@ -582,7 +582,9 @@ Symlinked to: `~/.claude/skills`, `~/.claude/agents` (individual subdirectories)
 | | Added TaskCreate/TaskUpdate live task tracking across workflow |
 | Mar 2026 | Added startup scripts (`start-claude.sh`, `start-claude.ps1`) to automate session startup |
 | | Replaced manual 8-step startup with single-command script (5 automated steps); shows tip to run `/resume-work` |
+| Apr 2026 | Aligned with Opus 4.7 release (CC 2.1.111): added `effort: high` frontmatter to `/code-review` and `/plan-feature` for stronger reasoning on review/synthesis work |
+| | Documented when to reach for built-in `/ultrareview` (high-risk pre-merge) vs custom `/code-review` (daily driver) in README |
 
 ---
 
-*Last updated: March 2026*
+*Last updated: April 2026*

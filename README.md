@@ -152,11 +152,13 @@ git pull
 |---------|---------|--------|
 | `/resume-work` | Start session - get up to speed | Skill |
 | `/plan-feature` | Interview before building features | Skill |
-| `/code-review` | Review code quality | Skill |
+| `/code-review` | Review code quality (lightweight, in-session, with `--security`/`--verify`/`--fix`) | Skill |
 | `/code-cleanup` | Find dead code & cruft (parallel subagents) | Skill |
 | `/update-docs` | End session - save progress | Skill |
 
 **Skills** are directories in `.claude/skills/` that bundle reference files, use YAML frontmatter for tool permissions, and can dispatch subagents.
+
+> **When to reach for `/ultrareview` instead of `/code-review`.** Claude Code 2.1.111 ships a built-in `/ultrareview` that runs 5+ verifying subagents in the cloud (10–20 min, scales to 20 agents). Use it for high-risk pre-merge reviews — auth rewrites, payment flows, database migrations. The custom `/code-review` skill is the lighter daily-driver: in-session, fast, with `--security` (OWASP), `--verify` (run tests), and `--fix` (auto-fix simple findings) modes that `/ultrareview` doesn't have.
 
 ## Subagents
 

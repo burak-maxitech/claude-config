@@ -1,224 +1,29 @@
 # Session History Archive
 
 > Auto-managed by `/update-docs`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
+> **Note:** Sessions older than the 5 most recent are compressed to one-liners with commit hashes. Full prose for compressed sessions lives in git history (`git show <hash>`).
 
 ---
 
-### Session 1 - 2026-03-10
-**What happened:**
-- Created CLAUDE.md with all 10 required sections per claude-md-sections.md
-- Created docs/ folder with session-history.md, key-decisions.md, completed-work.md
-- Added Documentation section to README.md with links to CLAUDE.md and docs/
-- No content removed from existing files — REFACTOR mode (additive only)
+### Session 1 - 2026-03-10: REFACTOR mode — created CLAUDE.md (10 required sections), `docs/` folder with session-history/key-decisions/completed-work, added Documentation section to README. (commits: 246c001, 9981d1e)
 
-**Files created/modified:**
-- `CLAUDE.md` - Created with all 10 required sections
-- `docs/session-history.md` - Created (this file)
-- `docs/key-decisions.md` - Created with architectural decisions
-- `docs/completed-work.md` - Created with full completed task checklist
-- `README.md` - Added Documentation section with links
+### Session 2 - 2026-03-12: `/code-cleanup` polish — `--dry-run`, `--aggressive` clarification, `Bash(gh:*)` permission; Python package→import-name lookup table (30+); batched `git log` for one-off script detection; conservative media-query flagging. (bundled in 639cfb3)
 
-**Next session should:**
-- Run `/resume-work` to verify the new doc structure loads correctly
-- Consider adding more skills as workflow needs emerge
+### Session 3 - 2026-03-12: Major skill overhaul — `/plan-feature` phase gating + test types + commit-per-phase + rollback strategy; `/code-review` `--verify`/`--security`/`--fix` modes + git blame context + large diff guard; new `references/security-deep-dive.md` with OWASP Top 10. (commit: 639cfb3)
 
-### Session 2 - 2026-03-12
-**What happened:**
-- Reviewed uncommitted changes across 5 files in the code-cleanup skill
-- Enhanced `/code-cleanup` SKILL.md: added `--dry-run` mode, clarified `--aggressive` behavior, added `Bash(gh:*)` permission, improved description
-- Added Python package→import name lookup table (30+ entries) to scan-deps-config.md
-- Optimized one-off script detection in scan-files-code.md (batch git log)
-- Made media query dead code detection more conservative in scan-styles-tests.md
-- Added find command permissions to settings.local.json for update-docs and resume-work skills
-- Ran `/update-docs` to capture all changes
+### Session 4 - 2026-03-12: `/resume-work` + `/update-docs` robustness — bidirectional task integrity (pre-hydration stale check + post-drain validation), context freshness detection vs git, commit checkpoint with `--skip-commit`, compact tip, deep-mode health check. (commits: 639cfb3, f616e0d)
 
-**Files created/modified:**
-- `.claude/skills/code-cleanup/SKILL.md` - Added --dry-run mode, --aggressive clarification, gh permission
-- `.claude/skills/code-cleanup/references/scan-deps-config.md` - Python import name lookup table
-- `.claude/skills/code-cleanup/references/scan-files-code.md` - Batch git log optimization
-- `.claude/skills/code-cleanup/references/scan-styles-tests.md` - Conservative media query flagging
-- `.claude/settings.local.json` - Added find command permissions
-- `CLAUDE.md` - Updated timestamp, session history
-- `docs/completed-work.md` - Added 4 new completed items
-- `docs/key-decisions.md` - Added 5 new decisions
-- `docs/session-history.md` - Added Session 2 entry
+### Session 5 - 2026-03-12: Startup scripts — `start-claude.sh` (Mac/Linux) and `start-claude.ps1` (Windows) automating 5-step session startup; Workflow.md and README.md updated with Quick Start; manual steps preserved alongside. (commits: acfc2b9, f24fd37, f7d3342)
 
-**Next session should:**
-- Commit all pending changes
-- Continue improving skills based on real-world usage patterns
+### Session 6 - 2026-03-12: PowerShell script filename fix (`Start-ClaudeSession.ps1` → `start-claude.ps1`) in Workflow.md and README.md; added `Unblock-File` Windows first-run note. (commit: e0c6a49)
 
-### Session 3 - 2026-03-12
-**What happened:**
-- Improved `/plan-feature` skill with 5 enhancements from Claude Code best practices:
-  - Phase gating with verification (tests must pass before next phase)
-  - Explicit test types per phase (unit/integration/e2e)
-  - Commit after each phase for rollback-friendly checkpoints
-  - Context management reminder (`/compact` before implementation)
-  - Rollback strategy required in both greenfield and existing mode plans
-- Improved `/code-review` skill with 5 enhancements from community + official Claude docs:
-  - `--verify` mode: run tests/lint to validate findings
-  - `--security` mode: OWASP Top 10 deep-dive checklist
-  - `--fix` mode: auto-fix simple issues (unused imports, formatting)
-  - Git blame context for Critical/Important findings
-  - Large diff guard (warn at 500+, suggest chunking at 1000+ lines)
-- Created new `references/security-deep-dive.md` with full OWASP Top 10 checklist
-- Updated allowed-tools for code-review to support verify/fix modes
-- Ran `/update-docs` to capture all changes
+### Session 7 - 2026-03-12: Startup scripts no longer auto-run `/resume-work` — show a tip message instead so user controls when to load context; remaining PS1 filename refs cleaned up. (commit: f58e5eb)
 
-**Files created/modified:**
-- `.claude/skills/plan-feature/references/plan-and-tasks.md` - Phase gating, commit rules, context management
-- `.claude/skills/plan-feature/references/mode-greenfield.md` - Test types, rollback in interview + summary
-- `.claude/skills/plan-feature/references/mode-existing.md` - Test types, rollback section, summary update
-- `.claude/skills/code-review/SKILL.md` - New flags, large diff guard, git blame step, verify/fix steps
-- `.claude/skills/code-review/references/review-checklist.md` - Enhanced security + testing sections
-- `.claude/skills/code-review/references/output-format.md` - Verification + auto-fix output templates
-- `.claude/skills/code-review/references/security-deep-dive.md` - NEW: OWASP Top 10 checklist
-- `CLAUDE.md` - Updated timestamp, key decisions, session history
-- `docs/completed-work.md` - Added 3 new completed items
-- `docs/key-decisions.md` - Added 11 new decisions
-- `docs/session-history.md` - Added Session 3 entry
+### Session 8 - 2026-03-13: Fixed wrong symlink-fix paths in `start-claude.sh` (referenced non-existent `commands/`); added `chmod +x` Mac/Linux first-run note; flipped `update-docs` `disable-model-invocation` to `false` for programmatic invocation. (commits: dc01f2d, 4a6cea4)
 
-**Next session should:**
-- Commit all pending changes (sessions 2 + 3)
-- Test improved skills on a real codebase
-- Consider improving `/resume-work` skill next
+### Session 9 - 2026-03-13: Clarified shell-alias instructions in Workflow.md — explicit "paste into config file" wording with `source ~/.zshrc` and `notepad $PROFILE` reload hints. (commit: 0233b79)
 
-### Session 4 - 2026-03-12
-**What happened:**
-- Planned and implemented 5 improvements to `/resume-work` and `/update-docs` skills:
-  1. Bidirectional task integrity check (pre-hydration stale check + post-drain validation)
-  2. Context freshness detection (compare CLAUDE.md date vs git commits)
-  3. Commit checkpoint reminder (Part 5 in update-docs, --skip-commit flag)
-  4. Compact guidance after both skills (free context before real work)
-  5. Quick health check in deep mode (detect and run test/build commands)
-- Committed and pushed all session 3+4 changes together (639cfb3)
-- Ran `/update-docs` to capture session 4 changes
-
-**Files created/modified:**
-- `.claude/skills/resume-work/SKILL.md` - Added Step 2.5 (health check), Step 3.0 (freshness), compact tip, expanded allowed-tools
-- `.claude/skills/resume-work/references/summary-template.md` - Added staleness warning, uncommitted changes check, health check section
-- `.claude/skills/resume-work/references/task-hydration.md` - Added pre-hydration stale task check
-- `.claude/skills/update-docs/SKILL.md` - Added --skip-commit to argument-hint
-- `.claude/skills/update-docs/references/mode-update.md` - Added drain validation, Part 5 commit checkpoint
-- `.claude/skills/update-docs/references/verification-checklists.md` - Added commit checkpoint checklist item, post-verification compact tip
-- `CLAUDE.md` - Updated timestamp, key decisions, session history
-- `docs/completed-work.md` - Added 2 new completed items
-- `docs/key-decisions.md` - Added 5 new decisions
-- `docs/session-history.md` - Added Session 4 entry
-
-**Next session should:**
-- Test improved skills on a real codebase
-- Add more skills as new workflow needs emerge
-- Consider adding hooks for automated pre-commit workflows
-
-### Session 5 - 2026-03-12
-**What happened:**
-- Added startup scripts (`start-claude.sh` for Mac/Linux, `start-claude.ps1` for Windows) to `.claude/scripts/`
-- Scripts automate 5-step session startup: sync config, verify symlinks, pull project, update Claude, launch with `/resume-work`
-- Updated Workflow.md: added scripts as "Quick Start" alternative alongside existing manual steps, added shell alias tips
-- Updated README.md: added scripts to directory tree, added Quick Start section
-- Updated CLAUDE.md architecture tree to include scripts directory
-- Fixed Workflow.md: restored manual startup steps after initially replacing them (user feedback: keep both methods visible)
-- Ran `/update-docs` to capture session 5 changes
-
-**Files created/modified:**
-- `.claude/scripts/start-claude.sh` - NEW: Mac/Linux session startup script
-- `.claude/scripts/start-claude.ps1` - NEW: Windows PowerShell session startup script
-- `Workflow.md` - Added Quick Start scripts section below manual steps, added alias tips, updated version history
-- `README.md` - Added scripts to tree, added Quick Start section
-- `CLAUDE.md` - Updated timestamp, architecture tree, key decisions, session history
-- `docs/key-decisions.md` - Added startup scripts decision
-- `docs/completed-work.md` - Added startup scripts to Infrastructure section
-- `docs/session-history.md` - Added Session 5 entry
-
-**Next session should:**
-- Test startup scripts on Mac/Linux
-- Add more skills as new workflow needs emerge
-- Consider adding hooks for automated pre-commit workflows
-
-### Session 6 - 2026-03-12
-**What happened:**
-- Fixed PowerShell script filename bug in Workflow.md and README.md — both referenced `Start-ClaudeSession.ps1` instead of the actual filename `start-claude.ps1`
-- Added `Unblock-File` note for Windows first-run setup in Workflow.md
-
-**Files created/modified:**
-- `Workflow.md` - Fixed PowerShell alias filename, added Unblock-File note
-- `README.md` - Fixed Quick Start PowerShell filename
-
-**Next session should:**
-- Test startup scripts on Mac/Linux
-- Add more skills as new workflow needs emerge
-- Consider adding hooks for automated pre-commit workflows
-
-### Session 7 - 2026-03-12
-**What happened:**
-- Changed startup scripts to no longer auto-run `/resume-work` — scripts now launch `claude` and show a tip message instead
-- Fixed remaining PowerShell filename references in Workflow.md (`Start-ClaudeSession.ps1` → `start-claude.ps1`)
-- Updated README.md, Workflow.md, and CLAUDE.md to reflect new script behavior
-
-**Files created/modified:**
-- `.claude/scripts/start-claude.ps1` - Removed `-p "/resume-work"`, added tip message
-- `.claude/scripts/start-claude.sh` - Removed `-p "/resume-work"`, added tip message
-- `Workflow.md` - Fixed PS1 filenames, updated step 5 description, updated version history
-- `README.md` - Updated Quick Start description
-- `CLAUDE.md` - Updated timestamp, session history, key decisions
-- `docs/session-history.md` - Added Session 7 entry
-- `docs/key-decisions.md` - Added script launch behavior decision
-- `docs/completed-work.md` - Added script update entry
-
-**Next session should:**
-- Test startup scripts on Mac/Linux
-- Add more skills as new workflow needs emerge
-- Consider adding hooks for automated pre-commit workflows
-
-### Session 8 - 2026-03-13
-**What happened:**
-- Fixed incorrect symlink fix suggestions in `start-claude.sh` — referenced non-existent `commands/` dir and wrong paths; corrected to `.claude/skills` and `.claude/agents`
-- Added `chmod +x` first-run note for Mac/Linux in Workflow.md (alongside existing Windows `Unblock-File` note)
-- Changed `disable-model-invocation` from `true` to `false` in update-docs SKILL.md to allow programmatic invocation via Skill tool
-
-**Files created/modified:**
-- `.claude/scripts/start-claude.sh` - Fixed symlink fix suggestion paths (lines 68-69)
-- `Workflow.md` - Added Mac/Linux first-run `chmod +x` note
-- `.claude/skills/update-docs/SKILL.md` - Changed disable-model-invocation to false
-
-**Next session should:**
-- Consider changing disable-model-invocation to false on remaining 4 skills
-- Add more skills as new workflow needs emerge
-- Consider adding hooks for automated pre-commit workflows
-
-### Session 9 - 2026-03-13
-**What happened:**
-- Clarified shell alias instructions in Workflow.md — made it explicit that the alias line must be pasted into the shell config file (e.g., `~/.zshrc`), not run directly in the terminal
-- Added `source ~/.zshrc` reload hint for Mac/Linux and `notepad $PROFILE` hint for Windows
-
-**Files created/modified:**
-- `Workflow.md` - Clarified alias persistence instructions (lines 97-105)
-
-**Next session should:**
-- Consider changing disable-model-invocation to false on remaining 4 skills
-- Add more skills as new workflow needs emerge
-- Consider adding hooks for automated pre-commit workflows
-
-### Session 10 - 2026-03-13
-**What happened:**
-- Removed duplicated "New Machine Setup" section from Workflow.md — replaced 60-line duplicate with one-line link to README.md
-- Fixed alias name from `claude-start` to `cc` in both Workflow.md (Mac + Windows examples)
-- Reordered Workflow.md Daily Workflow section: Quick Start with `cc` first, detailed manual steps collapsed in `<details>` blocks
-- Moved alias setup one-liners from Workflow.md to README.md Quick Start section (one-time setup belongs in README)
-- Simplified Workflow.md Quick Start to just `cc my-project` with link to README for alias setup
-- Removed `claude-config` filter from interactive project picker in both `start-claude.sh` and `start-claude.ps1`
-
-**Files created/modified:**
-- `Workflow.md` - Removed duplicate setup section, fixed alias names, reordered Quick Start first, simplified to `cc` usage
-- `README.md` - Added alias setup one-liners (Mac + Windows) and first-run notes to Quick Start section
-- `.claude/scripts/start-claude.sh` - Removed `! -name "claude-config"` filter from project picker
-- `.claude/scripts/start-claude.ps1` - Removed `$_.Name -ne "claude-config"` filter from project picker
-
-**Next session should:**
-- Add more skills as new workflow needs emerge
-- Consider adding hooks for automated pre-commit workflows
-- Consider changing disable-model-invocation to false on remaining 4 skills
+### Session 10 - 2026-03-13: Workflow.md cleanup — removed 60-line duplicate setup section (replaced with link to README); alias name fix `claude-start` → `cc`; reordered Quick Start first with manual steps in `<details>`; moved alias setup one-liners to README; removed `claude-config` filter from project picker in both startup scripts. (commits: 7c99471, 777ab86)
 
 ### Session 11 - 2026-03-17
 **What happened:**
@@ -338,3 +143,45 @@
 
 **Post-commit polish (same-day, post `4d444b0`):**
 - `/simplify` flagged that the new Step 5 item 3 in `plan-feature/SKILL.md` duplicated ~70 words of `references/interview-rules.md` content. Collapsed item 3 to a one-line pointer and stripped the leaked `"Other"` qualifier from item 5 — net –2 lines, restores the SKILL.md ↔ references/ separation the skill was designed around. Confirmed clean by a follow-up `/code-review`. `/code-cleanup` was invoked but declined to run — this repo has no code stack, so 6 of 7 cleanup categories don't apply; surfaced the judgment to the user instead of burning subagents.
+
+### Session 15 - 2026-04-16
+**What happened:**
+- User asked whether the Opus 4.7 launch (same day) warranted any repo changes. **Refused to speculate** without verified docs — fetched the Anthropic news post (anthropic.com/news/claude-opus-4-7), the Claude Code CHANGELOG (raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md), and the skills-frontmatter docs page (code.claude.com/docs/en/skills) before recommending anything. Confirmed: 4.7 is GA, same pricing as 4.6 ($5/$25), `xhigh` effort level new, `/ultrareview` shipped in CC 2.1.111, `effort:` skill frontmatter field accepts `low|medium|high|xhigh|max`.
+- **Discussed retiring `/code-review` in favor of built-in `/ultrareview`.** Read both surfaces before recommending. Concluded they're complementary: `/code-review` keeps `--security`/`--verify`/`--fix` + in-session speed + convention detection; `/ultrareview` is multi-agent cloud verification for high-stakes pre-merge (10-20min). Decision: keep both, document the split.
+- **Shipped 5-file alignment edit (no commit yet — left for user):**
+  1. `.claude/skills/code-review/SKILL.md` — added `effort: high` to frontmatter; description now positions skill vs `/ultrareview`.
+  2. `.claude/skills/plan-feature/SKILL.md` — added `effort: high` to frontmatter.
+  3. `README.md` — updated commands table row for `/code-review`; added blockquote explaining when to use `/ultrareview` instead.
+  4. `docs/key-decisions.md:45` — Sonnet-pin row updated to note 4.7 re-evaluation with verified pricing parity.
+  5. `workflow.md` — added Apr 2026 version-history row; bumped "Last updated" stamp.
+- **Dropped the Session 12 `defer` hook dogfood task entirely.** Carried 12→13→14→15. User chose retirement over verification. Pre-shipment: removed the "still pending" carry-forward bullet from Session 14's CLAUDE.md summary; deleted task #1 from the live tracker. README recipe at line 177 left in place untested.
+- Used `AskUserQuestion`-style confirmation pattern from `/plan-feature` Session 14 work (verified what to ship before editing). Saved a round-trip vs the old "edit first, ask later" pattern.
+- **Designed and shipped a session-history rollup pattern.** User flagged that `session-history.md` grows unboundedly and asked for a strategy. Picked the "compress sessions older than the 5 most recent into one-liners with commit hashes" approach (Option A from a 3-option discussion). Implemented in two parts:
+  1. Added Part 6 to `mode-update.md` that auto-rolls-up on every `/update-docs` run (with `--skip-rollup` escape). Updated `update-docs/SKILL.md` argument-hint and `verification-checklists.md`.
+  2. One-time pass on Sessions 1-10: replaced ~215 lines of full-prose entries with 10 one-liners, each carrying the architectural headline + commit hashes. File shrank from 27.7KB → 22.0KB (-21%). Future runs will compress more as new sessions push older ones past the 5-session window.
+  3. **Added Step 6.2 first-run confirmation gate** after user asked whether the skill would auto-compress other projects' session-history files (it would). Now: on the first rollup pass per-project, the user is prompted before compression; the rollup-format note added in Step 6.4 serves as the per-project sentinel so subsequent runs skip the prompt. `AskUserQuestion` added to `update-docs` allowed-tools (mirrors the `plan-feature` Session 14 pattern).
+
+**Files created/modified:**
+- `.claude/skills/code-review/SKILL.md` — added `effort: high`; description rewritten to position vs `/ultrareview` (+1 line, ~2 lines reworded)
+- `.claude/skills/plan-feature/SKILL.md` — added `effort: high` (+1 line)
+- `README.md` — `/code-review` table row expanded; new blockquote on `/ultrareview` (+3 lines)
+- `docs/key-decisions.md` — Sonnet-pin row reworded for 4.7 re-evaluation (~2 lines)
+- `workflow.md` — Apr 2026 version row + "Last updated" bump (+3 lines)
+- `CLAUDE.md` — removed defer-hook carry-forward bullet from Session 14 summary (-1 line); will be updated again by this `/update-docs` run with Session 15 summary + 3 new key decisions
+- `docs/completed-work.md` — appended Session 15 entries (this run)
+- `docs/session-history.md` — this entry + one-time rollup of Sessions 1-10 to one-liners + new "compressed format" note in header (this run)
+- `docs/key-decisions.md` — appended 4 Session 15 decision rows + 1 row for the rollup pattern (this run)
+- `.claude/skills/update-docs/SKILL.md` — added `--skip-rollup` to argument-hint
+- `.claude/skills/update-docs/references/mode-update.md` — appended Part 6 (Roll Up Old Sessions) after Part 5
+- `.claude/skills/update-docs/references/verification-checklists.md` — added rollup checkbox to UPDATE mode checklist
+
+**Files NOT modified (and why):**
+- `.claude/agents/cleanup-*.md` — Sonnet pin still cost-justified at 4.7 (same pricing as 4.6).
+- README.md `defer` hook recipe at line 177 — left untested per the drop-defer-dogfood decision; user accepted the small risk it's subtly wrong.
+- No actual `/ultrareview` adoption work — that's a runtime tool, not config; nothing to ship in the repo.
+
+**Next session should:**
+- Pick up Next Steps #3 (pre-commit hooks) or #4 (MCP integration) — both still pending in task tracker.
+- Consider whether the `/effort` slider (CC 2.1.111) being interactive means the per-skill `effort: high` should ever be downgraded — probably no, because the frontmatter is the deliberate per-skill override and the slider is a session-level convenience.
+- If a real high-risk PR comes up, actually try `/ultrareview` and compare with custom `/code-review --security --verify` to see whether the README positioning blockquote needs refining.
+- Watch for the next `/update-docs` run to confirm Part 6 fires correctly: as Session 16 is added, Session 11 (currently the 5th-most-recent) should get auto-compressed to a one-liner. If Part 6 misfires (e.g., picks bad commit hashes), refine the heuristic in `mode-update.md` Step 6.2.

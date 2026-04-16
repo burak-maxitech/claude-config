@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-04-14 (Session 14)
+Last Updated: 2026-04-16 (Session 15)
 
 ## Project Overview
 
@@ -75,6 +75,10 @@ Nothing currently in progress.
 | Verify every external-repo claim before shipping | Session 13 research on shanraisshan/claude-code-best-practice surfaced 14 candidate patterns. Spot-verification via direct raw.githubusercontent.com fetches found the catalog had conflated skills `paths:` with `.claude/rules/` `paths:`, and that "curation/start narrow" and "/compact at 50%" were community wisdom, not Anthropic guidance. Ship only what docs.claude.com confirms; soften or drop the rest. |
 | `plan-feature` Step 0 triviality check + `AskUserQuestion`-driven interview | Session 14 audit against code.claude.com/docs/en/best-practices. Doc explicitly recommends `AskUserQuestion` for the interview pattern and explicitly tells users to skip planning for one-sentence changes ("typo, log line, rename"). Step 0 returns control to the user before the interview overhead; interview itself uses multi-choice prompts with an "Other / explain" escape. Falls back to numbered Q&A when `AskUserQuestion` is unavailable. |
 | Surface `/rewind` in destructive `--fix` output | Same Session 14 audit. Doc treats checkpointing as a core safety net for risky operations. Both `code-cleanup --fix` and `code-review --fix` now end with a one-liner pointing the user at `Esc Esc` / `/rewind`. For `code-cleanup`, the existing `git branch -D` instruction stays as the coarse-grained option and `/rewind` is added for finer-grained per-edit undo. |
+| `effort: high` on reasoning-heavy skills | Session 15 (Opus 4.7 launch). Per official skills-frontmatter docs, `effort` accepts `low\|medium\|high\|xhigh\|max`. Applied `effort: high` to `/code-review` (deep diff analysis) and `/plan-feature` (interview synthesis). Mechanical skills (`/resume-work`, `/update-docs`, `/code-cleanup` orchestrator) keep session default. |
+| Keep custom `/code-review`; position `/ultrareview` as complementary | Session 15. Built-in `/ultrareview` (CC 2.1.111) runs 5-20 verifying subagents in cloud, 10-20min — best for high-risk pre-merge (auth, payments, migrations). Custom skill is faster, in-session, and has `--security`/`--verify`/`--fix` modes that `/ultrareview` lacks. Documented the when-to-use-which split in README. |
+| Dropped Session 12 `defer` hook dogfood | Session 15. Carried forward 12→13→14→15. Recipe in README:177 remains untested but documented; user accepted the small risk that it's subtly wrong rather than spend a session verifying. Removed the carry-forward bullet from CLAUDE.md so it stops surfacing in `/resume-work`. |
+| Session-history rollup pattern | Session 15. `docs/session-history.md` auto-compresses sessions older than the 5 most recent into one-liners with commit hashes; full prose preserved in git. Implemented as Part 6 in `update-docs/mode-update.md` with `--skip-rollup` escape and a Step 6.2 first-run confirmation prompt (rollup-format note acts as per-project sentinel). Keeps the file bounded across all projects without surprising legacy ones. |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -125,9 +129,9 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 14) - 2026-04-14
-- Audited the 5 custom skills against the official best-practices doc at code.claude.com/docs/en/best-practices. Verified 4 high-value gaps via grep against the skill files (no `AskUserQuestion`, no `/clear` / `/btw` / `/rewind` references, no triviality escape hatch in plan-feature, no `auto mode` / `--allowedTools` mentions in README).
-- Shipped one commit (`a94fbda`) with all four fixes: `plan-feature` Step 0 triviality check, `plan-feature` interview rerouted through `AskUserQuestion` (with fallback + multi-choice rules), `code-review` fresh-session tip in header, `/rewind` recovery footer on both `--fix` modes (`code-review` + `code-cleanup`). All four citations point back to the official doc.
-- Validated three things as **already aligned** with the doc and needing no change: the overflow-to-`docs/` model (doc explicitly says "skills load on demand without bloating every conversation"), `code-cleanup`'s parallel subagents (matches doc's "subagents are one of the most powerful tools available"), and `plan-feature` phase gating with tests + commit per phase.
-- Considered and **rejected** swapping CLAUDE.md's markdown links for `@import` syntax — would defeat the whole point of the overflow system, which is precisely *not* loading `docs/key-decisions.md` every session.
-- **Session 12 `defer` hook dogfood still pending** — carried forward through three sessions now (12 → 13 → 14); remains the correct next hook experiment.
+### Last Session (Session 15) - 2026-04-16
+- **Dropped the long-pending defer-hook dogfood.** Carried 12→13→14; user opted to remove it entirely rather than verify. README recipe at line 177 left in place untested.
+- **Aligned the repo with the Opus 4.7 launch (CC 2.1.111).** Verified via WebFetch of Anthropic news post + Claude Code CHANGELOG + skills docs page. Added `effort: high` to `/code-review` and `/plan-feature`; positioned custom `/code-review` as lighter daily-driver vs built-in `/ultrareview` for high-stakes pre-merge; refreshed Sonnet-pin decision (pricing unchanged from 4.6).
+- **Decided NOT to retire `/code-review`** in favor of `/ultrareview` after weighing tradeoffs — they're complementary, not competing.
+- **Designed and shipped session-history rollup pattern.** User flagged `docs/session-history.md` growing unboundedly. Picked "compress older than 5 most recent to one-liners + commit hashes" approach. Built Part 6 into `/update-docs` so every run keeps the file bounded automatically. One-time pass on Sessions 1-10 shrank file 27.7KB → 22.0KB (-21%); savings compound over time.
+- **Did not change subagent `model: sonnet` pins** — 4.7 same price as 4.6.

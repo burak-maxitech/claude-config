@@ -2,6 +2,7 @@
 name: plan-feature
 description: "Interviews the user exhaustively about a feature before implementation. Detects GREENFIELD vs EXISTING project state, runs a structured interview, then enters plan mode and hydrates tasks."
 disable-model-invocation: false
+effort: high
 allowed-tools: Read, Glob, Grep, Bash(git:*), Bash(ls:*), EnterPlanMode, ExitPlanMode, AskUserQuestion, TaskCreate, TaskUpdate, Edit, Write
 argument-hint: "[plan-file-path]"
 ---

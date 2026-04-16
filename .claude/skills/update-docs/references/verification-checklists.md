@@ -92,6 +92,7 @@ Provide complete content for each file created or significantly modified.
 - [ ] Auto-memory synced with stable project facts (if changed)
 - [ ] Task list drained — completed/in-progress/pending tasks synced back
 - [ ] Commit checkpoint offered (unless --skip-commit)
+- [ ] Session-history rollup considered (unless --skip-rollup) — older entries compressed when count > 5
 - [ ] Project-specific files preserved
 
 ## Post-Verification Note

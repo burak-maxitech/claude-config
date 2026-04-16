@@ -1,7 +1,8 @@
 ---
 name: code-review
-description: "Reviews code like a senior engineer. Auto-detects target (uncommitted changes, staged, PR, files), scans codebase conventions, and produces severity-ranked findings with mandatory file:line references. Supports --security (OWASP deep dive), --verify (run tests/lint to validate), and --fix (auto-fix simple issues)."
+description: "Reviews code like a senior engineer. Auto-detects target (uncommitted changes, staged, PR, files), scans codebase conventions, and produces severity-ranked findings with mandatory file:line references. Supports --security (OWASP deep dive), --verify (run tests/lint to validate), and --fix (auto-fix simple issues). For high-risk pre-merge reviews of critical PRs (auth, payments, migrations), the built-in `/ultrareview` runs 5+ verifying subagents in the cloud and is the better fit; this skill is the lighter, in-session daily driver."
 disable-model-invocation: true
+effort: high
 allowed-tools: Read, Edit, Grep, Glob, Bash(git:*), Bash(gh:*), Bash(npm:*), Bash(npx:*), Bash(cargo:*), Bash(python:*), Bash(pip:*)
 argument-hint: "[file/dir/PR#/--staged/--last-commit] [--security] [--verify] [--fix]"
 ---

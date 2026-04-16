@@ -333,3 +333,65 @@ After all documentation updates are complete, remind the user to commit.
    - **Ask the user:** "Would you like to commit these changes?"
    - **Never auto-commit** — always wait for user confirmation
 3. **If there are no uncommitted changes**, skip silently
+
+## Part 6: Roll Up Old Sessions in session-history.md
+
+Keep `docs/session-history.md` bounded by compressing sessions older than the 5 most recent into one-line summaries. The full prose still lives in git history at the linked commit hashes.
+
+**If `--skip-rollup` is in `$ARGUMENTS`, skip this step entirely.**
+
+### 6.1 Detect Compressible Sessions
+
+1. Read `docs/session-history.md`
+2. Grep for `^### Session` headers and count them
+3. **If count ≤ 5, skip silently** — nothing to compress
+4. The 5 highest-numbered sessions stay in full prose; everything older is a candidate for compression
+5. Identify which older entries are still in multi-line "What happened / Files / Next session" format. Skip any already in one-line format (idempotent — running this part repeatedly is safe)
+
+### 6.2 First-Run Confirmation (per-project)
+
+The presence of the rollup-format note (see Step 6.4) acts as a "this project has consented to rollups before" sentinel. Use it to gate the first-run prompt:
+
+1. **Check if the rollup note exists** in `session-history.md`'s header (search for the literal substring `Sessions older than the 5 most recent are compressed`)
+2. **If the note IS present** → proceed silently to Step 6.3 (this project has been rolled up before)
+3. **If the note is MISSING and there are entries to compress** → this is the first rollup pass on this project. Ask the user:
+   > "First-time rollup detected for this project: `docs/session-history.md` has [N] sessions in full-prose format, [M] of which are older than the 5 most recent and would be compressed to one-line summaries with commit hashes. Full prose stays preserved in git history. Compress now? (y/n)"
+   - **If user declines** → skip the rest of Part 6 entirely. Do NOT add the rollup note (so the user is asked again next run).
+   - **If user accepts** → proceed to Step 6.3.
+4. **Use `AskUserQuestion` if available** for a cleaner y/n/skip-this-time prompt; fall back to a numbered chat question otherwise.
+
+### 6.3 Compress Each Older Session
+
+For each session needing compression:
+
+1. **Extract a one-line summary** from the existing entry — pull the most architecturally significant 1-3 bullets from "What happened" and condense. Keep skill names, flag names, and concrete artifacts (file names, decision names) since those are what future-readers grep for. Drop process narration ("ran /update-docs", "committed and pushed", "user asked").
+2. **Find associated commit hashes** by running:
+   ```
+   git log --since="<session-date>" --until="<next-session-date or +1d>" --pretty=format:'%h %s'
+   ```
+   - If the session entry already lists commit hashes (`(commits ...)`, `(commit ...)`), prefer those — they were chosen during the original session
+   - Otherwise pick commits whose subjects clearly correspond to the session's work; cap at 4 hashes
+   - If no commits exist in the date window (rare — pure docs session?), omit the parenthetical
+3. **Replace the multi-line block** with a single line in this format:
+   ```
+   ### Session N - YYYY-MM-DD: [one-line summary] (commits: hash1, hash2)
+   ```
+   For a single commit, use `(commit: hash)`. For "bundled" cases where multiple sessions share a commit, write `(bundled in hash)`.
+4. Preserve a single blank line between session entries.
+
+### 6.4 Add Rollup Note (First Run Only)
+
+If `session-history.md` does not already contain the rollup note (i.e., this is the first run and the user said yes in Step 6.2), insert it after the existing `> Auto-managed by /update-docs...` line:
+
+```markdown
+> **Note:** Sessions older than the 5 most recent are compressed to one-liners with commit hashes. Full prose for compressed sessions lives in git history (`git show <hash>`).
+```
+
+This note is the gating sentinel: its presence tells future runs that the user has already consented to rollups for this project, and Step 6.2 will skip the prompt next time.
+
+### 6.5 Report
+
+Tell the user:
+> "Rolled up [N] older sessions. session-history.md: [old-size]k → [new-size]k chars."
+
+If 0 sessions were compressed, skip the report.
