@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-04-16 (Session 15)
+Last Updated: 2026-04-17 (Session 16)
 
 ## Project Overview
 
@@ -75,7 +75,8 @@ Nothing currently in progress.
 | Verify every external-repo claim before shipping | Session 13 research on shanraisshan/claude-code-best-practice surfaced 14 candidate patterns. Spot-verification via direct raw.githubusercontent.com fetches found the catalog had conflated skills `paths:` with `.claude/rules/` `paths:`, and that "curation/start narrow" and "/compact at 50%" were community wisdom, not Anthropic guidance. Ship only what docs.claude.com confirms; soften or drop the rest. |
 | `plan-feature` Step 0 triviality check + `AskUserQuestion`-driven interview | Session 14 audit against code.claude.com/docs/en/best-practices. Doc explicitly recommends `AskUserQuestion` for the interview pattern and explicitly tells users to skip planning for one-sentence changes ("typo, log line, rename"). Step 0 returns control to the user before the interview overhead; interview itself uses multi-choice prompts with an "Other / explain" escape. Falls back to numbered Q&A when `AskUserQuestion` is unavailable. |
 | Surface `/rewind` in destructive `--fix` output | Same Session 14 audit. Doc treats checkpointing as a core safety net for risky operations. Both `code-cleanup --fix` and `code-review --fix` now end with a one-liner pointing the user at `Esc Esc` / `/rewind`. For `code-cleanup`, the existing `git branch -D` instruction stays as the coarse-grained option and `/rewind` is added for finer-grained per-edit undo. |
-| `effort: high` on reasoning-heavy skills | Session 15 (Opus 4.7 launch). Per official skills-frontmatter docs, `effort` accepts `low\|medium\|high\|xhigh\|max`. Applied `effort: high` to `/code-review` (deep diff analysis) and `/plan-feature` (interview synthesis). Mechanical skills (`/resume-work`, `/update-docs`, `/code-cleanup` orchestrator) keep session default. |
+| Per-skill `effort:` frontmatter tuning | Sessions 15-16. Reasoning-heavy skills on `effort: high`: `/code-review`, `/plan-feature`. Mechanical skills on `effort: low`: `/update-docs`, `/resume-work` (added Session 16 after ~20min real-project run). `/code-cleanup` orchestrator stays at session default — heavy work lives in its Sonnet-pinned subagents. Frontmatter scope is per-invocation; auto-reverts to session default when the skill returns. |
+| Parallel batch reads + single `git log` in `/update-docs` Parts 3 and 6 | Session 16. Part 3 now pre-loads all `docs/*.md` in a single parallel-Read turn before editing; Part 6 rollup uses one pre-fetched `git log` across the full compressible date range instead of per-session calls. Pure wins — no functionality change, only faster. Addresses the ~20min user-reported run. |
 | Keep custom `/code-review`; position `/ultrareview` as complementary | Session 15. Built-in `/ultrareview` (CC 2.1.111) runs 5-20 verifying subagents in cloud, 10-20min — best for high-risk pre-merge (auth, payments, migrations). Custom skill is faster, in-session, and has `--security`/`--verify`/`--fix` modes that `/ultrareview` lacks. Documented the when-to-use-which split in README. |
 | Dropped Session 12 `defer` hook dogfood | Session 15. Carried forward 12→13→14→15. Recipe in README:177 remains untested but documented; user accepted the small risk that it's subtly wrong rather than spend a session verifying. Removed the carry-forward bullet from CLAUDE.md so it stops surfacing in `/resume-work`. |
 | Session-history rollup pattern | Session 15. `docs/session-history.md` auto-compresses sessions older than the 5 most recent into one-liners with commit hashes; full prose preserved in git. Implemented as Part 6 in `update-docs/mode-update.md` with `--skip-rollup` escape and a Step 6.2 first-run confirmation prompt (rollup-format note acts as per-project sentinel). Keeps the file bounded across all projects without surprising legacy ones. |
@@ -129,9 +130,9 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 15) - 2026-04-16
-- **Dropped the long-pending defer-hook dogfood.** Carried 12→13→14; user opted to remove it entirely rather than verify. README recipe at line 177 left in place untested.
-- **Aligned the repo with the Opus 4.7 launch (CC 2.1.111).** Verified via WebFetch of Anthropic news post + Claude Code CHANGELOG + skills docs page. Added `effort: high` to `/code-review` and `/plan-feature`; positioned custom `/code-review` as lighter daily-driver vs built-in `/ultrareview` for high-stakes pre-merge; refreshed Sonnet-pin decision (pricing unchanged from 4.6).
-- **Decided NOT to retire `/code-review`** in favor of `/ultrareview` after weighing tradeoffs — they're complementary, not competing.
-- **Designed and shipped session-history rollup pattern.** User flagged `docs/session-history.md` growing unboundedly. Picked "compress older than 5 most recent to one-liners + commit hashes" approach. Built Part 6 into `/update-docs` so every run keeps the file bounded automatically. One-time pass on Sessions 1-10 shrank file 27.7KB → 22.0KB (-21%); savings compound over time.
-- **Did not change subagent `model: sonnet` pins** — 4.7 same price as 4.6.
+### Last Session (Session 16) - 2026-04-17
+- **User reported `/update-docs` taking ~20 min on a real project** — audited the skill for perf wins without losing functionality.
+- **Added `effort: low` to `/update-docs` and `/resume-work`.** Mechanical work (text shuffling, git queries, template filling) doesn't need Opus-level reasoning. Frontmatter-scoped: auto-reverts when the skill returns, so no in-skill toggling needed.
+- **Parallelized `mode-update.md` Parts 3 and 6.** New Part 3.0 preamble batch-reads all `docs/*.md` in a single parallel turn before edits; Part 6.3 step 2 pre-fetches one `git log` across the full compressible date range instead of one per session.
+- **Kept `/code-cleanup` orchestrator at session default** per user — heavy work is in its Sonnet subagents.
+- **Updated Key Decisions** — prior "mechanical skills keep session default" guidance superseded by the two new `effort: low` pins; added a row for the Part 3/Part 6 parallelization.

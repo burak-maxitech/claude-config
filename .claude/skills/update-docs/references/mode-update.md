@@ -267,6 +267,17 @@ Update to reflect actual docs/ contents:
 
 ## Part 3: Update docs/*.md Files
 
+### 3.0 Batch Read All Doc Files in Parallel
+
+Before iterating file-by-file, pre-load the whole `docs/` tree in one turn:
+
+1. List docs with `Glob docs/**/*.md` (single call)
+2. Issue one `Read` tool call per file — **all in the same turn** — so they execute in parallel rather than sequentially
+3. Analyze all files in a single pass and plan the Edits
+4. Apply all Edits in batched parallel calls where the targets don't conflict
+
+This replaces a sequential read-analyze-edit loop (N turns) with a single parallel gather + batched writes, which is the dominant runtime cost on projects with 5+ doc files.
+
 ### For Each PRD/Spec File:
 
 #### 3.1 Architecture
@@ -365,10 +376,11 @@ The presence of the rollup-format note (see Step 6.4) acts as a "this project ha
 For each session needing compression:
 
 1. **Extract a one-line summary** from the existing entry — pull the most architecturally significant 1-3 bullets from "What happened" and condense. Keep skill names, flag names, and concrete artifacts (file names, decision names) since those are what future-readers grep for. Drop process narration ("ran /update-docs", "committed and pushed", "user asked").
-2. **Find associated commit hashes** by running:
+2. **Find associated commit hashes** using a single pre-fetched git log. Before the per-session compression loop, run ONCE:
    ```
-   git log --since="<session-date>" --until="<next-session-date or +1d>" --pretty=format:'%h %s'
+   git log --since="<earliest-compressible-session-date>" --until="<latest-compressible-session-date +1d>" --pretty=format:'%h %ad %s' --date=short
    ```
+   Then for each session being compressed, filter that pre-fetched output in memory by the session's date window. Do NOT run a separate `git log` per session — one command for the whole batch.
    - If the session entry already lists commit hashes (`(commits ...)`, `(commit ...)`), prefer those — they were chosen during the original session
    - Otherwise pick commits whose subjects clearly correspond to the session's work; cap at 4 hashes
    - If no commits exist in the date window (rare — pure docs session?), omit the parenthetical

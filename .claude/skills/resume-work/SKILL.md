@@ -2,6 +2,7 @@
 name: resume-work
 description: "Resumes development on a project after a break. Reads docs, scans git state, identifies next task, and hydrates live task tracker. Use at the start of every coding session."
 disable-model-invocation: true
+effort: low
 allowed-tools: Read, Grep, Glob, Bash(git:*), Bash(ls:*), Bash(npm:*), Bash(npx:*), Bash(python:*), Bash(make:*), Bash(cargo:*), TaskCreate, TaskGet, TaskList
 argument-hint: "[deep]"
 ---

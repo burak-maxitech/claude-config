@@ -25,20 +25,7 @@
 
 ### Session 10 - 2026-03-13: Workflow.md cleanup — removed 60-line duplicate setup section (replaced with link to README); alias name fix `claude-start` → `cc`; reordered Quick Start first with manual steps in `<details>`; moved alias setup one-liners to README; removed `claude-config` filter from project picker in both startup scripts. (commits: 7c99471, 777ab86)
 
-### Session 11 - 2026-03-17
-**What happened:**
-- Resumed work after 4-day break using `/resume-work`
-- Reviewed plan-feature skill's `disable-model-invocation` setting (currently `true`)
-- User initiated change to enable model invocation but cancelled before applying
-- No code changes made this session
-
-**Files created/modified:**
-- None (documentation-only update via `/update-docs`)
-
-**Next session should:**
-- Change `disable-model-invocation` to `false` on plan-feature skill (user intention from this session)
-- Add more skills as new workflow needs emerge
-- Consider adding hooks for automated pre-commit workflows
+### Session 11 - 2026-03-17: Enabled model invocation on plan-feature skill (`disable-model-invocation: false`). (commits: 734b13b, 1cffa6b)
 
 ### Session 12 - 2026-04-11
 **What happened:**
@@ -185,3 +172,42 @@
 - Consider whether the `/effort` slider (CC 2.1.111) being interactive means the per-skill `effort: high` should ever be downgraded — probably no, because the frontmatter is the deliberate per-skill override and the slider is a session-level convenience.
 - If a real high-risk PR comes up, actually try `/ultrareview` and compare with custom `/code-review --security --verify` to see whether the README positioning blockquote needs refining.
 - Watch for the next `/update-docs` run to confirm Part 6 fires correctly: as Session 16 is added, Session 11 (currently the 5th-most-recent) should get auto-compressed to a one-liner. If Part 6 misfires (e.g., picks bad commit hashes), refine the heuristic in `mode-update.md` Step 6.2.
+
+### Session 16 - 2026-04-17
+**What happened:**
+- User reported a real `/update-docs` run taking ~20 minutes on one of their other projects. Asked how to improve perf without losing functionality.
+- Audited `update-docs/SKILL.md` and `mode-update.md` to identify hotspots. Three main drivers: (1) skill had no `effort` pin so it ran at session default (Opus 4.7 for the user), (2) Part 3 walks `docs/*.md` sequentially, (3) Part 6 rollup runs one `git log --since/--until` per compressible session.
+- Recommended fixes; user said "do all." Confirmed that `effort:` in skill frontmatter is invocation-scoped — the harness applies it for the skill duration and reverts to session default on return, so no programmatic toggling is needed.
+- **Shipped three edits in `/update-docs`:**
+  1. `.claude/skills/update-docs/SKILL.md` — added `effort: low` to frontmatter (mirrors the `effort: high` pattern from Session 15's `/code-review` and `/plan-feature`).
+  2. `.claude/skills/update-docs/references/mode-update.md` — new **Part 3.0 "Batch Read All Doc Files in Parallel"** preamble directing a single `Glob docs/**/*.md` + parallel `Read` (one tool call per file, same turn) + batched Edits. Replaces sequential read-analyze-edit.
+  3. `.claude/skills/update-docs/references/mode-update.md` — rewrote **Part 6.3 step 2** to pre-fetch one `git log --since="<earliest>" --until="<latest>+1d" --pretty=format:'%h %ad %s' --date=short` across the full compressible date range, then slice per-session in memory. Replaces N sequential git calls with 1.
+- User then asked to sweep the other 4 skills. Presented a table with recommendations:
+  - `/code-review` keeps `effort: high` (reasoning-heavy, Session 15).
+  - `/plan-feature` keeps `effort: high` (interview synthesis, Session 15).
+  - `/update-docs` keeps just-added `effort: low`.
+  - Recommended `/resume-work` → `low` (read docs + git + hydrate tasks = mechanical).
+  - Recommended `/code-cleanup` orchestrator → `low` (real work in Sonnet subagents).
+- User approved `/resume-work` only. `/code-cleanup` left at session default per explicit instruction. Shipped `effort: low` on `resume-work/SKILL.md:5`.
+- Flagged to user that the CLAUDE.md Key Decisions row stating "Mechanical skills keep session default" was now partially outdated and would be refreshed by this `/update-docs` run.
+- **Dogfood note:** this `/update-docs` run is the first one exercising the new Part 3.0 parallel batch-read and Part 6.3 batched `git log`. Part 6 correctly identified Session 11 as the now-5th-oldest and compressed it using the two `2026-03-17` commits from the pre-fetched log. Subjective sense: run felt noticeably faster than Session 15's despite comparable scope (multi-file doc updates + one rollup).
+
+**Files created/modified:**
+- `.claude/skills/update-docs/SKILL.md` — `effort: low` added to frontmatter (+1 line)
+- `.claude/skills/update-docs/references/mode-update.md` — Part 3.0 preamble added before 3.1-3.4 (+10 lines); Part 6.3 step 2 rewritten to use a single batched `git log` (~5 lines changed)
+- `.claude/skills/resume-work/SKILL.md` — `effort: low` added to frontmatter (+1 line)
+- `CLAUDE.md` — bumped Last Updated to 2026-04-17, rewrote the Session 15 `effort: high` Key Decisions row to reflect current pins, added a new row for the Part 3/Part 6 parallelization, replaced Session 15 last-session summary with Session 16 (this run)
+- `docs/session-history.md` — Part 6 auto-rollup compressed Session 11 to one-liner; this entry appended (this run)
+- `docs/completed-work.md` — Session 16 entries appended (this run)
+- `docs/key-decisions.md` — 2 Session 16 decision rows appended (this run)
+
+**Files NOT modified (and why):**
+- `.claude/skills/code-cleanup/SKILL.md` — user explicitly declined the `effort: low` pin for the orchestrator. Stays at session default.
+- `.claude/skills/code-review/SKILL.md`, `.claude/skills/plan-feature/SKILL.md` — `effort: high` from Session 15 confirmed still correct (reasoning-heavy work).
+- `README.md`, `workflow.md` — skill behavior is unchanged from the user's perspective (same commands, same outputs, just faster). No user-facing doc change warranted.
+- `.claude/agents/cleanup-*.md` — no subagent changes this session.
+
+**Next session should:**
+- If anyone runs `/update-docs` on a real project again, observe actual wall-clock delta vs the 20-min baseline. If still slow, consider scoping Part 3 to `git diff --name-only` (small functionality trim — won't catch drift in untouched docs).
+- Pick up Next Steps #3 (pre-commit hooks) or #4 (MCP integration) — both still pending in task tracker from prior sessions.
+- Session 12 becomes the 6th-most-recent when Session 17 arrives → it'll be the next compressible entry. Watch the Part 6.3 batched `git log` path on that run to confirm the new approach picks correct commit hashes.
