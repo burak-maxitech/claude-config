@@ -44,3 +44,13 @@ Therefore:
 - **Context preservation applies to the WHOLE documentation system** (CLAUDE.md + reference files + docs/), not to CLAUDE.md alone. Moving content from CLAUDE.md to a reference file (e.g., `docs/completed-work.md`) is preservation, not removal.
 - **During REFACTOR: Move content to appropriate files, don't delete it**
 - **Preserve existing file names in docs/ - don't rename project-specific files**
+
+### Pruning Is Preservation
+
+CLAUDE.md has a ~17k char target because it is read into context every session, and unbounded growth eventually degrades performance. The cap-enforcement steps (`mode-update.md` Part 1.10) and the two rollups (Parts 5 and 6) **are the mechanism that keeps this rule workable at scale**:
+
+- **Moving a Key Decisions row from CLAUDE.md → `docs/key-decisions.md` is preservation.** The row still exists; it is one level less eager to load.
+- **Collapsing a run of `Complete` status rows into a summary line is preservation** — as long as the individual entries land in `docs/completed-work.md` with any unique notes before they leave CLAUDE.md.
+- **Compressing a session history block to a one-liner with commit hashes is preservation** — the full prose is recoverable via `git show <hash>`.
+
+The "when in doubt, keep it" rule applies to *information*, not to *location*. When CLAUDE.md would otherwise grow past its targets, moving content to its designated reference file is the correct action — not an exception to preservation.

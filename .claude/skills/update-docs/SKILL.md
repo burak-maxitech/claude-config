@@ -4,7 +4,7 @@ description: "Manages project documentation (README.md, CLAUDE.md, docs/*.md). D
 disable-model-invocation: false
 effort: low
 allowed-tools: Read, Edit, Write, Grep, Glob, Bash(git:*), Bash(ls:*), Bash(find:*), TaskList, TaskGet, AskUserQuestion
-argument-hint: "[scope] [--skip-memory] [--skip-tasks] [--skip-commit] [--skip-rollup]"
+argument-hint: "[scope] [--skip-memory] [--skip-tasks] [--skip-commit] [--skip-rollup] [--skip-decisions-rollup] [--skip-caps]"
 ---
 
 # /update-docs - Documentation Management Skill

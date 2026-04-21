@@ -237,6 +237,34 @@ After all updates, check CLAUDE.md file size:
    > "CLAUDE.md is [X]k chars — approaching the 40k limit. Consider condensing sections or moving more content to reference files."
 2. Target is ~17k chars. If significantly over, suggest specific sections to trim.
 
+### 1.10 Cap Enforcement
+
+Active per-section caps on CLAUDE.md. Part 1.9 warns; this step enforces. Runs every UPDATE.
+
+The biggest source of bloat — the Key Decisions table — is handled by the rollup in Part 6 because it requires moving rows to a reference file with a first-run consent gate. Part 1.10 handles the smaller in-CLAUDE.md sections only.
+
+**If `--skip-caps` is in `$ARGUMENTS`, skip this step entirely.**
+
+#### 1.10.1 Current Status Table
+Target: ≤10 rows. If >10 rows AND ≥3 are `Complete`:
+- Collapse runs of `Complete` rows into a single summary row in the same table:
+  > `| [N] components complete | Complete | See docs/completed-work.md |`
+- Keep all `In Progress` and `Not Started` rows verbatim.
+- Do not collapse if it would lose information (e.g. each `Complete` row has a unique note worth preserving — in that case, move them individually to `docs/completed-work.md` with their notes).
+
+#### 1.10.2 Next Steps
+Target: ≤10 items. If over cap, warn only — do not move:
+> "Next Steps has [N] items (target ≤10). Consider pruning low-priority ones or completing the top few."
+
+Next Steps is short-lived by design — accretion is a signal that items aren't being completed or reprioritized, not a storage problem.
+
+#### 1.10.3 In Progress
+Target: ≤5 items. If over cap, warn only — do not move:
+> "In Progress has [N] items (target ≤5). Fragmented work often means stalled tasks — consider consolidating before continuing."
+
+#### 1.10.4 Pruning Is Preservation
+When 1.10.1 collapses rows into a summary line, the collapsed rows must land in `docs/completed-work.md` (with any unique notes) before they leave CLAUDE.md. This is the **pruning-as-preservation** rule: content moves, it does not disappear. See `doc-structure-rules.md` for the full statement.
+
 ## Part 2: Update README.md
 
 ### 2.1 Project Overview
@@ -330,28 +358,13 @@ Do not duplicate evolving state — that stays in CLAUDE.md:
 4. **Only sync when facts change** — if tech stack, commands, or structure haven't changed, skip this step
 5. **Create topic files** for detailed notes (e.g., `debugging.md`, `patterns.md`) and link from MEMORY.md
 
-## Part 5: Commit Checkpoint
-
-After all documentation updates are complete, remind the user to commit.
-
-**If `--skip-commit` is in `$ARGUMENTS`, skip this step entirely.**
-
-1. **Run `git status`** to show all uncommitted files (staged and unstaged)
-2. **If there are uncommitted changes:**
-   - Show the list of modified/untracked files
-   - Suggest a conventional commit message based on what was done this session, e.g.:
-     > Suggested commit: `docs: update session progress and documentation`
-   - **Ask the user:** "Would you like to commit these changes?"
-   - **Never auto-commit** — always wait for user confirmation
-3. **If there are no uncommitted changes**, skip silently
-
-## Part 6: Roll Up Old Sessions in session-history.md
+## Part 5: Roll Up Old Sessions in session-history.md
 
 Keep `docs/session-history.md` bounded by compressing sessions older than the 5 most recent into one-line summaries. The full prose still lives in git history at the linked commit hashes.
 
 **If `--skip-rollup` is in `$ARGUMENTS`, skip this step entirely.**
 
-### 6.1 Detect Compressible Sessions
+### 5.1 Detect Compressible Sessions
 
 1. Read `docs/session-history.md`
 2. Grep for `^### Session` headers and count them
@@ -359,19 +372,19 @@ Keep `docs/session-history.md` bounded by compressing sessions older than the 5 
 4. The 5 highest-numbered sessions stay in full prose; everything older is a candidate for compression
 5. Identify which older entries are still in multi-line "What happened / Files / Next session" format. Skip any already in one-line format (idempotent — running this part repeatedly is safe)
 
-### 6.2 First-Run Confirmation (per-project)
+### 5.2 First-Run Confirmation (per-project)
 
-The presence of the rollup-format note (see Step 6.4) acts as a "this project has consented to rollups before" sentinel. Use it to gate the first-run prompt:
+The presence of the rollup-format note (see Step 5.4) acts as a "this project has consented to rollups before" sentinel. Use it to gate the first-run prompt:
 
 1. **Check if the rollup note exists** in `session-history.md`'s header (search for the literal substring `Sessions older than the 5 most recent are compressed`)
-2. **If the note IS present** → proceed silently to Step 6.3 (this project has been rolled up before)
+2. **If the note IS present** → proceed silently to Step 5.3 (this project has been rolled up before)
 3. **If the note is MISSING and there are entries to compress** → this is the first rollup pass on this project. Ask the user:
    > "First-time rollup detected for this project: `docs/session-history.md` has [N] sessions in full-prose format, [M] of which are older than the 5 most recent and would be compressed to one-line summaries with commit hashes. Full prose stays preserved in git history. Compress now? (y/n)"
-   - **If user declines** → skip the rest of Part 6 entirely. Do NOT add the rollup note (so the user is asked again next run).
-   - **If user accepts** → proceed to Step 6.3.
+   - **If user declines** → skip the rest of Part 5 entirely. Do NOT add the rollup note (so the user is asked again next run).
+   - **If user accepts** → proceed to Step 5.3.
 4. **Use `AskUserQuestion` if available** for a cleaner y/n/skip-this-time prompt; fall back to a numbered chat question otherwise.
 
-### 6.3 Compress Each Older Session
+### 5.3 Compress Each Older Session
 
 For each session needing compression:
 
@@ -391,19 +404,84 @@ For each session needing compression:
    For a single commit, use `(commit: hash)`. For "bundled" cases where multiple sessions share a commit, write `(bundled in hash)`.
 4. Preserve a single blank line between session entries.
 
-### 6.4 Add Rollup Note (First Run Only)
+### 5.4 Add Rollup Note (First Run Only)
 
-If `session-history.md` does not already contain the rollup note (i.e., this is the first run and the user said yes in Step 6.2), insert it after the existing `> Auto-managed by /update-docs...` line:
+If `session-history.md` does not already contain the rollup note (i.e., this is the first run and the user said yes in Step 5.2), insert it after the existing `> Auto-managed by /update-docs...` line:
 
 ```markdown
 > **Note:** Sessions older than the 5 most recent are compressed to one-liners with commit hashes. Full prose for compressed sessions lives in git history (`git show <hash>`).
 ```
 
-This note is the gating sentinel: its presence tells future runs that the user has already consented to rollups for this project, and Step 6.2 will skip the prompt next time.
+This note is the gating sentinel: its presence tells future runs that the user has already consented to rollups for this project, and Step 5.2 will skip the prompt next time.
 
-### 6.5 Report
+### 5.5 Report
 
 Tell the user:
 > "Rolled up [N] older sessions. session-history.md: [old-size]k → [new-size]k chars."
 
 If 0 sessions were compressed, skip the report.
+
+## Part 6: Roll Up Old Key Decisions
+
+Keep CLAUDE.md's `## Key Decisions` table bounded by moving older rows into `docs/key-decisions.md`. Mirrors the session-history rollup in Part 5: gated on a first-run sentinel, silent on subsequent runs.
+
+**If `--skip-decisions-rollup` is in `$ARGUMENTS`, skip this step entirely.**
+
+### 6.1 Detect Overflow
+
+1. Read CLAUDE.md's `## Key Decisions` table; count data rows (exclude the header and separator).
+2. **If count ≤ 20, skip silently** — nothing to roll up.
+3. Rows to move: the oldest `(count - 20)` rows.
+   - **Oldest = topmost in the table.** By convention, new decisions are appended at the bottom, so FIFO from the top is the mechanical rule. Using "least important" instead invites the same judgment-avoidance that caused the bloat — stick to FIFO unless the user overrides per-session.
+
+### 6.2 First-Run Confirmation (per-project)
+
+The presence of the rollup-format note in `docs/key-decisions.md` (see Step 6.4) acts as the "this project has consented to decision rollups before" sentinel:
+
+1. **Check if the rollup note exists** in `docs/key-decisions.md`'s header (search for the literal substring `Entries older than the 20 most recent in CLAUDE.md are rolled up`)
+2. **If the note IS present** → proceed silently to Step 6.3
+3. **If the note is MISSING and there are rows to roll up** → this is the first decisions rollup pass on this project. Ask the user via `AskUserQuestion` (or numbered Q&A fallback):
+   > "First-time Key Decisions rollup: CLAUDE.md has [N] rows (target ≤20). The oldest [M] rows would move to `docs/key-decisions.md`. Full content is preserved — just relocated. Proceed? (y/n)"
+   - **If user declines** → skip the rest of Part 6 entirely. Do NOT add the rollup note (re-asks next run).
+   - **If user accepts** → proceed to Step 6.3.
+
+### 6.3 Move Rows
+
+For each row to roll up:
+
+1. **Append to `docs/key-decisions.md`** preserving the existing row order (topmost row of the CLAUDE.md table becomes next row in the reference file).
+   - If the file doesn't exist, create it first with the header block from `mode-update.md` Part 1.6 (`# Key Decisions` → `> Full decision log. Referenced from [CLAUDE.md](../CLAUDE.md).` → table header).
+2. **Remove the row from CLAUDE.md's `## Key Decisions` table.**
+3. **Do NOT deduplicate.** If the same row already exists in `docs/key-decisions.md` (because an earlier session mirrored it there), leave both — dedup requires judgment. The cost is a duplicate line in the reference file, which is harmless.
+4. Preserve the trailing `> Full decision log: [docs/key-decisions.md](docs/key-decisions.md)` link in CLAUDE.md; that link is the whole point of keeping the section lean.
+
+### 6.4 Add Rollup Note (First Run Only)
+
+If `docs/key-decisions.md` does not already contain the rollup note, insert it after the existing `> Full decision log...` header line:
+
+```markdown
+> **Note:** Entries older than the 20 most recent in CLAUDE.md are rolled up here. CLAUDE.md keeps the freshest 20 as a quick-reference for AI sessions; the complete decision history lives in this file.
+```
+
+This note is the gating sentinel: its presence tells future runs that the user has already consented to decision rollups for this project, and Step 6.2 will skip the prompt next time.
+
+### 6.5 Report
+
+> "Rolled up [M] Key Decisions from CLAUDE.md → docs/key-decisions.md. CLAUDE.md: [old-size]k → [new-size]k chars."
+
+If 0 rows were moved, skip the report.
+
+## Part 7: Commit Checkpoint
+
+After all documentation updates **and rollups** are complete, remind the user to commit. This runs last so that Part 5 and Part 6 changes are included in the same commit as the session updates.
+
+**If `--skip-commit` is in `$ARGUMENTS`, skip this step entirely.**
+
+1. **Run `git status`** to show all uncommitted files (staged and unstaged)
+2. **If there are uncommitted changes:**
+   - Show the list of modified/untracked files
+   - Suggest a conventional commit message based on what was done this session, e.g.:
+     > Suggested commit: `docs: update session progress and documentation`
+   - **Ask the user:** "Would you like to commit these changes?"
+   - **Never auto-commit** — always wait for user confirmation
+3. **If there are no uncommitted changes**, skip silently

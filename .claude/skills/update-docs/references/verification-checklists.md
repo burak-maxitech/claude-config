@@ -84,6 +84,7 @@ Provide complete content for each file created or significantly modified.
 - [ ] CLAUDE.md links to actual docs/ files (including reference files)
 - [ ] CLAUDE.md has all required sections intact
 - [ ] CLAUDE.md is under 35k chars (warn if exceeded, target ~17k)
+- [ ] Cap enforcement (Part 1.10) ran — Current Status ≤10, Next Steps ≤10, In Progress ≤5 (or warnings issued)
 - [ ] README.md matches current features
 - [ ] README.md links to actual docs/ files
 - [ ] Relevant docs/*.md files updated
@@ -91,8 +92,9 @@ Provide complete content for each file created or significantly modified.
 - [ ] No valuable context removed
 - [ ] Auto-memory synced with stable project facts (if changed)
 - [ ] Task list drained — completed/in-progress/pending tasks synced back
-- [ ] Commit checkpoint offered (unless --skip-commit)
 - [ ] Session-history rollup considered (unless --skip-rollup) — older entries compressed when count > 5
+- [ ] Key Decisions rollup considered (unless --skip-decisions-rollup) — oldest rows moved to docs/key-decisions.md when CLAUDE.md table > 20
+- [ ] Commit checkpoint offered LAST (unless --skip-commit) — runs after both rollups so their changes land in the same commit
 - [ ] Project-specific files preserved
 
 ## Post-Verification Note
