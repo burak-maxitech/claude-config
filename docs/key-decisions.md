@@ -1,6 +1,7 @@
 # Key Decisions
 
 > Full decision log. Referenced from [CLAUDE.md](../CLAUDE.md).
+> **Note:** Entries older than the 20 most recent in CLAUDE.md are rolled up here. CLAUDE.md keeps the freshest 20 as a quick-reference for AI sessions; the complete decision history lives in this file.
 
 | Decision | Rationale |
 |----------|-----------|
@@ -62,6 +63,27 @@
 | Reject `@import` syntax for CLAUDE.md → docs/ overflow files | Session 14: official doc demonstrates `@docs/git-instructions.md` as a CLAUDE.md import mechanism that auto-loads referenced files into context at session start. Considered switching our markdown links (`[docs/key-decisions.md](docs/key-decisions.md)`) to `@docs/key-decisions.md`. Rejected because it defeats the entire purpose of the overflow system: we *don't* want `docs/completed-work.md` and `docs/key-decisions.md` loaded into every session — they're reference-on-demand files, exactly the case the doc itself says skills (not imports) are for. Markdown links stay. |
 | Per-skill `effort: low` on mechanical skills (Session 16) | After Session 15 pinned reasoning-heavy skills at `effort: high`, user hit a real ~20-minute `/update-docs` run on another project. Audited the skill: almost all work is mechanical (text shuffling, git queries, template filling) — Opus-level reasoning is unnecessary. Shipped `effort: low` on `/update-docs` and `/resume-work`. `/code-cleanup` orchestrator stays at session default per user preference — heavy scanning happens inside its Sonnet-pinned subagents, not the orchestrator. Frontmatter `effort:` is invocation-scoped: the value applies for the duration of the skill and auto-reverts to session default when control returns to the main conversation, so no manual toggling is needed. |
 | Parallel batch reads + single `git log` in `/update-docs` Parts 3 and 6 (Session 16) | Same audit. Two hotspots besides model choice: (1) Part 3 walked `docs/*.md` one file at a time in a sequential read-analyze-edit loop, (2) Part 6 rollup ran a separate `git log --since/--until` call per compressible session. Fixed both: Part 3.0 preamble now pre-loads all doc files with parallel Read tool calls in a single turn before editing; Part 6.3 step 2 pre-fetches one `git log` over the full compressible date range with `--date=short --pretty=format:'%h %ad %s'` and slices per-session in memory. Pure wins — no functionality changed, only wall-clock time. Scoping Part 3 to `git diff --name-only` was considered but deferred as a small functionality trim (wouldn't catch drift in untouched docs). |
+| Active CLAUDE.md cap enforcement (Session 17) | Pre-existing rules said "keep ~20 Key Decisions, 17k char target" but `update-docs` only *warned* at thresholds. Adding rows is mechanical; pruning requires judgment ("which is least important?") which the model defers on under `doc-structure-rules.md`'s "when in doubt, keep it" rule. Evidence: CLAUDE.md had drifted to ~36 Key Decisions rows. Shipped new Part 1.10: Current Status ≤10 (collapses consecutive `Complete` runs into a summary row after individual rows land in `docs/completed-work.md`), Next Steps ≤10 (warn only — accretion signals stalled work), In Progress ≤5 (warn only — fragmentation signals stalled tasks). Gated by `--skip-caps`. Handles only small in-CLAUDE.md sections; the big one (Key Decisions) is Part 6's job. |
+| Key Decisions rollup + commit-last ordering (Session 17) | Mirror of the Part 5 session-history rollup. New Part 6: FIFO move of oldest CLAUDE.md Key Decisions rows into `docs/key-decisions.md` when count > 20. "Oldest = topmost in table" by convention (new decisions append at the bottom). Chose FIFO over "least important" explicitly — the judgment-avoidance of "least important" is what caused the bloat. First-run `AskUserQuestion` consent gate with the rollup-format note in the reference file as the per-project sentinel for subsequent silent runs. Do-not-deduplicate rule: rows may overlap with pre-existing detailed entries in `docs/key-decisions.md`; dedup requires judgment and is out of scope. Gated by `--skip-decisions-rollup`. Also reordered Parts so commit checkpoint (now Part 7) runs last — closes the Session 15 bug where rollup changes could land uncommitted. |
+| "Pruning is preservation" codified (Session 17) | The existing context-preservation rule in `doc-structure-rules.md` said "NEVER remove... when in doubt, keep it" and noted that moving content between files counts as preservation. But that nuance was one bullet deep and the model still defaulted to "keep in CLAUDE.md." Session 17 added an explicit "Pruning Is Preservation" subsection giving Part 1.10 and Parts 5/6 canonical backing: moving a row CLAUDE.md → `docs/key-decisions.md` is preservation, not removal; collapsing `Complete` status runs is preservation *as long as* the individuals land in `docs/completed-work.md` first; compressing a session history block is preservation because git preserves the prose. The rule applies to *information*, not to *location*. |
+| Symlink subdirectories, not entire ~/.claude | Preserves local credentials and config |
+| Skills format (SKILL.md + references/) | Bundles logic with docs; YAML frontmatter for permissions |
+| Subagents on Sonnet | Cost efficiency for scanning work |
+| Parallel scanning in /code-cleanup | 3 simultaneous subagents for speed |
+| Lean CLAUDE.md with reference file overflow | Keep under ~17k chars; details in docs/*.md |
+| Three-file doc structure | README (public), CLAUDE.md (AI context), docs/ (references) |
+| Auto-memory sync via /update-docs | Stable facts persist across sessions |
+| Task hydration via TaskCreate | Live task tracking from CLAUDE.md content |
+| Plan Mode in /plan-feature | Formal approval before coding begins |
+| Session archiving (>3 sessions) | Auto-archive to docs/session-history.md |
+| --dry-run mode in /code-cleanup | Preview cleanup impact without deleting; builds user trust |
+| --aggressive requires --fix to delete | Cosmetic reclassification only without --fix; prevents accidental deletions |
+| Phase gating in /plan-feature | Tests + commit per phase; rollback-friendly checkpoints |
+| --verify/--security/--fix in /code-review | Verification, OWASP deep dive, and auto-fix as opt-in modes |
+| Git blame context for review findings | Understand intent before flagging; prevents false positives |
+| Large diff guard in /code-review | Warn at 500+ lines, suggest chunking at 1000+ to preserve review quality |
+| Bidirectional task integrity | Pre-hydration stale check + post-drain validation prevents silent task data loss |
+| Context freshness detection in /resume-work | Compare CLAUDE.md date vs git commits; warn if docs are stale |
 
 ---
 

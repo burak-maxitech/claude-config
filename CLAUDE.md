@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-04-17 (Session 16)
+Last Updated: 2026-04-21 (Session 17)
 
 ## Project Overview
 
@@ -44,24 +44,6 @@ Nothing currently in progress.
 
 | Decision | Rationale |
 |----------|-----------|
-| Symlink subdirectories, not entire ~/.claude | Preserves local credentials and config |
-| Skills format (SKILL.md + references/) | Bundles logic with docs; YAML frontmatter for permissions |
-| Subagents on Sonnet | Cost efficiency for scanning work |
-| Parallel scanning in /code-cleanup | 3 simultaneous subagents for speed |
-| Lean CLAUDE.md with reference file overflow | Keep under ~17k chars; details in docs/*.md |
-| Three-file doc structure | README (public), CLAUDE.md (AI context), docs/ (references) |
-| Auto-memory sync via /update-docs | Stable facts persist across sessions |
-| Task hydration via TaskCreate | Live task tracking from CLAUDE.md content |
-| Plan Mode in /plan-feature | Formal approval before coding begins |
-| Session archiving (>3 sessions) | Auto-archive to docs/session-history.md |
-| --dry-run mode in /code-cleanup | Preview cleanup impact without deleting; builds user trust |
-| --aggressive requires --fix to delete | Cosmetic reclassification only without --fix; prevents accidental deletions |
-| Phase gating in /plan-feature | Tests + commit per phase; rollback-friendly checkpoints |
-| --verify/--security/--fix in /code-review | Verification, OWASP deep dive, and auto-fix as opt-in modes |
-| Git blame context for review findings | Understand intent before flagging; prevents false positives |
-| Large diff guard in /code-review | Warn at 500+ lines, suggest chunking at 1000+ to preserve review quality |
-| Bidirectional task integrity | Pre-hydration stale check + post-drain validation prevents silent task data loss |
-| Context freshness detection in /resume-work | Compare CLAUDE.md date vs git commits; warn if docs are stale |
 | Commit checkpoint in /update-docs | Prompt to commit after docs update; never auto-commit; --skip-commit to suppress |
 | Compact guidance after both skills | Suggest /compact after resume-work and update-docs to free context |
 | Health check in /resume-work deep mode | Run tests/build in deep mode to catch broken state before coding |
@@ -80,6 +62,8 @@ Nothing currently in progress.
 | Keep custom `/code-review`; position `/ultrareview` as complementary | Session 15. Built-in `/ultrareview` (CC 2.1.111) runs 5-20 verifying subagents in cloud, 10-20min — best for high-risk pre-merge (auth, payments, migrations). Custom skill is faster, in-session, and has `--security`/`--verify`/`--fix` modes that `/ultrareview` lacks. Documented the when-to-use-which split in README. |
 | Dropped Session 12 `defer` hook dogfood | Session 15. Carried forward 12→13→14→15. Recipe in README:177 remains untested but documented; user accepted the small risk that it's subtly wrong rather than spend a session verifying. Removed the carry-forward bullet from CLAUDE.md so it stops surfacing in `/resume-work`. |
 | Session-history rollup pattern | Session 15. `docs/session-history.md` auto-compresses sessions older than the 5 most recent into one-liners with commit hashes; full prose preserved in git. Implemented as Part 6 in `update-docs/mode-update.md` with `--skip-rollup` escape and a Step 6.2 first-run confirmation prompt (rollup-format note acts as per-project sentinel). Keeps the file bounded across all projects without surprising legacy ones. |
+| Active CLAUDE.md cap enforcement (Session 17) | `/update-docs` now runs Part 1.10 every UPDATE: Current Status ≤10 (collapses `Complete` runs), Next Steps ≤10 (warn), In Progress ≤5 (warn). Replaces passive 35k-char warning with active per-section caps. Gated by `--skip-caps`. Root-cause fix for CLAUDE.md growing unboundedly across sessions despite "keep ~20 max" guidance — adding was mechanical, pruning required judgment the model deferred on. |
+| Key Decisions rollup + commit-last ordering (Session 17) | Mirrors the session-history rollup. New Part 6 in `update-docs/mode-update.md`: when CLAUDE.md's Key Decisions table > 20 rows, oldest (topmost = FIFO) rows move to `docs/key-decisions.md`. First-run `AskUserQuestion` consent gate with sentinel note in the reference file for silent subsequent runs. Gated by `--skip-decisions-rollup`. Commit checkpoint moved to Part 7 (last) so both rollups land in the same commit. "Pruning is preservation" codified in `doc-structure-rules.md` as canonical backing. |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -130,9 +114,12 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 16) - 2026-04-17
-- **User reported `/update-docs` taking ~20 min on a real project** — audited the skill for perf wins without losing functionality.
-- **Added `effort: low` to `/update-docs` and `/resume-work`.** Mechanical work (text shuffling, git queries, template filling) doesn't need Opus-level reasoning. Frontmatter-scoped: auto-reverts when the skill returns, so no in-skill toggling needed.
-- **Parallelized `mode-update.md` Parts 3 and 6.** New Part 3.0 preamble batch-reads all `docs/*.md` in a single parallel turn before edits; Part 6.3 step 2 pre-fetches one `git log` across the full compressible date range instead of one per session.
-- **Kept `/code-cleanup` orchestrator at session default** per user — heavy work is in its Sonnet subagents.
-- **Updated Key Decisions** — prior "mechanical skills keep session default" guidance superseded by the two new `effort: low` pins; added a row for the Part 3/Part 6 parallelization.
+### Last Session (Session 17) - 2026-04-21
+- **User asked for a review of `/resume-work` + `/update-docs` and specifically how to stop CLAUDE.md from bloating every cycle.** Root cause: rules said "keep ~20 Key Decisions, 17k target" but the skill only *warned* — the model added freely and rarely pruned (judgment work deferred under the "when in doubt, keep it" rule). Evidence: CLAUDE.md's Key Decisions table had grown to ~36 rows despite the ~20 cap.
+- **Shipped active cap enforcement + Key Decisions rollup** (commit `a8c99ba`):
+  - New Part 1.10 in `mode-update.md` — enforces Current Status ≤10 (collapses `Complete` runs), Next Steps ≤10 (warn), In Progress ≤5 (warn). Gated by `--skip-caps`.
+  - New Part 6 — mirrors the session-history rollup in Part 5. FIFO moves oldest CLAUDE.md Key Decisions rows beyond 20 into `docs/key-decisions.md`, with first-run `AskUserQuestion` consent gate and sentinel note in the reference file. Gated by `--skip-decisions-rollup`.
+  - Commit checkpoint moved to Part 7 (last) so both rollups land in the same commit.
+  - Codified "pruning is preservation" in `doc-structure-rules.md` as canonical backing under the existing "when in doubt, keep it" rule.
+- **First-run dogfood of the new Part 6 this session** — CLAUDE.md's 38-row Key Decisions table triggered the consent prompt; oldest 18 rows moved to `docs/key-decisions.md` (FIFO, no dedup per spec). CLAUDE.md now back under the 20-row target.
+- **Part 5 also fired** — Session 12 became the 6th-most-recent after Session 17 was added, auto-compressed to a one-liner using the batched `git log` path from Session 16.

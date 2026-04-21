@@ -27,39 +27,7 @@
 
 ### Session 11 - 2026-03-17: Enabled model invocation on plan-feature skill (`disable-model-invocation: false`). (commits: 734b13b, 1cffa6b)
 
-### Session 12 - 2026-04-11
-**What happened:**
-- User asked for a thorough analysis of Claude Code improvements released since the last session (2.1.88 → 2.1.101) and which would make sense to incorporate into the 5 skills.
-- Used plan mode with two parallel Explore agents (skill audit + feature research) plus one Plan agent to produce a tiered implementation blueprint. Plan written to `C:\Users\burak\.claude\plans\toasty-sleeping-charm.md`.
-- Verified 11 candidate features against docs.claude.com (hooks page, plugins page) and the official CHANGELOG at github.com/anthropics/claude-code. `PermissionDenied` hook, `defer` PreToolUse decision, `disableSkillShellExecution`, MCP `maxResultSizeChars`, plugin `bin/` on PATH, and named subagents in @-mention all confirmed. `showThinkingSummaries` and subagent MCP inheritance fix couldn't be verified and were dropped.
-- **Killed the `--gated` flag design** after discovering two blocking constraints in the hooks doc: `defer` only works when Claude makes a single tool call in the turn (quoted verbatim from docs), and it's specifically designed for external SDK/subprocess callers that run `claude -p` and resume via `claude -p --resume`. Skills cannot self-emit defer; only a `PreToolUse` hook can. The correct integration is harness-level config documented in README, not a new skill flag.
-- Shipped 5 commits total (2 original commits 5+6 dropped, commit 7 was a no-op grep):
-  1. `docs: note Claude Code 2.1 features and CI gating recipe` (56a5513) — README interop section added
-  2. `code-cleanup: document CI gating via PreToolUse defer hook` (dd6a7ce) — Fix Mode note
-  3. `code-review: document CI gating and MCP maxResultSizeChars` (644fb0c) — Step 1 + Step 6 notes
-  4. `resume-work: detect plugin bin/ scripts in deep-mode health check` (83f9bb1) — extends the detection ladder
-  5. (this commit) `docs: record session 12 and CC 2.1 adoption decisions`
-- Unexpected findings worth remembering: the user already has `frontend-design` and `feature-dev` plugins installed via the official marketplace; the plugins doc explicitly calls out standalone `.claude/` as the recommended approach for personal workflows, vindicating the symlink model.
-- Did **not** upgrade cleanup subagents to Opus 4.6 — reverses the existing "Subagents on Sonnet" key decision.
-
-**Files created/modified:**
-- `README.md` - Added "Interop with Claude Code 2.1 features" section (+12 lines), updated Subagents section to mention @-mention typeahead
-- `.claude/skills/code-cleanup/SKILL.md` - Added CI gating note in Fix Mode (+2 lines)
-- `.claude/skills/code-review/SKILL.md` - Added MCP maxResultSizeChars tip in Step 1 + CI gating note in Step 6 Auto-Fix (+4 lines)
-- `.claude/skills/resume-work/SKILL.md` - Added plugin bin/ detection to health check ladder in Step 2.5 (+1 line)
-- `CLAUDE.md` - Bumped Last Updated to 2026-04-11, added 3 Key Decisions rows, replaced Session 11 summary with Session 12
-- `docs/session-history.md` - Added Session 12 entry (this entry)
-
-**Files NOT modified (and why):**
-- `.claude/agents/cleanup-*.md` - Planned decline markers were speculative and don't fit the current return-structured-findings agent model
-- `.claude/skills/plan-feature/` - Grep confirmed no stale MCP inheritance caveat to remove; commit 7 was a no-op
-- `.claude/skills/update-docs/` - None of the verified features address its rough edges
-- `docs/completed-work.md`, `docs/key-decisions.md` - Not updated this session; Key Decisions condensed table in CLAUDE.md is the primary landing spot for this round
-
-**Next session should:**
-- Dogfood the `--fix` CI gating recipe: build a minimal PreToolUse defer hook in `~/.claude/settings.json` that matches `Bash(rm:*)`, run `/code-cleanup --fix` on a throwaway scratch repo, and verify the session exits with `stop_reason: "tool_deferred"` and resumes cleanly via `claude -p --resume`. If resume works, consider writing a reference file documenting the exact hook config.
-- Revisit `update-docs` rough edges (partial-mode selection, rollback) independently — none of this round's CC 2.1 features addressed them.
-- Consider the 2.1.98 Monitor tool for streaming background script events — could be useful for watching long-running commands inside `code-cleanup --fix` or `code-review --verify`.
+### Session 12 - 2026-04-11: CC 2.1 feature audit — killed `--gated` skill flag after verifying `defer` PreToolUse only works on single-tool-call turns for external SDK callers; shipped README interop section + skill doc notes for CI gating / MCP `maxResultSizeChars` / plugin `bin/` detection. (commits: 56a5513, dd6a7ce, 644fb0c, 83f9bb1)
 
 ### Session 13 - 2026-04-11
 **What happened:**
@@ -211,3 +179,38 @@
 - If anyone runs `/update-docs` on a real project again, observe actual wall-clock delta vs the 20-min baseline. If still slow, consider scoping Part 3 to `git diff --name-only` (small functionality trim — won't catch drift in untouched docs).
 - Pick up Next Steps #3 (pre-commit hooks) or #4 (MCP integration) — both still pending in task tracker from prior sessions.
 - Session 12 becomes the 6th-most-recent when Session 17 arrives → it'll be the next compressible entry. Watch the Part 6.3 batched `git log` path on that run to confirm the new approach picks correct commit hashes.
+
+### Session 17 - 2026-04-21
+**What happened:**
+- User asked for a review of the `/resume-work` + `/update-docs` skill pair and specifically how to stop CLAUDE.md from growing unboundedly every session-end cycle. User reported Claude Code was starting to warn about CLAUDE.md size on real projects.
+- Audited both skills end-to-end (SKILL.md + all references). Root-cause diagnosis: the existing rules said "keep ~20 Key Decisions, 17k char target, 3-5 bullets for last-session" but `update-docs` only emitted *passive warnings* at thresholds. Adding a row is mechanical; pruning requires judgment ("which is least important?") that the model defers on under `doc-structure-rules.md`'s "NEVER remove... when in doubt, keep it" rule. Evidence: this very CLAUDE.md had drifted to ~36 Key Decisions rows despite the ~20 cap documented since Session 1.
+- Also caught a pre-existing structural issue: the old Part 5 (commit checkpoint) was not actually last — the Session 15 rollup was appended as Part 6 *after* the commit checkpoint, so rollup changes landed uncommitted until next run.
+- **Proposed and shipped two features in one commit (`a8c99ba`):**
+  1. **Part 1.10 Cap Enforcement** — active per-section caps. Current Status ≤10 (collapses consecutive `Complete` runs into a summary row, with the individual rows landing in `docs/completed-work.md` first). Next Steps ≤10 (warn only — accretion is a signal, not a storage problem). In Progress ≤5 (warn only — fragmented work means stalled tasks). Gated by `--skip-caps`.
+  2. **Part 6 Key Decisions Rollup** — mirrors the Part 5 session-history rollup exactly. FIFO move of oldest CLAUDE.md table rows (topmost in the table) into `docs/key-decisions.md` when count > 20. First-run gated by `AskUserQuestion` consent, with a sentinel note (`Entries older than the 20 most recent in CLAUDE.md are rolled up here`) added to the reference file for silent subsequent runs. Chose FIFO over "least important" explicitly — the judgment-avoidance of "least important" is what caused the bloat in the first place. Gated by `--skip-decisions-rollup`.
+- Reordered the Parts so the commit checkpoint is truly last: old Part 6 (session-history rollup) → Part 5; new Part 6 = Key Decisions rollup; old Part 5 (commit checkpoint) → Part 7. This closes the Session 15 bug where rollup changes ended up uncommitted.
+- Strengthened `doc-structure-rules.md` with a new "Pruning Is Preservation" subsection. Explicit doctrine: when CLAUDE.md would otherwise exceed targets, moving content to its designated reference file *is* the correct preservation action, not an exception to it. Prevents the model from interpreting "NEVER remove" to mean "never prune from CLAUDE.md" next time around.
+- **Dogfood this same session** — this `/update-docs` run is the first exercise of the new Part 6. CLAUDE.md's Key Decisions table had 38 rows after Session 17's additions; Part 6 detected the overflow, fired the first-run `AskUserQuestion` consent prompt (no sentinel note in `docs/key-decisions.md` yet), user accepted, moved the oldest 18 rows to the reference file via FIFO. Added the sentinel note so future runs go silent. CLAUDE.md's Key Decisions table now back to the 20-row target. Duplicate-with-existing-detail-rows tradeoff accepted per the contract ("do not deduplicate — harmless").
+- **Part 5 (session-history rollup) also fired** — after Session 17 was appended, Session 12 (2026-04-11) became the 6th-most-recent. Compressed to a one-liner using the batched `git log --since="2026-04-11" --until="2026-04-12"` path from Session 16; picked the two Session 12 commits. Confirmed the batched `git log` approach works as designed for first-time compression of a single session.
+
+**Files created/modified:**
+- `.claude/skills/update-docs/references/mode-update.md` — added Part 1.10 (cap enforcement) after Part 1.9; inserted new Part 6 (Key Decisions rollup) mirroring Part 5's structure; renamed old Part 6 (session-history rollup) to Part 5 and updated internal references; renamed old Part 5 (commit checkpoint) to Part 7 and added the explicit "runs last so rollups are in the same commit" note (+110 insertions, -29 removals)
+- `.claude/skills/update-docs/SKILL.md` — extended `argument-hint` with `--skip-caps` and `--skip-decisions-rollup` (+1 line)
+- `.claude/skills/update-docs/references/verification-checklists.md` — added 3 UPDATE-mode checklist items (cap enforcement, key-decisions rollup, commit-last ordering) (+3 lines)
+- `.claude/skills/update-docs/references/doc-structure-rules.md` — new "Pruning Is Preservation" subsection with explicit doctrine for cap enforcement and rollups (+10 lines)
+- `CLAUDE.md` — bumped Last Updated to 2026-04-21 (Session 17); added 2 new Key Decisions rows (cap enforcement + rollup); replaced Session 16 last-session block with Session 17; then Part 6 rolled up the oldest 18 rows to `docs/key-decisions.md`
+- `docs/session-history.md` — this entry; Part 5 rollup compressed Session 12 to a one-liner
+- `docs/key-decisions.md` — received the 18 rolled-up rows from CLAUDE.md (appended via FIFO, no dedup) + the sentinel note added to the header block
+- `docs/completed-work.md` — 4 Session 17 completion entries
+
+**Files NOT modified (and why):**
+- `README.md`, `Workflow.md` — no user-visible command or workflow change. The new `--skip-caps` and `--skip-decisions-rollup` flags are documented in the skill's `argument-hint`, which is surfaced inline by the harness when the skill is invoked. README's commands table already says "see the skill" for flag detail.
+- `.claude/skills/resume-work/` — user asked for a review of both skills; the actual shipped changes were all in `/update-docs`. Recommended `/resume-work` improvements (git window since CLAUDE.md Last Updated, auto-memory diff-before-write, task hydration stricter filter, Step 6 cross-skill path fragility) were explicitly deferred — bloat was the primary problem, everything else is polish.
+- `.claude/agents/cleanup-*.md` — no subagent changes this session.
+- Auto-memory MEMORY.md — no stable-facts changed (no new skills, no structural shifts, no tech stack change). Rule 4.3.4 skip condition met.
+
+**Next session should:**
+- Observe the dogfood outcome — specifically, whether `docs/key-decisions.md` has become unwieldy with the 18 rolled-up condensed rows alongside the pre-existing detailed versions. The contract explicitly says "do not dedupe" because dedup requires judgment, but if the reference file is now cosmetically messy, a future session could add a one-time manual pass. Not worth automating.
+- Pick up any of the four remaining Next Steps items if they become concrete: pre-commit hooks (#3) or MCP integration (#4) are the most actionable; #1 ("add more skills as needs emerge") and #2 ("improve reference files based on usage patterns") are aspirational.
+- Consider whether Part 0.5's one-time migration is now redundant with Part 1.10 + Part 6 and can be simplified or removed. It would only trigger on a truly legacy project, but the heuristics overlap meaningfully.
+- If `/resume-work` polish becomes a priority, the four items flagged in Session 17's review still apply: (a) git log window scaled by CLAUDE.md Last Updated date rather than fixed `-10`, (b) auto-memory diff-before-write in update-docs Part 4, (c) stricter aspirational-task filter in task-hydration.md, (d) Step 6 cross-skill path is fragile (works via symlink today, should either copy or hardcode the section contract).
