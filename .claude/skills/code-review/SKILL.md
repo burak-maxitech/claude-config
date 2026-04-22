@@ -64,6 +64,20 @@ Do NOT spend more than one turn on this. Sample quickly, note the patterns, and 
 
 ---
 
+## Step 1.5: Kick Off Verification Early (when `--verify` is in $ARGUMENTS)
+
+If `--verify` is in `$ARGUMENTS`, start the test runner and linter **now**, in background, so they complete in parallel with the review work in Steps 2–4.
+
+1. Detect test/lint commands from project config (`package.json` scripts, `pyproject.toml`, `Cargo.toml`, `Makefile`, plugin `bin/test` on `$PATH`)
+2. Launch each as a Bash call with `run_in_background: true` — you'll be notified when each completes
+3. Note the commands and expected output locations; Step 5 collects results
+
+This parallelizes ~10–60s of test/lint time with the review itself. If no runnable test/lint command is obvious, skip — Step 5 will fall back to running synchronously.
+
+Skip Step 1.5 entirely when `--verify` is not set, or for diff-based reviews where the user is reviewing code they haven't checked out (PR reviews via `gh pr diff`).
+
+---
+
 ## Step 2: Review Against Checklist
 
 Read `references/review-checklist.md` and review the code against all applicable categories.
@@ -94,8 +108,8 @@ Read `references/output-format.md` and present findings in the required format.
 ## Step 5: Verification (when `--verify` is in $ARGUMENTS)
 
 After presenting findings, validate them:
-1. **Run the project's test suite** — detect test runner from package.json, Cargo.toml, pyproject.toml, etc.
-2. **Run linter** if configured (eslint, ruff, clippy, etc.)
+1. **Collect test output** from the background task started in Step 1.5 (or run the test command synchronously now if Step 1.5 was skipped)
+2. **Collect linter output** from the background task started in Step 1.5 (or run synchronously now)
 3. **Cross-check findings**: if a finding claims "this will break X" but tests pass, note the discrepancy — the finding may be a false positive or tests may be insufficient
 4. Append a **Verification Results** section to the output:
    ```
