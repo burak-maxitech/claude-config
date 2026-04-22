@@ -131,7 +131,7 @@ If the user passes `--fix`, apply Quick Wins automatically:
 
 If the working tree is dirty (uncommitted changes), warn the user and ask whether to stash first.
 
-> **CI gating note.** This skill does not implement its own pause-for-approval flag. If you want to gate destructive `--fix` operations in a headless run, configure a `PreToolUse` hook in `~/.claude/settings.json` that matches destructive bash patterns (e.g. `Bash(rm:*)`, `Bash(git:*)`) and returns `"permissionDecision": "defer"`. The session exits with `stop_reason: "tool_deferred"` and can be resumed with `claude -p --resume <session-id>`. `defer` only works when the turn makes a single tool call — it guards individual destructive commands, not the whole `--fix` run. See README "Interop with Claude Code 2.1 features" for the full recipe.
+> **CI gating.** Not self-gating. To pause for approval in headless `claude -p` runs, configure a `PreToolUse` `defer` hook scoped (via the `if` field) to destructive Bash patterns. Full recipe in README "Interop with Claude Code 2.1 features".
 
 ## Dry-Run Mode (when `--dry-run` is in $ARGUMENTS)
 

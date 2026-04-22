@@ -57,6 +57,21 @@ if ($symlinks) {
     Write-Host "  Fix: ln -s $ConfigRepo\skills ~\.claude\skills" -ForegroundColor Gray
 }
 
+# Check user settings for skill-breaking flags
+$SettingsFile = "$env:USERPROFILE\.claude\settings.json"
+if (Test-Path $SettingsFile) {
+    try {
+        $Settings = Get-Content $SettingsFile -Raw | ConvertFrom-Json
+        if ($Settings.disableSkillShellExecution -eq $true) {
+            Write-Host "  Warning: disableSkillShellExecution=true in ~\.claude\settings.json" -ForegroundColor Red
+            Write-Host "  Breaks /code-cleanup --fix, /code-review --verify, and /resume-work deep." -ForegroundColor Gray
+            Write-Host "  Fix: set it to false or remove the key." -ForegroundColor Gray
+        }
+    } catch {
+        # Silently skip if settings.json isn't parseable
+    }
+}
+
 # --- Step 3: Navigate to project and pull ---
 Write-Host "[3/5] Opening project: $ProjectName" -ForegroundColor Yellow
 Set-Location $ProjectPath

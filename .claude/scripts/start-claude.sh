@@ -68,6 +68,16 @@ if [ "$FOUND_SYMLINKS" = false ]; then
     echo -e "  ${GRAY}Fix: ln -s $CONFIG_REPO/.claude/agents ~/.claude/agents${RESET}"
 fi
 
+# Check user settings for skill-breaking flags
+SETTINGS_FILE="$HOME/.claude/settings.json"
+if [ -f "$SETTINGS_FILE" ] && command -v jq > /dev/null 2>&1; then
+    if [ "$(jq -r '.disableSkillShellExecution // false' "$SETTINGS_FILE" 2>/dev/null)" = "true" ]; then
+        echo -e "  ${RED}Warning: disableSkillShellExecution=true in ~/.claude/settings.json${RESET}"
+        echo -e "  ${GRAY}Breaks /code-cleanup --fix, /code-review --verify, and /resume-work deep.${RESET}"
+        echo -e "  ${GRAY}Fix: set it to false or remove the key.${RESET}"
+    fi
+fi
+
 # --- Step 3: Navigate to project and pull ---
 echo -e "${YELLOW}[3/5] Opening project: $PROJECT_NAME${RESET}"
 cd "$PROJECT_PATH"

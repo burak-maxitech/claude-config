@@ -127,7 +127,7 @@ After fixing, show a summary of what was changed and run tests again to confirm 
 
 > **If anything looks wrong, press `Esc Esc` or run `/rewind` to undo these edits.** Checkpoints are created automatically before each edit and persist across sessions.
 
-> **CI gating note.** This skill does not implement its own pause-for-approval flag. If you want to gate `--fix` edits in a headless run, configure a `PreToolUse` hook in `~/.claude/settings.json` that matches `Edit` (or the specific bash patterns you want to guard) and returns `"permissionDecision": "defer"`. The session exits with `stop_reason: "tool_deferred"` and can be resumed with `claude -p --resume <session-id>`. `defer` only works when the turn makes a single tool call — it guards individual edits, not the whole `--fix` run. See README "Interop with Claude Code 2.1 features" for the full recipe.
+> **CI gating.** Not self-gating. To pause for approval in headless `claude -p` runs, configure a `PreToolUse` `defer` hook scoped (via the `if` field) to `Edit` or specific Bash patterns. Full recipe in README "Interop with Claude Code 2.1 features".
 
 ---
 
