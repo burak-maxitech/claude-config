@@ -214,3 +214,45 @@
 - Pick up any of the four remaining Next Steps items if they become concrete: pre-commit hooks (#3) or MCP integration (#4) are the most actionable; #1 ("add more skills as needs emerge") and #2 ("improve reference files based on usage patterns") are aspirational.
 - Consider whether Part 0.5's one-time migration is now redundant with Part 1.10 + Part 6 and can be simplified or removed. It would only trigger on a truly legacy project, but the heuristics overlap meaningfully.
 - If `/resume-work` polish becomes a priority, the four items flagged in Session 17's review still apply: (a) git log window scaled by CLAUDE.md Last Updated date rather than fixed `-10`, (b) auto-memory diff-before-write in update-docs Part 4, (c) stricter aspirational-task filter in task-hydration.md, (d) Step 6 cross-skill path is fragile (works via symlink today, should either copy or hardcode the section contract).
+
+### Session 18 - 2026-05-04
+**What happened:**
+- User reported `/update-docs` runs taking 12-14 min on real projects despite Session 16's `effort: low` + Part 3.0 (parallel doc reads) + Part 6.3 (batched `git log`) perf work. Asked how to optimize without sacrificing functionality.
+- Audited `mode-update.md` (488 lines, 7 Parts plus pre-steps). Diagnosis: every run walks all parts sequentially regardless of need; reference reads scatter across 5-6 turns; no fast path for the daily-cycle case where only Parts 0, 1, and 7 actually have work. Most parts no-op on a daily cycle: 0.5 (migration, one-time per project), 4 (memory, only if facts change), 5/6 (rollups, only past thresholds), 1.10 (caps, only if over).
+- Discussed levers ranked by impact, then narrowed to the user-approved set:
+  1. **`--fast` mode** for the daily-cycle case (drain → CLAUDE.md updates → drift probes → commit; skips Parts 0.5/2/3/4/5/6/1.10). Surfaces drift via warnings, doesn't enforce.
+  2. **Step 0 upfront parallel batch** — single parallel turn reads CLAUDE.md, README, all `docs/*.md`, MEMORY.md, plus runs `git log -20`, `git diff --stat HEAD~5`, `git status`, and `TaskList`. Drives every downstream decision. Replaces 5-6 sequential read turns. Benefits both paths.
+  3. **Plan-then-batch CLAUDE.md edits** — gather all changes from Parts 1.0–1.10 (and Part 6 row removals) from Step 0 evidence, then apply as one Write or non-overlapping parallel Edits. Fast Path uses this by definition; Full Path opts in via the new Part 1 preamble.
+  - Deferred levers (revisit if measurement shows insufficient): #4 lazy-load heavy parts of `mode-update.md` (split rollups/migration into separate ref files), #5 evidence-driven Part 1 sub-sections (skip 1.X if no relevant evidence).
+- Confirmed in writing that nothing trims `--full`: every Part 0–7 still runs, every probe still fires, both first-run consent gates (Parts 5 and 6) intact, caps enforcement intact, auto-memory sync intact, README/`docs/*.md` sweep intact. Optimizations are pure orchestration — same data, same final state, fewer turns.
+- **Shipped (uncommitted, this session):**
+  1. `update-docs/SKILL.md` — added `--fast` to `argument-hint` (1-line change).
+  2. `update-docs/references/mode-update.md` — prepended Step 0 (Upfront Parallel Batch), Step 0.1 (Path Routing), Fast Path block (+77 lines) before existing Step 1.
+  3. `update-docs/references/mode-update.md` — added plan-then-batch preamble at start of Part 1 (+2 lines).
+- **Dogfooded `/update-docs --fast`** as the session-end run for Session 18 itself — this entry is the output. The Fast Path correctly: (a) ran Step 0 batch (parallel reads + git + TaskList in one turn), (b) routed to Fast Path on the `--fast` flag, (c) found empty TaskList → skipped Part 0 work, (d) identified evidence for Parts 1.0/1.6/1.8 only, (e) ran drift probes against the cached file contents (no extra reads), (f) batched the 3 CLAUDE.md edits + 2 reference-file appends into a single parallel-Edit turn. Subjective: noticeably faster than Session 17's run, dominated by the upfront parallel-batch turn. Real measurement requires a side-by-side comparison on a non-trivial project.
+- **Drift surfaced by Fast Path probes (the safety valve in action — these are exactly what `--fast` is designed to flag rather than enforce):**
+  - **1 multi-line session ready for Part 5 rollup**: after Session 18 lands, Session 13 becomes the 6th-most-recent multi-line entry → compressible.
+  - **Key Decisions table at 21 rows** (cap 20): 1 over after this session's append.
+  - **2 prior-session commits undocumented**: `14546ff` (2026-04-22, "interop polish: if-scoped defer hook, auto mode doc, startup guardrail") and `ff89cbb` (2026-04-22, "code-review: parallelize --verify via early background kickoff"). Real feature work that touched README, `start-claude.{sh,ps1}`, and `code-review/SKILL.md`. Was flagged by `/resume-work` at session start; not handled by Fast Path by design.
+  - **CLAUDE.md size**: still well under the 35k soft cap, no warning needed.
+  - All four items will clear on the next `--full` sweep.
+
+**Files created/modified:**
+- `.claude/skills/update-docs/SKILL.md` — added `--fast` to argument-hint (~+10 chars within the existing line)
+- `.claude/skills/update-docs/references/mode-update.md` — prepended Step 0 + Step 0.1 + Fast Path block (+77 lines); added plan-then-batch preamble at start of Part 1 (+2 lines)
+- `CLAUDE.md` — bumped Last Updated to 2026-05-04 (Session 18); added 1 Key Decisions row covering Fast Path + Step 0 batch + plan-then-batch; replaced Session 17 last-session block with Session 18 (this run)
+- `docs/session-history.md` — this entry (this run)
+- `docs/key-decisions.md` — appended 1 detailed Session 18 decision row (this run)
+
+**Files NOT modified (and why):**
+- `README.md`, `Workflow.md` — no user-visible command or workflow change beyond `--fast` which lives in the skill's `argument-hint` (surfaced inline by the harness on invocation). README's commands table already says "see the skill" for flag detail. The 2 undocumented prior-session commits will pull README/Workflow.md into the next `--full` sweep if they need updates there.
+- `docs/completed-work.md` — Fast Path skips Part 1.3 by spec. Drift warning didn't include this because completed-work churn is captured by session-history.md anyway. **Possible Fast Path spec refinement (defer for now):** if the divergence between session-history.md and completed-work.md becomes annoying after a few cycles, add Part 1.3 to the Fast Path subset (a single Edit per completed item — cheap).
+- The 2 undocumented commits (`14546ff`, `ff89cbb`) — flagged in drift warning, deferred to `--full` sweep per Fast Path's design intent. Documenting them in Fast Path would conflate "current session's work" with "backfill from prior unlogged sessions" — that conflation is exactly what `--full` is for.
+- `.claude/agents/cleanup-*.md` — no subagent changes this session.
+- Auto-memory `MEMORY.md` — no stable-facts changed (no new skills, no structural shifts, no tech stack change). Part 4 is anyway skipped in Fast Path; rule 4.3.4 skip condition would have applied in Full Path too.
+
+**Next session should:**
+- Run `/update-docs` (no flag, full path) when convenient to (a) sweep the 2 undocumented commits `14546ff` + `ff89cbb` into `docs/`, (b) trigger Part 5 rollup of Session 13 to a one-liner, (c) trigger Part 6 Key Decisions rollup of the 1-over-cap row to `docs/key-decisions.md`, (d) verify README/Workflow.md don't have other un-swept drift from prior commits.
+- Measure actual wall-clock of `/update-docs --fast` on a real project against the 12-14 min baseline. If still slow, consider implementing the deferred levers: #4 (split `mode-update.md` so Parts 5/6/0.5 only load when their probes trigger) and #5 (evidence-driven Part 1 sub-sections in Full Path — skip 1.X when no commits/tasks/user-input touch that section).
+- If drift accumulates faster than weekly `--full` runs can keep up in practice, refine the Fast Path subset: add Part 1.3 (completed-work append) as the most likely candidate. Low-cost amendment to `mode-update.md` Fast Path block.
+- Pick up Next Steps #3 (pre-commit hooks) or #4 (MCP integration) — both still pending from prior sessions, both more concrete than the aspirational #1/#2.

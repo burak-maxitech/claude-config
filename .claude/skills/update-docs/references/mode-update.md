@@ -2,6 +2,81 @@
 
 When documentation structure exists, update to reflect current state.
 
+## Step 0: Upfront Parallel Batch
+
+Before any Part runs, gather all read-only inputs in **one parallel turn**. This drives every downstream decision and replaces the per-part reads scattered through Parts 0.5, 2, 3, 4, 5, 6.
+
+### 0.1 Single parallel turn — issue these calls together
+
+**Reads (parallel):**
+- `CLAUDE.md`
+- `README.md`
+- All `docs/*.md` files (`Glob docs/**/*.md` first if list unknown, then one Read per file in the same turn)
+- Auto-memory `MEMORY.md` — usually already in conversation context (Claude Code auto-loads it at session start); read explicitly only if absent
+
+**Bash (parallel):**
+- `git log -20 --pretty=format:'%h %ad %s' --date=short` — recent commits with dates for filtering
+- `git diff --stat HEAD~5` — what files changed recently
+- `git status` — uncommitted state
+
+**Other:**
+- `TaskList` — current task tracker
+
+### 0.2 Cache results
+
+Hold all results in working memory for the rest of this run. Derive:
+
+- **Last Updated date** from CLAUDE.md → cutoff for filtering git log output
+- **Filtered commit list** (commits since Last Updated) → drives Parts 1.8, 5
+- **Diff file list** → drives Parts 2, 3, 4 (which docs/code actually changed)
+- **TaskList state** → drives Part 0
+- **Row counts**: Key Decisions in CLAUDE.md, `^### Session` in `docs/session-history.md` → drive Parts 5, 6 probes and Part 1.10 caps
+- **Sentinel presence**: rollup notes in `session-history.md` and `key-decisions.md` → drive Parts 5.2, 6.2 first-run gates
+
+After Step 0, do not re-read these files unless a Part has just modified one and needs to verify post-write state.
+
+## Step 0.1: Path Routing
+
+After Step 0 completes:
+
+- **If `--fast` is in `$ARGUMENTS`** → run the **Fast Path** below
+- **Otherwise** → run the **Full Path** (existing Parts 0–7, with the plan-then-batch preamble in Part 1)
+
+## Fast Path (`--fast`)
+
+Targeted at the daily-cycle case: a session produced commits and task progress but didn't touch README, `docs/`, or architecture. Runs a focused subset of the Full Path, keeping CLAUDE.md and `docs/session-history.md` current.
+
+**Sequence:**
+
+1. **Part 0** — drain `TaskList` into CLAUDE.md (full logic, unchanged; respects `--skip-tasks`)
+2. **Part 1 subset** — only the sub-sections with evidence from Step 0:
+   - **1.0** — update timestamp (always)
+   - **1.4 / 1.5** — In Progress / Next Steps (if `TaskList` showed changes)
+   - **1.6** — Key Decisions (only if user explicitly named one this session, or commit messages flag a decision)
+   - **1.8** — append last-session block to CLAUDE.md **and** write the detailed entry to `docs/session-history.md`
+3. **Drift probes** — run cheap counts on already-loaded files (no new reads), surface warnings, **do not enforce**
+4. **Plan-then-batch** — gather every CLAUDE.md change from step 2 above into a single Write of the full file, or non-overlapping parallel Edits in one turn
+5. **Part 7** — commit checkpoint (full logic, unchanged; respects `--skip-commit`)
+
+**Skipped in Fast Path:**
+- Part 0.5 (migration) — handled by Full Path if it ever fires
+- Part 2 (README sync)
+- Part 3 (`docs/*.md` sync)
+- Part 4 (auto-memory sync)
+- Part 5 (session rollup)
+- Part 6 (Key Decisions rollup)
+- Part 1.10 (caps enforcement) — replaced by drift warning
+
+**Drift warning format** (show only lines whose probe fires):
+
+> "Drift detected — run `/update-docs` (no flag) when convenient:
+>  - [N] sessions in `docs/session-history.md` ready for rollup (count > 5)
+>  - Key Decisions table in CLAUDE.md at [M] rows (cap 20)
+>  - README.md or `docs/*.md` touched in [K] commits since last full sweep
+>  - CLAUDE.md at [X]k chars (target 17k, soft cap 35k)"
+
+Drift warnings are the safety valve: `--fast` runs daily without losing visibility into accumulated debt. If a probe shows nothing has drifted, omit the warning entirely.
+
 ## Step 1: Scan docs/ Folder
 
 1. **List all .md files** in docs/
@@ -110,6 +185,8 @@ After draining, verify completeness:
 ---
 
 ## Part 1: Update CLAUDE.md
+
+> **Plan-then-batch (applies to Full Path):** Walk through 1.0–1.10 (and Part 6 row removals, if Part 6 fires) and gather every change you intend to make from the evidence cached in Step 0. Then apply all changes to CLAUDE.md in a **single Write** of the full file, or as non-overlapping parallel Edits in one turn. Do NOT issue one Edit per sub-section — that's the dominant turn-count cost.
 
 ### 1.0 Update Timestamp
 **Always update the "Last Updated" field** at the top:
