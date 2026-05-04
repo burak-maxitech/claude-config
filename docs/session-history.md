@@ -29,40 +29,7 @@
 
 ### Session 12 - 2026-04-11: CC 2.1 feature audit — killed `--gated` skill flag after verifying `defer` PreToolUse only works on single-tool-call turns for external SDK callers; shipped README interop section + skill doc notes for CI gating / MCP `maxResultSizeChars` / plugin `bin/` detection. (commits: 56a5513, dd6a7ce, 644fb0c, 83f9bb1)
 
-### Session 13 - 2026-04-11
-**What happened:**
-- User asked for a thorough review of the external best-practice repo https://github.com/shanraisshan/claude-code-best-practice (actively maintained, daily commits as of April 2026) to identify patterns worth incorporating.
-- Ran plan mode: single Explore agent produced a 40+ file catalog from the external repo; single Plan agent synthesized it against the existing 5 skills + 3 subagents into a tiered recommendation. Plan written to `C:\Users\burak\.claude\plans\toasty-sleeping-charm.md` (overwriting Session 12's plan).
-- **Spot-verification during Phase 3 killed two claims:**
-  1. Direct fetch of `.claude/skills/agent-browser/SKILL.md` from the external repo showed its frontmatter is only `name`, `description`, `allowed-tools` — the same minimal set we already use. The Explore agent's "13 skill frontmatter fields" claim was documentation extrapolation, not observed practice. **Dropped all Tier 2 skill-frontmatter adoptions** (no `paths:`, no `effort:`, no `context: fork`).
-  2. WebFetch of docs.claude.com memory page had no mention of proactive `/compact` at any specific percentage. "50%" was one person's opinion. **Softened the workflow wording** to "earlier rather than later" with no number cited.
-- Direct fetch of `.claude/agents/weather-agent.md` confirmed the external repo's rich agent frontmatter is real (`skills:`, `memory: project`, `hooks:`, camelCase `allowedTools`/`maxTurns`/`permissionMode`), validating the hooks.py dispatcher pattern exists. **Not adopted** — hook infrastructure is blocked on the pending Session 12 `defer` dogfood.
-- WebFetch of docs.claude.com MCP page confirmed `.mcp.json` at repo root is the project-scope config file (quote: *"Project-scoped servers enable team collaboration by storing configurations in a `.mcp.json` file at your project's root directory"*). Local scope lives in `~/.claude.json`; `claude mcp add --transport {http|sse|stdio}` is the recommended add path. Tool-search deferral keeps context cost low, so the "curation/start narrow" community narrative is only partially true — the real ceilings are tool-menu clarity and permission-prompt volume.
-- **Unexpected finding from memory doc (not in the original research):** `.claude/rules/` with `paths:` frontmatter is a real documented feature for path-scoped project rules, and `.claude/rules/` explicitly **supports symlinks for cross-project sharing**. This is different from skills and fits our symlink model cleanly — flagged as a potential future adoption but not shipped this session (would require deciding what rules to write, and nothing pressing).
-- Shipped 3 doc commits (`adf634e`, `5f61209`, `445c357`) all direct to `main`:
-  1. `docs: add MCP server setup bullet to README interop section` — one new bullet, verified scopes, CLI command, tool-search deferral note.
-  2. `docs: add mid-session context hygiene subsection to workflow` — new subsection under Daily Workflow explaining when to `/compact` (earlier rather than later) and noting that project-root CLAUDE.md survives compaction.
-  3. `docs: reference built-in /loop skill in workflow tips` — new subsection under Tips & Best Practices with examples, the session-scope + 3-day auto-expire caveat, and an explicit non-goal of reimplementing `/loop` as a custom skill.
-- Cancelled Tier 2 from the plan entirely (0 commits). Verification removed both T2 candidates before they reached implementation.
-
-**Files created/modified:**
-- `README.md` — Added MCP server setup bullet to "Interop with Claude Code 2.1 features" section (+1 line, fifth bullet)
-- `workflow.md` — Added `### Mid-Session Context Hygiene` subsection between "During Development" and "Ending a Session" (+12 lines); added `### Recurring tasks: /loop` subsection inside "Tips & Best Practices" after Don'ts list (+14 lines)
-- `CLAUDE.md` — Bumped Last Updated to Session 13, added 1 Key Decisions row ("Verify every external-repo claim before shipping"), replaced Session 12 summary with Session 13 summary
-- `docs/session-history.md` — This entry
-- `docs/key-decisions.md` — Appended 11-item skip-list appendix from the plan (see "## Considered and Skipped in Session 13" section)
-- `docs/completed-work.md` — Added 3 entries for the shipped docs
-- `.claude/settings.local.json` — Harness auto-added `WebFetch(domain:raw.githubusercontent.com)` and `WebFetch(domain:api.github.com)` permissions from this session's verification fetches
-
-**Files NOT modified (and why):**
-- No skill `SKILL.md` files — Tier 2 was cancelled after verification
-- No subagent `.md` files — no hook or memory adoption this session
-- No `.claude/rules/` directory created — feature is compelling but there's nothing urgent to put in it; document in key-decisions as "considered, deferred"
-
-**Next session should:**
-- **Still owed: Session 12 `defer` hook dogfood.** This has now been explicitly deferred twice (Session 12 after-work + Session 13 scope decision). It's the correct next hook experiment and blocks any broader hook adoption.
-- After the dogfood, consider whether `.claude/rules/` (symlink-compatible path-scoped rules) is worth adopting — e.g., a shared `.claude/rules/repo-conventions.md` that can be symlinked into other projects.
-- Revisit `update-docs` rough edges (partial-mode selection, rollback) — still not addressed.
+### Session 13 - 2026-04-11: External best-practice repo review — direct-fetch verification killed 2 of plan's Tier 2 candidates (`paths:`/`effort:` were doc-extrapolation, not observed in actual external skills); shipped 3 doc bullets (MCP setup in README, mid-session `/compact` in workflow, `/loop` reference); flagged `.claude/rules/` symlink-friendly rule files as future option. (commits: adf634e, 5f61209, 445c357)
 
 ### Session 14 - 2026-04-14
 **What happened:**
@@ -256,3 +223,45 @@
 - Measure actual wall-clock of `/update-docs --fast` on a real project against the 12-14 min baseline. If still slow, consider implementing the deferred levers: #4 (split `mode-update.md` so Parts 5/6/0.5 only load when their probes trigger) and #5 (evidence-driven Part 1 sub-sections in Full Path — skip 1.X when no commits/tasks/user-input touch that section).
 - If drift accumulates faster than weekly `--full` runs can keep up in practice, refine the Fast Path subset: add Part 1.3 (completed-work append) as the most likely candidate. Low-cost amendment to `mode-update.md` Fast Path block.
 - Pick up Next Steps #3 (pre-commit hooks) or #4 (MCP integration) — both still pending from prior sessions, both more concrete than the aspirational #1/#2.
+
+### Session 19 - 2026-05-04
+**What happened:**
+- Ran `/update-docs` (Full Path, no flag) immediately after Session 18's `--fast` run as a back-to-back dogfood: validate that the new Step 0 upfront batch + Part 1 plan-then-batch directive also speed up the comprehensive sweep, and clear the 4 drift items `--fast` had surfaced.
+- Drift to clear:
+  1. **Backfill 2 undocumented commits from 2026-04-22** — `14546ff` (interop polish: `if`-scoped defer hook example, README auto mode compatibility paragraph, startup-script `disableSkillShellExecution` guardrail, CI gating prose trim) and `ff89cbb` (code-review --verify parallelization via `run_in_background` in Step 1.5).
+  2. **Part 5 session-history rollup** — Session 13 became the 6th-most-recent multi-line entry after Session 18 landed.
+  3. **Part 6 Key Decisions rollup** — CLAUDE.md table at 21 rows after Session 18's add (cap 20).
+  4. **Part 1 sub-section caps** — none triggered; Current Status, Next Steps, In Progress all under cap.
+- Step 0 batch: 1 parallel turn for `git show 14546ff --stat` + `git show ff89cbb --stat` + `git status` + `TaskList`. Reads were already cached from Session 18's run earlier in this same conversation, so no re-reads needed (per the "hold all results in working memory for the rest of this run" rule). On a fresh session the Step 0 batch would also include reads of CLAUDE.md, README.md, all `docs/*.md`, MEMORY.md.
+- Inspected the 2 backfill commits before writing Key Decisions rows: confirmed they're architecturally distinct (one is interop refinement across multiple files, one is a perf optimization on a single skill) and warrant separate rows. README's interop section already reflects `14546ff`'s changes (it's the same commit that wrote them), so Part 2 verifies-and-no-ops.
+- **Plan-then-batch execution:** all 8 file edits batched into a single parallel-Edit turn:
+  1. `CLAUDE.md` — Last Updated S18 → S19
+  2. `CLAUDE.md` — Part 6 FIFO removal of 3 oldest Key Decisions rows
+  3. `CLAUDE.md` — Part 1.6 add 2 backfill rows after Session 18 row
+  4. `CLAUDE.md` — Part 1.8 replace Session 18 last-session block with Session 19
+  5. `docs/session-history.md` — Part 5 compress Session 13 multi-line block to one-liner
+  6. `docs/session-history.md` — Part 1.8 append Session 19 detailed entry (this entry)
+  7. `docs/key-decisions.md` — append 3 rolled-up rows + 2 detailed new rows
+  8. `docs/completed-work.md` — append entries for the 2 backfilled commits + Session 19 sweep
+- **Both first-run consent gates skipped silently.** Sentinel notes were added to `docs/session-history.md` (Session 15) and `docs/key-decisions.md` (Session 17), so Parts 5.2 and 6.2 detected the per-project consent and proceeded without prompting. Confirmed the sentinel pattern works as designed across multiple runs.
+- **Part 4 (auto-memory)** — skipped per rule 4.3.4: no stable-fact change since Session 18 (no new tech stack, no structural shifts, no architecture change). MEMORY.md content unchanged.
+- **Performance observation:** the entire Full Path run (Step 0 batch + plan + 8 batched Edits + commit prep) completed in ~3 turns of substantive tool calls. This is far below the 12-14 min baseline the user reported on real projects, but this is a small project running back-to-back with `--fast` (most reference reads were cached), so it's a best-case measurement. A side-by-side run on a non-trivial project still owed for a real comparison.
+
+**Files created/modified:**
+- `CLAUDE.md` — Last Updated 2026-05-04 (Session 19); Part 6 removed 3 oldest Key Decisions rows; Part 1.6 added 2 backfill rows for `14546ff` and `ff89cbb`; Part 1.8 replaced Session 18 last-session block with Session 19. Net table size: 21 - 3 + 2 = 20 rows (back at cap).
+- `docs/session-history.md` — Part 5 compressed Session 13 multi-line block (~35 lines) to one-liner with commit hashes; appended this Session 19 detailed entry.
+- `docs/key-decisions.md` — appended 3 rolled-up rows from CLAUDE.md (no dedup per spec) + 2 detailed rows for `14546ff` interop polish and `ff89cbb` --verify parallelization.
+- `docs/completed-work.md` — 6 new entries: 4 for `14546ff` (README defer/auto mode docs, startup-script guardrail, code-cleanup/code-review CI prose trim), 1 for `ff89cbb` (--verify parallelization), 1 for the Session 19 Full Path validation run itself.
+
+**Files NOT modified (and why):**
+- `README.md` — interop section is already current; `14546ff` was the commit that wrote the modernized defer recipe + auto mode paragraph + startup-script guardrail note. Part 2 verifies and no-ops.
+- `Workflow.md` — no user-visible workflow change.
+- `.claude/skills/*/SKILL.md` — no skill-behavior change this session; the changes from `14546ff`/`ff89cbb` were already in the skill files (committed at the time).
+- `.claude/agents/cleanup-*.md` — no subagent changes this session.
+- Auto-memory `MEMORY.md` — Part 4 skipped per rule 4.3.4 (no stable-fact change since Session 18).
+
+**Next session should:**
+- Run `/update-docs --fast` on a non-trivial real project (one that actually takes 12-14 min today) and measure the wall-clock delta. That's the only test that proves the perf claims at scale. If still slow, implement the deferred levers from Session 18: split `mode-update.md` so Parts 5/6/0.5 lazy-load (only when their probes trigger) and gate Part 1 sub-sections on evidence (skip 1.X if no commits/tasks/user-input touch that section).
+- Watch the next `/update-docs --fast` run for completed-work.md drift. Session 18's spec deferred Part 1.3 from Fast Path, which means completed-work.md only updates on `--full` runs. If the divergence between session-history.md and completed-work.md becomes annoying after a few cycles, add Part 1.3 to the Fast Path subset (single Edit per item, cheap).
+- Pick up Next Steps #3 (pre-commit hooks) or #4 (MCP integration) — both still pending from prior sessions and more concrete than the aspirational items.
+- Consider whether the back-to-back `--fast` then `--full` pattern is itself worth documenting in Workflow.md as the recommended cadence (`--fast` daily, `--full` end-of-week). Currently implicit in the design but not surfaced to the user.

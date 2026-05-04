@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-05-04 (Session 18)
+Last Updated: 2026-05-04 (Session 19)
 
 ## Project Overview
 
@@ -44,9 +44,6 @@ Nothing currently in progress.
 
 | Decision | Rationale |
 |----------|-----------|
-| Commit checkpoint in /update-docs | Prompt to commit after docs update; never auto-commit; --skip-commit to suppress |
-| Compact guidance after both skills | Suggest /compact after resume-work and update-docs to free context |
-| Health check in /resume-work deep mode | Run tests/build in deep mode to catch broken state before coding |
 | Startup scripts (.claude/scripts/) | Single-command session startup replacing 8 manual steps; cross-platform |
 | Scripts don't auto-run /resume-work | User controls when to run /resume-work; avoids forced context load on every launch |
 | Setup instructions in README.md only | One-time setup (clone, symlinks, alias) belongs in README; Workflow.md links to it to avoid duplication |
@@ -65,6 +62,8 @@ Nothing currently in progress.
 | Active CLAUDE.md cap enforcement (Session 17) | `/update-docs` now runs Part 1.10 every UPDATE: Current Status ≤10 (collapses `Complete` runs), Next Steps ≤10 (warn), In Progress ≤5 (warn). Replaces passive 35k-char warning with active per-section caps. Gated by `--skip-caps`. Root-cause fix for CLAUDE.md growing unboundedly across sessions despite "keep ~20 max" guidance — adding was mechanical, pruning required judgment the model deferred on. |
 | Key Decisions rollup + commit-last ordering (Session 17) | Mirrors the session-history rollup. New Part 6 in `update-docs/mode-update.md`: when CLAUDE.md's Key Decisions table > 20 rows, oldest (topmost = FIFO) rows move to `docs/key-decisions.md`. First-run `AskUserQuestion` consent gate with sentinel note in the reference file for silent subsequent runs. Gated by `--skip-decisions-rollup`. Commit checkpoint moved to Part 7 (last) so both rollups land in the same commit. "Pruning is preservation" codified in `doc-structure-rules.md` as canonical backing. |
 | `/update-docs --fast` + Step 0 upfront batch + plan-then-batch (Session 18) | Daily `/update-docs` was still 12-14 min despite Session 16's `effort: low`. Fast Path runs the daily subset (drain → CLAUDE.md updates → drift probes → commit) and skips Parts 0.5/2/3/4/5/6/1.10. Step 0 collapses 5-6 sequential read turns into 1 parallel turn (benefits both paths). Plan-then-batch turns 10 per-section Edits in Part 1 into one Write. **No functionality trimmed from `--full`.** Drift warnings are the safety valve: Fast Path surfaces accumulated debt instead of enforcing. Verified by dogfooding `/update-docs --fast` this session. |
+| Interop polish (commit `14546ff`, 2026-04-22; backfilled S19) | Modernized README defer recipe to use the 2.1.85 `if` field (e.g. `"if": "Bash(rm:*)"`) so PreToolUse `defer` only fires for matching tool calls, refining the existing CI-gating recipe. Added README auto mode compatibility paragraph (2.1.83+ classifier behavior + `PermissionDenied` hook fallback added 2.1.89). Startup scripts now warn when `disableSkillShellExecution=true` in user settings (would silently break `--fix`/`--verify`/`deep`). |
+| Parallelize `/code-review --verify` (commit `ff89cbb`, 2026-04-22; backfilled S19) | Step 1.5 launches test/lint with `run_in_background` so they complete during review work (Steps 2-4); Step 5 collects output instead of running synchronously. Saves ~10-60s per `--verify` invocation on projects with non-trivial test suites. Mirrors the parallelization pattern from `/update-docs` Part 3.0 (Session 16). |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -115,12 +114,9 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 18) - 2026-05-04
-- **User flagged `/update-docs` was still 12-14 min on real projects despite Session 16's `effort: low` + Part 3.0/Part 6.3 perf work.** Diagnosis: every run walks all 7 Parts unconditionally; reads scatter across many turns; no fast path for the daily case where only Parts 0/1/7 produce real work.
-- **Shipped 3 changes to `/update-docs` (uncommitted):**
-  - `SKILL.md` — added `--fast` to `argument-hint`
-  - `mode-update.md` — prepended Step 0 (Upfront Parallel Batch) + Step 0.1 (Path Routing) + Fast Path block (~80 lines)
-  - `mode-update.md` — added plan-then-batch preamble at start of Part 1 (Full Path)
-- **Nothing trimmed from `--full`:** every Part 0–7 still runs, every probe still fires, both first-run consent gates intact, caps enforcement intact. Just fewer turns to get there. Step 0 (upfront parallel batch) and the plan-then-batch directive benefit both paths.
-- **Dogfooded `/update-docs --fast`** as Session 18's own session-end run (this very entry is its output). Subjective: noticeably faster than Session 17 — dominated by the upfront parallel-batch turn rather than per-part read latency. Real wall-clock measurement needs a side-by-side run on a comparable real project.
-- **Drift surfaced by Fast Path probes (safety valve working as designed):** 1 multi-line session ready for Part 5 rollup (S13 becomes 6th-most-recent); Key Decisions at 21 rows (1 over cap); 2 commits from prior sessions (14546ff "interop polish", ff89cbb "code-review --verify parallelization") undocumented. All clear on next `--full` sweep.
+### Last Session (Session 19) - 2026-05-04
+- **Ran `/update-docs` (Full Path) immediately after Session 18's `--fast` run** to validate the new orchestration on the full sweep and clear the 4 drift items Fast Path had flagged.
+- **Backfilled 2 prior-session commits** (`14546ff` interop polish, `ff89cbb` code-review --verify parallelization) into `docs/completed-work.md` and added 2 detailed rows to `docs/key-decisions.md` + 2 condensed rows to CLAUDE.md. Both were real feature work from 2026-04-22 that never got a session-end run; this Full Path is the sweep `--fast` was designed to defer to.
+- **Part 5 fired** — Session 13 became the 6th-most-recent multi-line entry after Session 18 landed; compressed to a one-liner using the batched `git log` path from Session 16. Sentinel note from S15 → consent prompt skipped silently.
+- **Part 6 fired** — CLAUDE.md table reached 23 rows after the 2 Session 19 backfill rows (S18 already added 1 → 21; S19 added 2 → 23). FIFO moved oldest 3 ("Commit checkpoint in /update-docs", "Compact guidance after both skills", "Health check in /resume-work deep mode") to `docs/key-decisions.md`. Sentinel from S17 → silent. CLAUDE.md table back to 20.
+- **Full Path performance:** every CLAUDE.md edit (4) + every reference-file append/rewrite (4) batched into a single parallel-Edit turn after one upfront parallel batch and one git+TaskList check. Subjective wall-clock: dramatically below the 12-14 min baseline. Side-by-side on a non-trivial project still pending for a real measurement.
