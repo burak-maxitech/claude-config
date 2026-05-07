@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-05-04 (Session 19)
+Last Updated: 2026-05-06 (Session 20)
 
 ## Project Overview
 
@@ -44,7 +44,6 @@ Nothing currently in progress.
 
 | Decision | Rationale |
 |----------|-----------|
-| Startup scripts (.claude/scripts/) | Single-command session startup replacing 8 manual steps; cross-platform |
 | Scripts don't auto-run /resume-work | User controls when to run /resume-work; avoids forced context load on every launch |
 | Setup instructions in README.md only | One-time setup (clone, symlinks, alias) belongs in README; Workflow.md links to it to avoid duplication |
 | Don't filter claude-config from project picker | User may want to work on the config repo itself |
@@ -64,6 +63,7 @@ Nothing currently in progress.
 | `/update-docs --fast` + Step 0 upfront batch + plan-then-batch (Session 18) | Daily `/update-docs` was still 12-14 min despite Session 16's `effort: low`. Fast Path runs the daily subset (drain → CLAUDE.md updates → drift probes → commit) and skips Parts 0.5/2/3/4/5/6/1.10. Step 0 collapses 5-6 sequential read turns into 1 parallel turn (benefits both paths). Plan-then-batch turns 10 per-section Edits in Part 1 into one Write. **No functionality trimmed from `--full`.** Drift warnings are the safety valve: Fast Path surfaces accumulated debt instead of enforcing. Verified by dogfooding `/update-docs --fast` this session. |
 | Interop polish (commit `14546ff`, 2026-04-22; backfilled S19) | Modernized README defer recipe to use the 2.1.85 `if` field (e.g. `"if": "Bash(rm:*)"`) so PreToolUse `defer` only fires for matching tool calls, refining the existing CI-gating recipe. Added README auto mode compatibility paragraph (2.1.83+ classifier behavior + `PermissionDenied` hook fallback added 2.1.89). Startup scripts now warn when `disableSkillShellExecution=true` in user settings (would silently break `--fix`/`--verify`/`deep`). |
 | Parallelize `/code-review --verify` (commit `ff89cbb`, 2026-04-22; backfilled S19) | Step 1.5 launches test/lint with `run_in_background` so they complete during review work (Steps 2-4); Step 5 collects output instead of running synchronously. Saves ~10-60s per `--verify` invocation on projects with non-trivial test suites. Mirrors the parallelization pattern from `/update-docs` Part 3.0 (Session 16). |
+| `/code-cleanup` references — git ls-files + batched Grep + monorepo workspaces (Session 20) | Usage-pattern improvements per Next Steps #2. (1) **Perf:** `git ls-files` over `find` (honors `.gitignore` natively); per-item grep loops collapse into single batched `Grep` calls with regex alternation (`\b(name1\|name2\|...)\b` + `output_mode: count`). (2) **Coverage:** `scan-deps-config.md` detects npm/yarn/pnpm/Cargo workspaces, scans each child manifest separately, tags findings with workspace name; new "Misplaced Dependencies" output section. SKILL.md Step 0 surfaces monorepo state in the "Detected:" line. (3) **Mid-edit correctness fix:** literal `rg ...` shell-command examples → `Grep` tool syntax — the cleanup-* agents have `Bash(grep:*)` not `Bash(rg:*)`, and runtime guidance pins use of the `Grep` tool. |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -114,9 +114,9 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 19) - 2026-05-04
-- **Ran `/update-docs` (Full Path) immediately after Session 18's `--fast` run** to validate the new orchestration on the full sweep and clear the 4 drift items Fast Path had flagged.
-- **Backfilled 2 prior-session commits** (`14546ff` interop polish, `ff89cbb` code-review --verify parallelization) into `docs/completed-work.md` and added 2 detailed rows to `docs/key-decisions.md` + 2 condensed rows to CLAUDE.md. Both were real feature work from 2026-04-22 that never got a session-end run; this Full Path is the sweep `--fast` was designed to defer to.
-- **Part 5 fired** — Session 13 became the 6th-most-recent multi-line entry after Session 18 landed; compressed to a one-liner using the batched `git log` path from Session 16. Sentinel note from S15 → consent prompt skipped silently.
-- **Part 6 fired** — CLAUDE.md table reached 23 rows after the 2 Session 19 backfill rows (S18 already added 1 → 21; S19 added 2 → 23). FIFO moved oldest 3 ("Commit checkpoint in /update-docs", "Compact guidance after both skills", "Health check in /resume-work deep mode") to `docs/key-decisions.md`. Sentinel from S17 → silent. CLAUDE.md table back to 20.
-- **Full Path performance:** every CLAUDE.md edit (4) + every reference-file append/rewrite (4) batched into a single parallel-Edit turn after one upfront parallel batch and one git+TaskList check. Subjective wall-clock: dramatically below the 12-14 min baseline. Side-by-side on a non-trivial project still pending for a real measurement.
+### Last Session (Session 20) - 2026-05-06
+- **Acted on Next Steps #2** ("improve existing skill reference files based on usage patterns") narrowed to `/code-cleanup`. Presented three gaps (perf, monorepo deps, CSS-in-JS/Tailwind detection) via `AskUserQuestion`; user chose perf + monorepo.
+- **Perf (all three reference files):** replaced `find` with `git ls-files` for source enumeration (honors `.gitignore`, no hardcoded skip list, faster on large repos). Replaced per-item grep loops in unused-files, dead-functions, unused-classes, and unused-CSS-variable searches with single batched `Grep` calls using regex alternation (`\b(name1|name2|...)\b` + `output_mode: count`). Same shape as Session 16's Part 3.0 batch-read pattern, applied at finer grain.
+- **Monorepo coverage (`scan-deps-config.md`):** new §4.0 workspace detection block — npm/yarn/pnpm via `package.json` `workspaces` or `pnpm-workspace.yaml`; Cargo via `[workspace] members`. Each detected workspace is an independent scan target; sibling-workspace usage doesn't count. Output gains `workspace:` field; new "Misplaced Dependencies" section. SKILL.md Step 0 detection surfaces monorepo state in the "Detected:" one-liner.
+- **Mid-edit correctness fix:** first-pass examples used literal `rg ...` shell-command form, but the cleanup-* agents have `Bash(grep:*)` not `Bash(rg:*)` in their whitelists and runtime guidance pins use of the `Grep` tool. Refactored all batched-search examples across the three reference files to `Grep` tool parameter shape (`pattern:`, `output_mode:`, `glob:`, `path:`).
+- **Part 5 picked up two compressions** — S14 had been left in full prose by S19's rollup despite already being past the 5-most-recent threshold (apparent single-pass bug in S19; this run iterates further). Both S14 and S15 compressed to one-liners. Part 6 silent FIFO of 1 row (table 21 → 20). Auto-memory and README/Workflow.md unchanged. Subagent definition files unchanged — references already describe Grep-tool-batched pattern, agents already have `Grep` whitelisted.

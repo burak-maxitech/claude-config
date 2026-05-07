@@ -11,11 +11,12 @@ You will receive info about whether CSS and tests exist in the project. Skip any
 **Only scan if CSS/SCSS/LESS files exist in the project.**
 
 **Method — Unused classes:**
+- Enumerate template/JS files with `git ls-files '*.html' '*.jsx' '*.tsx' '*.vue' '*.svelte' '*.erb' '*.hbs' '*.pug' '*.js' '*.ts'` (honors `.gitignore`, much faster than `find`).
 - Extract all CSS class selectors from `.css`, `.scss`, `.less`, `.module.css` files
-- For each class name, grep across all template files (`.html`, `.jsx`, `.tsx`, `.vue`, `.svelte`, `.erb`, `.hbs`, `.pug`)
+- **Batch the reference search.** One `Grep` call alternating across all extracted class names (pattern `\b(class1|class2|class3|...)\b` with `output_mode: count`) rather than one grep per class — for stylesheets with hundreds of classes this is the difference between seconds and minutes.
 - Also check JavaScript/TypeScript files for dynamic class usage (`className=`, `classList.add`, `cn(`, `clsx(`, template literals with class names)
 - A class is "unused" if zero template or JS files reference it
-- Be careful with CSS Modules — `.module.css` classes are referenced via `styles.className`, not by bare class name
+- Be careful with CSS Modules — `.module.css` classes are referenced via `styles.className`, not by bare class name. For each `.module.css` file, search for `styles.<name>` patterns where the basename matches the importing file.
 
 **Method — Unused IDs:**
 - Same approach as classes, but for `#id` selectors
@@ -29,7 +30,7 @@ You will receive info about whether CSS and tests exist in the project. Skip any
 
 **Method — Unused CSS variables:**
 - Extract all `--custom-property` definitions
-- Grep for `var(--custom-property)` usage across all CSS and JS files
+- One batched `Grep` call alternating `var\(--(name1|name2|...)\)` across all CSS and JS files in a single pass
 - Flag defined but never consumed variables
 
 **Method — Dead media queries:**

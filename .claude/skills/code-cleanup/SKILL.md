@@ -15,9 +15,9 @@ Before scanning anything, gather project context to determine which categories a
 
 **Auto-detect stack by reading these (skip silently if missing):**
 
-- `package.json` → Node/JS project (scan npm deps, CSS, JSX/TSX)
+- `package.json` → Node/JS project (scan npm deps, CSS, JSX/TSX). Also check for monorepo: a `workspaces` field, or a sibling `pnpm-workspace.yaml`, means scan each child manifest as its own target.
 - `requirements.txt` / `pyproject.toml` / `Pipfile` → Python project (scan pip deps)
-- `Cargo.toml` → Rust project (scan cargo deps)
+- `Cargo.toml` → Rust project (scan cargo deps). If root has `[workspace]` with `members = [...]`, scan each member crate separately.
 - `go.mod` → Go project
 - `composer.json` → PHP project
 - `Gemfile` → Ruby project
@@ -29,7 +29,7 @@ Before scanning anything, gather project context to determine which categories a
 - `.env*` files, `docker-compose*`, `.github/workflows/` → enable config scan
 - `tsconfig.json` → TypeScript project (adjust import scanning)
 
-Store the detected stack info and use it to skip irrelevant scan categories automatically. Tell the user what you detected and what you're scanning (one line, e.g., "Detected: TypeScript/React project with Jest tests. Scanning all 7 categories.").
+Store the detected stack info and use it to skip irrelevant scan categories automatically. Tell the user what you detected and what you're scanning (one line, e.g., "Detected: TypeScript/React project with Jest tests. Scanning all 7 categories." or "Detected: pnpm monorepo with 5 workspaces. Scanning per-workspace deps + root-level shared categories.").
 
 ## Step 1 — Parallel Scan
 

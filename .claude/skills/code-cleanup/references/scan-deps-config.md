@@ -8,16 +8,35 @@ You will receive the detected package manager and config file paths. Use them to
 
 ## 4. Unused Dependencies
 
+### 4.0 Workspace detection (do this BEFORE per-manifest scanning)
+
+A monorepo has multiple `package.json` / `Cargo.toml` files. Scanning only the root will both miss workspace-only deps and false-positive root deps consumed by children. Detect workspaces first:
+
+- **npm / yarn classic / yarn berry:** root `package.json` has a `workspaces` field (array of globs like `["packages/*", "apps/*"]` or object form `{"packages": [...]}`)
+- **pnpm:** `pnpm-workspace.yaml` at repo root with top-level `packages:` list
+- **Cargo:** root `Cargo.toml` has `[workspace]` table with `members = [...]`
+
+If any of the above is present, expand the globs to enumerate each child manifest. Treat each manifest as an independent scan target:
+- A dep listed in a workspace's manifest is "unused" only if **that workspace's own source subtree** never references it (sibling-workspace usage doesn't count — that's misplaced, not used)
+- A dep listed in the root manifest is "used" if **any workspace** references it (root deps are typically hoisted)
+
+Tag every finding with the workspace it belongs to (use `root` for the top-level manifest). If there's no workspace config, scan the single root manifest as before and tag everything `root`.
+
+### 4.1 Per-manifest scan
+
 **For Node.js (package.json):**
-- Read `package.json` → extract all `dependencies` and `devDependencies` keys
-- For each package name, grep the entire `src/` (or project root) for:
-  - `require('package-name')` or `require("package-name")`
-  - `import ... from 'package-name'` or `import ... from "package-name"`
-  - `import('package-name')` (dynamic imports)
+- Extract `dependencies` and `devDependencies` keys from the manifest
+- **Batch the search.** Do not loop one-grep-per-package — that's O(N) Grep calls on potentially hundreds of deps. Use the `Grep` tool once with a single regex that alternates all package names, e.g.:
+  ```
+  pattern: from ['"](pkg1|pkg2|pkg3|...)['"]|require\(['"](pkg1|pkg2|pkg3|...)['"]\)|import\(['"](pkg1|pkg2|pkg3|...)['"]\)
+  output_mode: content
+  glob: *.{js,jsx,ts,tsx,mjs,cjs}
+  ```
+  Then post-process the matches: any package name from the manifest that didn't appear in any match line is an "unused" candidate. Re-verify those candidates with a second targeted Grep pass to rule out string templates and other dynamic references. Escape regex metacharacters in package names (`@scope/pkg` → `@scope/pkg`, but `pkg-name` is literal-safe).
+- Scope the scan to the workspace's source subtree (e.g., `packages/api/src/**` for the `packages/api` workspace; root `src/**` for root) — use the Grep tool's `path` parameter
 - Also check config files that reference packages: `webpack.config.*`, `vite.config.*`, `babel.config.*`, `.eslintrc*`, `jest.config.*`, `tsconfig.json`, `postcss.config.*`
-- A dependency is "unused" if zero source files AND zero config files reference it
-- Watch for packages used only via CLI (check `scripts` in package.json) — these are NOT unused
-- Watch for `@types/*` packages — they're unused in source but needed for TypeScript. Only flag if the corresponding package is also unused
+- A dependency is "unused" if zero source files AND zero config files reference it AND it's not used via CLI (check `scripts` in that manifest)
+- Watch for `@types/*` packages — only flag if the corresponding runtime package is also unused
 
 **For Python (requirements.txt / pyproject.toml / Pipfile):**
 - Extract package names from the dependency file
@@ -59,9 +78,11 @@ You will receive the detected package manager and config file paths. Use them to
 - Check if the package is used in scripts, Dockerfiles, or CI configs
 
 **For Rust (Cargo.toml):**
-- Extract crate names from `[dependencies]`
+- If the root `Cargo.toml` has `[workspace]` with `members = [...]`, scan each member crate's `Cargo.toml` separately (the workspace detection above already handled this)
+- Extract crate names from `[dependencies]` (and `[dev-dependencies]`, `[build-dependencies]`)
+- Batch the search: one Grep call with all crate names alternated (`use (crate1|crate2|...)|extern crate (crate1|crate2|...)`), scoped to the workspace's `src/` and `tests/` via `path`
 - Grep for `use crate_name` or `extern crate crate_name` in `.rs` files
-- Note: Rust crate names use hyphens in Cargo.toml but underscores in code
+- Note: Rust crate names use hyphens in Cargo.toml but underscores in code — when alternating, include both forms (`tokio_util|tokio-util`)
 
 **For any ecosystem:**
 - Flag duplicate packages serving the same purpose (e.g., both `moment` and `dayjs`, both `lodash` and `underscore`, both `axios` and `node-fetch`)
@@ -72,11 +93,18 @@ You will receive the detected package manager and config file paths. Use them to
 ```
 ## Unused Dependencies
 - package: <name>
+  workspace: <workspace name, or "root">
   version: <version from lockfile>
   type: production|dev
   reason: <why it appears unused>
-  uninstall_command: <e.g., npm uninstall package-name>
+  uninstall_command: <e.g., npm uninstall package-name -w packages/api>
   risk: safe|likely_safe|needs_investigation
+
+## Misplaced Dependencies (monorepos only)
+- package: <name>
+  declared_in: <workspace manifest where it's listed>
+  used_in: <workspace(s) that actually import it>
+  recommendation: <move it, or hoist to root>
 
 ## Duplicate Dependencies
 - packages: [name1, name2]

@@ -31,82 +31,9 @@
 
 ### Session 13 - 2026-04-11: External best-practice repo review — direct-fetch verification killed 2 of plan's Tier 2 candidates (`paths:`/`effort:` were doc-extrapolation, not observed in actual external skills); shipped 3 doc bullets (MCP setup in README, mid-session `/compact` in workflow, `/loop` reference); flagged `.claude/rules/` symlink-friendly rule files as future option. (commits: adf634e, 5f61209, 445c357)
 
-### Session 14 - 2026-04-14
-**What happened:**
-- User asked whether the official Claude Code best-practices doc (https://code.claude.com/docs/en/best-practices) revealed any discrepancies or improvements for the 5 custom skills.
-- WebFetched the full doc and ran a verification pass against the skill files: `Grep` confirmed zero references to `AskUserQuestion`, `/clear`, `/btw`, `/rewind`, "fresh session", `auto mode`, `--permission-mode`, or `--allowedTools` anywhere in `~/.claude/skills/` or the repo. Also confirmed `plan-feature` had no triviality escape hatch.
-- Reported the audit as 4 high-value gaps + 2 medium gaps + 3 already-aligned items + 1 considered-but-rejected change. User asked to implement the high-value gaps.
-- **Shipped one commit (`a94fbda`) covering all 4 high-value gaps:**
-  1. `plan-feature/SKILL.md` — new Step 0 triviality check that proposes skipping the skill if the request fits in one sentence and 1-2 files; cites the doc verbatim.
-  2. `plan-feature/SKILL.md` + `plan-feature/references/interview-rules.md` — interview now driven by the `AskUserQuestion` tool with multi-choice options + "Other / explain" escape; numbered chat Q&A is the documented fallback. `AskUserQuestion` added to `allowed-tools` frontmatter. "Start Now" list renumbered (caught and fixed a duplicate `3.` before commit).
-  3. `code-review/SKILL.md` — header tip recommending `/clear` or fresh `claude` session for non-trivial reviews, with carve-outs for `--last-commit` and quick passes.
-  4. `code-review/SKILL.md` + `code-cleanup/SKILL.md` — `--fix` outputs end with `Esc Esc` / `/rewind` recovery line. For `code-cleanup`, kept the existing `git branch -D` instruction and added `/rewind` as the finer-grained option.
-- The single audit commit replaced the typical 4-separate-commits pattern from Sessions 12-13 because all four changes share the same source citation (the official doc) and all touch skill behavior; one commit reads cleaner in `git log`.
+### Session 14 - 2026-04-14: Best-practices doc audit + 4 skill alignments — `/plan-feature` Step 0 triviality check + `AskUserQuestion`-driven interview, `/code-review` fresh-session tip, `/code-cleanup`+`/code-review` `--fix` `/rewind` recovery footer; post-commit `/simplify` collapsed Step 5 duplication. (commits: a94fbda, 4d444b0, 7e3f6fb)
 
-**Files created/modified:**
-- `.claude/skills/plan-feature/SKILL.md` — added Step 0 (triviality check), added `AskUserQuestion` to `allowed-tools`, updated Step 5 interview directive, renumbered "Start Now" (+18 lines net)
-- `.claude/skills/plan-feature/references/interview-rules.md` — new "Tool: use `AskUserQuestion`" section, rewrote 8 rules into 9 rules around multi-choice prompting (+15 lines net)
-- `.claude/skills/code-review/SKILL.md` — header fresh-session tip + `--fix` `/rewind` footer (+5 lines)
-- `.claude/skills/code-cleanup/SKILL.md` — `/rewind` footer added to step 8 of Fix Mode alongside the existing `git branch -D` (+1 line net)
-- `CLAUDE.md` — bumped Last Updated to Session 14, added 2 Key Decisions rows, replaced Session 13 summary with Session 14 summary
-- `docs/session-history.md` — this entry
-- `docs/key-decisions.md` — appended 5 detailed rows (4 shipped decisions + 1 considered-and-rejected for the `@import` choice)
-- `docs/completed-work.md` — appended 5 entries
-
-**Files NOT modified (and why):**
-- `README.md` — Medium gap #5 (auto mode for headless `claude -p` runs) was identified but deferred. The existing `defer` recipe at line 177 is correct as far as it goes; adding `auto mode` as a complementary first-line option is worth doing but wasn't requested in this round.
-- `update-docs` skill files — Medium gap #6 (CLAUDE.md compaction-preservation hints) also deferred; would add an optional `## Compaction Preferences` section to `claude-md-sections.md` contract. Not requested.
-- The 3 cleanup-* subagent files — no audit findings touched them.
-
-**Next session should:**
-- **Still owed: Session 12 `defer` hook dogfood.** Three sessions deferred now. Build the minimal `~/.claude/settings.json` `PreToolUse` hook matching `Bash(rm:*)`, run `/code-cleanup --fix` on a throwaway repo, verify `stop_reason: "tool_deferred"` and resume via `claude -p --resume <session-id>`.
-- Pick up the 2 deferred medium-value gaps if useful: README `auto mode` documentation, `update-docs` compaction-preservation section.
-- Revisit `update-docs` rough edges (partial-mode selection, rollback) — still not addressed since Session 12.
-
-**Post-commit polish (same-day, post `4d444b0`):**
-- `/simplify` flagged that the new Step 5 item 3 in `plan-feature/SKILL.md` duplicated ~70 words of `references/interview-rules.md` content. Collapsed item 3 to a one-line pointer and stripped the leaked `"Other"` qualifier from item 5 — net –2 lines, restores the SKILL.md ↔ references/ separation the skill was designed around. Confirmed clean by a follow-up `/code-review`. `/code-cleanup` was invoked but declined to run — this repo has no code stack, so 6 of 7 cleanup categories don't apply; surfaced the judgment to the user instead of burning subagents.
-
-### Session 15 - 2026-04-16
-**What happened:**
-- User asked whether the Opus 4.7 launch (same day) warranted any repo changes. **Refused to speculate** without verified docs — fetched the Anthropic news post (anthropic.com/news/claude-opus-4-7), the Claude Code CHANGELOG (raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md), and the skills-frontmatter docs page (code.claude.com/docs/en/skills) before recommending anything. Confirmed: 4.7 is GA, same pricing as 4.6 ($5/$25), `xhigh` effort level new, `/ultrareview` shipped in CC 2.1.111, `effort:` skill frontmatter field accepts `low|medium|high|xhigh|max`.
-- **Discussed retiring `/code-review` in favor of built-in `/ultrareview`.** Read both surfaces before recommending. Concluded they're complementary: `/code-review` keeps `--security`/`--verify`/`--fix` + in-session speed + convention detection; `/ultrareview` is multi-agent cloud verification for high-stakes pre-merge (10-20min). Decision: keep both, document the split.
-- **Shipped 5-file alignment edit (no commit yet — left for user):**
-  1. `.claude/skills/code-review/SKILL.md` — added `effort: high` to frontmatter; description now positions skill vs `/ultrareview`.
-  2. `.claude/skills/plan-feature/SKILL.md` — added `effort: high` to frontmatter.
-  3. `README.md` — updated commands table row for `/code-review`; added blockquote explaining when to use `/ultrareview` instead.
-  4. `docs/key-decisions.md:45` — Sonnet-pin row updated to note 4.7 re-evaluation with verified pricing parity.
-  5. `workflow.md` — added Apr 2026 version-history row; bumped "Last updated" stamp.
-- **Dropped the Session 12 `defer` hook dogfood task entirely.** Carried 12→13→14→15. User chose retirement over verification. Pre-shipment: removed the "still pending" carry-forward bullet from Session 14's CLAUDE.md summary; deleted task #1 from the live tracker. README recipe at line 177 left in place untested.
-- Used `AskUserQuestion`-style confirmation pattern from `/plan-feature` Session 14 work (verified what to ship before editing). Saved a round-trip vs the old "edit first, ask later" pattern.
-- **Designed and shipped a session-history rollup pattern.** User flagged that `session-history.md` grows unboundedly and asked for a strategy. Picked the "compress sessions older than the 5 most recent into one-liners with commit hashes" approach (Option A from a 3-option discussion). Implemented in two parts:
-  1. Added Part 6 to `mode-update.md` that auto-rolls-up on every `/update-docs` run (with `--skip-rollup` escape). Updated `update-docs/SKILL.md` argument-hint and `verification-checklists.md`.
-  2. One-time pass on Sessions 1-10: replaced ~215 lines of full-prose entries with 10 one-liners, each carrying the architectural headline + commit hashes. File shrank from 27.7KB → 22.0KB (-21%). Future runs will compress more as new sessions push older ones past the 5-session window.
-  3. **Added Step 6.2 first-run confirmation gate** after user asked whether the skill would auto-compress other projects' session-history files (it would). Now: on the first rollup pass per-project, the user is prompted before compression; the rollup-format note added in Step 6.4 serves as the per-project sentinel so subsequent runs skip the prompt. `AskUserQuestion` added to `update-docs` allowed-tools (mirrors the `plan-feature` Session 14 pattern).
-
-**Files created/modified:**
-- `.claude/skills/code-review/SKILL.md` — added `effort: high`; description rewritten to position vs `/ultrareview` (+1 line, ~2 lines reworded)
-- `.claude/skills/plan-feature/SKILL.md` — added `effort: high` (+1 line)
-- `README.md` — `/code-review` table row expanded; new blockquote on `/ultrareview` (+3 lines)
-- `docs/key-decisions.md` — Sonnet-pin row reworded for 4.7 re-evaluation (~2 lines)
-- `workflow.md` — Apr 2026 version row + "Last updated" bump (+3 lines)
-- `CLAUDE.md` — removed defer-hook carry-forward bullet from Session 14 summary (-1 line); will be updated again by this `/update-docs` run with Session 15 summary + 3 new key decisions
-- `docs/completed-work.md` — appended Session 15 entries (this run)
-- `docs/session-history.md` — this entry + one-time rollup of Sessions 1-10 to one-liners + new "compressed format" note in header (this run)
-- `docs/key-decisions.md` — appended 4 Session 15 decision rows + 1 row for the rollup pattern (this run)
-- `.claude/skills/update-docs/SKILL.md` — added `--skip-rollup` to argument-hint
-- `.claude/skills/update-docs/references/mode-update.md` — appended Part 6 (Roll Up Old Sessions) after Part 5
-- `.claude/skills/update-docs/references/verification-checklists.md` — added rollup checkbox to UPDATE mode checklist
-
-**Files NOT modified (and why):**
-- `.claude/agents/cleanup-*.md` — Sonnet pin still cost-justified at 4.7 (same pricing as 4.6).
-- README.md `defer` hook recipe at line 177 — left untested per the drop-defer-dogfood decision; user accepted the small risk it's subtly wrong.
-- No actual `/ultrareview` adoption work — that's a runtime tool, not config; nothing to ship in the repo.
-
-**Next session should:**
-- Pick up Next Steps #3 (pre-commit hooks) or #4 (MCP integration) — both still pending in task tracker.
-- Consider whether the `/effort` slider (CC 2.1.111) being interactive means the per-skill `effort: high` should ever be downgraded — probably no, because the frontmatter is the deliberate per-skill override and the slider is a session-level convenience.
-- If a real high-risk PR comes up, actually try `/ultrareview` and compare with custom `/code-review --security --verify` to see whether the README positioning blockquote needs refining.
-- Watch for the next `/update-docs` run to confirm Part 6 fires correctly: as Session 16 is added, Session 11 (currently the 5th-most-recent) should get auto-compressed to a one-liner. If Part 6 misfires (e.g., picks bad commit hashes), refine the heuristic in `mode-update.md` Step 6.2.
+### Session 15 - 2026-04-16: Opus 4.7 alignment — `effort: high` on `/code-review` and `/plan-feature`; positioned `/ultrareview` as complementary; Sonnet-pin re-confirmed at price parity; dropped S12 `defer` dogfood; designed session-history rollup Part 6 + first-run consent gate using `AskUserQuestion`. (commit: bc8e40b)
 
 ### Session 16 - 2026-04-17
 **What happened:**
@@ -265,3 +192,36 @@
 - Watch the next `/update-docs --fast` run for completed-work.md drift. Session 18's spec deferred Part 1.3 from Fast Path, which means completed-work.md only updates on `--full` runs. If the divergence between session-history.md and completed-work.md becomes annoying after a few cycles, add Part 1.3 to the Fast Path subset (single Edit per item, cheap).
 - Pick up Next Steps #3 (pre-commit hooks) or #4 (MCP integration) — both still pending from prior sessions and more concrete than the aspirational items.
 - Consider whether the back-to-back `--fast` then `--full` pattern is itself worth documenting in Workflow.md as the recommended cadence (`--fast` daily, `--full` end-of-week). Currently implicit in the design but not surfaced to the user.
+
+### Session 20 - 2026-05-06
+**What happened:**
+- User picked Next Steps #2 ("improve existing skill reference files based on usage patterns") narrowed to `/code-cleanup`. Presented three gaps via `AskUserQuestion`: (1) perf rewrite using `git ls-files` + batched `Grep` alternation, (2) monorepo/workspace deps coverage, (3) CSS-in-JS / Tailwind detection. User chose (1) + (2).
+- **Perf (all three reference files):** replaced `find` with `git ls-files` for source-file enumeration (honors `.gitignore` natively, faster on large repos, no hardcoded skip list needed). Replaced per-item grep loops in unused-files, dead-functions, unused-classes, and unused-CSS-variables searches with single batched `Grep` calls using regex alternation across all candidate names: pattern `\b(name1|name2|...)\b` with `output_mode: count` collapses N grep invocations into one. Same shape as Session 16's Part 3.0 batch-read pattern, applied at finer grain.
+- **Monorepo coverage (`scan-deps-config.md`):** added §4.0 "Workspace detection" block at the top of Unused Dependencies — npm/yarn via `package.json` `workspaces` field (array or `{packages:}` object form), pnpm via `pnpm-workspace.yaml` `packages:`, Cargo via root `Cargo.toml` `[workspace] members = [...]`. Each detected workspace is an independent scan target: a workspace's deps are "unused" only if that workspace's source subtree never references them; sibling-workspace usage is "misplaced" instead. Root deps are "used" if any workspace references them. Output format gains a `workspace:` field on Unused Dependencies findings and a new "Misplaced Dependencies (monorepos only)" output section. Cargo crate-name expansion (`tokio_util|tokio-util`) added since Rust uses both forms. `SKILL.md` Step 0 detection list updated; "Detected:" example expanded ("Detected: pnpm monorepo with 5 workspaces. Scanning per-workspace deps + root-level shared categories.").
+- **Mid-edit correctness fix:** noticed first-pass examples used literal `rg --type js -e "..."` shell-command form, but the three `cleanup-*` agent whitelists include `Bash(grep:*)` not `Bash(rg:*)`, and the runtime system prompt explicitly directs "ALWAYS use Grep [tool], NEVER invoke `rg` as Bash command." Refactored every batched-search example across all three reference files to use the `Grep` tool's parameter shape (`pattern:`, `output_mode:`, `glob:`, `path:`). Stays platform-agnostic and matches what the agents can actually do.
+- **Skipped (out of scope per CLAUDE.md "no premature abstraction" rule):** Python `pyproject.toml` workspace handling (rare in practice), lerna `lerna.json` (fading), Nx `nx.json` (too tool-specific), CSS-in-JS / Tailwind detection (third gap user declined).
+- **Drift handled by Part 5 (this run):** S14 had been left in full prose by Session 19's rollup — apparent single-pass bug in S19, since S14 was already past the 5-most-recent threshold at that time. S19 only compressed S13 and stopped. This run picks up both S14 and S15 (now 6th and 7th oldest after S20 lands).
+- **Drift handled by Part 6 (this run):** Key Decisions table at 21 after S20's add. Sentinel from S17 → silent FIFO move of the oldest row ("Startup scripts (.claude/scripts/)") to `docs/key-decisions.md`. That row already had a near-duplicate detailed entry there from earlier; per spec, no dedup. Table back to 20.
+
+**Files created/modified:**
+- `.claude/skills/code-cleanup/SKILL.md` — Step 0 detection list updated for monorepos (`package.json` `workspaces` field / `pnpm-workspace.yaml`; Cargo `[workspace]`); "Detected:" example expanded
+- `.claude/skills/code-cleanup/references/scan-deps-config.md` — new §4.0 workspace detection block at top of Unused Dependencies; §4.1 Node.js scan refactored to batched `Grep` with alternation; Cargo scan updated for workspace members + crate-name expansion + batched search; output format gains `workspace:` field and new "Misplaced Dependencies" section
+- `.claude/skills/code-cleanup/references/scan-files-code.md` — `git ls-files` over `find` for unused-files enumeration; batched-`Grep` alternation pattern for unused-files reference search and dead-functions call-site search
+- `.claude/skills/code-cleanup/references/scan-styles-tests.md` — `git ls-files` for template enumeration; batched-`Grep` alternation for unused-class search and unused-CSS-variable search
+- `CLAUDE.md` — Last Updated → S20; Part 6 removed oldest Key Decisions row; added new S20 row; replaced S19 last-session block with S20
+- `docs/session-history.md` — Part 5 compressed S14 + S15 to one-liners; appended this S20 detailed entry
+- `docs/key-decisions.md` — appended rolled-up "Startup scripts" row + this session's detailed decision row
+- `docs/completed-work.md` — appended 3 S20 entries (perf rewrite, monorepo coverage, Grep-tool correctness fix)
+
+**Files NOT modified (and why):**
+- `.claude/agents/cleanup-*.md` — no agent-definition change needed; the references they consume now describe the Grep-tool-batched pattern, and the agents already have `Grep` in their tool whitelist
+- `README.md`, `Workflow.md` — no user-visible command/workflow change; the optimizations are internal to subagent behavior
+- Auto-memory `MEMORY.md` — no stable-fact change (no new skills, no architecture shift). Rule 4.3.4 skip condition met
+- Python/lerna/Nx workspace detection — explicitly out of scope; user picked perf + monorepo (JS-flavored) only
+- CSS-in-JS / Tailwind detection — third gap presented to user, declined; left for a future session if it surfaces in real `/code-cleanup` runs
+
+**Next session should:**
+- If a real `/code-cleanup` run hits a monorepo, observe whether §4.0 workspace detection actually fires correctly, whether "Misplaced Dependencies" reports anything useful, and whether the batched-`Grep` alternation pattern survives package names with regex metacharacters (the new ref calls out `@scope/pkg` escaping as a known concern).
+- **Investigate the Part 5 single-pass bug** observed this session: S19's rollup compressed only S13 and missed S14 despite S14 being past the 5-most-recent threshold at that time. The current spec says "everything older is a candidate; skip any already in one-line format." The likely fix is to iterate over all multi-line sessions past the threshold instead of only handling the newly-overflowing one. Low-effort hardening of `mode-update.md` Part 5.
+- Pick up Next Steps #3 (pre-commit hooks) or #4 (MCP integration) — still the most concrete remaining items.
+- Consider whether `/code-cleanup` should also gain the "Detected:" line as a user-visible printout in monorepo runs, so the user sees per-workspace counts before the scan begins.

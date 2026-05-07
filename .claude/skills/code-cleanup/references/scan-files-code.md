@@ -11,8 +11,8 @@ You will receive project stack info (language, framework, file extensions). Use 
 Scan for files that are never imported, required, or referenced anywhere else in the codebase.
 
 **Method:**
-- List all source files using `find` (respect `.gitignore` patterns — skip `node_modules`, `venv`, `.git`, `dist`, `build`, `__pycache__`, `.next`, `.cache`)
-- For each file, `grep -r` its filename (without extension) and its common import patterns across the codebase
+- List source files with `git ls-files` (honors `.gitignore` automatically — no need to maintain a hardcoded skip list — and is much faster than `find` on large repos). Fall back to `find` only if the project isn't a git repo.
+- **Batch the reference search.** Do not loop one-grep-per-file. With hundreds of files that's hundreds of Grep calls. Make a single `Grep` call with a regex alternating across all candidate basenames, e.g. pattern `\b(userProfile|authMiddleware|dateUtils|...)\b` with `output_mode: count` so each file's match count comes back in one shot. Then bucket: any basename with zero hits across all files (excluding self-matches in the basename's own file) is a "potentially unused" candidate. For ~50–100 candidates per call, this collapses 50–100 Grep runs into one.
 - A file is "unused" if zero other files reference it AND it's not an entry point (like `index.*`, `main.*`, `app.*`, `server.*`, `manage.py`, `setup.py`, `__init__.py`)
 
 **Also flag:**
@@ -33,8 +33,7 @@ Scan for code that exists but is never executed.
 
 **Method — Functions/Methods:**
 - Extract all function/method definitions using grep patterns appropriate for the project language
-- For each, grep for calls to that function name across the codebase
-- Exclude the definition itself from results
+- **Batch the call-site search.** Make a single `Grep` call alternating across all extracted function names: pattern `\b(funcA|funcB|funcC|...)\b` with `output_mode: count`. Bucket matches by name; any name whose only match is its own definition line is a "dead" candidate.
 - A function is "dead" if it has zero call sites AND is not exported from a public API
 
 **Method — Commented-out code:**
