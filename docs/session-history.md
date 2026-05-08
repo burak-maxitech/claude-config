@@ -35,44 +35,7 @@
 
 ### Session 15 - 2026-04-16: Opus 4.7 alignment — `effort: high` on `/code-review` and `/plan-feature`; positioned `/ultrareview` as complementary; Sonnet-pin re-confirmed at price parity; dropped S12 `defer` dogfood; designed session-history rollup Part 6 + first-run consent gate using `AskUserQuestion`. (commit: bc8e40b)
 
-### Session 16 - 2026-04-17
-**What happened:**
-- User reported a real `/update-docs` run taking ~20 minutes on one of their other projects. Asked how to improve perf without losing functionality.
-- Audited `update-docs/SKILL.md` and `mode-update.md` to identify hotspots. Three main drivers: (1) skill had no `effort` pin so it ran at session default (Opus 4.7 for the user), (2) Part 3 walks `docs/*.md` sequentially, (3) Part 6 rollup runs one `git log --since/--until` per compressible session.
-- Recommended fixes; user said "do all." Confirmed that `effort:` in skill frontmatter is invocation-scoped — the harness applies it for the skill duration and reverts to session default on return, so no programmatic toggling is needed.
-- **Shipped three edits in `/update-docs`:**
-  1. `.claude/skills/update-docs/SKILL.md` — added `effort: low` to frontmatter (mirrors the `effort: high` pattern from Session 15's `/code-review` and `/plan-feature`).
-  2. `.claude/skills/update-docs/references/mode-update.md` — new **Part 3.0 "Batch Read All Doc Files in Parallel"** preamble directing a single `Glob docs/**/*.md` + parallel `Read` (one tool call per file, same turn) + batched Edits. Replaces sequential read-analyze-edit.
-  3. `.claude/skills/update-docs/references/mode-update.md` — rewrote **Part 6.3 step 2** to pre-fetch one `git log --since="<earliest>" --until="<latest>+1d" --pretty=format:'%h %ad %s' --date=short` across the full compressible date range, then slice per-session in memory. Replaces N sequential git calls with 1.
-- User then asked to sweep the other 4 skills. Presented a table with recommendations:
-  - `/code-review` keeps `effort: high` (reasoning-heavy, Session 15).
-  - `/plan-feature` keeps `effort: high` (interview synthesis, Session 15).
-  - `/update-docs` keeps just-added `effort: low`.
-  - Recommended `/resume-work` → `low` (read docs + git + hydrate tasks = mechanical).
-  - Recommended `/code-cleanup` orchestrator → `low` (real work in Sonnet subagents).
-- User approved `/resume-work` only. `/code-cleanup` left at session default per explicit instruction. Shipped `effort: low` on `resume-work/SKILL.md:5`.
-- Flagged to user that the CLAUDE.md Key Decisions row stating "Mechanical skills keep session default" was now partially outdated and would be refreshed by this `/update-docs` run.
-- **Dogfood note:** this `/update-docs` run is the first one exercising the new Part 3.0 parallel batch-read and Part 6.3 batched `git log`. Part 6 correctly identified Session 11 as the now-5th-oldest and compressed it using the two `2026-03-17` commits from the pre-fetched log. Subjective sense: run felt noticeably faster than Session 15's despite comparable scope (multi-file doc updates + one rollup).
-
-**Files created/modified:**
-- `.claude/skills/update-docs/SKILL.md` — `effort: low` added to frontmatter (+1 line)
-- `.claude/skills/update-docs/references/mode-update.md` — Part 3.0 preamble added before 3.1-3.4 (+10 lines); Part 6.3 step 2 rewritten to use a single batched `git log` (~5 lines changed)
-- `.claude/skills/resume-work/SKILL.md` — `effort: low` added to frontmatter (+1 line)
-- `CLAUDE.md` — bumped Last Updated to 2026-04-17, rewrote the Session 15 `effort: high` Key Decisions row to reflect current pins, added a new row for the Part 3/Part 6 parallelization, replaced Session 15 last-session summary with Session 16 (this run)
-- `docs/session-history.md` — Part 6 auto-rollup compressed Session 11 to one-liner; this entry appended (this run)
-- `docs/completed-work.md` — Session 16 entries appended (this run)
-- `docs/key-decisions.md` — 2 Session 16 decision rows appended (this run)
-
-**Files NOT modified (and why):**
-- `.claude/skills/code-cleanup/SKILL.md` — user explicitly declined the `effort: low` pin for the orchestrator. Stays at session default.
-- `.claude/skills/code-review/SKILL.md`, `.claude/skills/plan-feature/SKILL.md` — `effort: high` from Session 15 confirmed still correct (reasoning-heavy work).
-- `README.md`, `workflow.md` — skill behavior is unchanged from the user's perspective (same commands, same outputs, just faster). No user-facing doc change warranted.
-- `.claude/agents/cleanup-*.md` — no subagent changes this session.
-
-**Next session should:**
-- If anyone runs `/update-docs` on a real project again, observe actual wall-clock delta vs the 20-min baseline. If still slow, consider scoping Part 3 to `git diff --name-only` (small functionality trim — won't catch drift in untouched docs).
-- Pick up Next Steps #3 (pre-commit hooks) or #4 (MCP integration) — both still pending in task tracker from prior sessions.
-- Session 12 becomes the 6th-most-recent when Session 17 arrives → it'll be the next compressible entry. Watch the Part 6.3 batched `git log` path on that run to confirm the new approach picks correct commit hashes.
+### Session 16 - 2026-04-17: /update-docs perf — `effort: low` pin + Part 3.0 parallel batch-Read of `docs/*.md` + Part 6.3 single pre-fetched `git log` across compressible date range; `/resume-work` also pinned `effort: low`; CLAUDE.md decision rows refreshed; first run dogfooded the new parallel-read path. (commit: af0c451)
 
 ### Session 17 - 2026-04-21
 **What happened:**
@@ -225,3 +188,32 @@
 - **Investigate the Part 5 single-pass bug** observed this session: S19's rollup compressed only S13 and missed S14 despite S14 being past the 5-most-recent threshold at that time. The current spec says "everything older is a candidate; skip any already in one-line format." The likely fix is to iterate over all multi-line sessions past the threshold instead of only handling the newly-overflowing one. Low-effort hardening of `mode-update.md` Part 5.
 - Pick up Next Steps #3 (pre-commit hooks) or #4 (MCP integration) — still the most concrete remaining items.
 - Consider whether `/code-cleanup` should also gain the "Detected:" line as a user-visible printout in monorepo runs, so the user sees per-workspace counts before the scan begins.
+
+### Session 21 - 2026-05-07
+**What happened:**
+- User identified gap: existing review skills (`/code-review`, `/simplify`, `/ultrareview`) all operate on diffs/commits; `/code-cleanup` is repo-wide but deletion-focused. Nothing audits whole-repo *architecture*. Asked to build a new skill via `/plan-feature`.
+- Ran `/plan-feature` interview. **Three guardrails** came out of the asked-for-improvement step before plan finalization (user prompted "any improvement suggestions?" — important feedback loop): (1) **Reframe patterns as complexity-reducing refactors.** GoF patterns (Strategy, Command, Observer) often *hide* complexity behind indirection (Strategy = switch + class hierarchy + registry — same cognitive load, more files). Subagent renamed `arch-patterns` → `arch-refactors`; catalog (`refactor-catalog.md`) leans toward technique refactors. R13 Strategy / R14 Command present but with strict 4-condition "detect when" gates. (2) **Read intended architecture first.** Step 1 reads CLAUDE.md / README / `docs/architecture/` / ADRs to summarize the project's *intended* arch in 3-5 bullets; subagents flag findings conflicting with documented decisions as `respects_documented_decision: false` and surface in a separate report section requiring user confirmation. Prevents "you should have a domain layer" against projects that chose flat structure. (3) **CCN delta sanity gate.** Each finding has `ccn_current` (from detected linter — eslint with `complexity` rule / ruff `C901` / radon / lizard, fall back to Grep heuristic) and `ccn_projected`; orchestrator drops findings where projected ≥ current.
+- **Initial 3-dimension build (commit `52635ae`):** Skill scaffold (`SKILL.md` with Step 0 detection / Step 1 intended-architecture / mode dispatch / parallel subagent dispatch / consolidate-filter / output / mode tail), 8 reference files (`scale-strategy`, `refactor-catalog` with R01-R14, `report-template`, `fix-mode`, `plan-mode`, `scan-structure`, `scan-refactors`, `scan-performance`), 3 subagents (`arch-structure`, `arch-refactors`, `arch-performance`). Decomposition mirrors `/code-cleanup`. Scale tiers: <100=full, 100-500=bounded, >500=smart sample (LOC × churn × import-fan-in priority + drill-down). `--fix` restricted to single-file non-API-breaking; cross-file auto-routes to `--plan`. CLAUDE.md / README.md / Workflow.md / MEMORY.md updated (skills 5→6, agents 3→6).
+- **Mid-session honest audit + 4th dimension extension (commit `261878c`):** When asked "do you think this addresses optimized / maintainable / least-code-possible?", honest audit found `least-code-possible` was the weak dimension — refactor catalog *trades* complexity (decompose god function = readability ↑, LOC flat) and didn't have a deletion bias. Added 4th parallel subagent `arch-simplification` targeting *almost-dead* and *speculatively-built* code at sub-file granularity (vs `/code-cleanup` whole-file granularity). 9 new catalog entries S01-S09 (single-impl interface inline, pass-through wrapper, always-same parameter, unread/same-value config, defensive code for impossible static states, speculative generic, near-duplicate functions, unused exported symbol). Every simplification finding mandatorily reports `lines_deletable >= 1`. Report opens with **Code we can delete: N lines across M files** before the architecture map. Rank score factors `log(lines_deletable + 1)` so big deletions float up. Quick-wins phase puts simplification deletions ahead of refactors. False-positive guards baked in: test seams (mocks legitimize abstractions), boundary types (Adapter/Mapper wrappers), recently-added abstractions (<30 days, second impl may be in flight), public-API exports. `--fix` eligible for S04 (single-file), S06 (always single-file), S09 (when symbol body in one file with no importers); rest auto-route to `--plan`. Subagent count 6→7.
+- **Plan-feature flow exercised end-to-end:** triviality check correctly skipped (multi-file architecture-touching), interview ran with 3 batches of multi-choice `AskUserQuestion` calls (12 questions total across 3 batches; one batch hit the 4-question max and had to be re-batched), Plan Mode enter / write to `~/.claude/plans/immutable-tickling-castle.md` / ExitPlanMode approval. Auto mode picked up the approval and proceeded with batched writes. Confirmed: when asked for improvement suggestions before plan finalization, the model can productively push back on its own designs (the original plan would have shipped with GoF pattern-mongering and no intended-architecture detection — both real bugs).
+
+**Files created/modified:**
+- `.claude/skills/architecture-review/SKILL.md` — new orchestrator (12k chars)
+- `.claude/skills/architecture-review/references/{fix-mode,plan-mode,refactor-catalog,report-template,scale-strategy,scan-performance,scan-refactors,scan-simplification,scan-structure}.md` — 9 reference files
+- `.claude/agents/{arch-structure,arch-refactors,arch-performance,arch-simplification}.md` — 4 new subagents
+- `CLAUDE.md` — Last Updated → 2026-05-07; Status table (skills 5→6, agents 3→7); Architecture tree updated; 2 new Key Decisions rows (3-dim build + 4th-dim extension); replaced S20 last-session block with S21
+- `README.md` — agent file tree (3→4 arch agents); skill file tree (8→9 references); Commands table row updated for `/architecture-review` (4 dimensions, `lines_deletable` callout); new complement table positioning vs `/code-review`/`/simplify`/`/ultrareview`/`/code-cleanup`; Subagents table appended with 4 new arch agents
+- `workflow.md` — new Architecture Audit row in Quick Reference; new `/architecture-review` Command Reference section; new Scenario 5 "First time in unfamiliar repo / architecture health check"; May 2026 version-history row updated for 4-dimension extension
+- Auto-memory `MEMORY.md` — skill count 5→6, agent count 3→7
+
+**Files NOT modified (and why):**
+- Existing skill SKILL.md / agent .md files — no behavior change to existing skills; new skill is fully additive
+- `docs/key-decisions.md` — Part 6 will move 2 oldest CLAUDE.md rows here (run by /update-docs)
+- `docs/completed-work.md` — Part 1.3 will append S21 entries (run by /update-docs)
+- `docs/session-history.md` — Part 5 will compress S16, this entry appended by /update-docs (this run)
+
+**Next session should:**
+- **Dogfood `/architecture-review` on a non-trivial real project.** This is the one critical validation outstanding — the skill has never run end-to-end. Watch for: linter detection accuracy across different stacks (does it find the eslint config in real-world setups?), intended-architecture summary quality (does Step 1 produce useful 3-5 bullets, or vague platitudes?), CCN delta filter behavior (do projected estimates pass the sanity gate at a useful rate, or is the filter dropping most findings?), report length and signal density on a 200-500 file repo, false-positive rate on the simplification dimension's recency check (<30 days) and test-seam guard.
+- **Verify the `/plan-feature` 4-question batching constraint is documented.** This session hit `InputValidationError: too_big, maximum: 4` when sending 5 questions in one `AskUserQuestion` call. Worked around by dropping a question and asking it in the next batch, but `interview-rules.md` says "Batch 3-5 questions per call" which isn't accurate. Quick fix: change to "Batch 3-4 questions per call".
+- Optionally: refactor catalog could grow over time as `/architecture-review` gets used. Consider a per-project `refactor-catalog.local.md` extension mechanism so projects can add codebase-specific patterns without forking the skill. Probably premature — wait until a real run surfaces a concrete need.
+- Pick up Next Steps #3 (pre-commit hooks) or #4 (MCP integration) once dogfooding is done.

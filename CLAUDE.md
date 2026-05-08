@@ -34,17 +34,17 @@ Nothing currently in progress.
 
 ## Next Steps
 
-1. Add more skills as new workflow needs emerge
-2. Improve existing skill reference files based on usage patterns
-3. Consider adding hooks for automated pre-commit workflows
-4. Explore MCP server integration for external tool access
+1. **Dogfood `/architecture-review` on a non-trivial real project** — never run end-to-end yet. Watch for linter-detection accuracy, intended-architecture summary quality, CCN-delta filter behavior, simplification false-positive rate
+2. Fix `/plan-feature` `interview-rules.md` — change "Batch 3-5 questions per call" to "Batch 3-4 questions per call" (S21 hit `AskUserQuestion` `too_big maximum: 4` error)
+3. Add more skills as new workflow needs emerge
+4. Improve existing skill reference files based on usage patterns
+5. Consider adding hooks for automated pre-commit workflows
+6. Explore MCP server integration for external tool access
 
 ## Key Decisions
 
 | Decision | Rationale |
 |----------|-----------|
-| Scripts don't auto-run /resume-work | User controls when to run /resume-work; avoids forced context load on every launch |
-| Setup instructions in README.md only | One-time setup (clone, symlinks, alias) belongs in README; Workflow.md links to it to avoid duplication |
 | Don't filter claude-config from project picker | User may want to work on the config repo itself |
 | CI gating documented, not implemented in-skill | `defer` PermissionDecision only works for single-tool-call turns and is meant for SDK/subprocess callers; skills can't self-gate. Document the PreToolUse recipe in README instead of adding a `--gated` flag. |
 | Plugin `bin/` helpers in resume-work health check | CC 2.1.91 puts enabled plugins' `bin/` on `$PATH`; prefer plugin-provided smoke tests over the generic `package.json → Makefile → pyproject.toml → Cargo.toml` ladder. |
