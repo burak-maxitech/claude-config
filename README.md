@@ -7,6 +7,9 @@ My personal Claude Code configuration: custom commands, skills, subagents, and w
 claude-config/
 ├── .claude/                           # Subdirs symlinked into ~/.claude
 │   ├── agents/                        # Subagent definitions (Sonnet-routed)
+│   │   ├── arch-performance.md
+│   │   ├── arch-refactors.md
+│   │   ├── arch-structure.md
 │   │   ├── cleanup-deps-config.md
 │   │   ├── cleanup-files-code.md
 │   │   └── cleanup-styles-tests.md
@@ -15,6 +18,17 @@ claude-config/
 │   │   └── start-claude.ps1           # Windows startup (PowerShell)
 │   ├── settings.local.json            # Shared Claude Code settings
 │   └── skills/                        # Skills (commands + bundled references)
+│       ├── architecture-review/
+│       │   ├── SKILL.md
+│       │   └── references/
+│       │       ├── fix-mode.md
+│       │       ├── plan-mode.md
+│       │       ├── refactor-catalog.md
+│       │       ├── report-template.md
+│       │       ├── scale-strategy.md
+│       │       ├── scan-performance.md
+│       │       ├── scan-refactors.md
+│       │       └── scan-structure.md
 │       ├── code-cleanup/
 │       │   ├── SKILL.md
 │       │   └── references/
@@ -154,11 +168,24 @@ git pull
 | `/plan-feature` | Interview before building features | Skill |
 | `/code-review` | Review code quality (lightweight, in-session, with `--security`/`--verify`/`--fix`) | Skill |
 | `/code-cleanup` | Find dead code & cruft (parallel subagents) | Skill |
+| `/architecture-review` | Repo-wide architecture audit — complexity hotspots, refactor opportunities, perf suspects (parallel subagents, with `--plan`/`--fix`/`--map`/`--full-scan`) | Skill |
 | `/update-docs` | End session - save progress | Skill |
 
 **Skills** are directories in `.claude/skills/` that bundle reference files, use YAML frontmatter for tool permissions, and can dispatch subagents.
 
 > **When to reach for `/ultrareview` instead of `/code-review`.** Claude Code 2.1.111 ships a built-in `/ultrareview` that runs 5+ verifying subagents in the cloud (10–20 min, scales to 20 agents). Use it for high-risk pre-merge reviews — auth rewrites, payment flows, database migrations. The custom `/code-review` skill is the lighter daily-driver: in-session, fast, with `--security` (OWASP), `--verify` (run tests), and `--fix` (auto-fix simple findings) modes that `/ultrareview` doesn't have.
+
+> **Picking among the review skills.** All five operate on different scopes:
+>
+> | Skill | Scope | When |
+> |-------|-------|------|
+> | `/code-review` | diff or commit | per-commit / per-PR quality, daily driver |
+> | `/simplify` | recent changes | post-hoc cleanup of work just done |
+> | `/ultrareview` | PR (cloud) | high-risk pre-merge verification (auth, payments, migrations) |
+> | `/code-cleanup` | whole repo | deletion-focused — dead code, unused deps, stale config |
+> | `/architecture-review` | whole repo | structural audit — complexity hotspots, refactor opportunities, perf suspects |
+>
+> Useful chain on an unfamiliar repo: `/code-cleanup` → `/architecture-review` → `/architecture-review --plan` → `/plan-feature` per phase.
 
 ## Subagents
 
@@ -169,6 +196,9 @@ The `.claude/agents/` folder contains subagent definitions used by skills. These
 | `cleanup-files-code` | `/code-cleanup` | Scans for unused files and dead code |
 | `cleanup-deps-config` | `/code-cleanup` | Scans for unused deps and config cruft |
 | `cleanup-styles-tests` | `/code-cleanup` | Scans for unused CSS and stale tests |
+| `arch-structure` | `/architecture-review` | Cyclomatic + cognitive complexity hotspots, coupling, layering violations, circular deps |
+| `arch-refactors` | `/architecture-review` | Catalog-driven complexity-reducing refactor opportunities (cites entry IDs) |
+| `arch-performance` | `/architecture-review` | High-precision performance findings (N+1, sync I/O in async, accidental O(n²), hot-loop invariants) |
 
 ## Interop with Claude Code 2.1 features
 

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-05-06 (Session 20)
+Last Updated: 2026-05-07 (Session 21)
 
 ## Project Overview
 
@@ -15,17 +15,16 @@ Last Updated: 2026-05-06 (Session 20)
 
 | Area | Status |
 |------|--------|
-| Skills (5) | Complete |
-| Subagents (3) | Complete |
+| Skills (6) | Complete |
+| Subagents (6) | Complete |
 | Startup scripts | Complete |
-| Mac/Linux setup | Complete |
-| Windows setup | Complete |
+| Cross-platform setup | Complete |
 | GitHub sync | Complete |
 | Documentation | Complete |
 
 ## Completed
 
-All 5 skills, 3 subagents, cross-platform setup, and documentation system are complete.
+All 6 skills, 6 subagents, cross-platform setup, and documentation system are complete.
 
 See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
@@ -64,6 +63,7 @@ Nothing currently in progress.
 | Interop polish (commit `14546ff`, 2026-04-22; backfilled S19) | Modernized README defer recipe to use the 2.1.85 `if` field (e.g. `"if": "Bash(rm:*)"`) so PreToolUse `defer` only fires for matching tool calls, refining the existing CI-gating recipe. Added README auto mode compatibility paragraph (2.1.83+ classifier behavior + `PermissionDenied` hook fallback added 2.1.89). Startup scripts now warn when `disableSkillShellExecution=true` in user settings (would silently break `--fix`/`--verify`/`deep`). |
 | Parallelize `/code-review --verify` (commit `ff89cbb`, 2026-04-22; backfilled S19) | Step 1.5 launches test/lint with `run_in_background` so they complete during review work (Steps 2-4); Step 5 collects output instead of running synchronously. Saves ~10-60s per `--verify` invocation on projects with non-trivial test suites. Mirrors the parallelization pattern from `/update-docs` Part 3.0 (Session 16). |
 | `/code-cleanup` references — git ls-files + batched Grep + monorepo workspaces (Session 20) | Usage-pattern improvements per Next Steps #2. (1) **Perf:** `git ls-files` over `find` (honors `.gitignore` natively); per-item grep loops collapse into single batched `Grep` calls with regex alternation (`\b(name1\|name2\|...)\b` + `output_mode: count`). (2) **Coverage:** `scan-deps-config.md` detects npm/yarn/pnpm/Cargo workspaces, scans each child manifest separately, tags findings with workspace name; new "Misplaced Dependencies" output section. SKILL.md Step 0 surfaces monorepo state in the "Detected:" line. (3) **Mid-edit correctness fix:** literal `rg ...` shell-command examples → `Grep` tool syntax — the cleanup-* agents have `Bash(grep:*)` not `Bash(rg:*)`, and runtime guidance pins use of the `Grep` tool. |
+| New `/architecture-review` skill — three guardrails against pattern-mongering (Session 21) | Acted on Next Steps #1 (add new skills). Distinct from existing diff-scoped reviewers (`/code-review`, `/simplify`, `/ultrareview`) and deletion-focused `/code-cleanup`. Three guardrails came out of the planning interview: (1) **Reframe patterns as complexity-reducing refactors.** GoF patterns often *hide* complexity behind indirection (Strategy = switch + class hierarchy + registry). Catalog (`refactor-catalog.md`) is technique-driven (guard clauses, pure-function extraction, flag-arg removal, discriminated unions, table lookup); GoF patterns appear only with strict "detect when" gates (R13 Strategy requires 4 conditions). (2) **Read intended architecture first.** Step 1 reads CLAUDE.md / README / `docs/architecture/` / ADRs to summarize project's *intended* arch; subagents flag findings conflicting with documented decisions as `respects_documented_decision: false` and surface them in a separate report section requiring user confirmation. Prevents "you should have a domain layer" against projects that chose flat structure. (3) **CCN delta sanity gate.** Each finding has `ccn_current` (from detected linter — eslint/ruff/radon/lizard, fall back to Grep heuristic) and `ccn_projected`; orchestrator drops findings where projected ≥ current. Decomposition: 3 parallel Sonnet subagents (arch-structure / arch-refactors / arch-performance). Scale tiers: <100=full, 100-500=bounded, >500=smart sample (LOC × churn × import fan-in). `--fix` restricted to single-file non-API-breaking; cross-file auto-routes to `--plan`. Skill count 5→6, subagent count 3→6. |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -73,6 +73,9 @@ Nothing currently in progress.
 claude-config/
 ├── .claude/
 │   ├── agents/              # Subagent definitions (Sonnet-routed)
+│   │   ├── arch-performance.md
+│   │   ├── arch-refactors.md
+│   │   ├── arch-structure.md
 │   │   ├── cleanup-deps-config.md
 │   │   ├── cleanup-files-code.md
 │   │   └── cleanup-styles-tests.md
@@ -81,6 +84,7 @@ claude-config/
 │   │   └── start-claude.ps1        # Windows (PowerShell)
 │   ├── settings.local.json  # Shared Claude Code settings
 │   └── skills/              # Skills (SKILL.md + references/)
+│       ├── architecture-review/
 │       ├── code-cleanup/
 │       ├── code-review/
 │       ├── plan-feature/
@@ -114,9 +118,11 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 20) - 2026-05-06
-- **Acted on Next Steps #2** ("improve existing skill reference files based on usage patterns") narrowed to `/code-cleanup`. Presented three gaps (perf, monorepo deps, CSS-in-JS/Tailwind detection) via `AskUserQuestion`; user chose perf + monorepo.
-- **Perf (all three reference files):** replaced `find` with `git ls-files` for source enumeration (honors `.gitignore`, no hardcoded skip list, faster on large repos). Replaced per-item grep loops in unused-files, dead-functions, unused-classes, and unused-CSS-variable searches with single batched `Grep` calls using regex alternation (`\b(name1|name2|...)\b` + `output_mode: count`). Same shape as Session 16's Part 3.0 batch-read pattern, applied at finer grain.
-- **Monorepo coverage (`scan-deps-config.md`):** new §4.0 workspace detection block — npm/yarn/pnpm via `package.json` `workspaces` or `pnpm-workspace.yaml`; Cargo via `[workspace] members`. Each detected workspace is an independent scan target; sibling-workspace usage doesn't count. Output gains `workspace:` field; new "Misplaced Dependencies" section. SKILL.md Step 0 detection surfaces monorepo state in the "Detected:" one-liner.
-- **Mid-edit correctness fix:** first-pass examples used literal `rg ...` shell-command form, but the cleanup-* agents have `Bash(grep:*)` not `Bash(rg:*)` in their whitelists and runtime guidance pins use of the `Grep` tool. Refactored all batched-search examples across the three reference files to `Grep` tool parameter shape (`pattern:`, `output_mode:`, `glob:`, `path:`).
-- **Part 5 picked up two compressions** — S14 had been left in full prose by S19's rollup despite already being past the 5-most-recent threshold (apparent single-pass bug in S19; this run iterates further). Both S14 and S15 compressed to one-liners. Part 6 silent FIFO of 1 row (table 21 → 20). Auto-memory and README/Workflow.md unchanged. Subagent definition files unchanged — references already describe Grep-tool-batched pattern, agents already have `Grep` whitelisted.
+### Last Session (Session 21) - 2026-05-07
+- **Acted on Next Steps #1** ("Add more skills as new workflow needs emerge"). User identified gap: existing review skills (`/code-review`, `/simplify`, `/ultrareview`) all operate on diffs/commits; nothing audits whole-repo architecture. Built new `/architecture-review` skill via `/plan-feature` interview.
+- **Three guardrails came out of the interview** (user surfaced them when asked for improvement suggestions before plan finalization). (1) **Patterns reframed.** Subagent renamed `arch-patterns` → `arch-refactors`; catalog is complexity-reducing techniques (guard clauses, pure-function extraction, flag-arg removal, discriminated unions, table-lookup dispatch), not GoF patterns. R13 Strategy / R14 Command are present but with strict "detect when" gates (4 conditions for R13). (2) **Read intended architecture first.** Step 1 reads CLAUDE.md / README / `docs/architecture/` / ADRs and summarizes the project's *intended* architecture in 3-5 bullets, which gets passed to all subagents as shared context. Findings conflicting with documented decisions get `respects_documented_decision: false` and surface in a separate report section. (3) **CCN delta sanity gate.** Each finding has `ccn_current` (from detected linter — eslint with `complexity` rule / ruff `C901` / radon / lizard, fall back to Grep heuristic) and `ccn_projected`. Orchestrator filters findings where projected ≥ current.
+- **Decomposition mirrors `/code-cleanup`:** three parallel Sonnet subagents — `arch-structure` (complexity, coupling, cohesion, layering violations, circular deps), `arch-refactors` (catalog-driven, must cite catalog entry by ID), `arch-performance` (high-precision categories: N+1, sync I/O in async paths, accidental O(n²), missing memoization, hot-loop invariants; lower-confidence framed as "suspects to measure" not fixes).
+- **Scale tiers** (smart sampling, not random): <100=full, 100-500=bounded, >500=sample by `log(LOC) × churn × import-fan-in` priority + drill-down on hotspots. `--full-scan` escapes; "what was sampled vs skipped" in report footer.
+- **Modes:** default (review-only) / `--plan` (phased TaskCreate-ready brief with copy-pasteable `/plan-feature` snippets per phase) / `--fix` (per-finding diff preview, **single-file non-API-breaking only**; cross-file auto-routes to `--plan`). `/rewind` reminder at end of `--fix`. `--map` for heavier ASCII module-dep graph; `--full-scan` for forced full tier.
+- **Files created (12):** `architecture-review/SKILL.md`, 8 reference files (`scale-strategy.md`, `refactor-catalog.md`, `report-template.md`, `fix-mode.md`, `plan-mode.md`, `scan-structure.md`, `scan-refactors.md`, `scan-performance.md`), 3 agent definitions (`arch-structure.md`, `arch-refactors.md`, `arch-performance.md`).
+- **Doc updates:** CLAUDE.md (skills 5→6, agents 3→6, new key-decision row, architecture tree, this session bullets), README.md (skill list, complement table positioning vs `/code-review`/`/simplify`/`/ultrareview`/`/code-cleanup`, agent table, file tree), Workflow.md (new command reference section, new Scenario 5 "First time in unfamiliar repo / architecture health check," version history row), MEMORY.md (counts).

@@ -12,6 +12,7 @@
 | **Plan Feature** | `/plan-feature` | Interview before building |
 | **During Development** | `/code-review` | Review code quality |
 | **During Development** | `/code-cleanup` | Find dead code & cruft |
+| **Architecture Audit** | `/architecture-review` | Repo-wide complexity + refactor + perf review |
 | **End Session** | `/update-docs` | Save progress & context |
 
 ---
@@ -295,6 +296,37 @@ cd -
 
 ---
 
+### /architecture-review
+
+**When:** First-time exploring an unfamiliar repo, quarterly architecture health check, or before proposing a major refactor
+
+**Usage:**
+```bash
+/architecture-review                     # Default review-only report
+/architecture-review src/api/            # Scope to a path
+/architecture-review --plan              # Also emit a phased refactor brief with /plan-feature hand-offs
+/architecture-review --fix               # Apply mechanical refactors with per-finding diff preview
+/architecture-review --map               # Heavier architecture-map section with full module-dep ASCII graph
+/architecture-review --full-scan         # Force full scan even on >500-file repos
+```
+
+**Three guardrails distinguish this from "apply GoF patterns" tools:**
+1. **Refactor catalog over GoF patterns.** The catalog (in `references/refactor-catalog.md`) leans toward complexity-reducing techniques (guard clauses, pure-function extraction, flag-argument removal, discriminated unions, table-lookup dispatch). Patterns appear only when the *problem* matches.
+2. **Reads intended architecture first.** Step 1 reads CLAUDE.md, README.md, `docs/architecture/`, and ADRs to summarize what the project's architecture is *supposed* to be. Findings that conflict with documented decisions are surfaced separately for user confirmation, not applied automatically.
+3. **CCN delta sanity gate.** Each finding includes `ccn_current` (from detected linter) and `ccn_projected`. Findings whose projected ≥ current are filtered before report.
+
+**Decomposition:** Three parallel Sonnet subagents — `arch-structure` (complexity, coupling, layering), `arch-refactors` (catalog-driven), `arch-performance` (high-precision categories only).
+
+**Scale tiers:** <100 files = full scan, 100-500 = bounded, >500 = smart sampling (LOC × churn × import fan-in priority) + drill-down on hotspots.
+
+**Output:** Architecture Map → Findings (Structure / Refactors / Performance, ranked) → Documented-Decision Conflicts (separate, requires confirmation) → Suggested Next Actions (chained skill recommendations + copy-pasteable `/plan-feature` snippets).
+
+**`--fix` is restricted to single-file, non-API-breaking refactors.** Anything cross-file or API-touching auto-routes to `--plan` instead. Each edit is gated by per-finding diff preview. Use `Esc Esc` or `/rewind` to undo.
+
+**Useful chain:** `/code-cleanup` → `/architecture-review` → `/architecture-review --plan` → `/plan-feature` per phase.
+
+---
+
 ### /code-cleanup
 
 **When:** Periodic maintenance, before major releases
@@ -427,6 +459,32 @@ claude
 
 ---
 
+### Scenario 5: First Time in an Unfamiliar Repo / Architecture Health Check
+
+```bash
+# 1. Start session
+/resume-work
+
+# 2. Strip the easy stuff first (dead code is noise for architecture review)
+/code-cleanup
+
+# 3. Repo-wide architecture audit
+/architecture-review
+
+# 4. Convert top findings into a phased refactor brief
+/architecture-review --plan
+
+# 5. Drop each phase into a fresh /plan-feature session as you tackle it
+#    (the brief is self-contained — paste and go)
+
+# 6. End session
+/update-docs
+```
+
+For mechanical refactors only (single-file, non-API-breaking) you can skip step 4 and run `/architecture-review --fix` directly — it gates per finding with a diff preview. Anything cross-file or API-touching gets auto-routed to `--plan` regardless.
+
+---
+
 ## Documentation Structure
 
 Every project should have:
@@ -546,6 +604,7 @@ Commands are stored in:
 │   │   └── start-claude.ps1        # Windows startup
 │   ├── settings.local.json  # Shared Claude Code settings
 │   └── skills/              # Skills (commands + references)
+│       ├── architecture-review/
 │       ├── code-cleanup/
 │       ├── code-review/
 │       ├── plan-feature/
@@ -584,7 +643,8 @@ Symlinked to: `~/.claude/skills`, `~/.claude/agents` (individual subdirectories)
 | | Replaced manual 8-step startup with single-command script (5 automated steps); shows tip to run `/resume-work` |
 | Apr 2026 | Aligned with Opus 4.7 release (CC 2.1.111): added `effort: high` frontmatter to `/code-review` and `/plan-feature` for stronger reasoning on review/synthesis work |
 | | Documented when to reach for built-in `/ultrareview` (high-risk pre-merge) vs custom `/code-review` (daily driver) in README |
+| May 2026 | New `/architecture-review` skill — repo-wide complexity + refactor + perf audit, distinct from diff-scoped reviewers. Three guardrails: catalog-driven complexity-reducing refactors (not GoF pattern-mongering), reads intended architecture from CLAUDE.md/ADRs first, CCN delta sanity gate. Three new subagents (`arch-structure`, `arch-refactors`, `arch-performance`). |
 
 ---
 
-*Last updated: April 2026*
+*Last updated: May 2026*
