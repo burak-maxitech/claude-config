@@ -16,7 +16,7 @@ Last Updated: 2026-05-07 (Session 21)
 | Area | Status |
 |------|--------|
 | Skills (6) | Complete |
-| Subagents (6) | Complete |
+| Subagents (7) | Complete |
 | Startup scripts | Complete |
 | Cross-platform setup | Complete |
 | GitHub sync | Complete |
@@ -24,7 +24,7 @@ Last Updated: 2026-05-07 (Session 21)
 
 ## Completed
 
-All 6 skills, 6 subagents, cross-platform setup, and documentation system are complete.
+All 6 skills, 7 subagents, cross-platform setup, and documentation system are complete.
 
 See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
@@ -64,6 +64,7 @@ Nothing currently in progress.
 | Parallelize `/code-review --verify` (commit `ff89cbb`, 2026-04-22; backfilled S19) | Step 1.5 launches test/lint with `run_in_background` so they complete during review work (Steps 2-4); Step 5 collects output instead of running synchronously. Saves ~10-60s per `--verify` invocation on projects with non-trivial test suites. Mirrors the parallelization pattern from `/update-docs` Part 3.0 (Session 16). |
 | `/code-cleanup` references — git ls-files + batched Grep + monorepo workspaces (Session 20) | Usage-pattern improvements per Next Steps #2. (1) **Perf:** `git ls-files` over `find` (honors `.gitignore` natively); per-item grep loops collapse into single batched `Grep` calls with regex alternation (`\b(name1\|name2\|...)\b` + `output_mode: count`). (2) **Coverage:** `scan-deps-config.md` detects npm/yarn/pnpm/Cargo workspaces, scans each child manifest separately, tags findings with workspace name; new "Misplaced Dependencies" output section. SKILL.md Step 0 surfaces monorepo state in the "Detected:" line. (3) **Mid-edit correctness fix:** literal `rg ...` shell-command examples → `Grep` tool syntax — the cleanup-* agents have `Bash(grep:*)` not `Bash(rg:*)`, and runtime guidance pins use of the `Grep` tool. |
 | New `/architecture-review` skill — three guardrails against pattern-mongering (Session 21) | Acted on Next Steps #1 (add new skills). Distinct from existing diff-scoped reviewers (`/code-review`, `/simplify`, `/ultrareview`) and deletion-focused `/code-cleanup`. Three guardrails came out of the planning interview: (1) **Reframe patterns as complexity-reducing refactors.** GoF patterns often *hide* complexity behind indirection (Strategy = switch + class hierarchy + registry). Catalog (`refactor-catalog.md`) is technique-driven (guard clauses, pure-function extraction, flag-arg removal, discriminated unions, table lookup); GoF patterns appear only with strict "detect when" gates (R13 Strategy requires 4 conditions). (2) **Read intended architecture first.** Step 1 reads CLAUDE.md / README / `docs/architecture/` / ADRs to summarize project's *intended* arch; subagents flag findings conflicting with documented decisions as `respects_documented_decision: false` and surface them in a separate report section requiring user confirmation. Prevents "you should have a domain layer" against projects that chose flat structure. (3) **CCN delta sanity gate.** Each finding has `ccn_current` (from detected linter — eslint/ruff/radon/lizard, fall back to Grep heuristic) and `ccn_projected`; orchestrator drops findings where projected ≥ current. Decomposition: 3 parallel Sonnet subagents (arch-structure / arch-refactors / arch-performance). Scale tiers: <100=full, 100-500=bounded, >500=smart sample (LOC × churn × import fan-in). `--fix` restricted to single-file non-API-breaking; cross-file auto-routes to `--plan`. Skill count 5→6, subagent count 3→6. |
+| 4th dimension: `arch-simplification` over-engineering scanner (Session 21 mid-session extension) | Audit against user's three real goals (optimized / maintainable / least-code-possible) found a gap — original 3 dimensions covered maintainability and partially optimization, but the refactor catalog *trades* complexity (decompose god function = readability ↑, LOC flat) and didn't have a deletion bias. New `arch-simplification` subagent (4th parallel dispatch) targets *almost-dead* and *speculatively-built* code at sub-file granularity (vs `/code-cleanup` which targets whole-file deletion): single-impl interfaces (S01), pass-through wrappers (S02), always-same parameters (S03), unread/same-value config (S04/S05), defensive code for impossible static states (S06), speculative generics (S07), near-duplicate functions (S08), unused exported symbols (S09). Every finding mandatorily reports `lines_deletable >= 1`. Report renders **Code we can delete: N lines across M files** as the first line, before the architecture map — making "least code possible" a primary signal. Rank score factors `log(lines_deletable + 1)` so big deletions float up. Quick-wins phase puts simplification findings ahead of refactors. `--fix` eligible: S04 (single-file), S06 (always single-file), S09 (when symbol body in one file, no importers); rest auto-route to `--plan`. False-positive guards built into the catalog: test seams (mocks legitimize abstractions), boundary types (Adapter/Mapper wrappers legitimate), recently-added abstractions (<30 days, second impl may be in flight). Subagent count 6→7. |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -75,6 +76,7 @@ claude-config/
 │   ├── agents/              # Subagent definitions (Sonnet-routed)
 │   │   ├── arch-performance.md
 │   │   ├── arch-refactors.md
+│   │   ├── arch-simplification.md
 │   │   ├── arch-structure.md
 │   │   ├── cleanup-deps-config.md
 │   │   ├── cleanup-files-code.md
@@ -126,3 +128,4 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 - **Modes:** default (review-only) / `--plan` (phased TaskCreate-ready brief with copy-pasteable `/plan-feature` snippets per phase) / `--fix` (per-finding diff preview, **single-file non-API-breaking only**; cross-file auto-routes to `--plan`). `/rewind` reminder at end of `--fix`. `--map` for heavier ASCII module-dep graph; `--full-scan` for forced full tier.
 - **Files created (12):** `architecture-review/SKILL.md`, 8 reference files (`scale-strategy.md`, `refactor-catalog.md`, `report-template.md`, `fix-mode.md`, `plan-mode.md`, `scan-structure.md`, `scan-refactors.md`, `scan-performance.md`), 3 agent definitions (`arch-structure.md`, `arch-refactors.md`, `arch-performance.md`).
 - **Doc updates:** CLAUDE.md (skills 5→6, agents 3→6, new key-decision row, architecture tree, this session bullets), README.md (skill list, complement table positioning vs `/code-review`/`/simplify`/`/ultrareview`/`/code-cleanup`, agent table, file tree), Workflow.md (new command reference section, new Scenario 5 "First time in unfamiliar repo / architecture health check," version history row), MEMORY.md (counts).
+- **Mid-session extension** — when asked "do you think this addresses optimized / maintainable / least-code-possible?", honest audit found `least-code-possible` was the weak dimension: refactor catalog *trades* complexity, not deletes it. Built 4th subagent `arch-simplification` covering 9 over-engineering categories (S01-S09 in catalog), with `lines_deletable` as a mandatory finding field and a top-line "Code we can delete: N lines across M files" report metric. False-positive guards include test seams, boundary types, and recency check (<30 days). Skill count stays 6; subagent count 6→7.

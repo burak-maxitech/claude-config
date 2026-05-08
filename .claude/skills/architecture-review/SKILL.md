@@ -1,6 +1,6 @@
 ---
 name: architecture-review
-description: Repo-wide architecture audit. Surfaces structural debt, complexity hotspots, missed refactor opportunities, and performance suspects across the whole codebase — not just diffs. Use when user mentions architecture review, refactoring opportunities, technical debt at the repo level, restructuring proposals, or "where's the complexity in this codebase". Different from /code-review (diff-scoped), /simplify (recent changes only), /ultrareview (PR-scoped cloud review), and /code-cleanup (deletion-focused).
+description: Repo-wide architecture audit. Surfaces structural debt, complexity hotspots, refactor opportunities, performance suspects, AND over-engineering/almost-dead code (single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config). Reports lines-deletable as a top-line metric. Use when user mentions architecture review, refactoring opportunities, technical debt at the repo level, "is this codebase over-engineered", "make the codebase smaller", or "where's the complexity in this codebase". Different from /code-review (diff-scoped), /simplify (recent changes only), /ultrareview (PR-scoped cloud review), and /code-cleanup (file-level deletion only).
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(pip:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(cat:*), Bash(head:*), Task
 effort: high
@@ -16,10 +16,10 @@ This skill is distinct from the diff-scoped reviewers in this repo:
 - **`/code-review`** — diff or commit scope, single-pass quality review
 - **`/simplify`** — recent changes only, post-hoc cleanup
 - **`/ultrareview`** — PR-scoped cloud review with verifying subagents
-- **`/code-cleanup`** — repo-wide *deletion* focus (dead code, unused deps)
-- **`/architecture-review` (this)** — repo-wide *structural and complexity* focus
+- **`/code-cleanup`** — repo-wide deletion focus at *file/dependency* granularity (whole unused files, unused deps, stale config)
+- **`/architecture-review` (this)** — repo-wide *structural, complexity, and over-engineering* focus, with deletion at *symbol/abstraction* granularity
 
-If the user asks about dead code, unused dependencies, or per-commit quality, suggest the appropriate sibling skill instead.
+The two are complementary: `/code-cleanup` deletes whole files; this skill deletes abstractions, wrappers, defensive code, and almost-dead symbols inside files that are still in use. If the user asks about per-commit quality, suggest `/code-review` instead.
 
 ---
 
@@ -59,7 +59,7 @@ If none detected, fall back to **Grep heuristic** (count decision points: `if|el
 Override with `--full-scan` to force `full` regardless of size.
 
 **Tell the user what you detected** in one line, e.g.:
-> Detected: TypeScript pnpm monorepo (5 workspaces), 312 files, eslint with complexity rule. Tier: bounded. Scanning structure / refactors / performance.
+> Detected: TypeScript pnpm monorepo (5 workspaces), 312 files, eslint with complexity rule. Tier: bounded. Scanning structure / refactors / performance / simplification.
 
 ---
 
@@ -120,7 +120,7 @@ Compute the file lists once and pass them to subagents so all three see the same
 
 ## Step 4 — Parallel Subagent Dispatch
 
-Launch all three Task subagents in a single turn (one Task call per agent). Mirror `/code-cleanup` Step 1.
+Launch all four Task subagents in a single turn (one Task call per agent). Mirror `/code-cleanup` Step 1.
 
 For each subagent, **read its corresponding reference file** (it contains the detailed scan instructions) and pass the contents in the task prompt along with the shared context.
 
@@ -139,7 +139,7 @@ Intended Architecture summary:
 Findings format: structured JSON-like blocks. Do NOT format a final report — return raw findings only.
 
 Each finding must include:
-  dimension: structure | refactor | performance
+  dimension: structure | refactor | performance | simplification
   location: <path>:<line-range>
   title: <one-line>
   severity: low | medium | high
@@ -147,9 +147,10 @@ Each finding must include:
   effort_estimate: trivial | small | medium | large
   ccn_current: <int or null>
   ccn_projected: <int or null>
+  lines_deletable: <int>  (mandatory for simplification, default 0 for others)
   respects_documented_decision: true | false
   recommended_refactor: <prose>
-  cite_catalog_entry: <catalog ID, refactors only>
+  cite_catalog_entry: <catalog ID; required for refactor and simplification dimensions>
 ```
 
 ### Agent 1: arch-structure
@@ -161,20 +162,24 @@ Read `references/scan-refactors.md` AND `references/refactor-catalog.md`, then d
 ### Agent 3: arch-performance
 Read `references/scan-performance.md`, then dispatch the `arch-performance` subagent with those instructions + shared context. Restricted to high-precision categories (N+1, sync I/O in async paths, accidental O(n²), missing memoization, hot-loop invariants). Other performance hunches are framed as "suspects to measure," not fixes.
 
+### Agent 4: arch-simplification
+Read `references/scan-simplification.md` AND ensure the same `references/refactor-catalog.md` (S-prefix entries) is in the prompt. Dispatch the `arch-simplification` subagent with both + shared context. Targets: over-engineering and almost-dead code (single-impl interfaces, pass-through wrappers, always-same params, unread config, defensive code for impossible states, near-duplicates, speculative generics, unused exports). Every finding must report `lines_deletable >= 1`.
+
 ---
 
 ## Step 5 — Consolidate, Filter, Score
 
-After all three subagents return:
+After all four subagents return:
 
-1. **Sanity gate (CCN delta)** — drop any finding where `ccn_projected >= ccn_current` (when both populated). This is guardrail #3: if the projected refactor doesn't reduce complexity, it's not a finding.
-2. **Certainty gate** — drop findings with `certainty < 0.5` unless `severity = high`. Low-certainty noise is worse than missing edge findings.
-3. **Deduplicate** — if two subagents report the same location, merge into one finding with both perspectives.
-4. **Rank score** — `severity_weight × certainty / effort_weight` where severity {low: 1, medium: 2, high: 4} and effort {trivial: 1, small: 2, medium: 4, large: 8}.
-5. **Group**:
-   - **Quick wins** — top rank, effort ∈ {trivial, small}
+1. **Sanity gate (CCN delta)** — drop refactor-dimension findings where `ccn_projected >= ccn_current`. Simplification findings are not gated on CCN — they're gated on `lines_deletable >= 1` (the subagent already enforces this).
+2. **Certainty gate** — drop findings with `certainty < 0.5` unless `severity = high` OR `lines_deletable >= 20`. Big deletions earn a pass through the certainty filter so user can review even uncertain large wins.
+3. **Deduplicate** — if two subagents report the same location, merge into one finding with both perspectives. Common overlap: `arch-refactors` R03 (flag arg) and `arch-simplification` S03 (always-same param) — keep one with the higher rank score.
+4. **Rank score** — `severity_weight × certainty / effort_weight` where severity {low: 1, medium: 2, high: 4} and effort {trivial: 1, small: 2, medium: 4, large: 8}. For simplification findings, also factor `log(lines_deletable + 1)` into the score so big deletions float up.
+5. **Aggregate lines_deletable totals** — sum across all simplification findings (and any other findings reporting `lines_deletable > 0`). Track distinct files affected. These are the top-line numbers in Section 0 of the report.
+6. **Group**:
+   - **Quick wins** — top rank, effort ∈ {trivial, small}. Heavily favors simplification deletions and trivial refactors (R01, R08, R09, S04, S06).
    - **Strategic refactors** — high severity, effort ∈ {medium, large}
-   - **Documented-decision conflicts** — `respects_documented_decision == false`, regardless of dimension. Separate section, requires user confirmation.
+   - **Documented-decision conflicts** — `respects_documented_decision == false`, regardless of dimension. Separate section, requires user confirmation. (Especially important for simplification: documented "we keep this abstraction for X" must override deletion suggestions.)
    - **Performance suspects** — `dimension == performance` AND `certainty < 0.7`. Framed as "measure, don't refactor blindly."
 
 ---
@@ -183,15 +188,16 @@ After all three subagents return:
 
 Read `references/report-template.md` for exact formatting. The shape:
 
+0. **Top-line metric** — "Code we can delete: N lines across M files" (from Step 5 aggregation). This is the first line of the report, before the architecture map. Makes "least amount of code" a primary signal.
 1. **Architecture Map** (lightweight by default; full ASCII dep graph behind `--map`)
    - Detected layers (from Step 1) + observed file/dir tree alignment
    - Complexity heatmap: top 10 hotspots by current CCN with file:line and CCN value
-2. **Findings** — three subsections (Structure / Refactors / Performance), each ordered by rank score with CCN delta column (`current → projected`, Δ)
+2. **Findings** — four subsections (Structure / Refactors / Performance / Simplification), each ordered by rank score. CCN delta column (`current → projected`, Δ) for refactors. `Lines Δ` column for simplification.
 3. **Documented-Decision Conflicts** — separate, prefixed with "**Confirm intent before action:**"
 4. **Suggested Next Actions**
    - Skill chains: e.g. "If many `Unused module` candidates appeared, run `/code-cleanup` first and rerun this."
    - Copy-pasteable `/plan-feature <brief>` snippets for top 3 strategic refactors
-5. **Footer** — disclosure: linter used (or "heuristic"), files scanned, files sampled vs skipped
+5. **Footer** — disclosure: linter used (or "heuristic"), files scanned, files sampled vs skipped, deletion totals
 
 ---
 
@@ -201,7 +207,7 @@ Read `references/report-template.md` for exact formatting. The shape:
 Read `references/plan-mode.md`. Transform the top quick-wins + strategic refactors into a phased brief. Each phase becomes a self-contained `/plan-feature <brief>` payload the user can drop directly into another session. Documented-decision conflicts become their own confirmation phase, ordered last.
 
 ### If `--fix` in $ARGUMENTS:
-Read `references/fix-mode.md`. Walk findings whose `recommended_refactor` qualifies as **single-file, non-API-breaking** (extract method within file, guard-clause flatten, dedupe local helper, hoist invariant, replace inline conditional with table lookup *if* table stays in same file). Anything cross-file or API-touching is auto-routed to `--plan` instead.
+Read `references/fix-mode.md`. Walk findings whose `recommended_refactor` qualifies as **single-file, non-API-breaking** (extract method within file, guard-clause flatten, dedupe local helper, hoist invariant, replace inline conditional with table lookup *if* table stays in same file, defensive-code removal S06, unread-config deletion S04 when key lives in one file). Anything cross-file or API-touching is auto-routed to `--plan` instead.
 
 For each qualifying finding:
 1. Show the current snippet

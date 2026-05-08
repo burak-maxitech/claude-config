@@ -12,7 +12,7 @@
 | **Plan Feature** | `/plan-feature` | Interview before building |
 | **During Development** | `/code-review` | Review code quality |
 | **During Development** | `/code-cleanup` | Find dead code & cruft |
-| **Architecture Audit** | `/architecture-review` | Repo-wide complexity + refactor + perf review |
+| **Architecture Audit** | `/architecture-review` | Repo-wide complexity + refactor + perf + over-engineering audit (4 dimensions, reports `lines_deletable`) |
 | **End Session** | `/update-docs` | Save progress & context |
 
 ---
@@ -315,7 +315,9 @@ cd -
 2. **Reads intended architecture first.** Step 1 reads CLAUDE.md, README.md, `docs/architecture/`, and ADRs to summarize what the project's architecture is *supposed* to be. Findings that conflict with documented decisions are surfaced separately for user confirmation, not applied automatically.
 3. **CCN delta sanity gate.** Each finding includes `ccn_current` (from detected linter) and `ccn_projected`. Findings whose projected ≥ current are filtered before report.
 
-**Decomposition:** Three parallel Sonnet subagents — `arch-structure` (complexity, coupling, layering), `arch-refactors` (catalog-driven), `arch-performance` (high-precision categories only).
+**Decomposition:** Four parallel Sonnet subagents — `arch-structure` (complexity, coupling, layering), `arch-refactors` (catalog-driven complexity reduction), `arch-performance` (high-precision categories only), `arch-simplification` (over-engineering / almost-dead code, reports `lines_deletable`).
+
+**Top-line metric:** Report opens with **Code we can delete: N lines across M files** so "least amount of code possible" is the first signal. Quick-wins phase puts simplification deletions ahead of refactors.
 
 **Scale tiers:** <100 files = full scan, 100-500 = bounded, >500 = smart sampling (LOC × churn × import fan-in priority) + drill-down on hotspots.
 
@@ -643,7 +645,7 @@ Symlinked to: `~/.claude/skills`, `~/.claude/agents` (individual subdirectories)
 | | Replaced manual 8-step startup with single-command script (5 automated steps); shows tip to run `/resume-work` |
 | Apr 2026 | Aligned with Opus 4.7 release (CC 2.1.111): added `effort: high` frontmatter to `/code-review` and `/plan-feature` for stronger reasoning on review/synthesis work |
 | | Documented when to reach for built-in `/ultrareview` (high-risk pre-merge) vs custom `/code-review` (daily driver) in README |
-| May 2026 | New `/architecture-review` skill — repo-wide complexity + refactor + perf audit, distinct from diff-scoped reviewers. Three guardrails: catalog-driven complexity-reducing refactors (not GoF pattern-mongering), reads intended architecture from CLAUDE.md/ADRs first, CCN delta sanity gate. Three new subagents (`arch-structure`, `arch-refactors`, `arch-performance`). |
+| May 2026 | New `/architecture-review` skill — repo-wide complexity + refactor + perf + over-engineering audit, distinct from diff-scoped reviewers. Three guardrails: catalog-driven complexity-reducing refactors (not GoF pattern-mongering), reads intended architecture from CLAUDE.md/ADRs first, CCN delta sanity gate. **Four parallel subagents** (`arch-structure`, `arch-refactors`, `arch-performance`, `arch-simplification`). 4th dimension added mid-session after honest audit against user's three real goals (optimized / maintainable / least-code-possible) found `least-code-possible` was under-served — refactor catalog *trades* complexity, doesn't delete it. `arch-simplification` targets sub-file over-engineering: single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config, near-duplicates. Reports `lines_deletable` as top-line metric. |
 
 ---
 

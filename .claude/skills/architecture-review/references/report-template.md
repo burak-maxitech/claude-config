@@ -2,6 +2,22 @@
 
 Render the final report exactly in this order. Every section appears even if empty (with "None found" as content) so the output structure is predictable across runs.
 
+## Section 0 — Top-line Metrics
+
+Render this **first**, before anything else, so the user sees the deletion potential immediately:
+
+```
+## /architecture-review — <project name>
+
+**Code we can delete: <total_lines_deletable> lines across <files_affected> files.**
+**Complexity hotspots: <count> functions exceeding linter threshold.**
+**Performance suspects to measure: <count> findings.**
+```
+
+The deletion line uses bold to make it impossible to miss. Numbers come from Step 5 aggregation. If `total_lines_deletable == 0`, render the line as "**No over-engineering / almost-dead code detected** — this codebase is already lean." instead.
+
+---
+
 ## Section 1 — Architecture Map
 
 Default (lightweight):
@@ -29,7 +45,7 @@ If `--map` flag is set, additionally render an ASCII module-dep sketch (one node
 
 ## Section 2 — Findings
 
-Three subsections, in order: **Structure**, **Refactors**, **Performance**. Each subsection is a table:
+Four subsections, in order: **Simplification** (deletion-first, surfaced highest), **Structure**, **Refactors**, **Performance**. Each subsection is a table:
 
 ```
 ### Refactors
@@ -44,6 +60,18 @@ Three subsections, in order: **Structure**, **Refactors**, **Performance**. Each
 For Performance, replace the `Catalog` column with `Category` (e.g. `N+1`, `O(n²)`, `Hot-loop invariant`) and add a `Suspect?` column (Y/N). Suspects are findings with `certainty < 0.7`.
 
 For Structure, drop the `Catalog` column.
+
+For **Simplification**, replace `CCN Δ` with `Lines Δ`, sort primarily by `lines_deletable × certainty` (deletion impact), and use this column ordering — `Catalog` last because S-IDs are short:
+
+```
+### Simplification (— lines deletable: <subtotal>)
+
+| Rank | Location                            | Title                                    | Sev | Cert | Effort | Lines Δ | Catalog |
+|------|-------------------------------------|------------------------------------------|-----|------|--------|---------|---------|
+| 1    | src/services/PaymentProvider.ts:1-12| Inline single-impl interface             | M   | 0.9  | small  | -12     | S01     |
+| 2    | src/util/withRetry.ts:5-18          | Pass-through wrapper around fetch        | M   | 0.85 | small  | -14     | S02     |
+| ...  | ...                                 | ...                                      | ... | ...  | ...    | ...     | ...     |
+```
 
 Below each table, render a "Top finding detail" block expanding the #1 ranked finding:
 
@@ -112,7 +140,12 @@ Files skipped: 244
 
 Top skipped (low priority): src/types/__generated__/*.ts, src/migrations/*.sql, ...
 
+Deletion totals (from Simplification dimension):
+- total_lines_deletable: 184
+- files_affected: 22
+- breakdown by category: S01 (5 findings, 78 lines), S02 (3 findings, 42 lines), S06 (8 findings, 45 lines), ...
+
 Findings filtered:
-- Dropped 7 findings where projected CCN ≥ current CCN (sanity gate)
-- Dropped 4 findings with certainty < 0.5 and severity != high
+- Dropped 7 refactor findings where projected CCN ≥ current CCN (sanity gate)
+- Dropped 4 findings with certainty < 0.5 and severity != high (and lines_deletable < 20)
 ```

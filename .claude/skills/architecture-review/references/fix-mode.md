@@ -8,9 +8,17 @@ A finding is `--fix-eligible` only if **all** are true:
 
 1. The catalog entry has `--fix-eligible: true`
 2. The refactor is **single-file** (no edits outside the finding's location's file)
-3. The refactor is **non-API-breaking** (no exported symbol rename, signature change, or removal)
+3. The refactor is **non-API-breaking** (no exported symbol rename, signature change, or removal of an exported symbol with importers)
 4. `respects_documented_decision: true`
 5. `certainty >= 0.7`
+
+**Simplification findings (S-prefix)** that *are* fix-eligible:
+
+- **S04** when the unread config key lives in a single file (typical for ad-hoc constants in `config.ts`); auto-routes to `--plan` when key spans multiple env files.
+- **S06** defensive-code removal — always single-file by definition.
+- **S09** unused-export deletion when symbol body lives in one file AND has no importers (zero cross-file impact).
+
+All other S-findings (S01, S02, S03, S05, S07, S08) auto-route to `--plan` because they require coordinated cross-file edits.
 
 Anything failing any of these auto-routes to `--plan` mode instead, with a one-line note:
 

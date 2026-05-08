@@ -8,8 +8,9 @@ After the report is built, group findings into phases:
 
 1. **Phase 1: Quick wins**
    - All findings with `effort_estimate ∈ {trivial, small}` AND `respects_documented_decision: true`
-   - Ordered by rank score
-   - Goal: low-risk, high-leverage edits a single follow-up session can knock out
+   - **Simplification findings come first within this phase** — deletions are the highest-leverage edits (negative LOC, lower maintenance surface). Then trivial refactors.
+   - Ordered within sub-buckets by rank score
+   - Goal: low-risk, high-leverage edits a single follow-up session can knock out. Often a substantial chunk of `total_lines_deletable` lands here.
 
 2. **Phase 2: Strategic refactors**
    - Findings with `effort_estimate ∈ {medium, large}` AND `respects_documented_decision: true` AND `severity ∈ {medium, high}`
