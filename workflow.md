@@ -9,6 +9,7 @@
 | Phase | Command | Purpose |
 |-------|---------|---------|
 | **Start Session** | `/resume-work` | Get up to speed, see what's next |
+| **Not Sure Where to Start** | `/code-health-advice` | 30-sec routing advisor — reads repo state, recommends a skill sequence (read-only) |
 | **Plan Feature** | `/plan-feature` | Interview before building |
 | **During Development** | `/code-review` | Review code quality |
 | **During Development** | `/code-cleanup` | Find dead code & cruft |
@@ -120,7 +121,7 @@ claude
 **What `/plan-feature` does:**
 - Checks auto-memory, then reads all docs in parallel
 - Auto-detects if greenfield or existing project
-- Asks 3-5 questions at a time, covers all edge cases
+- Asks 3-4 questions at a time, covers all edge cases
 - Enters Plan Mode → writes formal implementation plan → requires approval via ExitPlanMode
 - Hydrates approved plan into live tasks with TaskCreate (with dependencies)
 - Updates CLAUDE.md with decisions
@@ -339,6 +340,7 @@ cd -
 /code-cleanup src/                       # Specific directory
 /code-cleanup --code                     # Dead code only
 /code-cleanup --deps                     # Unused dependencies only
+/code-cleanup --vulns                    # Add CVE scan (npm audit / pip-audit / cargo audit per stack); report-only
 /code-cleanup --css                      # Unused CSS only
 /code-cleanup --tests                    # Test cleanup only
 /code-cleanup --files                    # Unused files only
@@ -355,11 +357,48 @@ cd -
 - Unused files and dead code
 - Unused CSS classes
 - Unused dependencies
+- Vulnerable dependencies (CVEs) — *only when `--vulns` is passed*
 - Obsolete patterns
 - Configuration cruft
 - Stale tests
 
+**Vulnerability scanning (`--vulns`):** opt-in only. Runs the audit command appropriate to the detected stack — `npm audit` / `yarn audit` / `pnpm audit` for Node, `pip-audit` (or `safety check`) for Python, `cargo audit` for Rust, `composer audit` for PHP, `govulncheck` for Go, `bundle audit` for Ruby. Findings include CVE ID, severity, fixed version, and a fix command. **Never auto-applied by `--fix`** — version bumps can break the app, so you run the fix command yourself after reviewing.
+
 **Output:** Summary dashboard → Quick Wins → Safe to Delete / Likely Safe / Needs Investigation
+
+---
+
+### /code-health-advice
+
+**When:** You have time and want to do *something*, but you're not sure which of the other skills to reach for. Read-only routing call — never invokes anything.
+
+**Usage:**
+```bash
+/code-health-advice
+```
+
+No flags. No arguments. Always read-only.
+
+**What it inspects (single parallel turn):**
+- `git status --porcelain` — uncommitted file count
+- `git log --oneline -10` and `git log -1 --format=%cr` — recent activity
+- `git rev-parse --abbrev-ref HEAD` and ahead/behind counts
+- `gh pr view` — open PR for current branch (if any)
+- `CLAUDE.md` — `Current Status`, `In Progress`, `Next Steps`, `Last Updated`
+
+**State buckets it routes between:**
+
+| Bucket | Signal | Recommended starting skill |
+|---|---|---|
+| **A. Pre-commit cleanup** | Uncommitted changes on a feature branch | `/simplify` |
+| **B. Pre-merge verification** | Clean tree, open PR | `/code-review --security` |
+| **C. Post-ship audit** | Clean tree on main, recent ship | `/code-cleanup` |
+| **D. Orient + audit** | Long since last commit, or no `CLAUDE.md` | `/resume-work deep` |
+| **E. Ambient improvement** | Clean tree, no urgent task | `/architecture-review` |
+
+**Output:** ~10-line report — state summary, bucket name, recommended flow, one alternative flow with a "use this if…" qualifier, optional notes (≤2 bullets).
+
+**What it never does:** invoke skills, edit files, hydrate tasks, run tests, or generate a plan. It is a 30-second routing call before you commit to a flow.
 
 ---
 
@@ -485,6 +524,35 @@ claude
 
 For mechanical refactors only (single-file, non-API-breaking) you can skip step 4 and run `/architecture-review --fix` directly — it gates per finding with a diff preview. Anything cross-file or API-touching gets auto-routed to `--plan` regardless.
 
+### Scenario 6: Not Sure Which Skill to Run
+
+When you have time but no clear plan — uncommitted changes you might commit, a recently-shipped repo you might audit, or a stale repo you haven't touched in weeks — start with the routing advisor:
+
+```bash
+/code-health-advice
+```
+
+It reads `git status`, the current branch, recent commits, `CLAUDE.md` `In Progress` / `Next Steps`, and any open PR (via `gh`). Then it classifies the state into one of five buckets and prints a short report:
+
+```
+State:    7 uncommitted files · feature/auth · 2h since last commit
+Branch:   feature/auth (3 ahead of main, 0 behind)
+Context:  CLAUDE.md In Progress = "session refresh flow"
+PR:       no open PR
+
+Bucket:   A — Pre-commit cleanup
+
+Recommended flow:
+  /simplify → /code-review → /code-review --verify → commit → /update-docs
+
+Alternative: if this touches auth/payments/migrations
+  /simplify → /code-review --security → /code-review --verify → commit → push → /ultrareview <PR#> → merge → /update-docs
+```
+
+The buckets cover: pre-commit cleanup, pre-merge verification, post-ship audit, orient + audit (unfamiliar repo), and ambient improvement. **The advisor never invokes anything** — read the flow, then run it yourself.
+
+It's useful when you'd otherwise stare at the prompt for 30 seconds wondering whether to reach for `/simplify`, `/code-review`, `/code-cleanup`, or `/architecture-review`.
+
 ---
 
 ## Documentation Structure
@@ -608,6 +676,7 @@ Commands are stored in:
 │   └── skills/              # Skills (commands + references)
 │       ├── architecture-review/
 │       ├── code-cleanup/
+│       ├── code-health-advice/
 │       ├── code-review/
 │       ├── plan-feature/
 │       ├── resume-work/
@@ -646,6 +715,7 @@ Symlinked to: `~/.claude/skills`, `~/.claude/agents` (individual subdirectories)
 | Apr 2026 | Aligned with Opus 4.7 release (CC 2.1.111): added `effort: high` frontmatter to `/code-review` and `/plan-feature` for stronger reasoning on review/synthesis work |
 | | Documented when to reach for built-in `/ultrareview` (high-risk pre-merge) vs custom `/code-review` (daily driver) in README |
 | May 2026 | New `/architecture-review` skill — repo-wide complexity + refactor + perf + over-engineering audit, distinct from diff-scoped reviewers. Three guardrails: catalog-driven complexity-reducing refactors (not GoF pattern-mongering), reads intended architecture from CLAUDE.md/ADRs first, CCN delta sanity gate. **Four parallel subagents** (`arch-structure`, `arch-refactors`, `arch-performance`, `arch-simplification`). 4th dimension added mid-session after honest audit against user's three real goals (optimized / maintainable / least-code-possible) found `least-code-possible` was under-served — refactor catalog *trades* complexity, doesn't delete it. `arch-simplification` targets sub-file over-engineering: single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config, near-duplicates. Reports `lines_deletable` as top-line metric. |
+| | New `/code-health-advice` skill — read-only routing advisor. Reads `git status`, branch, recent commits, `CLAUDE.md` `In Progress`/`Next Steps`, open PR; classifies repo state into one of five buckets (pre-commit cleanup / pre-merge verification / post-ship audit / orient + audit / ambient improvement); prints a ~10-line report with one recommended skill flow + one alternative. Never invokes anything, never edits files. Solves "I have time but I'm not sure which skill to reach for next." |
 
 ---
 

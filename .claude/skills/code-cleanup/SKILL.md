@@ -2,7 +2,7 @@
 name: code-cleanup
 description: Codebase-wide cleanup audit that finds dead code, unused files, stale dependencies, and technical debt. Use when user mentions dead code, unused files, cleanup, technical debt, code hygiene, dependency audit, removing unused CSS, stale imports, or any form of codebase pruning — even casually like "this repo is messy" or "let's clean things up." This is different from /simplify (which reviews recent changes for quality) — this skill audits the entire codebase for things that can be removed.
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(sort:*), Bash(uniq:*), Bash(sed:*), Bash(awk:*), Bash(git:*), Bash(jq:*), Bash(npm:*), Bash(pip:*), Bash(cargo:*), Bash(gh:*), Task
+allowed-tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(sort:*), Bash(uniq:*), Bash(sed:*), Bash(awk:*), Bash(git:*), Bash(jq:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(pip:*), Bash(pip-audit:*), Bash(safety:*), Bash(cargo:*), Bash(composer:*), Bash(govulncheck:*), Bash(bundle:*), Bash(gh:*), Task
 ---
 
 # Code Cleanup — Codebase Cleanup Audit
@@ -38,14 +38,15 @@ Launch subagents in parallel using the Task tool. Each agent handles an independ
 **Important orchestration rules:**
 - Launch ALL agents in a single turn (one Task call per agent)
 - Each agent returns structured findings — do NOT ask agents to format final output
-- If `$ARGUMENTS` contains a filter flag (`--files`, `--code`, `--css`, `--deps`, `--tests`), skip parallelization and scan that single category directly in the main context
+- If `$ARGUMENTS` contains a filter flag (`--files`, `--code`, `--css`, `--deps`, `--tests`, `--vulns`), skip parallelization and scan that single category directly in the main context
 - If a category is irrelevant to the detected stack (e.g., CSS for a Python CLI tool), skip it entirely
+- **Vulnerability scanning is opt-in only.** Section 4.5 (Vulnerable Dependencies) runs ONLY if `$ARGUMENTS` contains `--vulns` or the user explicitly asks for it. Default scans never call `npm audit`, `pip-audit`, etc. — those hit network registries and slow the audit. Tell the user once that a vuln scan is available via `/code-cleanup --vulns` if they want it.
 
 ### Agent 1: Files & Dead Code Scanner
 Read the `references/scan-files-code.md` file from this skill's directory, then spawn a Task subagent with those instructions. Pass it the detected project stack info so it knows what file extensions matter.
 
 ### Agent 2: Dependencies & Config Scanner
-Read the `references/scan-deps-config.md` file from this skill's directory, then spawn a Task subagent with those instructions. Pass it the detected package manager and config file paths.
+Read the `references/scan-deps-config.md` file from this skill's directory, then spawn a Task subagent with those instructions. Pass it the detected package manager and config file paths. **If `--vulns` is in `$ARGUMENTS`, also tell the agent to run Section 4.5 (Vulnerable Dependencies) using the audit command appropriate to the detected stack.** Without `--vulns`, the agent skips that section silently.
 
 ### Agent 3: Styles & Tests Scanner
 **Only spawn if the project has CSS files AND/OR test files.** Read the `references/scan-styles-tests.md` file from this skill's directory, then spawn a Task subagent with those instructions. If neither CSS nor tests exist, skip this agent entirely.
@@ -74,13 +75,14 @@ After all agents return:
 | Dead Code          | [count]     | [est. lines]    | [risk] |
 | Unused CSS         | [count]     | [est. lines]    | [risk] |
 | Unused Dependencies| [count]     | —               | [risk] |
+| Vulnerable Deps    | [count]     | —               | [severity-mix] |
 | Obsolete Patterns  | [count]     | [est. lines]    | [risk] |
 | Config Cruft       | [count]     | —               | [risk] |
 | Test Cleanup       | [count]     | [est. lines]    | [risk] |
 | **Total**          | **[total]** | **[total]**     |        |
 ```
 
-If a category was skipped (irrelevant to project), show "—" across the row and note "(skipped — not applicable)" instead of a risk level.
+If a category was skipped (irrelevant to project), show "—" across the row and note "(skipped — not applicable)" instead of a risk level. The "Vulnerable Deps" row shows "(not scanned — pass `--vulns` to enable)" by default.
 
 ### Quick Wins (zero-risk, bulk-approvable)
 
@@ -109,6 +111,8 @@ Group into four sections:
 
 **Dependency Cleanup** — Packages to remove, with uninstall commands for the detected package manager.
 
+**Vulnerable Dependencies** *(only present when `--vulns` was passed)* — Packages with known CVEs, grouped by severity (critical → high → moderate → low). Each entry shows the installed version, the vulnerable range, the fixed version (if known), and a fix command. **Never auto-applied** — see the Fix Mode carve-out below.
+
 For each item, state:
 1. What it is and where (`file_path:line_number`)
 2. Why it appears unused (what was searched, what wasn't found)
@@ -125,9 +129,10 @@ If the user passes `--fix`, apply Quick Wins automatically:
 3. For each "Safe to Delete" item, show it and ask for confirmation before removing
 4. If `--aggressive` is also present, include "Likely Safe" items in step 3 (show and ask for confirmation before removing each one) — never auto-delete "Likely Safe" items
 5. Skip "Needs Investigation" entirely (report only)
-6. Stage all changes and commit: `chore: automated cleanup — [count] items removed`
-7. Show a summary diff with `git diff --stat HEAD~1`
-8. Tell the user: "Review the changes on the `cleanup/YYYYMMDD` branch. Merge when satisfied, or `git checkout main && git branch -D cleanup/YYYYMMDD` to discard the whole branch. For finer-grained undo (single deletion, single edit), press `Esc Esc` or run `/rewind` — Claude's edits are checkpointed automatically and `/rewind` persists across sessions."
+6. **Skip "Vulnerable Dependencies" entirely.** `--fix` never auto-runs `npm audit fix` / `pip-audit --fix` / `cargo audit fix` / equivalents — version bumps can break the app, transitive constraints get rewritten, and lockfile churn is project-policy. Vulnerable deps are report-only; the user runs the suggested `fix_command` themselves after reviewing.
+7. Stage all changes and commit: `chore: automated cleanup — [count] items removed`
+8. Show a summary diff with `git diff --stat HEAD~1`
+9. Tell the user: "Review the changes on the `cleanup/YYYYMMDD` branch. Merge when satisfied, or `git checkout main && git branch -D cleanup/YYYYMMDD` to discard the whole branch. For finer-grained undo (single deletion, single edit), press `Esc Esc` or run `/rewind` — Claude's edits are checkpointed automatically and `/rewind` persists across sessions."
 
 If the working tree is dirty (uncommitted changes), warn the user and ask whether to stash first.
 
@@ -156,6 +161,7 @@ If the user passes `--dry-run`, simulate the fix without deleting anything:
 | `--code` | Only Section 2 (Dead Code) |
 | `--css` | Only Section 3 (Unused CSS) |
 | `--deps` | Only Section 4 (Unused Dependencies) |
+| `--vulns` | Adds Section 4.5 (Vulnerable Dependencies) — runs the stack-appropriate audit command (`npm audit`, `pip-audit`, `cargo audit`, etc.). Combinable with anything; on its own, runs the full scan + vuln scan. Network-dependent; never auto-fixed by `--fix`. |
 | `--tests` | Only Section 7 (Test Cleanup) |
 | `--fix` | Full scan + auto-apply Quick Wins |
 | `--dry-run` | Full scan + generate cleanup branch with commits, but do NOT delete anything — show what *would* happen via `git diff --stat` |

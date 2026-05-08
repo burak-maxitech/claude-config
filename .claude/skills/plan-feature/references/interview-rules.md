@@ -8,7 +8,7 @@ When `AskUserQuestion` is unavailable in the current environment, fall back to n
 
 ## Rules
 
-1. **Batch 3-5 questions per `AskUserQuestion` call** (or per chat turn in fallback mode)
+1. **Batch 3-4 questions per `AskUserQuestion` call** (or per chat turn in fallback mode) — the tool's `questions` array is capped at 4; passing 5 errors with `too_big maximum: 4`
 2. For each question, supply **2-4 multi-choice options** that cover the realistic answer space, plus an "Other / explain" option for anything you didn't anticipate. This is faster for the user than typing freeform answers and surfaces options they may not have considered.
 3. Be specific to the plan/feature content — no generic questions
 4. **Reference existing code/docs** when relevant (EXISTING mode)

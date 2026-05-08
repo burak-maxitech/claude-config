@@ -115,6 +115,7 @@ From the review of https://github.com/shanraisshan/claude-code-best-practice. Th
 | — | Agent frontmatter field imports (`allowedTools`, `maxTurns`, `permissionMode`) | The external repo uses camelCase for these; our agents use kebab-case `tools`. Copying without verifying casing against docs.claude.com subagent schema would be unsafe, and the verification effort exceeds the value for solo use. |
 | Scripts don't auto-run /resume-work | User controls when to run /resume-work; avoids forced context load on every launch. Rolled up from CLAUDE.md → docs/key-decisions.md in S21 per Part 6 FIFO. |
 | Setup instructions in README.md only | One-time setup (clone, symlinks, alias) belongs in README.md; Workflow.md links to it to avoid duplication. Rolled up from CLAUDE.md → docs/key-decisions.md in S21 per Part 6 FIFO. |
+| Don't filter claude-config from project picker | User may want to work on the config repo itself. Rolled up from CLAUDE.md → docs/key-decisions.md in S22 per Part 6 FIFO. |
 
 **Also noted during verification (not in the original research, not adopted, flagged for future):**
 

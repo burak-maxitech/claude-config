@@ -151,3 +151,94 @@ Scan for patterns that indicate technical debt from past workarounds or migratio
 ```
 
 Limit to top 30 findings per category. If there are more, note the total count.
+
+---
+
+## 4.5 Vulnerable Dependencies (only when `--vulns` is requested)
+
+**Skip this entire section unless your task prompt explicitly says `--vulns` is enabled.** Vulnerability scanning hits network registries, is slower than the rest of the audit, and may fail in offline environments — running it by default would surprise users.
+
+When `--vulns` is enabled, run the appropriate audit command per detected stack and surface known CVEs. This is *additive* to (not replacing) the unused-deps scan.
+
+### 4.5.1 Per-stack audit commands
+
+Pick the command(s) matching the detected stack. Prefer JSON output where available so the agent can parse rather than scrape text.
+
+**Node / npm-family — pick by lockfile:**
+- `package-lock.json` present → `npm audit --json` (set `--audit-level=low` to include everything; default omits low-severity)
+- `yarn.lock` present → `yarn npm audit --json --recursive` (Yarn Berry) or `yarn audit --json` (Yarn Classic — line-delimited JSON, parse line-by-line)
+- `pnpm-lock.yaml` present → `pnpm audit --json`
+- For monorepos, run the audit per workspace where each child has its own lockfile; otherwise run once at the root.
+
+**Python:**
+- Prefer `pip-audit --format=json` (works against `requirements.txt`, `pyproject.toml`, or the active environment)
+- Fallback `safety check --json` if `pip-audit` is unavailable
+- If neither tool is installed, emit a single finding noting which tool to install rather than scraping CVE databases manually
+
+**Rust:**
+- `cargo audit --json` (requires `cargo-audit` installed; emit an install hint if missing: `cargo install cargo-audit`)
+
+**Go:**
+- `govulncheck -json ./...` (requires `golang.org/x/vuln/cmd/govulncheck`; emit an install hint if missing)
+
+**PHP:**
+- `composer audit --format=json` (Composer 2.4+)
+
+**Ruby:**
+- `bundle audit check --update --format json` (requires `bundler-audit` gem)
+
+**For any ecosystem:**
+- If the audit tool isn't installed and can't be invoked, return ONE finding describing how to install it, and skip the rest of the vuln scan for that stack. Do not silently emit zero findings — that's indistinguishable from "everything is safe."
+- If the audit command fails for a non-tool reason (network error, lockfile out of sync), surface the error verbatim as a single finding. Don't pretend it succeeded.
+- Set a 60-second timeout on the audit subprocess. If it doesn't return in time, surface a "timed out" finding and move on.
+
+### 4.5.2 Severity-to-risk mapping
+
+Audit tools report severity (CVSS-derived). Map to the existing `risk` field:
+
+| Audit severity | code-cleanup risk |
+|---|---|
+| critical | safe (in the sense that the *finding* is high-confidence and actionable — the *upgrade* is what's risky, see below) |
+| high | safe |
+| moderate / medium | likely_safe |
+| low | needs_investigation |
+| info / negligible | (drop — not worth surfacing) |
+
+**Important:** the `risk` field here describes confidence that the finding is real and worth acting on, not the risk of running an upgrade. Vulnerability fixes can still break the app — `--fix` mode does NOT auto-upgrade vulnerable deps (see SKILL.md Fix Mode).
+
+### 4.5.3 Output format
+
+```
+## Vulnerable Dependencies
+- package: <name>
+  workspace: <workspace name, or "root">
+  installed_version: <version from lockfile>
+  vulnerable_range: <e.g., "<2.4.5">
+  fixed_version: <version that resolves the CVE, if known; "no fix available" otherwise>
+  cve: <CVE-YYYY-NNNNN, or advisory ID like GHSA-xxxx-xxxx-xxxx>
+  severity: critical|high|moderate|low
+  title: <short CVE title>
+  fix_command: <e.g., "npm install package@2.4.5" or "no fix yet — pin alternative">
+  risk: safe|likely_safe|needs_investigation
+  source: <audit tool name, e.g., "npm audit" or "pip-audit">
+```
+
+If the audit tool returns zero vulnerabilities, emit ONE summary line:
+```
+## Vulnerable Dependencies
+- (none — <tool> reported 0 vulnerabilities at <severity threshold>)
+```
+
+If the audit tool isn't available:
+```
+## Vulnerable Dependencies
+- tool_unavailable: <tool name>
+  install_command: <how to install it>
+  reason: <e.g., "cargo-audit binary not found">
+```
+
+### 4.5.4 What to skip
+
+- **GitHub Dependabot alerts.** They overlap with `npm audit` / `pip-audit` and require API auth. Audit-CLI output is the simpler signal.
+- **Transitive vs. direct distinction beyond what the tool reports.** The audit tools already surface this; don't try to re-derive it from lockfile traversal.
+- **CVE de-duplication across workspaces.** If the same CVE appears in 3 workspaces of a monorepo, emit 3 findings (with the workspace tag) — they may need separate fixes if pinned differently.

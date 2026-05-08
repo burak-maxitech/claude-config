@@ -31,6 +31,10 @@ claude-config/
 │       │       ├── scan-refactors.md
 │       │       ├── scan-simplification.md
 │       │       └── scan-structure.md
+│       ├── code-health-advice/
+│       │   ├── SKILL.md
+│       │   └── references/
+│       │       └── state-buckets.md
 │       ├── code-cleanup/
 │       │   ├── SKILL.md
 │       │   └── references/
@@ -169,8 +173,9 @@ git pull
 | `/resume-work` | Start session - get up to speed | Skill |
 | `/plan-feature` | Interview before building features | Skill |
 | `/code-review` | Review code quality (lightweight, in-session, with `--security`/`--verify`/`--fix`) | Skill |
-| `/code-cleanup` | Find dead code & cruft (parallel subagents) | Skill |
+| `/code-cleanup` | Find dead code & cruft (parallel subagents). Adds CVE scanning with `--vulns` (runs `npm audit` / `pip-audit` / `cargo audit` / equivalents per detected stack; report-only, never auto-fixed). | Skill |
 | `/architecture-review` | Repo-wide architecture audit — complexity hotspots, refactor opportunities, perf suspects, **and over-engineering** (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable` as a top-line metric. 4 parallel subagents, with `--plan`/`--fix`/`--map`/`--full-scan` | Skill |
+| `/code-health-advice` | Routing advisor — looks at `git status`, branch, recent commits, `CLAUDE.md`, open PR, then suggests which skills to run in what order. **Read-only, never invokes anything.** Use when unsure where to start. | Skill |
 | `/update-docs` | End session - save progress | Skill |
 
 **Skills** are directories in `.claude/skills/` that bundle reference files, use YAML frontmatter for tool permissions, and can dispatch subagents.
@@ -188,6 +193,8 @@ git pull
 > | `/architecture-review` | whole repo | structural audit — complexity hotspots, refactor opportunities, perf suspects, AND sub-file over-engineering (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable`. |
 >
 > Useful chain on an unfamiliar repo: `/code-cleanup` → `/architecture-review` → `/architecture-review --plan` → `/plan-feature` per phase.
+>
+> Not sure where to start? `/code-health-advice` reads your repo state and suggests which of these skills to run in what order. It's a 30-second routing call, not a review.
 
 ## Subagents
 
