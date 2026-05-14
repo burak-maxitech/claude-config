@@ -463,15 +463,73 @@ Read `references/scan-geo.md`, dispatch `geo-generative` with the file + shared 
 
 ## Step 6 — Consolidate + Score
 
-After all 3 subagents return:
+After all subagents return (3 by default, 4 when GSC mode enabled):
 
-1. **Aggregate + clamp sub-dimension deductions.** Each subagent returns a `sub_dimension_breakdown` map of deductions keyed by sub-dim name. For each sub-dim, **clamp at the sub-dim max** per `references/rubric.md`: `clamped[sub_dim] = min(raw[sub_dim], sub_dim_max)`. The dimension total is then `adjusted_dimension_max - sum(clamped sub_dim deductions)`, floored at 0. This is the single point of clamp enforcement — subagents may emit raw sums larger than a sub-dim cap (multiple findings in the same sub-dim), and the rubric is canonical here. If a subagent's emitted dimension_total disagrees with the recomputed one, prefer the recomputed value and flag the divergence in the footer.
-2. **Apply weight adjustments** from Step 1's brief (max ±5 per dim, sum delta 0). E.g., if brief bumped Generative Engine +3, `adjusted_dimension_max` becomes 23 and the deduction-from-max is computed against the new max. Sub-dim caps used in step 1 are the **base** caps from `rubric.md` and are not rescaled by weight adjustments.
-3. **Verify total = 100.** Print a `subtotal_check: <a>+<b>+<c>+<d>+<e>=<total>` line in the footer so any arithmetic drift is visible.
-4. **Compute total score:** `total = sum(dimension_scores)`.
-5. **Read `docs/seo-history.md`** if it exists. Find the most recent entry. Compute `delta = today_score - previous_score`.
-6. **Rank improvement opportunities:** sort all findings by `score_impact × certainty / effort_weight` descending. Effort weights: trivial 1, small 2, medium 4, large 8. Take **top 3** for the headline.
-7. **Drop low-confidence noise:** drop findings with `certainty < 0.5` AND `score_impact < 1` unless `is_fix_eligible: true` (fix-eligible findings get to surface even at lower confidence so the user can review the diff).
+### 6.0 — GSC consolidation passes (only when `gsc_mode: enabled`)
+
+When a 4th `seo-gsc-insights` subagent was dispatched, run these three passes **before** the existing aggregation. Each is a no-op under `gsc_mode: disabled` (no source-tagged findings to act on), so the order of operations stays the same regardless of mode.
+
+**a) Score-impact enforcement.** For every finding with `source == "gsc"`, force `score_impact = 0`. Single point of enforcement per `references/rubric.md` "Score-impact invariant" — the subagent may emit non-zero by mistake; orchestrator overrides. Heuristic findings (`source == "heuristic"`) are untouched.
+
+**b) URL dedup pass.** For findings whose `location` is a URL, check overlap between probe-emitted `technical_seo.url_health` findings (Step 3.2) and GSC-emitted `gsc_insights.not_found_404` or `gsc_insights.redirect_hygiene` findings. Join key: URL (case-insensitive, trailing-slash-normalized). For each overlap pair:
+- Drop the GSC finding from the findings list.
+- Add to the probe finding's record: `gsc_corroborated: true`, plus carry over `recent_commits: [...]` from the GSC finding when present.
+- Sub-dim attribution stays with the probe finding — `technical_seo.url_health` is the source of the non-zero score_impact, so dedup never loses score signal.
+
+**c) gsc_findings count.** Aggregate `gsc_findings_count = count of findings where source == "gsc"` (post-dedup). Stash for the footer's subtotal-check addendum.
+
+### 6.1 — Aggregate + clamp sub-dimension deductions
+
+Each subagent returns a `sub_dimension_breakdown` map of deductions keyed by sub-dim name. For each sub-dim, **clamp at the sub-dim max** per `references/rubric.md`: `clamped[sub_dim] = min(raw[sub_dim], sub_dim_max)`. The dimension total is then `adjusted_dimension_max - sum(clamped sub_dim deductions)`, floored at 0. Single point of clamp enforcement — subagents may emit raw sums larger than a sub-dim cap (multiple findings in the same sub-dim), and the rubric is canonical here. If a subagent's emitted dimension_total disagrees with the recomputed one, prefer the recomputed value and flag the divergence in the footer.
+
+**Skip the `gsc_insights` dimension** in this pass — it has no score allocation (Phase 0 contract). Its sub-dim breakdown is structural-only and reported in the new Section 3 (`references/report-template.md`).
+
+### 6.2 — Apply weight adjustments
+
+From Step 1's brief (max ±5 per dim, sum delta 0). E.g., if brief bumped Generative Engine +3, `adjusted_dimension_max` becomes 23 and the deduction-from-max is computed against the new max. Sub-dim caps used in 6.1 are the **base** caps from `rubric.md` and are not rescaled by weight adjustments. Weight adjustments never touch `gsc_insights` (no score).
+
+### 6.3 — Verify total = 100
+
+Print a `subtotal_check: <a>+<b>+<c>+<d>+<e>=<total>` line in the footer so any arithmetic drift is visible. When GSC mode is enabled, append `| gsc_findings: <count> (info-only, 0 score impact)` to the same line — visible audit that GSC findings ran without contributing to the score.
+
+### 6.4 — Compute total score
+
+`total = sum(dimension_scores)` across the 5 scoring dimensions (Technical SEO, On-Page, Structured Data, Generative Engine, Performance). `gsc_insights` is excluded by construction.
+
+### 6.5 — Read `docs/seo-history.md`
+
+If it exists, find the most recent entry. Compute `delta = today_score - previous_score`. (History row format with `[gsc]` prefix on GSC-sourced priorities — see 6.6 and the rubric.)
+
+### 6.6 — Rank improvement opportunities
+
+The ranking formula expands when GSC mode is enabled. Reference: `rubric.md` "Traffic-weighted ranking".
+
+**Effort weights** (unchanged): trivial 1, small 2, medium 4, large 8.
+
+```
+effective_impact (heuristic) = score_impact
+effective_impact (gsc)       = log10(impressions + 1)
+
+traffic_weight (URL in url_impressions_map) = max(1.0, log10(url_impressions + 1))
+traffic_weight (URL not in map / no GSC)     = 1.0
+
+rank_score = effective_impact × certainty × traffic_weight / effort_weight
+```
+
+**URL resolution for traffic_weight:**
+- If the finding's `location` IS a URL → look it up directly in `url_impressions_map` from Step 1.6.
+- If `location` is a source file path (e.g., `src/app/layout.tsx:14`) → derive the page URL from the filename via the same page-path heuristics used by `page_type_map` (Step 1.6), then look up.
+- No match → `traffic_weight = 1.0`.
+
+**Heuristic-only behavior preserved:** when `gsc_mode: disabled`, `effective_impact == score_impact`, `traffic_weight == 1.0` everywhere, formula collapses to the legacy `score_impact × certainty / effort_weight`. Score history stays comparable across runs.
+
+**Top-3 for headline:** sort all findings (heuristic + GSC, post-dedup) by `rank_score` descending. Take top 3. GSC findings can land in headline because their `rank_score` is non-zero (via the `log10(impressions+1)` effective_impact path).
+
+**[gsc] prefix on history row:** when a top-3 priority string for `docs/seo-history.md` comes from a GSC finding (`source == "gsc"`), prepend `[gsc]` to that priority's short string at history-write time (Step 7 docs/seo-history.md append).
+
+### 6.7 — Drop low-confidence noise
+
+Drop findings with `certainty < 0.5` AND `score_impact < 1` unless `is_fix_eligible: true` (fix-eligible findings surface even at lower confidence so the user can review the diff). **GSC findings** (`score_impact: 0`) survive this filter when their `certainty >= 0.5` — the filter's `score_impact < 1` clause matches them, but the spirit of the rule is "drop noisy heuristic findings," not GSC findings. Override: keep all GSC findings whose `certainty >= 0.5`, regardless of their `score_impact` value.
 
 ---
 

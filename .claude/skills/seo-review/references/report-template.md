@@ -22,7 +22,17 @@ Render this **first**, before everything else. Format depends on whether `docs/s
 **SEO/GEO score: 72/100** — Top 3 opportunities: missing meta descriptions (12 pages); no llms.txt; broken /products/v1 (404).
 ```
 
-**Top-3 opportunities** are computed in Step 6 by `score_impact × certainty / effort_weight` desc.
+**Top-3 opportunities** are computed in Step 6.6:
+- Without GSC: `rank_score = score_impact × certainty × traffic_weight / effort_weight` where `traffic_weight = 1.0` (heuristic-only behavior).
+- With GSC: same formula, but `traffic_weight = max(1.0, log10(url_impressions + 1))` when the affected URL has GSC traffic data, and GSC findings rank via `effective_impact = log10(impressions + 1)` (so they can land in top-3 despite `score_impact: 0`).
+
+When GSC findings land in top-3, prefix the priority string with `[gsc]`:
+
+```
+**SEO/GEO score: 72/100 (Δ +8 since 2026-04-30)** — Top 3 opportunities: [gsc] CTR opportunity on /pricing (12.4K imps, 0.4% CTR); no llms.txt; [gsc] 775 × 404 at Google's view (matches recent rename).
+```
+
+The headline stays single-line regardless of GSC mode — never render a separate "GSC top-3" line.
 
 Special cases:
 - Total score 90+: render line as `**SEO/GEO score: 92/100** — Top 3 opportunities: <list, but framed as polish>` so the user knows the site is already in good shape.
@@ -87,14 +97,88 @@ Repeat per dimension. Don't render detail blocks for every finding — only #1 p
 
 ---
 
-## Section 3 — Score History (only when `docs/seo-history.md` exists)
+## Section 3 — GSC Insights (only when `gsc_mode: enabled`)
+
+Render this section between Findings (Section 2) and Score History (Section 4) **only when at least one GSC CSV was parsed in Step 1.6**. Skip entirely otherwise — no banner, no placeholder. The section has 5 sub-blocks; render only those that have data (e.g., skip the indexing-summary block if `indexing/summary.csv` wasn't present).
+
+```
+## GSC Insights
+
+Real-world signal from Google Search Console — informational, does NOT affect /100 score.
+
+### Indexing coverage (from indexing/summary.csv)
+
+3,530 pages not indexed of 5,260 known (67% non-index rate).
+
+| Reason                                          | Pages | Most actionable |
+|-------------------------------------------------|-------|-----------------|
+| Crawled - currently not indexed                 | 1,146 | ✓ content quality / E-E-A-T |
+| Discovered - currently not indexed              |   726 | ✓ crawl budget / internal links |
+| Not found (404)                                 |   775 | ✓ bulk redirect / sitemap clean |
+| Page with redirect                              |   766 | ✓ sitemap hygiene |
+| Blocked due to access forbidden (403)           |    99 | usually intentional |
+| Duplicate, Google chose different canonical     |     9 | ✓ canonical investigation |
+| Blocked due to other 4xx                        |     6 | usually intentional |
+| Alternate page with proper canonical tag        |     5 | OK |
+| Soft 404                                        |     1 | ✓ rendering fix |
+
+### Top-impact GSC findings
+
+| Rank | Sub-dim                  | Title                                                           | Imps   | CTR  | Pos  | Code-changed? |
+|------|--------------------------|-----------------------------------------------------------------|--------|------|------|---------------|
+| 1    | not_found_404            | 775 URLs return 404 at Google's view (matches /blog/2023/* rename) | —      | —    | —    | YES (2026-04-10) |
+| 2    | ctr_opportunity          | CTR opportunity on /pricing (12.4K imps, 0.4% CTR)             | 12,420 | 0.4% | 4.2  | YES (2026-04-22) |
+| 3    | crawled_not_indexed      | 1,146 pages crawled but not indexed (content quality cluster)   | —      | —    | —    | NO              |
+| 4    | position_band_opportunity| Query 'best widgets' at pos 8.3, 4,200 imps                    | 4,200  | 2.1% | 8.3  | NO              |
+| 5    | discovered_not_indexed   | 726 pages discovered but not crawled (linking signal)           | —      | —    | —    | NO              |
+
+(Top 5 from N total GSC findings. Full list ranked by impressions × certainty / effort_weight.)
+
+### CTR opportunities (high impressions, low CTR — top 5 from pages.csv)
+
+| URL                          | Impressions | CTR   | Median CTR | Position |
+|------------------------------|-------------|-------|------------|----------|
+| /pricing                     | 12,420      | 0.4%  | 1.8%       | 4.2      |
+| /docs/getting-started        |  8,100      | 0.9%  | 1.8%       | 5.7      |
+| /blog/2025/llms-explained    |  6,400      | 1.1%  | 1.8%       | 6.1      |
+| /products/api                |  4,800      | 0.6%  | 1.8%       | 3.8      |
+| /about                       |  3,200      | 0.5%  | 1.8%       | 7.2      |
+
+Title + meta rewrites on these 5 pages alone could recover an estimated 200-400 clicks/month.
+
+### Position-band query opportunities (positions 5-20 with ≥100 imps — top 5 from queries.csv)
+
+| Query                        | Impressions | Clicks | CTR  | Position |
+|------------------------------|-------------|--------|------|----------|
+| best widgets                 | 4,200       | 88     | 2.1% | 8.3      |
+| how to configure widgets     | 2,100       | 31     | 1.5% | 11.4     |
+| widget pricing               | 1,800       | 22     | 1.2% | 14.8     |
+| widget alternatives          | 1,200       | 18     | 1.5% | 9.7      |
+| open source widget tool      |   650       | 12     | 1.8% | 12.1     |
+
+Moving any of these from position 8-14 to position 3-5 typically 3-5x's clicks. Identify which page ranks for each query via GSC > Performance > Pages tab filtered by query.
+
+### Traffic orphans (sitemap URLs with 0 impressions in window)
+
+23 URLs in sitemap.xml received 0 impressions across GSC's data window. Sample: /archive/2019/jan, /author/legacy-contributor, /tag/deprecated-feature, … Audit: improve content + internal links, remove from sitemap if they shouldn't rank, or accept as legitimate low-traffic pages.
+
+### Code-already-fixed annotations
+
+3 of 18 GSC findings flagged `code_changed_since_gsc_window: true` (recent commits touched the affected paths within 35 days). Confidence lowered to 0.4 for these. They may resolve in the next GSC update cycle (2-4 weeks). Manually request indexing via GSC for the highest-traffic ones to accelerate.
+```
+
+If `gsc_mode: disabled`, this entire section is omitted. The skill operates exactly as it did pre-GSC — score, findings, ranking all heuristic-only.
+
+---
+
+## Section 4 — Score History (only when `docs/seo-history.md` exists)
 
 ```
 ## Score History
 
 | Date       | Score | Δ    | Top-3 priorities |
 |------------|-------|------|------------------|
-| 2026-05-14 | 72    | +8   | meta descriptions; llms.txt; broken URL |
+| 2026-05-14 | 72    | +8   | [gsc] CTR opp on /pricing (12.4K imps); No llms.txt; [gsc] 1,146 crawled-not-indexed |
 | 2026-04-30 | 64    | +12  | sitemap.xml; OG tags; canonicals |
 | 2026-04-15 | 52    | -    | starting score |
 
@@ -103,9 +187,11 @@ Repeat per dimension. Don't render detail blocks for every finding — only #1 p
 
 Show last 5 entries. If history has >5 entries, link to the file.
 
+**`[gsc]` prefix** on a top-3 priority string indicates the priority came from a GSC finding (see `rubric.md` "History row format"). Lets readers see why a row's priorities shifted between runs — e.g., user added or removed CSVs between two runs. Heuristic priorities have no prefix.
+
 ---
 
-## Section 4 — Suggested Next Actions
+## Section 5 — Suggested Next Actions
 
 ```
 ## Suggested Next Actions
@@ -132,7 +218,7 @@ If `--fix` flag is set, this section is replaced by the per-finding gate flow (s
 
 ---
 
-## Section 5 — Footer Disclosure
+## Section 6 — Footer Disclosure
 
 ```
 ---
@@ -152,16 +238,38 @@ i18n: yes (en/fr/de — hreflang scan applied)
 Sitemap URL probe: 47 URLs probed; 2 failures (1 × 404, 1 × redirect chain >1 hop)
 Probe cap: 100 URLs (47 in this sitemap; no cap hit)
 
+Git history scan: 35d, 23 SEO-relevant commits across 14 files. Shallow: no.
+
+GSC CSVs: 7 present (queries, pages, 5/9 indexing reasons).
+Freshness: 6 fresh (<30d), 1 stale (queries.csv at 47d ⚠ — consider re-export).
+Page-type map: 84 URLs classified (54 article / 18 product / 12 other).
+URL impressions map: 312 URLs with traffic data.
+Malformed rows: 0.
+Unknown CSVs ignored: 0.
+
 Files scanned: 84
 Files skipped (per .gitignore + vendored dirs): 312
 
-subtotal_check: 22 + 18 + 14 + 9 + 8 = 71 ⚠ (headline shows 72 — recheck consolidation)
+subtotal_check: 22 + 18 + 14 + 9 + 8 = 71 ⚠ (headline shows 72 — recheck consolidation) | gsc_findings: 18 (info-only, 0 score impact)
 ```
 
-The `subtotal_check` line MUST show the arithmetic. If subtotals match the headline, render `... = 72 ✓`. If not, render the ⚠ with no auto-correction — the user sees the inconsistency directly rather than trusting a possibly-wrong headline silently.
+The `subtotal_check` line MUST show the arithmetic. If subtotals match the headline, render `... = 72 ✓`. If not, render the ⚠ with no auto-correction — the user sees the inconsistency directly rather than trusting a possibly-wrong headline silently. When GSC mode is enabled, append `| gsc_findings: <count> (info-only, 0 score impact)` to the same line.
 
 Other footer notes:
 - If `--url` was used: include `Live URL fetched: https://example.com (HTML excerpt 4.2k chars passed to seo-technical, seo-content)`.
 - If probe was skipped: include `URL probe skipped: <reason>. Re-run with --url <base> for live URL health check.`
 - If hreflang sub-dim was redistributed (no i18n): include `hreflang not applicable — points redistributed.`
 - If best-practices fetch failed: include `⚠ best-practices fetch failed — used embedded heuristics only. Findings may not reflect current SEO/GEO guidance.`
+
+**GSC-mode footer additions** (when `gsc_mode: enabled`):
+- `Git history scan: 35d, <N> SEO-relevant commits across <M> files. Shallow: <true | false>.` — when shallow: `Git history scan: skipped (shallow clone).`
+- `GSC CSVs: <N> present (<inventory summary>).` — list categories present; e.g., `queries, pages, 5/9 indexing reasons`.
+- `Freshness: <fresh-count> fresh (<30d), <stale-count> stale (<files at days>).` — only when at least one CSV is stale.
+- `Page-type map: <N> URLs classified (<distribution>).`
+- `URL impressions map: <N> URLs with traffic data.`
+- `Malformed rows: <count by file>.` — only when any CSV had malformed rows.
+- `Unknown CSVs ignored: [<list>].` — only when any unknown CSV was found.
+
+**GSC-mode subtotal-check addendum:** append `| gsc_findings: <count> (info-only, 0 score impact)` to the subtotal_check line so reviewers can confirm GSC ran without affecting the score.
+
+**When `gsc_mode: disabled`:** omit all GSC-mode footer additions. If the one-time setup banner fired this run, the banner itself appears BEFORE Section 1 (not in the footer).
