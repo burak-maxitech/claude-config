@@ -353,7 +353,7 @@ When disabled:
 - Reason: "no .seo-data/gsc/" | "no canonical CSVs found"
 ```
 
-**Primary consumer:** `seo-gsc-insights` subagent (added in Phase 4 — Step 5 will be updated to 4 parallel Task dispatches at that point). Until Phase 4 ships, the GSC block is built but unused — the 3 existing subagents may consume `url_impressions_map` for traffic_weight ranking starting in Phase 3.
+**Primary consumer:** `seo-gsc-insights` subagent (dispatched as 4th parallel Task in Step 5 when `gsc_mode: enabled`). Other 3 subagents use `url_impressions_map` for traffic_weight when ranking their own findings; the rest is informational.
 
 ---
 
@@ -421,11 +421,11 @@ If a path argument was given, scope subagents to that path (only page-template /
 
 ## Step 5 — Parallel Subagent Dispatch
 
-Launch all 3 Task subagents in a **single turn** (3 Task calls in one message). Mirror `/test-review` Step 4.
+Launch all subagents in a **single turn** (3 Task calls when `gsc_mode: disabled`; 4 Task calls when `gsc_mode: enabled` — add the `seo-gsc-insights` dispatch in the same message as the other 3). Mirror `/test-review` Step 4.
 
-For each subagent, read its corresponding reference file (`references/scan-technical.md`, `references/scan-content.md`, `references/scan-geo.md`) and pass the contents in the task prompt along with shared context.
+For each subagent, read its corresponding reference file (`references/scan-technical.md`, `references/scan-content.md`, `references/scan-geo.md`, and `references/gsc-ingestion.md` for the 4th when enabled) and pass the contents in the task prompt along with shared context.
 
-### Shared context — base block passed to all 3 subagents:
+### Shared context — base block passed to all subagents:
 
 ```
 Detected stack: <from Step 0>
@@ -438,9 +438,22 @@ Weight adjustments (validated in Step 1: |each| ≤ 5, sum = 0):
 
 Scope file list: <paths>
 
+# GSC + git context (always present; values vary by mode)
+
+GSC Mode: enabled | disabled
+[When enabled, full GSC block from Step 1.6.7 — CSVs detected, digests, page_type_map, url_impressions_map, freshness summary, malformed rows]
+[When disabled, just: gsc_mode: disabled, Reason: ...]
+
+Git history scan: 35d window, <N> commits across <M> files. Shallow: <true|false>.
+[Recent SEO-Relevant Changes digest from Step 1.5.5, ~30 lines]
+
+# Output expectations
+
 Findings format: structured JSON-like blocks per the scan-*.md reference.
 Each finding includes dimension, sub_dimension, location, title, severity, certainty,
 effort_estimate, score_impact, is_fix_eligible, recommended_action, evidence.
+GSC findings (from seo-gsc-insights) additionally include the 8 GSC-specific fields
+per rubric.md "Per-finding output shape — GSC additions" (source, impressions, etc.).
 Return raw findings only — do NOT format a final report.
 ```
 
@@ -449,6 +462,7 @@ Return raw findings only — do NOT format a final report.
 - **`seo-technical` only** — also pass the **Sitemap URL probe results** (full record list) AND the **Rendered HTML excerpt** if `--url` was provided.
 - **`seo-content` only** — also pass the **Rendered HTML excerpt** if `--url` was provided. Do NOT pass probe results (it doesn't use them).
 - **`geo-generative`** — base block only. No probe results (doesn't use them); no rendered HTML (JSON-LD lives in source most reliably). Keeps geo-generative's prompt smallest of the three.
+- **`seo-gsc-insights`** (only when `gsc_mode: enabled`) — base block only (GSC + git digests are already in the base block). Sitemap URL list from Step 3.2 is passed separately so the agent can compute `traffic_orphan` findings (sitemap URLs not appearing in `performance/pages.csv`).
 
 ### Agent 1: seo-technical
 Read `references/scan-technical.md`, dispatch `seo-technical` with the file + shared context. Owns Technical SEO (25) + Performance signals (10) = 35 points. Consumes sitemap probe results.
@@ -458,6 +472,11 @@ Read `references/scan-content.md`, dispatch `seo-content` with the file + shared
 
 ### Agent 3: geo-generative
 Read `references/scan-geo.md`, dispatch `geo-generative` with the file + shared context. Owns Structured Data (20) + Generative Engine (20) = 40 points. Source-only (no rendered HTML).
+
+### Agent 4: seo-gsc-insights (only when `gsc_mode: enabled`)
+Read `references/gsc-ingestion.md` (the same reference used by the orchestrator in Step 1.6 — the "Finding-type catalog" section is the agent's spec) and dispatch `seo-gsc-insights` with the reference content + shared context + sitemap URL list. Owns `gsc_insights` dimension with 12 sub-dims and **0 score allocation** (informational by Phase 0 contract). All findings emit `source: "gsc"` and `score_impact: 0`.
+
+When `gsc_mode: disabled`, do not dispatch the 4th agent — only dispatch 3.
 
 ---
 
