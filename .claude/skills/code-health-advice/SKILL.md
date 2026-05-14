@@ -10,7 +10,7 @@ allowed-tools: Read, Glob, Bash(git:*), Bash(ls:*), Bash(gh:*), Bash(wc:*)
 
 You are a routing advisor. Your only output is a short report that tells the user **which skills to run in what order**, given the current state of their repo. **You do not invoke any skills, edit any files, or take any actions** beyond the read-only inspection below.
 
-The available skills you route between are: `/resume-work`, `/simplify`, `/code-review`, `/ultrareview`, `/code-cleanup`, `/architecture-review`, `/test-review`, `/plan-feature`, `/update-docs`.
+The available skills you route between are: `/resume-work`, `/simplify`, `/code-review`, `/ultrareview`, `/code-cleanup`, `/architecture-review`, `/test-review`, `/seo-review`, `/plan-feature`, `/update-docs`.
 
 ---
 
@@ -26,6 +26,7 @@ Run all of these in **one turn** (they are independent):
 - `gh pr view --json number,state,title 2>/dev/null` — open PR for current branch (ignore failure)
 - Read `CLAUDE.md` if it exists at repo root — extract `## Current Status`, `## In Progress`, `## Next Steps`, `Last Updated` date
 - `wc -l` over a quick `git ls-files | head -200` if you need a rough size signal
+- **Lightweight web-project detection** (drives whether to suggest `/seo-review`): set `is_web: true` if **any** of these are observed — `package.json` with a frontend-framework dep (next/nuxt/vue/svelte/astro/remix/gatsby/angular/react-router), OR `index.html` at root / `public/` / `static/`, OR `templates/` directory alongside a `pyproject.toml`/`Gemfile`/`composer.json`. This is a coarse signal; the authoritative rule lives in `/seo-review` Step 0 and that's the skill that actually rejects non-web repos. You're only deciding whether it's worth *mentioning* `/seo-review` in the recommended/alternative flow.
 
 If `CLAUDE.md` is missing, note that in the report and proceed with git signals only.
 

@@ -70,15 +70,21 @@ Skip `/ultrareview` for trivial PRs — the cloud cost and 10–20 min wait isn'
 
 **Mental model:** "Just shipped. Calm waters. What's the technical debt situation?"
 
-**Recommended flow:**
+**Recommended flow** *(when `is_web: false`)*:
 ```
 /code-cleanup → /architecture-review → /test-review → /architecture-review --plan → /plan-feature <phase>
+```
+
+**Recommended flow** *(when `is_web: true`)*:
+```
+/code-cleanup → /architecture-review → /test-review → /seo-review → /architecture-review --plan → /plan-feature <phase>
 ```
 
 Why this order:
 - `/code-cleanup` first deletes whole files/deps that are dead — cleaner signal for everything downstream.
 - `/architecture-review` then audits the *remaining* code for structural complexity, refactor opportunities, perf suspects, and over-engineering.
 - `/test-review` audits the test suite itself — coverage gaps in critical code AND wasteful/redundant tests. Run after the structural audits so coverage gaps are measured against post-cleanup code.
+- `/seo-review` *(web projects only)* audits SEO + Generative Engine Optimization with fresh fetched best practices. Run after structural cleanup so the SEO scan reflects the post-cleanup site. Score is tracked over time in `docs/seo-history.md`.
 - `/architecture-review --plan` turns findings into phased work.
 - `/plan-feature` per phase before implementing.
 
@@ -133,11 +139,11 @@ Build the doc surface first; everything downstream is easier with it.
 
 **Recommended flow:**
 ```
-/architecture-review (or /test-review for test suite focus) → pick one finding → /plan-feature → implement → /code-review → /update-docs
+/architecture-review (or /test-review for test suite focus, or /seo-review when is_web: true) → pick one finding → /plan-feature → implement → /code-review → /update-docs
 ```
 
 Why:
-- `/architecture-review` is the highest-signal entry point when nothing is on fire — it surfaces deletions, refactors, and perf wins ranked by impact. Use `/test-review` instead when the test suite specifically is what you want to invest in (coverage gaps in critical code + redundant/wasteful tests).
+- `/architecture-review` is the highest-signal entry point when nothing is on fire — it surfaces deletions, refactors, and perf wins ranked by impact. Use `/test-review` instead when the test suite specifically is what you want to invest in (coverage gaps in critical code + redundant/wasteful tests). When `is_web: true`, `/seo-review` is also a strong inline option — SEO/GEO findings tend to deliver visible business impact (search ranking, AI citation) and the skill tracks scores over time in `docs/seo-history.md` so progress compounds across runs.
 - Pick **one** finding (don't try to do them all).
 - `/plan-feature` to scope the change before writing code.
 - Then the standard implement → review → docs loop.
