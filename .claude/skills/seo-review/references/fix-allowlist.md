@@ -269,7 +269,7 @@ The TODO markers preserve format compliance while making it obvious the user mus
 
 ## Per-finding gate flow
 
-For each fix-eligible finding (in rank order):
+For each fix-eligible finding (in rank order — when `gsc_mode: enabled`, ranking includes `traffic_weight`; when disabled, ranking is heuristic-only):
 
 ```
 ─────────────────────────────────────────────────────
@@ -295,12 +295,17 @@ Proposed change (diff):
      </head>
 
 Score impact recovered if applied: +1.0 (On-Page SEO)
+Traffic weight: 4.2 (12,420 impressions on / — top 3 trafficked page in GSC)
 This fix adds placeholders only — you will need to fill in the values.
 
 Apply? [y / n / skip / abort]
 ```
 
-User responses:
+**Traffic weight line** is rendered only when `gsc_mode: enabled` AND the finding's affected URL appears in `url_impressions_map`. Format: `Traffic weight: <traffic_weight>  (<impressions> impressions on <page-url> — <rank> trafficked page in GSC)`. When the finding has no URL match (or GSC disabled), omit this line entirely.
+
+The traffic-weight signal helps the user prioritize y/n decisions: "fix this one first because it affects your top-traffic page" vs "skip this one, page gets no impressions anyway."
+
+User responses (unchanged):
 - `y` — apply via `Edit`, advance.
 - `n` — record "rejected (do not re-show this run)", advance.
 - `skip` — record "skipped (revisit later)", advance.
@@ -308,12 +313,18 @@ User responses:
 
 ## After all findings processed
 
-Print a summary:
+Print a summary. When `gsc_mode: enabled`, order the "Applied" entries by `traffic_weight` desc so the high-impact fixes are visible at the top of the summary:
 
 ```
 --fix pass complete.
 
 Applied: 5 scaffolds across 4 files
+  (sorted by traffic_weight desc when GSC enabled)
+  1. src/app/layout.tsx — OG/Twitter Card scaffold (traffic_weight 4.2, all pages)
+  2. src/app/pricing/page.tsx — meta description placeholder (traffic_weight 4.1, 12.4K imps)
+  3. src/app/blog/foo/page.tsx — Article JSON-LD scaffold (traffic_weight 3.2, 1.5K imps)
+  4. src/app/about/page.tsx — canonical self-reference (traffic_weight 1.0, 0 imps)
+  5. public/llms.txt — created (traffic_weight n/a, structural)
 Rejected: 1
 Skipped: 2
 Auto-routed to --plan: 23
@@ -322,9 +333,13 @@ Score recovery if all applied: estimated +6 points
 
 ⚠️  Every applied fix contains TODO placeholders. Run `grep -rn "TODO:" <touched-files>` to find them. Fill in values before this work delivers real SEO value.
 
+⚠️  Bulk-redirect / GSC-derived fixes are NOT applied by `--fix`. Run `/seo-review --plan` to see those as user-confirmed snippets.
+
 Per-edit undo: press Esc Esc twice or run /rewind.
 Whole-pass undo: if you did this on a branch, `git checkout main && git branch -D <fix-branch>` discards all changes.
 ```
+
+When `gsc_mode: disabled`, the summary omits the per-fix traffic-weight column (just lists files), and omits the "Bulk-redirect" warning line (not applicable).
 
 ## Hard rules
 
