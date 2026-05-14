@@ -216,3 +216,48 @@
 - **Dogfood `/code-cleanup --vulns` on a Node and a Python project.** Watch for: tool-detection accuracy (does it pick `npm audit` vs `pnpm audit` correctly from the lockfile?), behavior when `pip-audit` is missing (does the install-hint finding actually surface, or does the agent silently emit zero results?), monorepo per-workspace audit invocations, severity-to-risk mapping legibility in the final report.
 - Optionally: consider whether the gap-audit findings warrant action — strongest remaining gap is **type-safety drift audit** (whole-repo `any` / missing-annotation count for TS/Python). Could be a 5th `/architecture-review` dimension (`arch-types`) or a separate `/type-coverage` skill. User has not committed to this yet.
 - Pick up Next Steps #5 (pre-commit hooks) or #6 (MCP integration) once dogfooding stabilizes.
+
+### Session 23 - 2026-05-13
+**What happened:**
+- /resume-work showed clean tree on main (matches CLAUDE.md Last Updated date), 2 pending dogfood tasks hydrated.
+- User asked for thorough examination of code-health skill coverage to identify the biggest gap. Read `cleanup-styles-tests.md` §7, `code-review/review-checklist.md` §7, `code-review/security-deep-dive.md`, `code-review/SKILL.md`, and `architecture-review/SKILL.md` directly to verify coverage claims before grading (not trusting CLAUDE.md summaries).
+- Built 14-dimension coverage map (table form in chat). Ranked **test health** as the biggest gap — both directions uncovered at scale: missing tests for critical paths AND wasteful/redundant tests. Existing `cleanup-styles-tests` §7 is artifact-level only (orphaned files, >3mo skips, unused helpers, stale snapshots); existing `/code-review` §7 is a 4-bullet diff-scoped checkbox. Runner-up gap surfaced: whole-repo SAST + secrets in committed code, but partially serviced by `/code-review --security` accepting dir args + built-in `/security-review` — narrower gap than test health.
+- Ran `/plan-feature` interview for new `/test-review` skill. 12 questions across 3 batches via `AskUserQuestion` (multi-choice + Other escape). User picked Recommended on 11/12; Q12 (mode-set multiSelect) picked only `--plan` despite Q10 designing `--fix` scope and batch-1 Q2 settling `--coverage` opt-in policy. Per session's "no clarifying questions" mode: reconciled to include `--plan`/`--fix`/`--coverage`; dropped `--since`.
+- **Design settled:**
+  - 3-way subagent decomposition: `test-coverage` / `test-quality` / `test-economics` (mirrors `/architecture-review` 4-way pattern minus simplification).
+  - Coverage data **opt-in only** via `--coverage` flag (mirrors `/code-cleanup --vulns` policy — never auto-runs `jest --coverage` / `pytest --cov` / `cargo tarpaulin` / `go test -coverprofile`).
+  - **Twin headline metric:** `Coverage gaps in critical code: X lines across Y files | Tests we can delete: Z lines across W files`. Both directions of the gap surfaced as primary signals.
+  - **Critical-paths ranking** for coverage gaps: composite `security_keyword_density × churn × import_fan_in` (auth/payment/token/admin/permission keywords × git change frequency × how many files import it).
+  - **Tier 2 smell catalog (5 entries):** T01 assertion-free, T02 weak assertions (`toBeTruthy`/`not.toBeNull`/`>= 0`), T03 implementation-coupled (mock-heavy + `toHaveBeenCalledWith` counts), T04 mystery guests (external fixture/db state), T05 redundant tests (same setup + near-identical assertion).
+  - **Bug-fix-without-regression-test scan in v1 scope:** last 50 commits, match `^fix:` / `bugfix` / `closes #` / `fixes #` with no `*test*`/`*.spec.*`/`*.test.*` file change in the same diff.
+  - **Snapshot policy:** flag when >50% of a test file's assertions are `toMatchSnapshot()`; default risk `needs_investigation`.
+  - **Flakiness data source:** `git log --grep=flaky` + retry decorators (`it.retry`, `test.retry`, `@pytest.mark.flaky`, `#[ignore]` tagged flaky). No CI history required.
+  - **Non-overlap with `/code-cleanup`:** `/test-review` defers entirely to `cleanup-styles-tests` §7 for orphans/skips/helpers/snapshots. Bidirectional footer pointers cross-reference.
+  - **Deletable aggregation** (the Y in headline) = T01 + T05 + snapshot-heavy reductions. NOT T02/T03/T04 — those are rewritable, not deletable; including them would mislead the headline.
+  - **`--fix` scope T01-only** (assertion-free deletion is provably safe). Everything else auto-routes to `--plan`. Per-finding diff preview gate; `/rewind` reminder at end.
+  - **False-positive guard for T01:** detect project-defined assertion helpers (`assert*`/`should*`/`expect*` imports) before flagging.
+- User accepted the plan and asked to modify `/code-health-advice` BEFORE building `/test-review` (reversed the order I'd proposed). Made 4 Edits to 2 files:
+  - `SKILL.md` available-skills list (line 13): added `/test-review` between `/architecture-review` and `/plan-feature`.
+  - `state-buckets.md` Bucket C (post-ship audit): inserted `/test-review` between `/architecture-review` and `--plan` in recommended flow; updated Why section to explain "runs after structural audits so coverage gaps are measured against post-cleanup code."
+  - `state-buckets.md` Bucket D (orient + audit): inserted `/test-review` between `/architecture-review` and `/update-docs` in recommended flow; added "Skip if `git ls-files` shows no test files" guard.
+  - `state-buckets.md` Bucket E (ambient improvement): changed recommended flow from `/architecture-review → pick one →...` to `/architecture-review (or /test-review for test suite focus) → pick one →...`. Honors the strict "exactly one Recommended + one Alternative per bucket" rule by making it an inline choice, not a third flow.
+- Buckets A (pre-commit cleanup) and B (pre-merge verification) deliberately not touched — both diff/PR-scoped; `/test-review` is whole-repo. Tie-breaker rules unchanged.
+
+**Files created/modified:**
+- `.claude/skills/code-health-advice/SKILL.md` — added `/test-review` to available-skills list (1-line change).
+- `.claude/skills/code-health-advice/references/state-buckets.md` — 3 bucket updates (C, D, E recommended flows + Why sections). Alternative flows unchanged.
+- `CLAUDE.md` — Last Updated 2026-05-08 (S22) → 2026-05-13 (S23); In Progress section populated with /test-review build; Next Steps reordered (/test-review build inserted as #1, dogfood items demoted to #2/#3, "Add more skills" removed since /test-review IS the new skill); new Key Decisions row for /test-review design; Session History updated (S22 demoted to "Previous Session" since S21 block was still attached, S23 now Last Session).
+- `docs/session-history.md` — this Session 23 entry appended.
+- `docs/key-decisions.md` — 2 oldest CLAUDE.md decision rows rolled up via Part 6 FIFO (CI gating + Plugin bin/ helpers).
+
+**Next session should:**
+- Build `/test-review` skill per the approved plan. Implementation phases (~4.5h total):
+  1. Skeleton + scaffolding (~30m) — `test-review/SKILL.md` frontmatter, 3 agent stub files, stub references.
+  2. `test-coverage` subagent (~45m) — `scan-coverage.md` heuristic gap detection, `coverage-tooling.md` per-stack opt-in invocation, bug-fix-without-test scanner, critical-paths ranking.
+  3. `test-quality` subagent + smell catalog (~45m) — `test-smell-catalog.md` T01-T05 with detect-when criteria + FP guards.
+  4. `test-economics` subagent (~30m) — `scan-economics.md` snapshot-heavy detection, flakiness signals, LOC ratio.
+  5. Orchestrator (~45m) — `SKILL.md` Steps 0-6 (stack detect, read intended-testing strategy from CLAUDE.md / `docs/testing/`, mode dispatch, scope, parallel dispatch, twin-metric aggregation, report).
+  6. Modes (~30m) — `plan-mode.md` phased brief with `/plan-feature` snippets, `fix-mode.md` T01-only auto-delete with diff preview + `/rewind`.
+  7. Cross-references (~20m) — CLAUDE.md (skills 7→8, agents 7→10), README.md (commands table, complement table, agent table, file tree), Workflow.md (Command Reference section, Scenario, version history row), MEMORY.md (counts), `/code-cleanup` SKILL.md footer cross-ref, `/code-health-advice` state-buckets.md re-check (already points at /test-review, just verify).
+  8. Dogfood + commit (~30m) — run on a real project, tune thresholds (snapshot %, critical-paths weights, smell FP guards).
+- After /test-review ships: continue dogfooding `/architecture-review` (Next Steps #2) and `/code-health-advice` (Next Steps #3).

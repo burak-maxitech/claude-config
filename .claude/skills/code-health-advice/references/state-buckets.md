@@ -72,12 +72,13 @@ Skip `/ultrareview` for trivial PRs — the cloud cost and 10–20 min wait isn'
 
 **Recommended flow:**
 ```
-/code-cleanup → /architecture-review → /architecture-review --plan → /plan-feature <phase>
+/code-cleanup → /architecture-review → /test-review → /architecture-review --plan → /plan-feature <phase>
 ```
 
 Why this order:
 - `/code-cleanup` first deletes whole files/deps that are dead — cleaner signal for everything downstream.
 - `/architecture-review` then audits the *remaining* code for structural complexity, refactor opportunities, perf suspects, and over-engineering.
+- `/test-review` audits the test suite itself — coverage gaps in critical code AND wasteful/redundant tests. Run after the structural audits so coverage gaps are measured against post-cleanup code.
 - `/architecture-review --plan` turns findings into phased work.
 - `/plan-feature` per phase before implementing.
 
@@ -101,13 +102,14 @@ The default `/architecture-review` report includes a "Code we can delete: N line
 
 **Recommended flow:**
 ```
-/resume-work deep → /code-cleanup → /architecture-review → /update-docs
+/resume-work deep → /code-cleanup → /architecture-review → /test-review → /update-docs
 ```
 
 Why:
 - `/resume-work deep` reads the full reference set (`docs/session-history.md`, `docs/completed-work.md`, `docs/key-decisions.md`) and runs the health-check ladder. If `CLAUDE.md` is missing, it surfaces the gap and recommends `/update-docs` first.
 - `/code-cleanup` next because it works without `CLAUDE.md` context — pure structural deletion signal.
 - `/architecture-review` for the structural picture once dead code is gone.
+- `/test-review` for the test suite picture — both coverage gaps and waste. Surfaces what to write next and what to delete. Skip if `git ls-files` shows no test files.
 - `/update-docs` at the end populates `CLAUDE.md` and auto-memory so the next session starts oriented.
 
 **Alternative:** *If `CLAUDE.md` is completely missing and the repo isn't yours:*
@@ -131,11 +133,11 @@ Build the doc surface first; everything downstream is easier with it.
 
 **Recommended flow:**
 ```
-/architecture-review → pick one finding → /plan-feature → implement → /code-review → /update-docs
+/architecture-review (or /test-review for test suite focus) → pick one finding → /plan-feature → implement → /code-review → /update-docs
 ```
 
 Why:
-- `/architecture-review` is the highest-signal entry point when nothing is on fire — it surfaces deletions, refactors, and perf wins ranked by impact.
+- `/architecture-review` is the highest-signal entry point when nothing is on fire — it surfaces deletions, refactors, and perf wins ranked by impact. Use `/test-review` instead when the test suite specifically is what you want to invest in (coverage gaps in critical code + redundant/wasteful tests).
 - Pick **one** finding (don't try to do them all).
 - `/plan-feature` to scope the change before writing code.
 - Then the standard implement → review → docs loop.

@@ -116,6 +116,8 @@ From the review of https://github.com/shanraisshan/claude-code-best-practice. Th
 | Scripts don't auto-run /resume-work | User controls when to run /resume-work; avoids forced context load on every launch. Rolled up from CLAUDE.md → docs/key-decisions.md in S21 per Part 6 FIFO. |
 | Setup instructions in README.md only | One-time setup (clone, symlinks, alias) belongs in README.md; Workflow.md links to it to avoid duplication. Rolled up from CLAUDE.md → docs/key-decisions.md in S21 per Part 6 FIFO. |
 | Don't filter claude-config from project picker | User may want to work on the config repo itself. Rolled up from CLAUDE.md → docs/key-decisions.md in S22 per Part 6 FIFO. |
+| CI gating documented, not implemented in-skill | `defer` PermissionDecision only works for single-tool-call turns and is meant for SDK/subprocess callers; skills can't self-gate. Document the PreToolUse recipe in README instead of adding a `--gated` flag. Rolled up from CLAUDE.md → docs/key-decisions.md in S23 per Part 6 FIFO. |
+| Plugin `bin/` helpers in resume-work health check | CC 2.1.91 puts enabled plugins' `bin/` on `$PATH`; prefer plugin-provided smoke tests over the generic `package.json → Makefile → pyproject.toml → Cargo.toml` ladder. Rolled up from CLAUDE.md → docs/key-decisions.md in S23 per Part 6 FIFO. |
 
 **Also noted during verification (not in the original research, not adopted, flagged for future):**
 
