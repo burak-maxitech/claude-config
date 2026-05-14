@@ -528,9 +528,11 @@ For each row to roll up:
 
 1. **Append to `docs/key-decisions.md`** preserving the existing row order (topmost row of the CLAUDE.md table becomes next row in the reference file).
    - If the file doesn't exist, create it first with the header block from `mode-update.md` Part 1.6 (`# Key Decisions` → `> Full decision log. Referenced from [CLAUDE.md](../CLAUDE.md).` → table header).
+   - **Anchor at the end of the table block, NOT at end-of-file.** Before appending, scan `docs/key-decisions.md` and find the last consecutive `|`-row in the main table. Insert the new row(s) immediately after that line. If the file has non-table content after the table (e.g., a bulleted "Also noted during verification" section, a footer, or any other prose), the new rows MUST land BEFORE that content — appending at literal end-of-file would create an orphan table fragment (a `|`-row with no header context). Implementation: Edit using `(last existing table row)\n\n(first line of trailing non-table content)` as `old_string`, splice the new rows in between. If the table is the only content in the file, end-of-file is the correct anchor.
 2. **Remove the row from CLAUDE.md's `## Key Decisions` table.**
 3. **Do NOT deduplicate.** If the same row already exists in `docs/key-decisions.md` (because an earlier session mirrored it there), leave both — dedup requires judgment. The cost is a duplicate line in the reference file, which is harmless.
 4. Preserve the trailing `> Full decision log: [docs/key-decisions.md](docs/key-decisions.md)` link in CLAUDE.md; that link is the whole point of keeping the section lean.
+5. **If an orphan table row is detected at end-of-file** (a `|`-row sitting alone after non-table content, leftover from a prior buggy run before this anchor rule was added), move it into the table block during this run as a one-time repair. The repair and the new rollup land in the same commit.
 
 ### 6.4 Add Rollup Note (First Run Only)
 
