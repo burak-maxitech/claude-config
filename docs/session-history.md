@@ -81,47 +81,7 @@
 - If drift accumulates faster than weekly `--full` runs can keep up in practice, refine the Fast Path subset: add Part 1.3 (completed-work append) as the most likely candidate. Low-cost amendment to `mode-update.md` Fast Path block.
 - Pick up Next Steps #3 (pre-commit hooks) or #4 (MCP integration) — both still pending from prior sessions, both more concrete than the aspirational #1/#2.
 
-### Session 19 - 2026-05-04
-**What happened:**
-- Ran `/update-docs` (Full Path, no flag) immediately after Session 18's `--fast` run as a back-to-back dogfood: validate that the new Step 0 upfront batch + Part 1 plan-then-batch directive also speed up the comprehensive sweep, and clear the 4 drift items `--fast` had surfaced.
-- Drift to clear:
-  1. **Backfill 2 undocumented commits from 2026-04-22** — `14546ff` (interop polish: `if`-scoped defer hook example, README auto mode compatibility paragraph, startup-script `disableSkillShellExecution` guardrail, CI gating prose trim) and `ff89cbb` (code-review --verify parallelization via `run_in_background` in Step 1.5).
-  2. **Part 5 session-history rollup** — Session 13 became the 6th-most-recent multi-line entry after Session 18 landed.
-  3. **Part 6 Key Decisions rollup** — CLAUDE.md table at 21 rows after Session 18's add (cap 20).
-  4. **Part 1 sub-section caps** — none triggered; Current Status, Next Steps, In Progress all under cap.
-- Step 0 batch: 1 parallel turn for `git show 14546ff --stat` + `git show ff89cbb --stat` + `git status` + `TaskList`. Reads were already cached from Session 18's run earlier in this same conversation, so no re-reads needed (per the "hold all results in working memory for the rest of this run" rule). On a fresh session the Step 0 batch would also include reads of CLAUDE.md, README.md, all `docs/*.md`, MEMORY.md.
-- Inspected the 2 backfill commits before writing Key Decisions rows: confirmed they're architecturally distinct (one is interop refinement across multiple files, one is a perf optimization on a single skill) and warrant separate rows. README's interop section already reflects `14546ff`'s changes (it's the same commit that wrote them), so Part 2 verifies-and-no-ops.
-- **Plan-then-batch execution:** all 8 file edits batched into a single parallel-Edit turn:
-  1. `CLAUDE.md` — Last Updated S18 → S19
-  2. `CLAUDE.md` — Part 6 FIFO removal of 3 oldest Key Decisions rows
-  3. `CLAUDE.md` — Part 1.6 add 2 backfill rows after Session 18 row
-  4. `CLAUDE.md` — Part 1.8 replace Session 18 last-session block with Session 19
-  5. `docs/session-history.md` — Part 5 compress Session 13 multi-line block to one-liner
-  6. `docs/session-history.md` — Part 1.8 append Session 19 detailed entry (this entry)
-  7. `docs/key-decisions.md` — append 3 rolled-up rows + 2 detailed new rows
-  8. `docs/completed-work.md` — append entries for the 2 backfilled commits + Session 19 sweep
-- **Both first-run consent gates skipped silently.** Sentinel notes were added to `docs/session-history.md` (Session 15) and `docs/key-decisions.md` (Session 17), so Parts 5.2 and 6.2 detected the per-project consent and proceeded without prompting. Confirmed the sentinel pattern works as designed across multiple runs.
-- **Part 4 (auto-memory)** — skipped per rule 4.3.4: no stable-fact change since Session 18 (no new tech stack, no structural shifts, no architecture change). MEMORY.md content unchanged.
-- **Performance observation:** the entire Full Path run (Step 0 batch + plan + 8 batched Edits + commit prep) completed in ~3 turns of substantive tool calls. This is far below the 12-14 min baseline the user reported on real projects, but this is a small project running back-to-back with `--fast` (most reference reads were cached), so it's a best-case measurement. A side-by-side run on a non-trivial project still owed for a real comparison.
-
-**Files created/modified:**
-- `CLAUDE.md` — Last Updated 2026-05-04 (Session 19); Part 6 removed 3 oldest Key Decisions rows; Part 1.6 added 2 backfill rows for `14546ff` and `ff89cbb`; Part 1.8 replaced Session 18 last-session block with Session 19. Net table size: 21 - 3 + 2 = 20 rows (back at cap).
-- `docs/session-history.md` — Part 5 compressed Session 13 multi-line block (~35 lines) to one-liner with commit hashes; appended this Session 19 detailed entry.
-- `docs/key-decisions.md` — appended 3 rolled-up rows from CLAUDE.md (no dedup per spec) + 2 detailed rows for `14546ff` interop polish and `ff89cbb` --verify parallelization.
-- `docs/completed-work.md` — 6 new entries: 4 for `14546ff` (README defer/auto mode docs, startup-script guardrail, code-cleanup/code-review CI prose trim), 1 for `ff89cbb` (--verify parallelization), 1 for the Session 19 Full Path validation run itself.
-
-**Files NOT modified (and why):**
-- `README.md` — interop section is already current; `14546ff` was the commit that wrote the modernized defer recipe + auto mode paragraph + startup-script guardrail note. Part 2 verifies and no-ops.
-- `Workflow.md` — no user-visible workflow change.
-- `.claude/skills/*/SKILL.md` — no skill-behavior change this session; the changes from `14546ff`/`ff89cbb` were already in the skill files (committed at the time).
-- `.claude/agents/cleanup-*.md` — no subagent changes this session.
-- Auto-memory `MEMORY.md` — Part 4 skipped per rule 4.3.4 (no stable-fact change since Session 18).
-
-**Next session should:**
-- Run `/update-docs --fast` on a non-trivial real project (one that actually takes 12-14 min today) and measure the wall-clock delta. That's the only test that proves the perf claims at scale. If still slow, implement the deferred levers from Session 18: split `mode-update.md` so Parts 5/6/0.5 lazy-load (only when their probes trigger) and gate Part 1 sub-sections on evidence (skip 1.X if no commits/tasks/user-input touch that section).
-- Watch the next `/update-docs --fast` run for completed-work.md drift. Session 18's spec deferred Part 1.3 from Fast Path, which means completed-work.md only updates on `--full` runs. If the divergence between session-history.md and completed-work.md becomes annoying after a few cycles, add Part 1.3 to the Fast Path subset (single Edit per item, cheap).
-- Pick up Next Steps #3 (pre-commit hooks) or #4 (MCP integration) — both still pending from prior sessions and more concrete than the aspirational items.
-- Consider whether the back-to-back `--fast` then `--full` pattern is itself worth documenting in Workflow.md as the recommended cadence (`--fast` daily, `--full` end-of-week). Currently implicit in the design but not surfaced to the user.
+### Session 19 - 2026-05-04: /update-docs Full-Path dogfood backfilling 14546ff (interop polish) + ff89cbb (/code-review --verify parallelization); Step 0 batch + plan-then-batch validated end-to-end on Full Path (~3 substantive turns); Part 5 rolled up S13, Part 6 moved 3 oldest Decisions rows via sentinel-gated silent runs. (commits: 3142e42)
 
 ### Session 20 - 2026-05-06
 **What happened:**
@@ -261,3 +221,48 @@
   7. Cross-references (~20m) — CLAUDE.md (skills 7→8, agents 7→10), README.md (commands table, complement table, agent table, file tree), Workflow.md (Command Reference section, Scenario, version history row), MEMORY.md (counts), `/code-cleanup` SKILL.md footer cross-ref, `/code-health-advice` state-buckets.md re-check (already points at /test-review, just verify).
   8. Dogfood + commit (~30m) — run on a real project, tune thresholds (snapshot %, critical-paths weights, smell FP guards).
 - After /test-review ships: continue dogfooding `/architecture-review` (Next Steps #2) and `/code-health-advice` (Next Steps #3).
+
+### Session 24 - 2026-05-14
+**What happened:**
+- Built `/test-review` skill end-to-end per the Session 23-approved plan via `/plan-feature` (which detected EXISTING project state, recognized the interview already happened in S23, and jumped straight to Plan Mode + task hydration). 8 phase commits landed sequentially on `main` — no feature branch, low-risk skill build.
+- **Plan-then-build flow:** triviality check skipped (multi-phase build, not a 1-sentence change); Phase 1 Exploration spawned one parallel `Explore` agent to surface conventions (refactor-catalog schema for the T-prefix catalog, report-template line ranges, fix-mode/plan-mode coupling depth, README/Workflow insertion points, code-cleanup --vulns pattern, subagent dispatch ids); plan file written to `~/.claude/plans/cheerful-sauteeing-alpaca.md`; `ExitPlanMode` got approval; 8 tasks hydrated; build executed phase by phase with a commit gate per phase.
+- **Phase 1** — three subagent definitions (`.claude/agents/test-{coverage,quality,economics}.md`). Mirrors `arch-simplification.md` frontmatter + "Do not invoke independently" disclaimer + hard rules + false-positive guards format. `test-coverage` ranks gaps by `security_keyword_density × log(churn) × log(import_fan_in)`; `test-quality` walks T01-T05 with the project-defined-assertion-helper allowlist scan running FIRST (critical T01 FP guard); `test-economics` covers snapshot-heavy (≥0.5 ratio), flakiness (markers + git-log signals), test:code LOC ratio extremes (>3.0 over, <0.1 under). Commit `51a91d6`.
+- **Phase 2** — `SKILL.md` skeleton with 8-step orchestration (`a52c3c7`). Mirrors `architecture-review/SKILL.md`. Step 0 detects stack + test framework + coverage-tool availability (record only, never auto-invokes). Step 1 reads testing-intent summary from CLAUDE.md / `tests/README*` / ADRs / coverage configs. Step 4 parallel-dispatches three subagents in a single turn. Step 5 implements **twin-headline aggregation**: `deletable_total` includes ONLY `smell_id == T01`, `smell_id == T05 AND certainty >= 0.85`, and `economic_signal == snapshot_heavy`. T02/T03/T04 explicitly excluded as rewritable — including them would mislead the headline. Graceful "no test framework detected" exit when nothing applicable found.
+- **Phase 3** — five test-review-specific reference files (`6eeb332`): `test-smell-catalog.md` (T01-T05 in S-prefix schema shape; T01 is the only `--fix-eligible` entry; every catalog entry includes mandatory false-positive guards), `scan-coverage.md` (heuristic mode default + report mode for `--coverage`; install_hint finding shape), `scan-quality.md` (Step 0 builds the project assertion-helper allowlist BEFORE any T01 detection; per-smell deletable_lines rules table), `scan-economics.md` (three independent scan categories: snapshot ratio / flakiness / LOC ratio; `deletable_lines > 0` ONLY for snapshot_heavy), `report-template.md` (twin headline as Section 0; "subtotal-check" footer line surfaces arithmetic discrepancies rather than letting the headline silently lie).
+- **Phase 4** — wire reused references + `plan-mode-test.md` adapter (`9377e06`). Decision: architecture-review's `plan-mode.md` and `fix-mode.md` are tightly bound to the R/S catalog (CCN deltas, S04/S06/S09 specifics) — verbatim reuse would produce nonsense for test-review. Wrote a thin `plan-mode-test.md` adapter with 5 phases (Phase 1 deletions-first quick wins emphasizing T01/snapshot_heavy; Phase 2 dedicated to coverage gaps; Phase 3 strategic rewrites T02/T03/T04; Phase 4 reframes flakiness/ratio as suspects-to-measure; Phase 5 documented-decision confirmations). `scale-strategy.md` reused by reference (no test-specific divergence in the smart-sampling formula).
+- **Phase 5** — `--coverage` opt-in per-stack wiring (`f22874c`). Tightened SKILL.md Step 2 with a 9-row stack table (Jest/Vitest/pytest-cov/coverage.py/cargo-tarpaulin/cargo-llvm-cov/go cover/phpunit/JaCoCo). Each row maps: stack → expected report path → generator command suggested in install_hint when missing. Mirrors `/code-cleanup --vulns` policy: never auto-invokes the tool; opt-in only; hard-stop install_hint when `--coverage` is supplied but no report exists (no silent fallback to heuristic mode).
+- **Phase 6** — `fix-mode-test.md` adapter with T01-only carve-out (`e2a3a3b`). Spells out **why T01 only** for each smell type (deletion of assertion-free tests cannot regress real coverage; everything else needs human judgment). Pre-flight aborts the whole pass if `helper_allowlist_size` is missing from `test-quality`'s footer — never delete T01 without the FP guard. Per-finding flow shows test name + body + evidence + proposed diff + cascade preview. Cascades prompt independently (empty parent `describe` block gets its own y/n; empty file routes to `/code-cleanup`, not self-delete — cross-skill boundary preserved). Sequential per-file edits go bottom-to-top so line numbers stay valid.
+- **Phase 7** — README + Workflow doc updates (`1406c61` + `d379222` for Windows case-quirk fixup). README: file tree, commands table row, picker table row, subagents table 3 rows, useful chain (`/code-cleanup` → `/architecture-review` → `/test-review` → `/architecture-review --plan` → `/plan-feature`). Workflow: Quick Reference row, new Command Reference section (with twin-headline math + T01-T05 catalog summary + non-overlap with `/code-cleanup`), Scenario 5 step insertion, version history May 2026 row, custom commands tree. Phase 7b was needed because `Workflow.md` (capital W) didn't stage under `git add Workflow.md` due to git tracking it as lowercase `workflow.md` — Windows case-insensitive filename quirk.
+- **Phase 8** — verification + non-overlap audit (no commit; read-only pass). Frontmatter sanity ✓ (all 4 files have correct opening/closing `---`). Cross-reference integrity ✓ (all 3 reused refs from architecture-review exist; all 7 test-review references exist). Tool allowlist coverage ✓ (every Bash pattern in scan-*.md and SKILL.md is covered by `Bash(git:*)` / `Bash(npx:*)` etc. in frontmatter). Twin-headline math spot-check ✓ (synthetic fixture: 1× T01 4-line + 1× coverage gap 20-line + 1× snapshot_heavy 15-line → coverage_gap_total: 20 lines / 1 file; deletable_total: 4 + 15 = 19 lines / 2 files; expected headline matches plan). Non-overlap audit ✓ — orphans/skips/helpers/snapshots reference `/code-cleanup` 12 times across SKILL.md (5), test-smell-catalog.md (1), report-template.md (2), fix-mode-test.md (3), scan-economics.md (1), scan-quality.md (1). No duplicate-coverage findings.
+- **Three invariants deliberately enforced via verification, not just intent:**
+  1. **Twin-headline math integrity** — Step 5 aggregation is strict; T02/T03/T04 explicitly excluded. Subtotal-check footer makes any orchestrator arithmetic bug visible to the user.
+  2. **T01 false-positive guard is mandatory** — `--fix` pre-flight aborts the whole pass if the allowlist scan didn't run. Critical because T01 is the only `--fix-eligible` smell, and a false positive deletes real tests.
+  3. **Non-overlap with `/code-cleanup` is enforced in 12 places** — explicit "do not double up" sections in each scan-*.md, footer pointer in report-template.md, cascade routing in fix-mode-test.md.
+
+**Files created/modified:**
+- **11 new files:**
+  - `.claude/agents/test-coverage.md` (108 lines)
+  - `.claude/agents/test-quality.md` (108 lines)
+  - `.claude/agents/test-economics.md` (102 lines)
+  - `.claude/skills/test-review/SKILL.md` (281 lines)
+  - `.claude/skills/test-review/references/test-smell-catalog.md` (107 lines)
+  - `.claude/skills/test-review/references/scan-coverage.md` (160 lines)
+  - `.claude/skills/test-review/references/scan-quality.md` (181 lines)
+  - `.claude/skills/test-review/references/scan-economics.md` (135 lines)
+  - `.claude/skills/test-review/references/report-template.md` (203 lines)
+  - `.claude/skills/test-review/references/plan-mode-test.md` (136 lines)
+  - `.claude/skills/test-review/references/fix-mode-test.md` (174 lines)
+- **2 docs modified:** `README.md` (file tree, commands table, picker table, subagents table, useful chain), `workflow.md` (Quick Reference, Command Reference section, Scenario 5, file tree, version history).
+- **CLAUDE.md / session-history.md / completed-work.md** — landed in this `/update-docs` run.
+
+**Files NOT modified (and why):**
+- `MEMORY.md` — Part 4 skip rule 4.3.4 applies. No stable-fact change since S23. (Skill count and agent count live in `MEMORY.md` only as project-internal trivia, not as something `/resume-work` depends on; CLAUDE.md is the source of truth for evolving counts.)
+- `docs/key-decisions.md` — Part 6 didn't fire. The existing /test-review row in CLAUDE.md was UPDATED in place (S23 plan → S24 built) rather than appended as a new row, so the table stayed at 20 rows and no rollup was triggered. Alternative considered: append a new row, take the rollup, end up with the design row in `docs/key-decisions.md` and the build-completion row in CLAUDE.md. Rejected — splits one logical decision across two files for no win.
+- `.claude/skills/architecture-review/references/*` — `scale-strategy.md` is reused by reference; `plan-mode.md` and `fix-mode.md` would have been damaged by adaptation (test-review needed different phases / smell-only fix policy), so adapters live in `.claude/skills/test-review/references/`.
+- `/code-cleanup` and `/code-health-advice` — both already reference `/test-review` from S22-S23 work. Verified no dangling pointers, no edits needed.
+
+**Next session should:**
+- **Dogfood `/test-review` on a real Node/Jest or Python/pytest project.** Top outstanding validation — never run end-to-end. Watch for: (a) T01 false-positive rate (the project-defined assertion-helper scan should catch `assertValidUser`-style helpers and not flag tests that use them; if it fails to scan or returns 0 helpers in a project that obviously has them, the `--fix` pre-flight should abort), (b) twin-headline math correctness on real subagent output (the subtotal-check line in the footer should always reconcile — if it doesn't, the orchestrator's Step 5 has a bug), (c) `--coverage` path against an actual `coverage-summary.json` (jest's summary shape vs vitest's coverage-final.json — Step 2's table needs to handle both), (d) scan-economics ratio thresholds on a real module structure (current `>3.0` / `<0.1` thresholds are theoretical — adjust if findings are too noisy or too sparse), (e) non-overlap with `/code-cleanup` (no orphans/skips/helpers/snapshots surfaced in test-review's output even on a repo with all four).
+- Continue dogfooding `/architecture-review` (Next Steps #2) and `/code-health-advice` (Next Steps #3). All three skills are now built-but-untested.
+- If the T01 cascade flow proves clunky on a real project (especially the "file has zero tests" case that routes to `/code-cleanup`), consider tightening the prompt-rate per cascade. Current design prompts independently for each cascade event — could batch them.
+- Consider whether `--fast` mode should be added to `/test-review` for the daily-cycle case (e.g. quick heuristic gap probe without subagent dispatch). Probably premature — wait until real usage surfaces the need.
