@@ -81,19 +81,22 @@ Each dimension has a sub-dimension breakdown that the subagent reports in its ou
 
 ## Scoring computation
 
-Each subagent reports per-finding `score_impact` (points lost). The subagent's dimension total is:
+Each subagent reports per-finding `score_impact` (points lost). Findings are grouped by sub-dimension and the per-sub-dim sum is **clamped at the sub-dim's max points** before contributing to the dimension total. This keeps the Section 1 breakdown internally consistent — a sub-dim's reported deduction never exceeds its allocation, even when many findings land in the same bucket (e.g., 8+ `<img>` tags missing dimensions don't show a `-4.5` against a 4-point `image_perf` sub-dim).
 
 ```
-dimension_total = adjusted_dimension_max - sum(score_impact)
+sub_dim_deduction = min(sum(score_impact for findings in this sub_dim), sub_dim_max)
+dimension_total = adjusted_dimension_max - sum(sub_dim_deductions)
 ```
 
-Floor at 0. The total report score is:
+Floor `dimension_total` at 0. The total report score is:
 
 ```
 total = sum(dimension_total for each dimension)
 ```
 
 Always 0-100.
+
+**Clamp enforcement lives in the orchestrator's Step 6.1** (`SKILL.md`) so the rubric is the single source of truth and subagents don't need to track sub-dim caps locally. Sub-dim caps are the **base** values from the tables above and are *not* rescaled by weight adjustments — weight adjustments only move the dimension max, never the sub-dim caps.
 
 ## Subtotal-check footer
 

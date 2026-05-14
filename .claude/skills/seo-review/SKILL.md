@@ -2,7 +2,7 @@
 name: seo-review
 description: Repo-wide SEO and Generative Engine Optimization audit for web projects. Rejects non-web repos. Fetches current best practices every run (SEO/GEO field evolves rapidly). Probes sitemap URLs for 4xx/5xx/redirect-chain/slow-response health. Three parallel Sonnet subagents (seo-technical / seo-content / geo-generative). Produces a single score out of 100 + top-3 highest-impact opportunities, with delta from previous run when docs/seo-history.md exists. Use when user mentions SEO audit, GEO audit, Generative Engine Optimization, AI search optimization, llms.txt, structured data, sitemap health, or "make this site rank better."
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Edit, WebSearch, WebFetch, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(jq:*), Bash(cat:*), Bash(head:*), Task
+allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(jq:*), Bash(cat:*), Bash(head:*), Task
 effort: high
 argument-hint: "[path] [--plan] [--fix] [--url <deployed-url>]"
 ---
@@ -220,8 +220,8 @@ Read `references/scan-geo.md`, dispatch `geo-generative` with the file + shared 
 
 After all 3 subagents return:
 
-1. **Aggregate sub-dimension scores per dimension.** Each subagent returns its dimension-total and a sub-dimension breakdown. Sum them.
-2. **Apply weight adjustments** from Step 1's brief (max ±5 per dim, sum delta 0). E.g., if brief bumped Generative Engine +3, the maximum becomes 23 and the deduction-from-max is rescaled.
+1. **Aggregate + clamp sub-dimension deductions.** Each subagent returns a `sub_dimension_breakdown` map of deductions keyed by sub-dim name. For each sub-dim, **clamp at the sub-dim max** per `references/rubric.md`: `clamped[sub_dim] = min(raw[sub_dim], sub_dim_max)`. The dimension total is then `adjusted_dimension_max - sum(clamped sub_dim deductions)`, floored at 0. This is the single point of clamp enforcement — subagents may emit raw sums larger than a sub-dim cap (multiple findings in the same sub-dim), and the rubric is canonical here. If a subagent's emitted dimension_total disagrees with the recomputed one, prefer the recomputed value and flag the divergence in the footer.
+2. **Apply weight adjustments** from Step 1's brief (max ±5 per dim, sum delta 0). E.g., if brief bumped Generative Engine +3, `adjusted_dimension_max` becomes 23 and the deduction-from-max is computed against the new max. Sub-dim caps used in step 1 are the **base** caps from `rubric.md` and are not rescaled by weight adjustments.
 3. **Verify total = 100.** Print a `subtotal_check: <a>+<b>+<c>+<d>+<e>=<total>` line in the footer so any arithmetic drift is visible.
 4. **Compute total score:** `total = sum(dimension_scores)`.
 5. **Read `docs/seo-history.md`** if it exists. Find the most recent entry. Compute `delta = today_score - previous_score`.
