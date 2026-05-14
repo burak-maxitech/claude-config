@@ -114,6 +114,150 @@ If WebSearch/WebFetch fail or return nothing useful (rare, but possible on flaky
 
 ---
 
+## Step 1.5 — SEO-Relevant Change Scan (last 35 days)
+
+Scan git history for SEO-relevant code changes in the last 35 days — roughly the typical Google recrawl + position-stabilization cycle. Produces a ~30-line digest of recent commits + renames + touched files. Used by `seo-gsc-insights` (Phase 4) to annotate findings with `code_changed_since_gsc_window`, and by `--plan` Phase 1 to detect routing-rename + 404-cluster co-occurrence (bulk-redirect signal).
+
+**Critical context:** GSC's reports reflect Google's view of the site at crawl time, which can lag the actual codebase by 4-5 weeks. Without this scan, the skill would confidently recommend "add meta description to /pricing" while the user's commit history shows they added it 18 days ago. The annotation lets the recommendation become "may already be fixed — wait for next GSC cycle or request indexing manually."
+
+This step is **independent of Step 1.6** (CSV ingestion) — both build shared context for Step 5 and may execute in any order or in parallel.
+
+### 1.5.1 — Detect git history depth
+
+Run `git rev-parse --is-shallow-repository`. If the answer is `true`, set `git_history_shallow: true` in shared context, log to footer `"git history shallow — change-awareness annotations skipped"`, and skip to Step 1.6.
+
+### 1.5.2 — Build SEO-relevant pathspec set
+
+Combine **universal patterns** (always applied) with **stack-specific patterns** derived from Step 0 framework detection.
+
+**Universal patterns** (every project):
+- `**/robots.txt`, `**/sitemap.{xml,ts,js,tsx,jsx,mjs}`, `**/llms.txt`
+- `vercel.json`, `netlify.toml`, `_redirects`
+- `**/metadata.{ts,js,tsx,jsx}`
+- `**/[Hh]ead*.{tsx,jsx,ts,js,vue,svelte,astro}`
+- `**/[Ll]ayout*.{tsx,jsx,ts,js,vue,svelte,astro}`
+
+**Stack-specific overlays** (apply when Step 0 detected the framework):
+
+| Stack | Pathspecs |
+|---|---|
+| Next.js app-router | `app/**/page.{tsx,jsx,ts,js}`, `app/**/layout.{tsx,jsx,ts,js}`, `app/sitemap.{ts,js}`, `app/robots.{ts,js}`, `next.config.{js,ts,mjs}` |
+| Next.js pages-router | `pages/**/*.{tsx,jsx,ts,js,md,mdx}`, `next.config.{js,ts,mjs}` |
+| Nuxt | `pages/**/*.vue`, `layouts/**/*.vue`, `nuxt.config.{js,ts}` |
+| Astro | `src/pages/**/*.{astro,mdx,md,html}`, `src/layouts/**/*.astro`, `astro.config.{mjs,ts,js}` |
+| Remix | `app/routes/**/*.{tsx,jsx,ts,js,md,mdx}`, `app/root.{tsx,jsx,ts,js}` |
+| SvelteKit | `src/routes/**/+page*.svelte`, `src/routes/**/+layout*.svelte`, `svelte.config.{js,ts}` |
+| Vue/Vite | `src/pages/**/*.vue`, `vite.config.{js,ts}` |
+| Gatsby | `src/pages/**/*.{js,jsx,ts,tsx}`, `gatsby-config.{js,ts}`, `gatsby-node.{js,ts}` |
+| Jekyll | `_layouts/**/*.html`, `_includes/**/*.html`, `_config.yml`, `**/*.md` |
+| Hugo | `layouts/**/*.html`, `content/**/*.md`, `config.toml`, `hugo.{toml,yaml,yml}` |
+| 11ty | `**/*.{njk,liquid,hbs}`, `**/*.11ty.js`, `eleventy.config.{js,cjs}`, `.eleventy.js` |
+| Rails | `app/views/**/*.{erb,haml,slim}`, `config/routes.rb` |
+| Django | `**/templates/**/*.html`, `**/urls.py` |
+| Flask/FastAPI | `**/templates/**/*.{html,jinja,jinja2}`, `**/routes.py`, `**/main.py` |
+| Laravel | `resources/views/**/*.blade.php`, `routes/web.php` |
+| Spring Boot | `**/templates/**/*.html`, `**/*Controller.java`, `**/*Controller.kt` |
+| .NET | `**/Views/**/*.cshtml`, `**/Pages/**/*.cshtml`, `**/Program.cs`, `**/Startup.cs` |
+| Static HTML | `**/*.html` |
+
+If Step 0 detected an unrecognized stack OR no specific framework (e.g., raw static HTML in `public/`), use universal patterns only.
+
+### 1.5.3 — Run git scan
+
+Execute a **single** git log call:
+
+```
+git log --since="35 days ago" --name-status --pretty=format:"<<<COMMIT>>>%n%H|%ci|%s" -- <pathspec1> <pathspec2> ...
+```
+
+The `<<<COMMIT>>>` separator makes parsing unambiguous. Output structure per commit:
+
+```
+<<<COMMIT>>>
+abc1234567|2026-04-22 12:34:56 -0700|fix: add meta description to /pricing
+M	src/app/pricing/page.tsx
+M	app/metadata.ts
+
+<<<COMMIT>>>
+ghi7894561|2026-04-10 14:22:11 -0700|chore: restructure blog routing
+R100	src/content/posts/foo.md	src/app/blog/foo/page.tsx
+R100	src/content/posts/bar.md	src/app/blog/bar/page.tsx
+M	next.config.js
+M	public/sitemap.xml
+```
+
+Cap the output to the first **200 commits** by splitting on `<<<COMMIT>>>` and slicing.
+
+### 1.5.4 — Parse + aggregate
+
+Walk the commit blocks. For each:
+
+1. First line after `<<<COMMIT>>>` is `<hash>|<iso-date>|<subject>` — parse.
+2. Subsequent lines are `<status>\t<path>[\t<new-path>]`:
+   - `M`, `A`, `D` → modified/added/deleted, single path
+   - `R<percent>`, `C<percent>` → rename/copy with old + new paths (rename score is the percent match)
+
+Aggregate:
+
+- `file_commits: {path → [(hash, date, subject), ...]}` — for the touched-files list
+- `renames: [(old_path, new_path, hash, date, subject), ...]` — for rename detection (high signal for 404 generation)
+
+### 1.5.5 — Output: SEO-Relevant Changes Digest
+
+Build a structured digest (~30 lines max). Truncate per category if needed; cluster aggressive renames:
+
+```
+## Recent SEO-Relevant Changes (last 35 days, N commits across M files)
+
+### Touched files (top 10 by commit count)
+- src/app/pricing/page.tsx: 3 commits, latest 2026-04-22 ("add meta description")
+- public/sitemap.xml: 2 commits, latest 2026-04-15 ("regen sitemap after route rename")
+- next.config.js: 2 commits, latest 2026-04-10 ("restructure blog routing")
+[…]
+
+### Renames detected (high signal for 404 generation)
+- src/content/posts/* → src/app/blog/* on 2026-04-10 (12 files, commit ghi7894, "restructure blog routing")
+[…]
+
+### Routing config changes
+- next.config.js (3 commits, latest 2026-04-10): redirect rules touched
+[…]
+```
+
+Cluster renames: when ≥3 renames share a prefix pattern (e.g., all `src/content/posts/foo.md → src/app/blog/foo/page.tsx`-style mappings), report as a single cluster `src/content/posts/* → src/app/blog/*` with file count, not per-file.
+
+If the scan returned zero commits in window, render `## Recent SEO-Relevant Changes (last 35 days)\n\nNo SEO-relevant changes in the window.` — short, single block.
+
+### 1.5.6 — Pass to all 4 subagents (Step 5 shared context)
+
+Append to the Step 5 base shared-context block (after the GSC section from 1.6):
+
+```
+Git history scan: 35d window, <N> commits across <M> files. Shallow: false.
+
+Digest:
+<the 30-line digest from 1.5.5>
+
+(Renames + touched files map also passed as a structured object for 
+seo-gsc-insights cross-reference logic.)
+```
+
+Subagents use this in two ways:
+- **`seo-gsc-insights`** — primary consumer. For each GSC finding, scan the digest for matching paths (e.g., if a `not_found_404` finding affects `/blog/2023/foo`, look for a rename touching `src/content/posts/2023/` or similar). Set `code_changed_since_gsc_window: true` when matched; lower certainty to 0.4; rewrite recommendation to acknowledge the recent change.
+- **Other 3 subagents** — informational. May note "this finding is on a recently-touched file" but don't change scoring.
+
+### 1.5.7 — Footer addition
+
+Append to Step 5's footer:
+
+```
+Git history scan: 35d, <N> SEO-relevant commits across <M> files. Shallow: <true | false>.
+```
+
+When shallow: `Git history scan: skipped (shallow clone — change-awareness annotations off).`
+
+---
+
 ## Step 1.6 — GSC CSV Ingestion (orchestrator-only)
 
 When the user has dropped Google Search Console CSV exports into `.seo-data/gsc/`, parse them into structured digests + maps for downstream subagent use. When absent, print a one-time setup banner and proceed heuristic-only.
