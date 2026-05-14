@@ -13,7 +13,10 @@ claude-config/
 │   │   ├── arch-structure.md
 │   │   ├── cleanup-deps-config.md
 │   │   ├── cleanup-files-code.md
-│   │   └── cleanup-styles-tests.md
+│   │   ├── cleanup-styles-tests.md
+│   │   ├── test-coverage.md
+│   │   ├── test-economics.md
+│   │   └── test-quality.md
 │   ├── scripts/                       # Session startup scripts
 │   │   ├── start-claude.sh            # Mac/Linux startup
 │   │   └── start-claude.ps1           # Windows startup (PowerShell)
@@ -59,6 +62,16 @@ claude-config/
 │       │   └── references/
 │       │       ├── summary-template.md
 │       │       └── task-hydration.md
+│       ├── test-review/
+│       │   ├── SKILL.md
+│       │   └── references/
+│       │       ├── fix-mode-test.md
+│       │       ├── plan-mode-test.md
+│       │       ├── report-template.md
+│       │       ├── scan-coverage.md
+│       │       ├── scan-economics.md
+│       │       ├── scan-quality.md
+│       │       └── test-smell-catalog.md
 │       └── update-docs/
 │           ├── SKILL.md
 │           └── references/
@@ -175,6 +188,7 @@ git pull
 | `/code-review` | Review code quality (lightweight, in-session, with `--security`/`--verify`/`--fix`) | Skill |
 | `/code-cleanup` | Find dead code & cruft (parallel subagents). Adds CVE scanning with `--vulns` (runs `npm audit` / `pip-audit` / `cargo audit` / equivalents per detected stack; report-only, never auto-fixed). | Skill |
 | `/architecture-review` | Repo-wide architecture audit — complexity hotspots, refactor opportunities, perf suspects, **and over-engineering** (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable` as a top-line metric. 4 parallel subagents, with `--plan`/`--fix`/`--map`/`--full-scan` | Skill |
+| `/test-review` | Repo-wide test suite audit — missing coverage on critical paths AND wasteful/redundant tests, in a single report. **Twin headline metric** (`Coverage gaps in critical code: X lines | Tests we can delete: Y lines`). 3 parallel subagents (`test-coverage` / `test-quality` / `test-economics`), T01-T05 smell catalog, with `--plan`/`--fix` (T01-only safe deletion)/`--coverage` (opt-in report reading)/`--full-scan`. Defers entirely to `/code-cleanup` for orphans / stale snapshots / >3mo skips. | Skill |
 | `/code-health-advice` | Routing advisor — looks at `git status`, branch, recent commits, `CLAUDE.md`, open PR, then suggests which skills to run in what order. **Read-only, never invokes anything.** Use when unsure where to start. | Skill |
 | `/update-docs` | End session - save progress | Skill |
 
@@ -191,8 +205,9 @@ git pull
 > | `/ultrareview` | PR (cloud) | high-risk pre-merge verification (auth, payments, migrations) |
 > | `/code-cleanup` | whole repo | deletion-focused — whole unused files, unused deps, stale config |
 > | `/architecture-review` | whole repo | structural audit — complexity hotspots, refactor opportunities, perf suspects, AND sub-file over-engineering (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable`. |
+> | `/test-review` | whole repo, test suite focus | test suite audit — coverage gaps on critical paths + test smells (T01-T05) + suite economics (snapshot bloat, flakiness, LOC ratio extremes). Reports twin headline (coverage gap LOC + deletable LOC). |
 >
-> Useful chain on an unfamiliar repo: `/code-cleanup` → `/architecture-review` → `/architecture-review --plan` → `/plan-feature` per phase.
+> Useful chain on an unfamiliar repo: `/code-cleanup` → `/architecture-review` → `/test-review` → `/architecture-review --plan` → `/plan-feature` per phase.
 >
 > Not sure where to start? `/code-health-advice` reads your repo state and suggests which of these skills to run in what order. It's a 30-second routing call, not a review.
 
@@ -209,6 +224,9 @@ The `.claude/agents/` folder contains subagent definitions used by skills. These
 | `arch-refactors` | `/architecture-review` | Catalog-driven complexity-reducing refactor opportunities (cites entry IDs) |
 | `arch-performance` | `/architecture-review` | High-precision performance findings (N+1, sync I/O in async, accidental O(n²), hot-loop invariants) |
 | `arch-simplification` | `/architecture-review` | Over-engineering / almost-dead code at sub-file granularity — single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config, near-duplicates. Reports `lines_deletable`. |
+| `test-coverage` | `/test-review` | Ranks coverage gaps by `security_keyword_density × churn × import_fan_in`. Heuristic mode (test-neighbor + public-symbol enum) by default; reads coverage reports when `--coverage` opted in. Also scans bug-fixes-without-regression-tests in last 50 commits. |
+| `test-quality` | `/test-review` | Scans tests against T01-T05 smell catalog (assertion-free / weak / mock-heavy / mystery guest / redundant). Runs project-defined-assertion-helper allowlist scan FIRST as the critical T01 false-positive guard. |
+| `test-economics` | `/test-review` | Suite-level cost vs value: snapshot-heavy (≥50% ratio), flakiness (markers + git-log signals), test:code LOC ratio extremes per module. Reports `deletable_lines` only for snapshot reductions — keeps twin-headline math honest. |
 
 ## Interop with Claude Code 2.1 features
 
