@@ -14,6 +14,7 @@
 | **During Development** | `/code-review` | Review code quality |
 | **During Development** | `/code-cleanup` | Find dead code & cruft |
 | **Architecture Audit** | `/architecture-review` | Repo-wide complexity + refactor + perf + over-engineering audit (4 dimensions, reports `lines_deletable`) |
+| **Test Suite Audit** | `/test-review` | Repo-wide test health — coverage gaps on critical paths + smells (T01-T05) + suite economics. Twin headline metric. |
 | **End Session** | `/update-docs` | Save progress & context |
 
 ---
@@ -368,6 +369,44 @@ cd -
 
 ---
 
+### /test-review
+
+**When:** Repo-wide test suite audit — when you want to know both "what isn't tested that matters" and "what tests can we delete" in a single report. Complements diff-scoped `/code-review` §7 and artifact-level `cleanup-styles-tests` §7.
+
+**Usage:**
+```bash
+/test-review                             # Default review-only report
+/test-review src/auth/                   # Scope to a path
+/test-review --plan                      # Phased rewrite/fill brief with /plan-feature hand-offs
+/test-review --fix                       # Apply T01 deletions with per-finding diff preview (T01 only — assertion-free tests)
+/test-review --coverage                  # Read existing coverage reports (jest/vitest/pytest-cov/cargo-tarpaulin/go cover); never auto-runs the tool
+/test-review --full-scan                 # Force full scan even on >500-file repos
+```
+
+**Three deliberate design choices:**
+1. **Twin headline metric.** Section 0 of the report shows *both* `Coverage gaps in critical code: X lines across Y files` and `Tests we can delete: Z lines across W files`. A single number on either axis is misleading on its own.
+2. **`--coverage` is opt-in only.** Coverage tooling hits network/runtime; the default scan is heuristic-only (test-neighbor presence + public-symbol enumeration). Even with `--coverage`, only *reading* an existing report is auto — never running the tool.
+3. **`--fix` is T01-only.** Assertion-free tests are the one provably-safe deletion (a test that asserts nothing cannot fail meaningfully). T02-T05, snapshot bloat, coverage gaps, and flakiness all auto-route to `--plan` because they need human judgment.
+
+**Decomposition:** Three parallel Sonnet subagents — `test-coverage` (priority-ranked gaps + bug-fix-without-regression scan), `test-quality` (T01-T05 catalog with project-defined-assertion-helper false-positive guard), `test-economics` (snapshot bloat / flakiness / LOC-ratio extremes).
+
+**T01-T05 catalog** (full schema in `references/test-smell-catalog.md`):
+- **T01** — Assertion-free test (only `--fix-eligible` entry; deletable)
+- **T02** — Weak assertion (`toBeTruthy`, `not.toBeNull` standing alone; rewritable)
+- **T03** — Implementation-coupled / mock-heavy (impl/behavior ratio >2:1; rewritable)
+- **T04** — Mystery guest (depends on data not in test file; rewritable)
+- **T05** — Redundant (≥80% body overlap, non-boundary inputs; conservative — routes to `--plan`)
+
+**Non-overlap with `/code-cleanup`:** `/test-review` does **not** flag orphaned test files, >3mo skipped tests, unused helpers, or stale snapshots — `cleanup-styles-tests` §7 owns those. Bidirectional pointers in the report footer cross-reference. If you're auditing for those four categories, run `/code-cleanup --tests` instead.
+
+**Scale tiers:** <100 files = full, 100-500 = bounded, >500 = smart sample (reuses `architecture-review/references/scale-strategy.md`).
+
+**Output:** Twin headline → Testing posture summary → Findings (Coverage / Quality / Economics, ranked) → Documented-decision conflicts (separate, requires confirmation) → Suggested next actions (skill chains + copy-pasteable `/plan-feature` snippets for strategic rewrites).
+
+**Useful chain:** `/code-cleanup` (deletes orphaned test artifacts) → `/test-review` (audits what remains) → `/test-review --plan` → `/plan-feature` per phase. Or post-ship: `/test-review` → `/code-review --security` on the critical-path gaps it surfaces.
+
+---
+
 ### /code-health-advice
 
 **When:** You have time and want to do *something*, but you're not sure which of the other skills to reach for. Read-only routing call — never invokes anything.
@@ -512,17 +551,20 @@ claude
 # 3. Repo-wide architecture audit
 /architecture-review
 
-# 4. Convert top findings into a phased refactor brief
+# 4. Repo-wide test suite audit (if the project has tests)
+/test-review
+
+# 5. Convert top architecture findings into a phased refactor brief
 /architecture-review --plan
 
-# 5. Drop each phase into a fresh /plan-feature session as you tackle it
+# 6. Drop each phase into a fresh /plan-feature session as you tackle it
 #    (the brief is self-contained — paste and go)
 
-# 6. End session
+# 7. End session
 /update-docs
 ```
 
-For mechanical refactors only (single-file, non-API-breaking) you can skip step 4 and run `/architecture-review --fix` directly — it gates per finding with a diff preview. Anything cross-file or API-touching gets auto-routed to `--plan` regardless.
+For mechanical refactors only (single-file, non-API-breaking) you can skip step 5 and run `/architecture-review --fix` directly — it gates per finding with a diff preview. Anything cross-file or API-touching gets auto-routed to `--plan` regardless. Similarly, `/test-review --fix` walks T01 (assertion-free) deletions with per-finding diff preview.
 
 ### Scenario 6: Not Sure Which Skill to Run
 
@@ -680,6 +722,7 @@ Commands are stored in:
 │       ├── code-review/
 │       ├── plan-feature/
 │       ├── resume-work/
+│       ├── test-review/
 │       └── update-docs/
 ├── .gitignore
 ├── Workflow.md              # This file
@@ -716,6 +759,7 @@ Symlinked to: `~/.claude/skills`, `~/.claude/agents` (individual subdirectories)
 | | Documented when to reach for built-in `/ultrareview` (high-risk pre-merge) vs custom `/code-review` (daily driver) in README |
 | May 2026 | New `/architecture-review` skill — repo-wide complexity + refactor + perf + over-engineering audit, distinct from diff-scoped reviewers. Three guardrails: catalog-driven complexity-reducing refactors (not GoF pattern-mongering), reads intended architecture from CLAUDE.md/ADRs first, CCN delta sanity gate. **Four parallel subagents** (`arch-structure`, `arch-refactors`, `arch-performance`, `arch-simplification`). 4th dimension added mid-session after honest audit against user's three real goals (optimized / maintainable / least-code-possible) found `least-code-possible` was under-served — refactor catalog *trades* complexity, doesn't delete it. `arch-simplification` targets sub-file over-engineering: single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config, near-duplicates. Reports `lines_deletable` as top-line metric. |
 | | New `/code-health-advice` skill — read-only routing advisor. Reads `git status`, branch, recent commits, `CLAUDE.md` `In Progress`/`Next Steps`, open PR; classifies repo state into one of five buckets (pre-commit cleanup / pre-merge verification / post-ship audit / orient + audit / ambient improvement); prints a ~10-line report with one recommended skill flow + one alternative. Never invokes anything, never edits files. Solves "I have time but I'm not sure which skill to reach for next." |
+| | New `/test-review` skill — repo-wide test suite audit. Closes the biggest code-health gap surfaced in Session 23's audit (existing skills only covered diff-scoped or artifact-level test concerns). Three parallel Sonnet subagents (`test-coverage` / `test-quality` / `test-economics`). T01-T05 smell catalog. **Twin headline metric** so both directions (missing coverage on critical paths + wasteful/redundant tests) are equally visible. `--fix` restricted to T01 (assertion-free — provably safe deletion); everything else routes to `--plan`. `--coverage` opt-in for reading existing coverage reports (jest/vitest/pytest-cov/cargo-tarpaulin/go cover); never auto-invokes the tool. Defers entirely to `cleanup-styles-tests` §7 for orphans / >3mo skips / unused helpers / stale snapshots — non-overlap is deliberate. |
 
 ---
 
