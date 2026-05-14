@@ -1,0 +1,448 @@
+# GSC Ingestion — Canonical Reference
+
+Loaded by the orchestrator in **Step 1.6** of `SKILL.md`. This file is the source of truth for:
+- Folder layout under `.seo-data/gsc/`
+- Expected CSV filenames + their canonical column headers
+- Per-CSV parsing rules + graceful-fail behavior
+- Per-CSV finding-type catalog (12 sub-dims, thresholds, severity/certainty defaults)
+- Digest caps + ranking inputs
+- Setup banner content
+- `.gitignore` auto-append rules
+- Freshness policy
+
+For the **finding output shape**, ranking formulas, and `score_impact: 0` invariant, see `rubric.md` — that file is the contract; this file is the implementation reference.
+
+---
+
+## Folder layout
+
+```
+.seo-data/gsc/
+├── README.md                              (auto-created on first detection)
+├── performance/
+│   ├── queries.csv                        GSC: Performance > Search results > Queries tab > Export
+│   ├── pages.csv                          GSC: Performance > Search results > Pages tab > Export
+│   ├── countries.csv                      (optional — not used in v1)
+│   └── devices.csv                        (optional — not used in v1)
+├── indexing/
+│   ├── summary.csv                        GSC: Page indexing > Export the top-level "Why pages aren't indexed" table
+│   ├── crawled-not-indexed.csv            GSC: Page indexing > click "Crawled - currently not indexed" > Export
+│   ├── discovered-not-indexed.csv         GSC: Page indexing > click "Discovered - currently not indexed" > Export
+│   ├── not-found-404.csv                  GSC: Page indexing > click "Not found (404)" > Export
+│   ├── page-with-redirect.csv             GSC: Page indexing > click "Page with redirect" > Export
+│   ├── alternate-canonical.csv            GSC: Page indexing > click "Alternate page with proper canonical tag" > Export
+│   ├── duplicate-google-chose-different.csv  GSC: Page indexing > click "Duplicate, Google chose different canonical than user" > Export
+│   ├── blocked-4xx.csv                    GSC: Page indexing > click "Blocked due to other 4xx issue" > Export
+│   ├── blocked-403.csv                    GSC: Page indexing > click "Blocked due to access forbidden (403)" > Export
+│   ├── soft-404.csv                       GSC: Page indexing > click "Soft 404" > Export
+│   └── server-error-5xx.csv               GSC: Page indexing > click "Server error (5xx)" > Export
+├── core-web-vitals/                       (Tier 2 — not parsed in v1, skip with footer note)
+├── enhancements/                          (Tier 2 — not parsed in v1, skip with footer note)
+└── sitemaps.csv                           (Tier 2 — not parsed in v1, skip with footer note)
+```
+
+**Tier 1 CSVs in v1:** the 2 under `performance/` + the 11 under `indexing/`. Tier 2 (CWV, Enhancements, Sitemaps status) is recognized but skipped with a footer note "found N Tier 2 CSVs — not parsed in v1; will be supported in a future version." Users can still export them now without breaking anything.
+
+**File naming convention:** GSC's "Export → CSV" produces files named `Table.csv` or `<property>_Insights_<dates>.csv` (the exact name varies by tab + property + locale). The user manually renames each download to the canonical filename and drops it into the matching subfolder. The skill never inspects the originally-downloaded filename.
+
+**Unknown files:** any CSV in `.seo-data/gsc/` whose path doesn't match the canonical inventory above is logged in the report footer as `unknown CSV ignored: <path>` and otherwise ignored — does not block ingestion of recognized files.
+
+---
+
+## Per-CSV header expectations (English only — v1)
+
+GSC's interface language determines the exported header names. v1 supports English headers only. Non-English headers cause a per-CSV failure with detected headers logged: `gsc-ingestion: expected headers {X,Y,Z} for <file>; detected {Α,Β,Γ}. CSV skipped — re-export from a GSC session in English, or wait for v2 locale support.`
+
+Header matching is **case-insensitive** and tolerates leading/trailing whitespace.
+
+| CSV | Required headers (case-insensitive) | Optional headers | Notes |
+|---|---|---|---|
+| `performance/queries.csv` | `Top queries`, `Clicks`, `Impressions`, `CTR`, `Position` | — | CTR exported as `"5.4%"`-style string; parse as `float / 100`. Position as decimal. |
+| `performance/pages.csv` | `Top pages`, `Clicks`, `Impressions`, `CTR`, `Position` | — | Same parsing rules. URL is in the first column. |
+| `indexing/summary.csv` | `Reason`, `Pages` | `Source`, `Validation`, `Trend` | The summary is a 1-row-per-reason table; only `Reason` + `Pages` count are used. |
+| `indexing/crawled-not-indexed.csv` | `URL`, `Last crawled` | — | URL list; date column optional in older exports. |
+| `indexing/discovered-not-indexed.csv` | `URL`, `Last crawled` | — | Same shape. |
+| `indexing/not-found-404.csv` | `URL`, `Last crawled` | — | Same shape. |
+| `indexing/page-with-redirect.csv` | `URL`, `Last crawled` | — | Same shape. |
+| `indexing/alternate-canonical.csv` | `URL` | `Last crawled`, `Google-selected canonical` | When present, capture the Google-chosen canonical for cross-reference. |
+| `indexing/duplicate-google-chose-different.csv` | `URL` | `Last crawled`, `Google-selected canonical` | Capture Google-chosen canonical — central to the finding's evidence. |
+| `indexing/blocked-4xx.csv` | `URL` | `Last crawled` | URL list. |
+| `indexing/blocked-403.csv` | `URL` | `Last crawled` | URL list. |
+| `indexing/soft-404.csv` | `URL`, `Last crawled` | — | Same shape. |
+| `indexing/server-error-5xx.csv` | `URL`, `Last crawled` | — | Same shape. |
+
+If a CSV has the required headers plus extra columns, ignore the extras silently. If a CSV is missing a required header, skip it with footer log + continue with the rest.
+
+---
+
+## Parsing rules
+
+CSV parsing happens in the orchestrator using `Read` (no `awk`/`cut`/`sed` available — `allowed-tools` doesn't include them).
+
+**The CSV regex pattern** must handle quoted commas (queries containing commas are common):
+
+```
+Field separator: ,
+Field quoting: "..."   (double quotes; escape internal " as "")
+Line terminator: \n or \r\n
+Header row: first non-empty line
+```
+
+Per-row parsing pseudocode (executed by orchestrator in-context, line by line):
+
+```
+1. Read the file with Read.
+2. Strip BOM if present (GSC exports often start with ﻿).
+3. Split on \r?\n. First non-empty line is the header row.
+4. Normalize headers (lowercase, trim) and validate against expected set.
+5. For each subsequent non-empty line:
+   - Walk the line character-by-character.
+   - Maintain in_quote state.
+   - Split fields on ',' only when not in_quote.
+   - Strip outer quotes from each field; unescape "" to ".
+   - Map field values to header columns.
+6. For numeric columns: strip thousands separators (commas don't appear inside numbers in
+   GSC exports, but be defensive — handle "1,234" → 1234 if encountered).
+7. For CTR: strip trailing %, divide by 100.0. Empty/missing → null.
+8. For Position: parse as float. Empty/missing → null.
+9. For dates (Last crawled): keep as ISO date string; don't parse beyond that.
+```
+
+**Defensive parsing — never fail the whole skill on one bad row.** If a row can't be parsed (wrong column count, malformed quoting), skip it and accumulate to a `malformed_rows: <count>` footer note per CSV. Continue with the rest.
+
+---
+
+## Digest caps (per CSV)
+
+Each CSV's parsed rows are reduced to a **digest** of at most **50 rows** before being passed to the `seo-gsc-insights` subagent. This keeps prompt size bounded.
+
+| CSV | Sort key | Direction | Cap |
+|---|---|---|---|
+| `performance/queries.csv` | `impressions` | desc | 50 |
+| `performance/pages.csv` | `impressions` | desc | 50 |
+| `indexing/summary.csv` | n/a (full table, max 11 rows) | — | unbounded |
+| `indexing/<reason>.csv` | `last_crawled` | desc (most-recent first) | 50 |
+
+For indexing CSVs, the **count** of rows in the source CSV is preserved as `total_count` even if the digest is capped — that's what feeds the "1,146 crawled-not-indexed pages" cluster headline.
+
+---
+
+## page_type_map building
+
+The orchestrator builds a single `page_type_map: {url → page_type}` once in Step 1.6 (replacing the duplication of detection logic across `geo-generative` and `seo-gsc-insights`).
+
+**Sources of URLs to classify:**
+- All URLs in `performance/pages.csv` (top 50 by impressions)
+- All URLs in any `indexing/*.csv` (capped per file as above)
+- All URLs from sitemap.xml entries (Step 3.2 probe results)
+
+**Classification logic** mirrors `scan-geo.md:25-37` page-type heuristics. For each URL, derive a `page_type` from path patterns:
+
+| URL path pattern | page_type |
+|---|---|
+| `/` exactly | `homepage` |
+| `/blog/*`, `/posts/*`, `/news/*`, `/articles/*` | `article` |
+| `/products/*`, `/product/*`, `/shop/*` | `product` |
+| `*faq*`, `*frequently-asked*` | `faq` |
+| `*how-to*`, `*tutorial*`, `*guide*` | `howto` |
+| `*recipe*` | `recipe` |
+| `*event*` | `event` |
+| `/author/*`, `/team/*`, `/about/*` | `person` or `about` |
+| `/docs/*`, `/documentation/*`, `/api/*` | `documentation` |
+| `/category/*`, `/tag/*`, `/topic/*` | `taxonomy` |
+| anything else | `unknown` |
+
+The map is passed to **all 4 subagents** in shared context — `seo-gsc-insights` (primary consumer), `geo-generative` (uses it to short-circuit its own page-type detection), and the other 2 (informational, helps prioritize).
+
+---
+
+## Setup banner (one-time, sentinel-gated)
+
+When the orchestrator runs `/seo-review` and `.seo-data/gsc/` does not exist:
+
+1. Check sentinel: `.seo-data/.gsc-banner-shown` (note: not in `gsc/` because the parent doesn't exist yet). Actually — use a per-project marker that's git-tracked-aware:
+   - If `.seo-data/` doesn't exist at all → print banner; the marker is implicit (next time `.seo-data/gsc/` may exist OR `.seo-data/.gsc-banner-shown` will exist)
+   - If `.seo-data/` exists but `.gsc-banner-shown` is absent → print banner, touch `.seo-data/.gsc-banner-shown`
+   - If `.seo-data/.gsc-banner-shown` is present → suppress banner
+2. The marker is itself gitignored (no value committing it).
+
+**Banner content** (printed before Section 1 of the report):
+
+```
+─────────────────────────────────────────────────────────────────────────────
+GSC INTEGRATION AVAILABLE — Make /seo-review traffic-aware
+
+This run used static signals only. /seo-review can incorporate Google Search
+Console data to surface traffic-prioritized findings (which pages get
+impressions, which queries you rank for at position 5-20, which pages Google
+crawled but didn't index).
+
+To enable:
+
+1. Open Google Search Console for your property.
+2. Export these CSVs (see ".seo-data/gsc/README.md" once the folder exists for
+   the full step-by-step):
+   • Performance > Search results > Queries tab → Export → CSV
+   • Performance > Search results > Pages tab → Export → CSV
+   • Page indexing > Export "Why pages aren't indexed" table → CSV
+   • Page indexing > click each reason row → Export → CSV (up to 9 CSVs)
+3. Create .seo-data/gsc/{performance,indexing}/ in this repo.
+4. Drop each CSV into the matching subfolder. Rename to canonical names:
+   queries.csv, pages.csv, summary.csv, crawled-not-indexed.csv, etc.
+5. Re-run /seo-review.
+
+This folder will be auto-gitignored (search queries can include brand-internal
+data — privacy default). You don't need to commit anything.
+
+Score will stay /100 either way — GSC enriches the *recommendations*, not the
+score, so docs/seo-history.md stays comparable across runs.
+
+(This banner shows once per project. Touch .seo-data/.gsc-banner-shown to
+silence it manually.)
+─────────────────────────────────────────────────────────────────────────────
+```
+
+Banner skipped silently when `.seo-data/gsc/` exists (any state).
+
+---
+
+## .gitignore auto-append
+
+When the orchestrator first detects `.seo-data/gsc/` (i.e., at least one CSV present), append to project-root `.gitignore` using a sentinel-marked block for idempotency:
+
+```
+# /seo-review managed — do not edit between markers
+.seo-data/gsc/
+.seo-data/.gsc-banner-shown
+# /end /seo-review managed
+```
+
+**Idempotency check:** before appending, Grep `.gitignore` for the start marker (`# /seo-review managed`). If present, skip — block already exists.
+
+**`.gitignore` doesn't exist yet:** create it with the block above as the only content.
+
+The orchestrator prints a one-line notice on first append: `Added .seo-data/gsc/ to .gitignore (sentinel-marked block).` Subsequent runs are silent.
+
+**Why ignore the sentinel file too:** the banner sentinel `.seo-data/.gsc-banner-shown` is per-machine. Committing it would suppress the banner for other team members on their first clone.
+
+**Why not edit the user's existing .gitignore content:** the sentinel block is append-only. The orchestrator never modifies anything outside the markers. Users editing the block manually (e.g., adding `!.seo-data/gsc/notes.md` to selectively commit) is their call — the orchestrator's idempotency check only verifies the start marker is present, not its exact contents.
+
+---
+
+## Freshness policy
+
+For each parsed CSV, capture `mtime`. Calculate `days_old = (today - mtime).days`.
+
+| days_old | Behavior |
+|---|---|
+| < 30 | No warning; treated as fresh. |
+| 30 - 90 | Footer warning: `freshness: <file> is <N> days old — re-export from GSC for fresher signal`. Run continues. |
+| > 90 | Footer warning escalates to `⚠ freshness: <file> is <N> days old — over 90 days, data may be misleading`. Run still continues — never block. |
+
+Aggregate freshness summary in the footer:
+
+```
+GSC CSVs: 7 present (queries, pages, 5/9 indexing reasons).
+Freshness: 6 fresh (<30d), 1 stale (queries.csv at 47d ⚠ — consider re-export).
+```
+
+---
+
+## Finding-type catalog (12 sub-dims)
+
+Each CSV produces 0+ findings. Below is the per-CSV / per-sub-dim spec. All findings have `source: "gsc"`, `score_impact: 0` (enforced orchestrator-side in Step 6).
+
+### 1. `indexing_coverage` (from `indexing/summary.csv`)
+
+**Trigger:** any time summary.csv is parsed.
+
+**Emit one finding total** — a headline informational finding:
+
+- `severity`: `medium` if non-index rate >50%, `low` otherwise
+- `certainty`: `1.0`
+- `effort_estimate`: `medium` (umbrella for sub-cluster work)
+- `title`: e.g., `"GSC reports <X> pages not indexed out of <Y> known (<Z>% non-index rate)"`
+- `recommended_action`: `"See per-reason breakdown below — each indexing reason has a different remediation path."`
+- `evidence`: full reason→count table from summary.csv
+
+### 2. `crawled_not_indexed` (from `indexing/crawled-not-indexed.csv`)
+
+**Trigger:** ≥1 row in the file.
+
+**Cluster all rows into one finding** (not one per URL):
+
+- `severity`: `medium` if count <100; `high` if ≥100
+- `certainty`: `0.9` (Google's call, usually accurate)
+- `effort_estimate`: `large` (content-quality work)
+- `affected_urls`: top 10 by `last_crawled` descending
+- `title`: `"<N> pages crawled by Google but not indexed (content quality signal)"`
+- `recommended_action`: `"Audit content quality and E-E-A-T signals. Common causes: duplicate content, thin content, low authority signal, soft-quality issues. Sample affected URLs: <list>. Pick 3-5 representative URLs, compare against top-ranking competitors, identify what's missing (length, originality, expert authorship, citations)."`
+
+### 3. `discovered_not_indexed` (from `indexing/discovered-not-indexed.csv`)
+
+**Trigger:** ≥1 row.
+
+**Cluster into one finding:**
+
+- `severity`: `medium` if count <50; `high` if ≥50
+- `certainty`: `0.9`
+- `effort_estimate`: `medium`
+- `affected_urls`: top 10
+- `title`: `"<N> pages discovered but not crawled (crawl budget / internal linking signal)"`
+- `recommended_action`: `"Google found these URLs but hasn't crawled them — usually crawl-budget or low-priority signal. Add internal links from high-authority pages, ensure they're in sitemap.xml, request indexing manually for the most important ones."`
+
+### 4. `not_found_404` (from `indexing/not-found-404.csv`)
+
+**Trigger:** ≥1 row.
+
+**Cluster + routing-rename match** (this is the bulk-redirect detection):
+
+1. Parse all URLs, derive path patterns (e.g., `/blog/2023/post-1`, `/blog/2023/post-2` → cluster `/blog/2023/*`).
+2. Cross-reference with Step 1.5 git-changes digest: any commits in the 35-day window touching the source paths that *generated* these URLs?
+3. If routing-rename match found: emit a single bulk-cluster finding with **the routing-rename signal in evidence**.
+
+- `severity`: `high` (broken URLs at Google's view dilute crawl budget)
+- `certainty`: `1.0` (Google saw them as 404)
+- `effort_estimate`: `small` (bulk 301 redirect or sitemap cleanup)
+- `affected_urls`: top 10 (or all if ≤10)
+- `title`: `"<N> URLs return 404 at Google's view"`
+- `evidence`: includes `"Routing rename in window: <commit-msg> on YYYY-MM-DD touching <paths>"` when detected
+- `recommended_action`: when routing-rename detected: `"Bulk 301 redirects mapping <old-pattern> → <new-pattern> in <framework-config-file>. Plus remove 404 entries from sitemap.xml. Confirm the mapping is 1:1 before bulk-applying."` Otherwise: `"Either restore the affected pages or remove these entries from sitemap.xml."`
+
+### 5. `redirect_hygiene` (from `indexing/page-with-redirect.csv`)
+
+**Trigger:** ≥1 row.
+
+**Cluster into one finding:**
+
+- `severity`: `medium`
+- `certainty`: `1.0`
+- `effort_estimate`: `small`
+- `title`: `"<N> sitemap URLs point to redirect destinations (sitemap hygiene)"`
+- `recommended_action`: `"Replace these sitemap entries with their final destinations. Redirect-chain URLs in sitemap waste crawl budget. Sample: <list>."`
+
+### 6. `canonical_conflict` (from `indexing/duplicate-google-chose-different.csv`)
+
+**Trigger:** ≥1 row.
+
+**Per-URL findings** (cap 5), or cluster if N >5:
+
+- `severity`: `high`
+- `certainty`: `0.85` (canonical handling is nuanced — sometimes Google's choice is fine)
+- `effort_estimate`: `medium` (requires per-URL investigation)
+- `title`: per-URL: `"Google chose different canonical for <URL>: <google-canonical>"`. Cluster: `"<N> URLs where Google rejected the declared canonical"`.
+- `recommended_action`: `"Compare your declared <link rel='canonical'> against Google's selected canonical for each URL. Common causes: hreflang misconfig, duplicate-content cluster, soft-duplicate variations (trailing slash, params). Use the URL Inspection tool in GSC to see Google's full reasoning per URL."`
+
+### 7. `blocked_access` (from `blocked-4xx.csv` + `blocked-403.csv` + `alternate-canonical.csv`)
+
+**Trigger:** ≥1 row in any of these. Usually intentional.
+
+**One finding per source CSV** (max 3):
+
+- `severity`: `low`
+- `certainty`: `0.6`
+- `effort_estimate`: `small`
+- `title`: e.g., `"<N> URLs blocked by 403 (likely intentional)"`
+- `recommended_action`: `"Verify these are intentionally blocked. If any should be public, fix the access rule. Otherwise no action needed — these URLs are correctly excluded from Google's index."`
+
+### 8. `soft_404` (from `indexing/soft-404.csv`)
+
+**Trigger:** ≥1 row.
+
+**Cluster into one finding:**
+
+- `severity`: `medium`
+- `certainty`: `0.9`
+- `effort_estimate`: `medium`
+- `title`: `"<N> URLs return 200 but Google detected empty/error content (soft 404)"`
+- `recommended_action`: `"Visit each URL — pages may load with stub/placeholder/error content that returns 200. Fix the rendering or set proper 404 status. Sample: <list>."`
+
+### 9. `server_errors` (from `indexing/server-error-5xx.csv`)
+
+**Trigger:** ≥1 row.
+
+**Cluster + always high-priority:**
+
+- `severity`: `high`
+- `certainty`: `1.0`
+- `effort_estimate`: `medium` (depends on cause)
+- `title`: `"<N> URLs returned 5xx errors when Google crawled (site reliability signal)"`
+- `recommended_action`: `"Investigate server logs around the last-crawled timestamps. Common causes: deployment-window errors, timeouts on heavy pages, dependency outages. Sample: <list>."`
+
+### 10. `ctr_opportunity` (from `performance/pages.csv`)
+
+**Trigger:** rows with `impressions ≥ 500` AND `ctr < (median_ctr_in_file × 0.5)`.
+
+**Per-URL findings** (cap 5):
+
+- `severity`: `medium`
+- `certainty`: `0.7` (CTR is affected by many factors; title/meta is a common one)
+- `effort_estimate`: `small` (rewrite title + meta)
+- `impressions`, `clicks`, `ctr` populated
+- `title`: `"CTR opportunity on <URL> (<X>K impressions, <Y>% CTR vs <Z>% median)"`
+- `recommended_action`: `"Rewrite <title> + <meta name='description'> to be more compelling. Test against top SERP results for the page's primary queries. Target CTR: at least median (<Z>%)."`
+
+### 11. `position_band_opportunity` (from `performance/queries.csv`)
+
+**Trigger:** rows with `position` between 5.0 and 20.0 inclusive AND `impressions ≥ 100`.
+
+**Per-query findings** (cap 5):
+
+- `severity`: `medium`
+- `certainty`: `0.7`
+- `effort_estimate`: `medium` (on-page optimization)
+- `impressions`, `avg_position`, `clicks` populated
+- `title`: `"Query '<query>' ranks at position <X.Y> with <N> impressions — position-band opportunity"`
+- `recommended_action`: `"Identify which page ranks for this query (use GSC's Pages tab filtered by query). Improve on-page signals: H1/title alignment, content depth, internal links from related pages, schema markup. Moving from position 10 → 5 typically 3-5x's clicks."`
+
+### 12. `traffic_orphan` (from `performance/pages.csv` ∩ sitemap)
+
+**Trigger:** URLs in sitemap.xml that **do not appear** in pages.csv (i.e., 0 impressions in the GSC data window).
+
+**Cluster into one finding** (only if count ≥5 — fewer is too noisy):
+
+- `severity`: `low`
+- `certainty`: `0.6` (some pages legitimately get 0 impressions but should stay)
+- `effort_estimate`: `medium` (per-page audit)
+- `affected_urls`: top 10 by some criterion (alphabetical for now; could use sitemap `<priority>` later)
+- `title`: `"<N> sitemap URLs received 0 impressions in GSC's data window (traffic orphans)"`
+- `recommended_action`: `"Audit these pages — they're indexed (in sitemap) but no one's finding them. Options: improve content + internal linking, remove from sitemap if they shouldn't rank, or accept as legitimate low-traffic pages (e.g., archived posts). Sample: <list>."`
+
+---
+
+## Output to shared context (orchestrator → 4 subagents)
+
+After Step 1.6 completes, the orchestrator passes this structured block to all 4 subagents:
+
+```
+GSC Mode: enabled | disabled
+
+When enabled:
+- CSVs detected: <list of canonical paths>
+- Digests:
+  - performance/queries.csv: <top 50 rows by impressions, structured records>
+  - performance/pages.csv: <top 50 rows by impressions>
+  - indexing/summary.csv: <full table, ≤11 rows>
+  - indexing/<reason>.csv: <top 50 rows by last_crawled desc>, plus total_count
+- page_type_map: {<url>: <page_type>, ...}
+- url_impressions_map: {<url>: <impressions>, ...}  ← for traffic_weight lookup
+- Freshness summary: {<file>: <days_old>, ...}
+- Malformed-rows count per CSV (if any)
+
+When disabled:
+- gsc_mode: disabled
+- Reason: "no .seo-data/gsc/" | "directory empty"
+```
+
+The `seo-gsc-insights` subagent is the primary consumer (uses everything). The other 3 subagents use `url_impressions_map` for traffic_weight when ranking their own findings; the rest is informational.
+
+---
+
+## Hard rules (orchestrator side)
+
+- **Never block runs.** Every failure mode (missing folder, missing file, missing header, malformed row, stale freshness) logs to footer and continues.
+- **Never modify .gitignore outside the sentinel block.** Idempotency check via start-marker Grep.
+- **CSV parsing is single-pass.** Don't re-read files; cache parsed digest in shared context.
+- **No HTTP.** All work is local file reads + git log + Grep.
+- **Digest cap is 50 rows per CSV** — never bypass.
+- **Score impact stays heuristic.** GSC findings carry `score_impact: 0` (see `rubric.md` for the orchestrator-side enforcement).

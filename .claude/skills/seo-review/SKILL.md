@@ -50,9 +50,11 @@ If none match: output
 
 and stop the skill cleanly.
 
-**Otherwise, print the detected stack in one line:**
+**Otherwise, print the detected stack in one line.** The line includes the GSC-mode summary computed in Step 1.6 (e.g., `Mode: heuristic` when no CSVs present, `Mode: heuristic + GSC (N CSVs)` when CSVs detected). Examples:
 
-> Detected: Next.js 14 app-router project, TypeScript, with sitemap.xml at /public/sitemap.xml and i18n via next-i18next. Mode: heuristic (use `--url <base>` for live HTML diff and sitemap URL probe).
+> Detected: Next.js 14 app-router project, TypeScript, with sitemap.xml at /public/sitemap.xml and i18n via next-i18next. Mode: heuristic + GSC (7 CSVs present: queries, pages, 5/9 indexing reasons; freshness OK). Use `--url <base>` for live HTML diff and sitemap URL probe.
+
+> Detected: Astro 4 project, TypeScript, no i18n. Mode: heuristic (drop GSC CSVs in `.seo-data/gsc/` for traffic-aware mode — see one-time setup banner above).
 
 **Detect i18n** for the hreflang scan: `next-i18next`, `nuxt-i18n`, `react-i18next`, `vue-i18n`, `@formatjs/intl`, `i18next`, `next-international` deps, or multi-locale folder structure (`pages/en/`, `pages/fr/`, etc.).
 
@@ -109,6 +111,105 @@ The brief gets passed **verbatim** to all 3 subagents as shared context. Subagen
 **Weight-adjustment validation gate.** Before passing weight adjustments to subagents, validate: each |delta| ≤ 5, sum of deltas = 0. If the brief proposes deltas that violate either rule, cap individual deltas to ±5 and rebalance by scaling the opposing deltas proportionally so the sum remains 0. Note any capping in the report footer.
 
 If WebSearch/WebFetch fail or return nothing useful (rare, but possible on flaky network), fall back to a one-line note "best-practices fetch failed — proceeding with embedded heuristics only" and continue. Mark the report footer accordingly.
+
+---
+
+## Step 1.6 — GSC CSV Ingestion (orchestrator-only)
+
+When the user has dropped Google Search Console CSV exports into `.seo-data/gsc/`, parse them into structured digests + maps for downstream subagent use. When absent, print a one-time setup banner and proceed heuristic-only.
+
+Read `references/gsc-ingestion.md` for the canonical reference (folder layout, expected headers, parsing rules, finding-type catalog, freshness policy, `.gitignore` auto-append rules). The reference is comprehensive; this step describes the orchestrator's call graph.
+
+This step is **independent of Step 1.5** (git-history scan) — both build shared context for Step 5 and may execute in any order or in parallel.
+
+### 1.6.1 — Detection
+
+1. `Glob` for `.seo-data/gsc/**/*.csv`.
+2. If **zero matches**:
+   - Check sentinel `.seo-data/.gsc-banner-shown`. If the sentinel file is **absent** → emit the setup banner (full text in `gsc-ingestion.md` "Setup banner"). Touch the sentinel file (`Write` an empty file).
+   - Set `gsc_mode: disabled` in shared context. Skip to Step 2 (Mode Dispatch).
+3. If **≥1 match**: proceed to 1.6.2.
+
+### 1.6.2 — README + .gitignore (idempotent)
+
+**README:** If `.seo-data/gsc/README.md` does NOT exist, read `references/gsc-setup-readme-template.md` and write its **template content block** (everything between the `## Template content (begin)` and `## Template content (end)` markers, inner-fenced block extracted) to `.seo-data/gsc/README.md`. If the README already exists, leave it alone — user may have edited it.
+
+**.gitignore:** Read project-root `.gitignore` if it exists. Grep for the sentinel start marker `# /seo-review managed`. If absent, append:
+
+```
+# /seo-review managed — do not edit between markers
+.seo-data/gsc/
+.seo-data/.gsc-banner-shown
+# /end /seo-review managed
+```
+
+If `.gitignore` doesn't exist, create it with the sentinel block as sole content. Print a one-line notice: `Added .seo-data/gsc/ to .gitignore (sentinel-marked block).` Subsequent runs are silent.
+
+### 1.6.3 — Parse each canonical CSV
+
+For each canonical path in `.seo-data/gsc/` (per the inventory in `gsc-ingestion.md` "Folder layout"):
+
+1. `Read` the file.
+2. Parse per `gsc-ingestion.md` "Parsing rules" — strip BOM, validate headers case-insensitively, walk rows respecting CSV quoting, normalize CTR/Position/dates.
+3. Build digest per `gsc-ingestion.md` "Digest caps" (top-50 per CSV by the documented sort key).
+4. Track `total_count` (full row count) separately from digest length — clusters use total_count in headlines.
+
+Failure modes (all log to footer + continue, never block):
+- Unknown CSV path → log `unknown CSV ignored: <path>`.
+- Missing required header → log `CSV skipped: <path> — expected <X>, detected <Y>`.
+- Malformed rows → tally `malformed_rows: <count>` per CSV.
+
+### 1.6.4 — Build cross-subagent maps
+
+After all CSVs parsed:
+
+- **page_type_map**: `{url → page_type}` over the union of URLs from `performance/pages.csv` digest + any `indexing/*.csv` digests + sitemap URLs (from Step 3.2 probe results when available, else from sitemap parsing). Classification heuristics: `gsc-ingestion.md` "page_type_map building" (mirrors `scan-geo.md:25-37` patterns).
+- **url_impressions_map**: `{url → impressions}` from `performance/pages.csv` rows. Used by ALL 4 subagents in Step 6 ranking — supplies `traffic_weight` when a finding's affected URL has GSC impression data (`rubric.md` "Traffic-weighted ranking").
+
+### 1.6.5 — Freshness check
+
+For each parsed CSV, compute `days_old = floor((now - file_mtime) / 1 day)`. Accumulate `freshness_summary: [{file, days_old}, ...]` for the footer. Per `gsc-ingestion.md` "Freshness policy":
+- <30 days: no warning
+- 30-90: footer warning "consider re-export"
+- >90: stronger warning "data may be misleading"
+
+Never block on freshness.
+
+### 1.6.6 — Compute GSC mode summary (consumed by Step 0)
+
+Build the GSC-mode fragment for Step 0's detected-stack line:
+
+- Disabled: `heuristic (drop GSC CSVs in .seo-data/gsc/ for traffic-aware mode — see one-time setup banner above)`
+- Enabled: `heuristic + GSC (<N> CSVs present: <inventory summary>; freshness <OK | warning>)`
+
+Where `<inventory summary>` lists categories present, e.g., `queries, pages, 5/9 indexing reasons`.
+
+### 1.6.7 — Pass to all 4 subagents (Step 5 shared context)
+
+The orchestrator's Step 5 shared-context block (the base block passed to all subagents) gains a GSC section:
+
+```
+GSC Mode: enabled | disabled
+
+When enabled:
+- CSVs detected: <list of canonical paths>
+- Digests:
+  - performance/queries.csv: <top-50 structured records>
+  - performance/pages.csv: <top-50 structured records>
+  - indexing/summary.csv: <full table, ≤11 rows>
+  - indexing/<reason>.csv: <top-50 by last_crawled desc>, total_count=<N>
+- page_type_map: {<url>: <page_type>, ...}
+- url_impressions_map: {<url>: <impressions>, ...}   ← for traffic_weight lookups
+- Freshness summary: [{file, days_old}, ...]
+- Malformed rows: {<file>: <count>} (omit when all zero)
+- Unknown CSVs ignored: [<paths>] (omit when empty)
+
+When disabled:
+- gsc_mode: disabled
+- Reason: "no .seo-data/gsc/" | "no canonical CSVs found"
+```
+
+**Primary consumer:** `seo-gsc-insights` subagent (added in Phase 4 — Step 5 will be updated to 4 parallel Task dispatches at that point). Until Phase 4 ships, the GSC block is built but unused — the 3 existing subagents may consume `url_impressions_map` for traffic_weight ranking starting in Phase 3.
 
 ---
 
