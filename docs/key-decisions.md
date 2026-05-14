@@ -125,3 +125,5 @@ From the review of https://github.com/shanraisshan/claude-code-best-practice. Th
 - **`@path/to/file` imports in CLAUDE.md** — documented syntax for importing additional files into CLAUDE.md context at launch. Max recursion depth 5. Not needed today (our CLAUDE.md is at 7.6k chars, well under limits) but a clean way to split if CLAUDE.md ever grows past target.
 - **`claudeMdExcludes` setting** — useful in monorepos for skipping other teams' CLAUDE.md files. Not applicable here (single-repo).
 - **`InstructionsLoaded` hook** — useful for debugging which instruction files are loaded, when, and why. Worth knowing about if/when we ever need to debug CLAUDE.md loading behavior.
+
+| Standalone skills + installed marketplace plugins coexist | Claude Code docs explicitly recommend standalone `.claude/` for personal config and plugins for sharing. No migration needed; the symlink model is the recommended personal-workflow pattern. (Rolled up from CLAUDE.md in S25 — table was at 21 rows after /seo-review row append; FIFO oldest moved here.) |
