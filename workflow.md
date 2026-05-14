@@ -15,6 +15,7 @@
 | **During Development** | `/code-cleanup` | Find dead code & cruft |
 | **Architecture Audit** | `/architecture-review` | Repo-wide complexity + refactor + perf + over-engineering audit (4 dimensions, reports `lines_deletable`) |
 | **Test Suite Audit** | `/test-review` | Repo-wide test health — coverage gaps on critical paths + smells (T01-T05) + suite economics. Twin headline metric. |
+| **SEO + GEO Audit** | `/seo-review` | Repo-wide SEO + Generative Engine Optimization audit for web projects. Fetches current best practices every run. Probes sitemap URL health. Score `/100` tracked over time. |
 | **End Session** | `/update-docs` | Save progress & context |
 
 ---
@@ -407,6 +408,36 @@ cd -
 
 ---
 
+### /seo-review
+
+**When:** Repo-wide SEO and Generative Engine Optimization audit. Web projects only (rejects non-web repos silently). Use frequently on web projects — SEO/GEO is high-leverage and the field evolves rapidly, so fresh-fetched best practices each run keep recommendations current.
+
+**Usage:**
+```bash
+/seo-review                              # Default report (heuristic + sitemap URL probe)
+/seo-review src/pages/                   # Scope to a path
+/seo-review --plan                       # Phased improvement brief with /plan-feature snippets per phase
+/seo-review --fix                        # Apply strict-allowlist mechanical scaffolds (never fabricates content)
+/seo-review --url https://example.com    # Live HTML diff + synthesizes sitemap URL probe bases when sitemap has relative URLs
+```
+
+**Three deliberate design choices:**
+1. **Fetches current best practices fresh every run** via `WebSearch` + `WebFetch` from 4 source categories (Google Search Central + web.dev, Schema.org + JSON-LD docs, GEO sources including llms.txt spec + Anthropic/OpenAI/Perplexity guidance, third-party authority blogs Moz/Ahrefs/SEJ). SEO/GEO field evolves fast — embedded static guidance ages instantly. The fetched ~50-line brief is passed verbatim to all 3 subagents as their primary source of truth.
+2. **Probes sitemap URLs for HTTP health.** Locates `sitemap.xml`/`sitemap_index.xml` locally, parses URLs, caps at top 100 by document order or `<priority>` desc, probes in parallel via `WebFetch`. Classifies 4xx/5xx/redirect-chains-greater-than-1-hop/slow-responses. **Total URL-health score impact capped at 8 points** out of Technical SEO's 25 — a fully broken sitemap doesn't zero out the dimension. All HTTP work runs in the orchestrator; subagents never make network calls.
+3. **`--fix` mode never fabricates content.** Every allowlist-eligible fix inserts a placeholder + TODO comment (missing viewport meta, canonical scaffold, robots.txt template, sitemap.xml stub, OG/Twitter Card templates, JSON-LD scaffolds with required-field placeholders, llms.txt scaffold). Titles, descriptions, alt text, JSON-LD values — these require human judgment and route to `--plan` instead. Per-finding diff gate; summary surfaces the TODO markers needing real values.
+
+**Decomposition:** Three parallel Sonnet subagents — `seo-technical` (crawlability, canonicals, mobile, hreflang, redirect config, perf signals, **sitemap URL health**), `seo-content` (titles, metas, headings, alt text, OG/Twitter Cards, internal linking), `geo-generative` (JSON-LD coverage, schema validation, llms.txt, E-E-A-T, semantic content patterns, AI-bot crawl access).
+
+**Rubric:** 5 weighted dimensions summing to 100 (Technical SEO 25 / On-Page SEO 25 / Structured Data 20 / Generative Engine 20 / Performance 10). Fetched best practices may tune weights ±5 per dimension per run; sum delta always 0. Score breakdown by dimension + sub-dimension shown in the report.
+
+**Score history:** Tracked in-repo at `docs/seo-history.md` (auto-created on first run, append-only). Each row = date + score + top-3 priorities. Delta from previous score shown in the headline when history exists. The file is git-tracked so progress is visible across machines / commits / team members.
+
+**Output:** Single-headline score `/100` (with Δ when history present) + top-3 highest-impact opportunities. Section 1 detected-context + score breakdown. Section 2 findings per dimension. Section 3 score-history table (when present). Section 4 next actions. Section 5 footer disclosure (sources fetched, sitemap probe results, subtotal-check arithmetic).
+
+**Useful chain:** post-ship → `/code-cleanup` (delete dead pages) → `/seo-review` (audit what remains) → `/seo-review --plan` → `/plan-feature` per phase. Or ambient improvement → `/seo-review --fix` for safe scaffolds, then `/seo-review --plan` for the rest.
+
+---
+
 ### /code-health-advice
 
 **When:** You have time and want to do *something*, but you're not sure which of the other skills to reach for. Read-only routing call — never invokes anything.
@@ -722,6 +753,7 @@ Commands are stored in:
 │       ├── code-review/
 │       ├── plan-feature/
 │       ├── resume-work/
+│       ├── seo-review/
 │       ├── test-review/
 │       └── update-docs/
 ├── .gitignore
@@ -760,6 +792,7 @@ Symlinked to: `~/.claude/skills`, `~/.claude/agents` (individual subdirectories)
 | May 2026 | New `/architecture-review` skill — repo-wide complexity + refactor + perf + over-engineering audit, distinct from diff-scoped reviewers. Three guardrails: catalog-driven complexity-reducing refactors (not GoF pattern-mongering), reads intended architecture from CLAUDE.md/ADRs first, CCN delta sanity gate. **Four parallel subagents** (`arch-structure`, `arch-refactors`, `arch-performance`, `arch-simplification`). 4th dimension added mid-session after honest audit against user's three real goals (optimized / maintainable / least-code-possible) found `least-code-possible` was under-served — refactor catalog *trades* complexity, doesn't delete it. `arch-simplification` targets sub-file over-engineering: single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config, near-duplicates. Reports `lines_deletable` as top-line metric. |
 | | New `/code-health-advice` skill — read-only routing advisor. Reads `git status`, branch, recent commits, `CLAUDE.md` `In Progress`/`Next Steps`, open PR; classifies repo state into one of five buckets (pre-commit cleanup / pre-merge verification / post-ship audit / orient + audit / ambient improvement); prints a ~10-line report with one recommended skill flow + one alternative. Never invokes anything, never edits files. Solves "I have time but I'm not sure which skill to reach for next." |
 | | New `/test-review` skill — repo-wide test suite audit. Closes the biggest code-health gap surfaced in Session 23's audit (existing skills only covered diff-scoped or artifact-level test concerns). Three parallel Sonnet subagents (`test-coverage` / `test-quality` / `test-economics`). T01-T05 smell catalog. **Twin headline metric** so both directions (missing coverage on critical paths + wasteful/redundant tests) are equally visible. `--fix` restricted to T01 (assertion-free — provably safe deletion); everything else routes to `--plan`. `--coverage` opt-in for reading existing coverage reports (jest/vitest/pytest-cov/cargo-tarpaulin/go cover); never auto-invokes the tool. Defers entirely to `cleanup-styles-tests` §7 for orphans / >3mo skips / unused helpers / stale snapshots — non-overlap is deliberate. |
+| | New `/seo-review` skill — repo-wide SEO + Generative Engine Optimization audit for web projects (rejects non-web silently). Three parallel Sonnet subagents (`seo-technical` / `seo-content` / `geo-generative`). **Fetches current best practices fresh every run** via WebSearch + WebFetch (4 source categories: Google Search Central + web.dev / Schema.org + JSON-LD / GEO sources + llms.txt spec / third-party authority blogs) — SEO/GEO evolves fast; embedded static guidance ages instantly. **Probes sitemap URLs for HTTP health** (4xx/5xx/redirect-chains/slow-responses; orchestrator-only HTTP, 100-URL cap, 8-point score-impact cap so a fully broken sitemap can't zero out Technical SEO). Single headline: score `/100` + top-3 opportunities + delta vs previous run when `docs/seo-history.md` exists. **`--fix` strict allowlist never fabricates content** — only inserts placeholders + TODO comments for the 11 eligible patterns (viewport, canonical, robots.txt, sitemap.xml stub, OG/Twitter scaffolds, JSON-LD scaffolds, llms.txt, decorative alt="", img dimensions from context, lazy-loading). `--url <deployed-url>` adds live HTML diff for SSR/runtime-rendered issues. Rubric: Technical SEO 25 / On-Page 25 / Structured Data 20 / Generative Engine 20 / Performance 10, with ±5-per-dim weight tuning from the fetched brief. |
 
 ---
 

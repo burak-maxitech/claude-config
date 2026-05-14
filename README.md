@@ -14,6 +14,9 @@ claude-config/
 │   │   ├── cleanup-deps-config.md
 │   │   ├── cleanup-files-code.md
 │   │   ├── cleanup-styles-tests.md
+│   │   ├── geo-generative.md
+│   │   ├── seo-content.md
+│   │   ├── seo-technical.md
 │   │   ├── test-coverage.md
 │   │   ├── test-economics.md
 │   │   └── test-quality.md
@@ -62,6 +65,17 @@ claude-config/
 │       │   └── references/
 │       │       ├── summary-template.md
 │       │       └── task-hydration.md
+│       ├── seo-review/
+│       │   ├── SKILL.md
+│       │   └── references/
+│       │       ├── best-practices-sources.md
+│       │       ├── fix-allowlist.md
+│       │       ├── plan-mode-seo.md
+│       │       ├── report-template.md
+│       │       ├── rubric.md
+│       │       ├── scan-content.md
+│       │       ├── scan-geo.md
+│       │       └── scan-technical.md
 │       ├── test-review/
 │       │   ├── SKILL.md
 │       │   └── references/
@@ -189,6 +203,7 @@ git pull
 | `/code-cleanup` | Find dead code & cruft (parallel subagents). Adds CVE scanning with `--vulns` (runs `npm audit` / `pip-audit` / `cargo audit` / equivalents per detected stack; report-only, never auto-fixed). | Skill |
 | `/architecture-review` | Repo-wide architecture audit — complexity hotspots, refactor opportunities, perf suspects, **and over-engineering** (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable` as a top-line metric. 4 parallel subagents, with `--plan`/`--fix`/`--map`/`--full-scan` | Skill |
 | `/test-review` | Repo-wide test suite audit — missing coverage on critical paths AND wasteful/redundant tests, in a single report. **Twin headline metric** (`Coverage gaps in critical code: X lines | Tests we can delete: Y lines`). 3 parallel subagents (`test-coverage` / `test-quality` / `test-economics`), T01-T05 smell catalog, with `--plan`/`--fix` (T01-only safe deletion)/`--coverage` (opt-in report reading)/`--full-scan`. Defers entirely to `/code-cleanup` for orphans / stale snapshots / >3mo skips. | Skill |
+| `/seo-review` | Repo-wide SEO + Generative Engine Optimization audit for **web projects only** (rejects non-web repos silently). **Fetches current best practices fresh every run** via WebSearch + WebFetch (4 source categories: Google Search Central+web.dev, Schema.org+JSON-LD, GEO sources, third-party authority blogs). **Probes sitemap URLs** for 4xx/5xx/redirect-chains/slow-responses (cap 100 URLs; score-impact capped at 8 points). 3 parallel subagents (`seo-technical` / `seo-content` / `geo-generative`). Single headline: **score /100 (Δ since last run) + top-3 highest-impact opportunities**. Score tracked over time in `docs/seo-history.md`. Flags: `--plan` / `--fix` (strict allowlist, never fabricates content — only inserts TODO placeholders) / `--url <deployed-url>` (live HTML diff). | Skill |
 | `/code-health-advice` | Routing advisor — looks at `git status`, branch, recent commits, `CLAUDE.md`, open PR, then suggests which skills to run in what order. **Read-only, never invokes anything.** Use when unsure where to start. | Skill |
 | `/update-docs` | End session - save progress | Skill |
 
@@ -206,8 +221,9 @@ git pull
 > | `/code-cleanup` | whole repo | deletion-focused — whole unused files, unused deps, stale config |
 > | `/architecture-review` | whole repo | structural audit — complexity hotspots, refactor opportunities, perf suspects, AND sub-file over-engineering (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable`. |
 > | `/test-review` | whole repo, test suite focus | test suite audit — coverage gaps on critical paths + test smells (T01-T05) + suite economics (snapshot bloat, flakiness, LOC ratio extremes). Reports twin headline (coverage gap LOC + deletable LOC). |
+> | `/seo-review` | whole web repo, SEO + GEO focus | SEO + Generative Engine Optimization audit. Fetches current best practices each run. Probes sitemap URL health (404/5xx/redirect-chain/slow). Single score `/100` headline + top-3 priorities. Tracked over time in `docs/seo-history.md`. Web projects only — rejects others silently. |
 >
-> Useful chain on an unfamiliar repo: `/code-cleanup` → `/architecture-review` → `/test-review` → `/architecture-review --plan` → `/plan-feature` per phase.
+> Useful chain on an unfamiliar repo: `/code-cleanup` → `/architecture-review` → `/test-review` → (if web) `/seo-review` → `/architecture-review --plan` → `/plan-feature` per phase.
 >
 > Not sure where to start? `/code-health-advice` reads your repo state and suggests which of these skills to run in what order. It's a 30-second routing call, not a review.
 
@@ -227,6 +243,9 @@ The `.claude/agents/` folder contains subagent definitions used by skills. These
 | `test-coverage` | `/test-review` | Ranks coverage gaps by `security_keyword_density × churn × import_fan_in`. Heuristic mode (test-neighbor + public-symbol enum) by default; reads coverage reports when `--coverage` opted in. Also scans bug-fixes-without-regression-tests in last 50 commits. |
 | `test-quality` | `/test-review` | Scans tests against T01-T05 smell catalog (assertion-free / weak / mock-heavy / mystery guest / redundant). Runs project-defined-assertion-helper allowlist scan FIRST as the critical T01 false-positive guard. |
 | `test-economics` | `/test-review` | Suite-level cost vs value: snapshot-heavy (≥50% ratio), flakiness (markers + git-log signals), test:code LOC ratio extremes per module. Reports `deletable_lines` only for snapshot reductions — keeps twin-headline math honest. |
+| `seo-technical` | `/seo-review` | Technical SEO (25 pts) + Performance signals (10 pts): crawlability (robots.txt + sitemap.xml), canonicals, mobile viewport, hreflang, indexability, redirect config, image/font/script perf. Consumes orchestrator-passed sitemap URL probe results (4xx/5xx/redirect-chains/slow); score impact capped at 8 points so a fully broken sitemap can't zero out the dimension. No network access — orchestrator owns all HTTP. |
+| `seo-content` | `/seo-review` | On-Page SEO (25 pts): titles, meta descriptions, headings hierarchy, image alt text, OpenGraph + Twitter Cards, internal linking, content depth signals. Strict no-fabrication rule on `--fix` — only inserts TODO placeholders. |
+| `geo-generative` | `/seo-review` | Structured Data (20 pts) + Generative Engine readiness (20 pts): Schema.org JSON-LD coverage + rich-result eligibility, llms.txt presence + format, E-E-A-T signals (author bios, dates, citations), semantic content patterns (topic sentences, list/table structure, question-headings), AI-bot crawl access (GPTBot/ClaudeBot/PerplexityBot/etc.). Fetched best-practices brief is primary source of truth (GEO evolves fast); `brief_divergence` field surfaces when heuristic disagrees. |
 
 ## Interop with Claude Code 2.1 features
 
