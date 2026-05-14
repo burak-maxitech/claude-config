@@ -54,172 +54,18 @@ The orchestrator-passed **GSC ingestion reference** (`references/gsc-ingestion.m
 
 ## Scans
 
-### 1. indexing_coverage (from `indexing/summary.csv`)
+**The per-CSV finding-emission spec lives in `references/gsc-ingestion.md`** section "Finding-type catalog (12 sub-dims)". The orchestrator passes that section in your task prompt (Step 5). Follow it unaltered:
 
-Trigger: summary.csv is parsed (always).
+- One sub-dim per CSV (or per CSV group for `blocked_access`).
+- Trigger thresholds, severity/certainty defaults, effort estimates, title templates, recommended_action prose — all defined there.
+- Cluster vs per-URL emission rules (e.g., `not_found_404` clusters by shared URL prefix when ≥3 URLs share a path; `canonical_conflict` is per-URL up to 5 then clusters).
+- The `not_found_404` **routing-rename match** procedure (cross-reference URL clusters against the git-changes digest's renames; emit `routing_rename_match: true` when matched + rename details in evidence) is in the catalog under sub-scan 4.
 
-Emit **one informational finding** total, summarizing the indexing-state table:
+Reasons this spec lives in `gsc-ingestion.md` and not here:
+- The orchestrator parses CSVs and computes thresholds (median CTR, total_count, cluster sizes) before dispatching you. The catalog documents what's in the digest and how to interpret it.
+- Single source of truth — drift between the agent's local catalog and the orchestrator's digest would mean the orchestrator-computed thresholds disagree with what the agent expects.
 
-- `severity`: `medium` if non-index rate >50%, `low` otherwise
-- `certainty`: `1.0`
-- `effort_estimate`: `medium` (umbrella for sub-cluster work)
-- `title`: e.g., `"GSC reports 3,530 of 5,260 known pages not indexed (67% non-index rate)"`
-- `recommended_action`: `"See per-reason breakdown below — each indexing reason has a different remediation path. Top-3 reasons: <reason1> (count), <reason2> (count), <reason3> (count)."`
-- `evidence`: full reason→count table, formatted
-
-### 2. crawled_not_indexed (from `indexing/crawled-not-indexed.csv`)
-
-Trigger: ≥1 row in the file.
-
-Cluster all rows into one finding (not one per URL):
-
-- `severity`: `medium` if total_count <100; `high` if ≥100
-- `certainty`: `0.9` (Google's call, usually accurate)
-- `effort_estimate`: `large`
-- `affected_urls`: top 10 from the digest
-- `title`: `"<total_count> pages crawled by Google but not indexed (content quality signal)"`
-- `recommended_action`: standard content-quality / E-E-A-T audit prose — pick 3-5 representative URLs, compare against top-ranking competitors for the same intent, identify what's missing.
-
-### 3. discovered_not_indexed (from `indexing/discovered-not-indexed.csv`)
-
-Trigger: ≥1 row.
-
-Cluster into one finding:
-
-- `severity`: `medium` if total_count <50; `high` if ≥50
-- `certainty`: `0.9`
-- `effort_estimate`: `medium`
-- `affected_urls`: top 10
-- `title`: `"<total_count> pages discovered but not crawled (crawl budget / internal linking signal)"`
-- `recommended_action`: add internal links from high-authority pages, ensure URLs are in sitemap.xml, request indexing for the most important ones manually.
-
-### 4. not_found_404 — cluster + routing-rename match (from `indexing/not-found-404.csv`)
-
-Trigger: ≥1 row.
-
-This is the **bulk-redirect cluster detection** — the highest-value pattern in the GSC scan.
-
-Procedure:
-
-1. Walk the URL list. Derive path patterns by extracting the path prefix up to the last segment (e.g., `/blog/2023/post-1` and `/blog/2023/post-2` share prefix `/blog/2023/`).
-2. Cluster URLs by shared prefix. Any cluster with ≥3 URLs gets a "pattern" label.
-3. Cross-reference the git-changes digest **renames** section: for each rename-pair `<old_path> → <new_path>`, infer the URL pattern affected. E.g., a rename from `src/content/posts/*` to `src/app/blog/*` likely affected URLs under `/blog/*` (or `/posts/*` → `/blog/*` depending on the framework's path-derivation conventions). Use `page_type_map` to confirm.
-4. If a 404-URL-cluster matches a rename pattern → emit the cluster finding with `routing_rename_match: true` and the rename details in evidence. This is the bulk-redirect signal.
-
-Cluster finding:
-
-- `severity`: `high`
-- `certainty`: `1.0` (Google directly observed 404)
-- `effort_estimate`: `small` (bulk 301 redirect)
-- `affected_urls`: top 10 from cluster
-- `title`: `"<count> URLs return 404 at Google's view"` (add `" (matches recent rename <old-pattern> → <new-pattern>)"` when routing-rename matched)
-- `evidence`: when routing-rename detected: `"Routing rename in window: <commit-subject> on <YYYY-MM-DD>, hash <short-hash>, paths <old> → <new>"`
-- `recommended_action`: when routing-rename detected: `"Bulk 301 redirects mapping <old-pattern> → <new-pattern> in <framework-config-file>. Plus remove 404 entries from sitemap.xml. Confirm the mapping is 1:1 before bulk-applying — sample-check 3 URLs first."` Otherwise: standard "restore or remove from sitemap" prose.
-
-If no routing-rename match found and the URL count is high, emit per-cluster findings (cap 3 clusters surfaced) rather than per-URL findings.
-
-### 5. redirect_hygiene (from `indexing/page-with-redirect.csv`)
-
-Trigger: ≥1 row.
-
-Cluster into one finding:
-
-- `severity`: `medium`
-- `certainty`: `1.0`
-- `effort_estimate`: `small`
-- `affected_urls`: top 10
-- `title`: `"<total_count> sitemap URLs point to redirect destinations (sitemap hygiene)"`
-- `recommended_action`: "Replace these sitemap entries with their final destinations. Redirect-chain URLs in sitemap waste crawl budget."
-
-### 6. canonical_conflict (from `indexing/duplicate-google-chose-different.csv`)
-
-Trigger: ≥1 row.
-
-Cap at 5 per-URL findings, or cluster if N >5:
-
-- `severity`: `high`
-- `certainty`: `0.85` (Google's canonical choices are usually justifiable but worth investigating)
-- `effort_estimate`: `medium`
-- per-URL: `title`: `"Google chose different canonical for <url>: <google-canonical>"`. Cluster: `"<count> URLs where Google rejected the declared canonical"`
-- `recommended_action`: compare declared `<link rel="canonical">` against Google's selected canonical per URL. Common causes: hreflang misconfig, duplicate-content cluster, soft-duplicate variations. Use GSC URL Inspection to see Google's reasoning per URL.
-
-### 7. blocked_access (from `blocked-4xx.csv`, `blocked-403.csv`, `alternate-canonical.csv`)
-
-Trigger: ≥1 row in any of these.
-
-One finding per source CSV (up to 3 findings total, low priority):
-
-- `severity`: `low`
-- `certainty`: `0.6`
-- `effort_estimate`: `small`
-- `title`: e.g., `"<count> URLs blocked by 403 (likely intentional — verify)"`
-- `recommended_action`: verify intentionality. If any should be public, fix the access rule.
-
-### 8. soft_404 (from `indexing/soft-404.csv`)
-
-Trigger: ≥1 row.
-
-Cluster into one finding:
-
-- `severity`: `medium`
-- `certainty`: `0.9`
-- `effort_estimate`: `medium`
-- `title`: `"<total_count> URLs return 200 but Google detected empty/error content (soft 404)"`
-- `recommended_action`: visit each URL — pages may load with stub/placeholder/error content that still returns 200. Either fix the rendering (so legitimate content loads) or set proper 404 status.
-
-### 9. server_errors (from `indexing/server-error-5xx.csv`)
-
-Trigger: ≥1 row.
-
-Cluster, always high-priority:
-
-- `severity`: `high`
-- `certainty`: `1.0`
-- `effort_estimate`: `medium`
-- `affected_urls`: all rows (these are usually rare; show them all)
-- `title`: `"<total_count> URLs returned 5xx errors when Google crawled (site reliability signal)"`
-- `recommended_action`: cross-reference server logs around the last-crawled timestamps. Common causes: deployment-window errors, timeouts, dependency outages.
-
-### 10. ctr_opportunity (from `performance/pages.csv`)
-
-Compute `median_ctr` across the digest (the top-50 rows by impressions). Trigger threshold: rows with `impressions >= 500` AND `ctr < (median_ctr × 0.5)`.
-
-Cap at 5 per-URL findings:
-
-- `severity`: `medium`
-- `certainty`: `0.7`
-- `effort_estimate`: `small`
-- Populate `impressions`, `clicks`, `ctr`, `avg_position` from the row
-- `title`: `"CTR opportunity on <url> (<imps> imps, <ctr>% CTR vs <median_ctr>% median)"`
-- `recommended_action`: `"Rewrite <title> + <meta name='description'> to be more compelling. Pull the page's top 3-5 query strings from queries.csv to inform the rewrite. Target CTR: at least the median (<median_ctr>%)."`
-
-### 11. position_band_opportunity (from `performance/queries.csv`)
-
-Trigger: rows with `5.0 <= position <= 20.0` AND `impressions >= 100`.
-
-Cap at 5 per-query findings:
-
-- `severity`: `medium`
-- `certainty`: `0.7`
-- `effort_estimate`: `medium`
-- Populate `impressions`, `clicks`, `ctr`, `avg_position` (=position) from the row
-- `title`: `"Query '<query>' ranks at position <X.Y> with <N> impressions — position-band opportunity"`
-- `recommended_action`: `"Identify which page ranks for this query (GSC > Performance > Pages tab filtered by query). Improve on-page signals: H1/title alignment, content depth, internal links from related pages, schema markup. Moving from position <X> to position 3-5 typically 3-5x's clicks."`
-
-### 12. traffic_orphan (sitemap ∩ NOT in pages.csv)
-
-Compute: `sitemap_url_set - {urls in performance/pages.csv}` = orphans.
-
-Trigger: ≥5 orphans (fewer is too noisy).
-
-Cluster into one finding:
-
-- `severity`: `low`
-- `certainty`: `0.6` (some pages legitimately get 0 impressions)
-- `effort_estimate`: `medium`
-- `affected_urls`: top 10 (alphabetical for v1)
-- `title`: `"<count> sitemap URLs received 0 impressions in GSC's data window (traffic orphans)"`
-- `recommended_action`: audit these pages — they're indexed (in sitemap) but no one's finding them. Options: improve content + internal linking, remove from sitemap if they shouldn't rank, or accept as legitimate low-traffic pages (e.g., archived posts).
+What you DO own (sections below): the cross-reference logic that turns CSV digests + git digest into annotated findings, the per-finding output shape, and the agent-only rules (hard rules, false-positive guards, output addendum).
 
 ## code_changed_since_gsc_window annotation
 

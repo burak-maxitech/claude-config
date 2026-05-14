@@ -114,13 +114,28 @@ If WebSearch/WebFetch fail or return nothing useful (rare, but possible on flaky
 
 ---
 
+## Parallel-batch note for Steps 1.5 + 1.6
+
+Steps 1.5 (git scan) and 1.6 (CSV ingestion) have **independent tool calls** that should fire in a **single parallel turn** — not back-to-back sequentially. In one tool-use block, batch:
+
+- `git rev-parse --is-shallow-repository` (Step 1.5.1)
+- `git log --since="35 days ago" --name-status ...` (Step 1.5.3)
+- `Glob .seo-data/gsc/**/*.csv` (Step 1.6.1)
+- `Glob .seo-data/gsc/README.md` (Step 1.6.2)
+- `Read .gitignore` (Step 1.6.2, idempotency check)
+- `Read references/gsc-setup-readme-template.md` (Step 1.6.2, only if needed — fire optimistically; discard if README already exists)
+
+Only the **post-tool aggregation** (parsing the git log output, parsing each CSV, building the maps) runs sequentially. After this parallel batch returns, the CSV `Read` calls themselves (Step 1.6.3) also fire as a **second parallel batch** — one tool-use block containing one Read per canonical CSV path that the Glob confirmed exists.
+
+Without explicit batching, the orchestrator would run ~13 sequential tool turns just for Steps 1.5+1.6 ingestion. With batching: 2 turns total.
+
+---
+
 ## Step 1.5 — SEO-Relevant Change Scan (last 35 days)
 
 Scan git history for SEO-relevant code changes in the last 35 days — roughly the typical Google recrawl + position-stabilization cycle. Produces a ~30-line digest of recent commits + renames + touched files. Used by `seo-gsc-insights` (Phase 4) to annotate findings with `code_changed_since_gsc_window`, and by `--plan` Phase 1 to detect routing-rename + 404-cluster co-occurrence (bulk-redirect signal).
 
 **Critical context:** GSC's reports reflect Google's view of the site at crawl time, which can lag the actual codebase by 4-5 weeks. Without this scan, the skill would confidently recommend "add meta description to /pricing" while the user's commit history shows they added it 18 days ago. The annotation lets the recommendation become "may already be fixed — wait for next GSC cycle or request indexing manually."
-
-This step is **independent of Step 1.6** (CSV ingestion) — both build shared context for Step 5 and may execute in any order or in parallel.
 
 ### 1.5.1 — Detect git history depth
 
@@ -228,7 +243,7 @@ Cluster renames: when ≥3 renames share a prefix pattern (e.g., all `src/conten
 
 If the scan returned zero commits in window, render `## Recent SEO-Relevant Changes (last 35 days)\n\nNo SEO-relevant changes in the window.` — short, single block.
 
-### 1.5.6 — Pass to all 4 subagents (Step 5 shared context)
+### 1.5.6 — Pass to all dispatched subagents (Step 5 shared context)
 
 Append to the Step 5 base shared-context block (after the GSC section from 1.6):
 
@@ -264,8 +279,6 @@ When the user has dropped Google Search Console CSV exports into `.seo-data/gsc/
 
 Read `references/gsc-ingestion.md` for the canonical reference (folder layout, expected headers, parsing rules, finding-type catalog, freshness policy, `.gitignore` auto-append rules). The reference is comprehensive; this step describes the orchestrator's call graph.
 
-This step is **independent of Step 1.5** (git-history scan) — both build shared context for Step 5 and may execute in any order or in parallel.
-
 ### 1.6.1 — Detection
 
 1. `Glob` for `.seo-data/gsc/**/*.csv`.
@@ -276,9 +289,11 @@ This step is **independent of Step 1.5** (git-history scan) — both build share
 
 ### 1.6.2 — README + .gitignore (idempotent)
 
-**README:** If `.seo-data/gsc/README.md` does NOT exist, read `references/gsc-setup-readme-template.md` and write its **template content block** (everything between the `## Template content (begin)` and `## Template content (end)` markers, inner-fenced block extracted) to `.seo-data/gsc/README.md`. If the README already exists, leave it alone — user may have edited it.
+The `Glob` for `.seo-data/gsc/README.md`, the `Read .gitignore`, and the optimistic `Read references/gsc-setup-readme-template.md` all fire in the first parallel batch (see "Parallel-batch note"). After the batch returns:
 
-**.gitignore:** Read project-root `.gitignore` if it exists. Grep for the sentinel start marker `# /seo-review managed`. If absent, append:
+**README:** If the Glob returned no README, write the template's **content block** (everything between the `## Template content (begin)` and `## Template content (end)` markers, inner-fenced block extracted) to `.seo-data/gsc/README.md`. If the README exists, discard the template Read result — user may have edited it.
+
+**.gitignore:** From the `Read .gitignore` result, Grep for the sentinel start marker `# /seo-review managed`. If absent, append:
 
 ```
 # /seo-review managed — do not edit between markers
@@ -291,12 +306,13 @@ If `.gitignore` doesn't exist, create it with the sentinel block as sole content
 
 ### 1.6.3 — Parse each canonical CSV
 
-For each canonical path in `.seo-data/gsc/` (per the inventory in `gsc-ingestion.md` "Folder layout"):
+After 1.6.1's Glob returns the list of present canonical CSV paths, fire **a single parallel turn batching one `Read` per confirmed-present path** (this is the second parallel batch from the "Parallel-batch note" above). Up to 13 CSV reads → 1 tool turn.
 
-1. `Read` the file.
-2. Parse per `gsc-ingestion.md` "Parsing rules" — strip BOM, validate headers case-insensitively, walk rows respecting CSV quoting, normalize CTR/Position/dates.
-3. Build digest per `gsc-ingestion.md` "Digest caps" (top-50 per CSV by the documented sort key).
-4. Track `total_count` (full row count) separately from digest length — clusters use total_count in headlines.
+After the batch returns, walk each parsed content sequentially:
+
+1. Parse per `gsc-ingestion.md` "Parsing rules" — strip BOM, validate headers case-insensitively, walk rows respecting CSV quoting, normalize CTR/Position/dates.
+2. Build digest per `gsc-ingestion.md` "Digest caps" (top-50 per CSV by the documented sort key).
+3. Track `total_count` (full row count) separately from digest length — clusters use total_count in headlines.
 
 Failure modes (all log to footer + continue, never block):
 - Unknown CSV path → log `unknown CSV ignored: <path>`.
@@ -328,7 +344,7 @@ Build the GSC-mode fragment for Step 0's detected-stack line:
 
 Where `<inventory summary>` lists categories present, e.g., `queries, pages, 5/9 indexing reasons`.
 
-### 1.6.7 — Pass to all 4 subagents (Step 5 shared context)
+### 1.6.7 — Pass to all dispatched subagents (Step 5 shared context)
 
 The orchestrator's Step 5 shared-context block (the base block passed to all subagents) gains a GSC section:
 
@@ -490,9 +506,9 @@ When a 4th `seo-gsc-insights` subagent was dispatched, run these three passes **
 
 **a) Score-impact enforcement.** For every finding with `source == "gsc"`, force `score_impact = 0`. Single point of enforcement per `references/rubric.md` "Score-impact invariant" — the subagent may emit non-zero by mistake; orchestrator overrides. Heuristic findings (`source == "heuristic"`) are untouched.
 
-**b) URL dedup pass.** For findings whose `location` is a URL, check overlap between probe-emitted `technical_seo.url_health` findings (Step 3.2) and GSC-emitted `gsc_insights.not_found_404` or `gsc_insights.redirect_hygiene` findings. Join key: URL (case-insensitive, trailing-slash-normalized). For each overlap pair:
+**b) URL dedup pass.** Build a normalized-URL index of probe `url_health` findings: `{normalize(url) → probe_finding}` where `normalize` lowercases + strips trailing slash. Then walk GSC `not_found_404` and `redirect_hygiene` findings; lookup each by `normalize(its_url)`. On match:
 - Drop the GSC finding from the findings list.
-- Add to the probe finding's record: `gsc_corroborated: true`, plus carry over `recent_commits: [...]` from the GSC finding when present.
+- Add to the probe finding's record: `gsc_corroborated: true`, plus carry `gsc_recent_commits: [...]` from the GSC finding's `recent_commits` field when present.
 - Sub-dim attribution stays with the probe finding — `technical_seo.url_health` is the source of the non-zero score_impact, so dedup never loses score signal.
 
 **c) gsc_findings count.** Aggregate `gsc_findings_count = count of findings where source == "gsc"` (post-dedup). Stash for the footer's subtotal-check addendum.
@@ -548,7 +564,7 @@ rank_score = effective_impact × certainty × traffic_weight / effort_weight
 
 ### 6.7 — Drop low-confidence noise
 
-Drop findings with `certainty < 0.5` AND `score_impact < 1` unless `is_fix_eligible: true` (fix-eligible findings surface even at lower confidence so the user can review the diff). **GSC findings** (`score_impact: 0`) survive this filter when their `certainty >= 0.5` — the filter's `score_impact < 1` clause matches them, but the spirit of the rule is "drop noisy heuristic findings," not GSC findings. Override: keep all GSC findings whose `certainty >= 0.5`, regardless of their `score_impact` value.
+Drop findings with `certainty < 0.5` AND `score_impact < 1` unless `is_fix_eligible: true` (fix-eligible findings surface even at lower confidence so the user can review the diff). **The drop rule applies only to `source == "heuristic"` findings.** GSC findings (`source == "gsc"`) are always retained — including those with `code_changed_since_gsc_window: true` whose certainty was lowered to 0.4 by the agent, since "may already be fixed; re-check next cycle" is exactly the annotation worth surfacing. The filter targets noisy heuristic guesses, not GSC ground-truth signal.
 
 ---
 

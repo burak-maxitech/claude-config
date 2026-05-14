@@ -147,6 +147,7 @@ GSC findings extend the canonical 10-field per-finding shape (defined in each sc
 | `affected_urls` | `[str]` | Sample of URLs in the cluster (cap 10 inline; full list in subagent output addendum) |
 | `code_changed_since_gsc_window` | `bool \| null` | Set from Step 1.5 git-history match; `null` when git history shallow |
 | `recent_commits` | `[str]` | Short commit messages matched in window, max 3 |
+| `routing_rename_match` | `bool \| null` | Optional, only emitted on `not_found_404` cluster findings when the cluster's URL pattern matches a rename in the git-history window. `null` for findings where the field doesn't apply. |
 
 ### Traffic-weighted ranking (Step 6)
 

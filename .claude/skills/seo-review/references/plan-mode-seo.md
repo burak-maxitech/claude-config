@@ -6,7 +6,7 @@ Transform `/seo-review` findings into a phased improvement brief. Each phase bec
 
 After the report is built, group findings into 6 phases (indexing & crawl hygiene comes first because it directly damages search-engine trust and crawl budget):
 
-1. **Phase 1: Indexing & Crawl Hygiene** (sitemap probe 4xx/5xx + GSC `not_found_404` + `page-with-redirect` + `server-error-5xx` + `soft_404` clusters)
+1. **Phase 1: Indexing & Crawl Hygiene** (sitemap probe 4xx/5xx + GSC `not_found_404` + `redirect_hygiene` + `server_errors` + `soft_404` clusters)
 2. **Phase 2: Quick wins** (allowlist-eligible mechanical scaffolds)
 3. **Phase 3: Structural improvements** (heading hierarchy, internal linking, redirect chains)
 4. **Phase 4: Content rewrites** (titles, meta descriptions, alt text — human judgment required, GSC-prioritized when CSVs present)
@@ -20,7 +20,7 @@ Surface findings from **both** the sitemap URL probe (Step 3.2) and the GSC inde
 **Source signals folded into Phase 1:**
 - `technical_seo.url_health` findings from sitemap probe (Step 3.2): 4xx, 5xx, redirect-chain
 - `gsc_insights.not_found_404` cluster from GSC (often a superset of the probe-sample, since GSC sees URLs the probe didn't reach)
-- `gsc_insights.page-with-redirect` cluster (sitemap entries pointing to redirected URLs)
+- `gsc_insights.redirect_hygiene` cluster (sitemap entries pointing to redirected URLs — from `indexing/page-with-redirect.csv`)
 - `gsc_insights.server_errors` cluster
 - `gsc_insights.soft_404` cluster
 

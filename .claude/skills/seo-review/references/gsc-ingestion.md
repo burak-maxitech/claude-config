@@ -152,19 +152,19 @@ The orchestrator builds a single `page_type_map: {url → page_type}` once in St
 | `/category/*`, `/tag/*`, `/topic/*` | `taxonomy` |
 | anything else | `unknown` |
 
-The map is passed to **all 4 subagents** in shared context — `seo-gsc-insights` (primary consumer), `geo-generative` (uses it to short-circuit its own page-type detection), and the other 2 (informational, helps prioritize).
+The map is passed to **all dispatched subagents** (3 or 4 depending on `gsc_mode`) in shared context — `seo-gsc-insights` (primary consumer, only dispatched when enabled), `geo-generative` (uses it to short-circuit its own page-type detection), and the other 2 (informational, helps prioritize).
 
 ---
 
 ## Setup banner (one-time, sentinel-gated)
 
-When the orchestrator runs `/seo-review` and `.seo-data/gsc/` does not exist:
+When the orchestrator runs `/seo-review` and no GSC CSVs are detected:
 
-1. Check sentinel: `.seo-data/.gsc-banner-shown` (note: not in `gsc/` because the parent doesn't exist yet). Actually — use a per-project marker that's git-tracked-aware:
-   - If `.seo-data/` doesn't exist at all → print banner; the marker is implicit (next time `.seo-data/gsc/` may exist OR `.seo-data/.gsc-banner-shown` will exist)
-   - If `.seo-data/` exists but `.gsc-banner-shown` is absent → print banner, touch `.seo-data/.gsc-banner-shown`
-   - If `.seo-data/.gsc-banner-shown` is present → suppress banner
-2. The marker is itself gitignored (no value committing it).
+1. **Sentinel check.** Look for `.seo-data/.gsc-banner-shown`. If it exists → suppress the banner; nothing to do.
+2. **Print the banner** (text below). Then create the sentinel:
+   - If `.seo-data/` doesn't exist yet, create it (single `Write` of `.seo-data/.gsc-banner-shown` with empty content — the parent directory is created implicitly on most platforms; if it errors, the banner will print again next run, which is acceptable degraded behavior).
+   - If `.seo-data/` already exists (e.g., from another tool), just `Write` the sentinel file.
+3. The sentinel is itself gitignored via the auto-`.gitignore` block — never committed.
 
 **Banner content** (printed before Section 1 of the report):
 
@@ -254,7 +254,7 @@ Each CSV produces 0+ findings. Below is the per-CSV / per-sub-dim spec. All find
 
 ### 1. `indexing_coverage` (from `indexing/summary.csv`)
 
-**Trigger:** any time summary.csv is parsed.
+**Trigger:** summary.csv is parsed AND has ≥1 row. If summary.csv is present but empty (0 rows), skip the finding — there's nothing to report and the non-index rate divide-by-zero is undefined.
 
 **Emit one finding total** — a headline informational finding:
 
@@ -410,29 +410,9 @@ Each CSV produces 0+ findings. Below is the per-CSV / per-sub-dim spec. All find
 
 ---
 
-## Output to shared context (orchestrator → 4 subagents)
+## Output to shared context
 
-After Step 1.6 completes, the orchestrator passes this structured block to all 4 subagents:
-
-```
-GSC Mode: enabled | disabled
-
-When enabled:
-- CSVs detected: <list of canonical paths>
-- Digests:
-  - performance/queries.csv: <top 50 rows by impressions, structured records>
-  - performance/pages.csv: <top 50 rows by impressions>
-  - indexing/summary.csv: <full table, ≤11 rows>
-  - indexing/<reason>.csv: <top 50 rows by last_crawled desc>, plus total_count
-- page_type_map: {<url>: <page_type>, ...}
-- url_impressions_map: {<url>: <impressions>, ...}  ← for traffic_weight lookup
-- Freshness summary: {<file>: <days_old>, ...}
-- Malformed-rows count per CSV (if any)
-
-When disabled:
-- gsc_mode: disabled
-- Reason: "no .seo-data/gsc/" | "directory empty"
-```
+After Step 1.6 completes, the orchestrator passes a structured GSC block to all dispatched subagents (3 when `gsc_mode: disabled`, 4 when enabled) as part of the Step 5 base shared-context. **See `SKILL.md` Step 1.6.7 for the canonical block format** — it's defined once there to avoid drift.
 
 The `seo-gsc-insights` subagent is the primary consumer (uses everything). The other 3 subagents use `url_impressions_map` for traffic_weight when ranking their own findings; the rest is informational.
 

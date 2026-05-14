@@ -99,7 +99,7 @@ Repeat per dimension. Don't render detail blocks for every finding — only #1 p
 
 ## Section 3 — GSC Insights (only when `gsc_mode: enabled`)
 
-Render this section between Findings (Section 2) and Score History (Section 4) **only when at least one GSC CSV was parsed in Step 1.6**. Skip entirely otherwise — no banner, no placeholder. The section has 5 sub-blocks; render only those that have data (e.g., skip the indexing-summary block if `indexing/summary.csv` wasn't present).
+Render this section between Findings (Section 2) and Score History (Section 4) **only when at least one GSC CSV was parsed in Step 1.6**. Skip entirely otherwise — no banner, no placeholder. The section has 6 sub-blocks (Indexing coverage / Top-impact GSC findings / CTR opportunities / Position-band query opportunities / Traffic orphans / Code-already-fixed annotations); render only those that have data (e.g., skip the indexing-summary block if `indexing/summary.csv` wasn't present).
 
 ```
 ## GSC Insights
