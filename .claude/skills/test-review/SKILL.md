@@ -105,7 +105,25 @@ Interpret `$ARGUMENTS`:
 
 `--plan` and `--fix` are mutually exclusive. If both supplied, error: "Pick one — `--plan` emits a brief, `--fix` applies edits."
 
-For `--coverage`: detect whether a coverage report exists at the expected path. If yes, pass path to `test-coverage` agent with `coverage_mode: report`. If no, the agent surfaces a single `install_hint` finding telling the user how to generate one (e.g. `npx jest --coverage --coverageReporters=json-summary`); do not run the coverage tool yourself.
+For `--coverage`: detect whether a coverage report exists at the per-stack expected path. **Never run the coverage tool yourself** — that hits network/runtime and the user opted into reading, not generating.
+
+Per-stack expected report paths (check first match per stack):
+
+| Stack | Report path | Generator command (suggest in install_hint) |
+|---|---|---|
+| Jest | `coverage/coverage-summary.json` | `npx jest --coverage --coverageReporters=json-summary` |
+| Vitest | `coverage/coverage-summary.json` (same shape) or `coverage/coverage-final.json` | `npx vitest run --coverage --coverage.reporter=json-summary` |
+| pytest-cov | `coverage.json` | `pytest --cov=. --cov-report=json` |
+| coverage.py | `.coverage.json` or `coverage.json` | `coverage run -m pytest && coverage json` |
+| cargo-tarpaulin | `tarpaulin-report.json` | `cargo tarpaulin --out Json` |
+| cargo-llvm-cov | `target/llvm-cov-target/llvm-cov.json` | `cargo llvm-cov --json --output-path target/llvm-cov-target/llvm-cov.json` |
+| go test -cover | `coverage.out` (text profile, not JSON) | `go test -coverprofile=coverage.out ./...` |
+| phpunit | `coverage/coverage.xml` (Clover) or `coverage.json` | `phpunit --coverage-clover=coverage/coverage.xml` |
+| JaCoCo | `target/site/jacoco/jacoco.xml` (XML — agent parses) | `mvn test jacoco:report` |
+
+If a report file exists at any expected path, pass it to `test-coverage` with `coverage_mode: report` and `coverage_report_path: <found-path>`. If none exist, the agent surfaces a single `install_hint` finding with the appropriate generator command and exits — do not silently fall back to heuristic mode (the user explicitly asked for report-based coverage).
+
+If `--coverage` is **not** passed, default `coverage_mode: heuristic` and `coverage_report_path: null`. The test-coverage agent uses test-neighbor + symbol enumeration heuristics only.
 
 ---
 
