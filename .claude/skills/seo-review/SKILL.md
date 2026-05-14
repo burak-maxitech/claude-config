@@ -25,6 +25,8 @@ Distinct from existing review skills:
 
 ## Step 0 — Detect Web Project + Stack
 
+**Run all detection probes in a single parallel turn** — the `Read` + `Glob` calls for the config files below are independent and should fire together, not sequentially.
+
 Reject non-web repos silently. A repo is "web" if **any** of these signals are present:
 
 **Frontend frameworks** (check `package.json` dependencies + devDependencies):
@@ -70,10 +72,12 @@ Run in a **single parallel turn** (multiple WebSearch + WebFetch tool calls toge
 - `"AI search citation patterns ChatGPT Perplexity Claude 2026"`
 - One stack-specific query if applicable, e.g. `"Next.js app router SEO metadata 2026"` or `"Astro SEO best practices 2026"`
 
-**WebFetch (parallel with WebSearch results once back, or curated URLs from `references/best-practices-sources.md`):**
+**WebFetch (run in the SAME parallel turn as the WebSearch queries — the curated URLs in `references/best-practices-sources.md` are stable and don't need WebSearch results to fire):**
 - Authoritative pages: Google Search Central docs, web.dev/learn/seo, schema.org type definitions for likely page types
 - llms.txt spec page
 - Recent Anthropic/OpenAI/Perplexity guidance on citation behavior
+
+A second round of WebFetch on highest-signal WebSearch results is optional and only worth a follow-up turn when the curated URLs returned thin content.
 
 **Summarize into a structured in-session "best-practices brief" (~50 lines max):**
 
@@ -101,6 +105,8 @@ Run in a **single parallel turn** (multiple WebSearch + WebFetch tool calls toge
 ```
 
 The brief gets passed **verbatim** to all 3 subagents as shared context. Subagents prefer the brief over their embedded heuristics when the brief diverges.
+
+**Weight-adjustment validation gate.** Before passing weight adjustments to subagents, validate: each |delta| ≤ 5, sum of deltas = 0. If the brief proposes deltas that violate either rule, cap individual deltas to ±5 and rebalance by scaling the opposing deltas proportionally so the sum remains 0. Note any capping in the report footer.
 
 If WebSearch/WebFetch fail or return nothing useful (rare, but possible on flaky network), fall back to a one-line note "best-practices fetch failed — proceeding with embedded heuristics only" and continue. Mark the report footer accordingly.
 
@@ -160,13 +166,6 @@ Runs **always when sitemap.xml exists locally** AND (sitemap URLs are absolute O
 
 **Total URL-health deduction is capped at 8 points** (out of Technical SEO's 25). A fully broken sitemap doesn't zero out Technical SEO.
 
-### 3.3 Graceful skip cases (already covered in 3.2 but reiterated)
-
-- No `sitemap.xml` found → skip probe; missing-sitemap finding is captured separately by crawlability scan.
-- Sitemap has only relative URLs AND no `--url` provided → skip probe with footer note.
-- WebFetch returns errors on individual URLs → record as `status: error`, treat as low-severity informational rather than crashing.
-- Sitemap >100 URLs → cap at 100, note in footer.
-
 ---
 
 ## Step 4 — Scope Selection
@@ -181,7 +180,7 @@ Launch all 3 Task subagents in a **single turn** (3 Task calls in one message). 
 
 For each subagent, read its corresponding reference file (`references/scan-technical.md`, `references/scan-content.md`, `references/scan-geo.md`) and pass the contents in the task prompt along with shared context.
 
-### Shared context passed to all 3 subagents:
+### Shared context — base block passed to all 3 subagents:
 
 ```
 Detected stack: <from Step 0>
@@ -189,18 +188,7 @@ i18n detected: true | false (with config file path if true)
 Best-practices brief (fetched <date>):
 <verbatim 50-line brief from Step 1>
 
-Sitemap URL probe results (if Step 3.2 ran):
-[
-  {"url": "https://example.com/a", "status": 200, "redirect_hops": 0, "response_seconds": 0.4, "response_bucket": "fast"},
-  {"url": "https://example.com/b", "status": 404, "redirect_hops": 0, "response_seconds": 0.3, "response_bucket": "fast"},
-  ...
-]
-Probe note: <if skipped, the skip reason>
-
-Rendered HTML excerpt (if --url provided):
-<truncated rendered HTML for seo-technical and seo-content only>
-
-Weight adjustments (from brief, capped at ±5 per dim, sum delta 0):
+Weight adjustments (validated in Step 1: |each| ≤ 5, sum = 0):
 {"structured_data": -2, "generative_engine": +3, "performance": -1, ...}
 
 Scope file list: <paths>
@@ -210,6 +198,12 @@ Each finding includes dimension, sub_dimension, location, title, severity, certa
 effort_estimate, score_impact, is_fix_eligible, recommended_action, evidence.
 Return raw findings only — do NOT format a final report.
 ```
+
+### Per-subagent additions (do NOT include these in agents that don't consume them):
+
+- **`seo-technical` only** — also pass the **Sitemap URL probe results** (full record list) AND the **Rendered HTML excerpt** if `--url` was provided.
+- **`seo-content` only** — also pass the **Rendered HTML excerpt** if `--url` was provided. Do NOT pass probe results (it doesn't use them).
+- **`geo-generative`** — base block only. No probe results (doesn't use them); no rendered HTML (JSON-LD lives in source most reliably). Keeps geo-generative's prompt smallest of the three.
 
 ### Agent 1: seo-technical
 Read `references/scan-technical.md`, dispatch `seo-technical` with the file + shared context. Owns Technical SEO (25) + Performance signals (10) = 35 points. Consumes sitemap probe results.
@@ -250,7 +244,9 @@ If no `docs/seo-history.md` exists yet, drop the delta clause: `**SEO/GEO score:
 
 ### Append to docs/seo-history.md
 
-After rendering the report, append (or create) `docs/seo-history.md`:
+**Only in default review-only mode.** Skip the history append entirely when `--plan` or `--fix` is in `$ARGUMENTS` — those are follow-ups to a recent audit, not new audits; writing duplicate score rows pollutes the history with no information gain.
+
+In default mode, after rendering the report, append (or create) `docs/seo-history.md`:
 
 If file doesn't exist, create with header:
 ```markdown

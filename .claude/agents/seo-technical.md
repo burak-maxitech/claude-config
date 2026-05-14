@@ -104,7 +104,7 @@ If the orchestrator passes a "probe skipped" note instead of results, surface a 
 ```
 {
   "dimension": "technical_seo" | "performance",
-  "sub_dimension": "robots_sitemap" | "canonicals" | "mobile" | "hreflang" | "indexability" | "redirects" | "url_health" | "image_perf" | "font_script_perf" | "response_time",
+  "sub_dimension": "robots_sitemap" | "canonicals" | "mobile" | "hreflang" | "redirects" | "url_health" | "image_perf" | "font_script_perf" | "response_time",
   "location": "<path>:<line-range>" | "<URL>" (for url_health),
   "title": "<one-line>",
   "severity": "low" | "medium" | "high",
@@ -124,7 +124,7 @@ If the orchestrator passes a "probe skipped" note instead of results, surface a 
 - **Never make network calls.** No `Bash(curl:*)`. No `WebFetch`. URL probe results come from the orchestrator only.
 - **URL-health score-impact cap: 8 points total.** Enforce this in your aggregation — if your raw findings would deduct more, scale them proportionally to fit.
 - **Honor the fetched best-practices brief.** When the brief contradicts a heuristic in this file (e.g., the brief says "Google now treats CWV thresholds differently"), prefer the brief.
-- **Skip vendored / generated / build dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `.next`, `.nuxt`, `out`, `_site`, `public/build`, `__generated__/`, `*.generated.*`, `*.d.ts`.
+- **Skip vendored / generated / build dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `.next`, `.nuxt`, `out`, `_site`, `public/build`, `__generated__/`, `__pycache__`, `.cache`, `vendor`, `target/`, `coverage/`, `*.generated.*`, `*.d.ts`.
 - **Limit output to 30 findings**, ordered by `score_impact × certainty` desc.
 
 ## False-positive guards

@@ -113,7 +113,7 @@ The **fetched best-practices brief** in your task prompt is the source of truth 
 
 - **Never fabricate content.** When `is_fix_eligible: true`, the recommended fix MUST insert a placeholder + `TODO` comment, never fabricated copy.
 - **Honor the fetched best-practices brief** for optimal lengths and patterns when it differs from this file.
-- **Skip vendored / generated dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `.next`, `.nuxt`, `out`, `_site`, `__generated__/`, `*.generated.*`.
+- **Skip vendored / generated / build dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `.next`, `.nuxt`, `out`, `_site`, `public/build`, `__generated__/`, `__pycache__`, `.cache`, `vendor`, `target/`, `coverage/`, `*.generated.*`, `*.d.ts`.
 - **Limit output to 30 findings**, ordered by `score_impact × certainty` desc.
 
 ## False-positive guards

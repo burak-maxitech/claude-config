@@ -66,7 +66,7 @@ For each found JSON-LD block:
 
 For each missing required field → `severity: medium`, `score_impact: 0.5-1`.
 
-**Rich-result blockers** (these prevent rich snippets even when schema validates):
+**Rich-result blockers** (these prevent rich snippets even when schema validates) — emit under `sub_dimension: "schema_validation"` (the rubric combines rich-result eligibility with schema validation into a single 10-point bucket; do not use a separate `rich_result` sub_dim):
 - `Article` missing `image` → no rich-result eligibility.
 - `Product` with `offers` but no `priceCurrency`.
 - `FAQPage` with placeholder answers (`answer text`, lorem ipsum, single-character answers).
@@ -186,22 +186,7 @@ For each bot with `Disallow: /` or `Disallow: <broad pattern>`:
 
 ## Per-finding output shape
 
-```json
-{
-  "dimension": "structured_data" | "generative_engine",
-  "sub_dimension": "jsonld_coverage" | "schema_validation" | "rich_result" | "llms_txt" | "eeat" | "semantic_content" | "ai_bot_access",
-  "location": "<path>:<line-range>",
-  "title": "<one-line>",
-  "severity": "low" | "medium" | "high",
-  "certainty": 0.0-1.0,
-  "effort_estimate": "trivial" | "small" | "medium" | "large",
-  "score_impact": <float>,
-  "is_fix_eligible": true | false,
-  "recommended_action": "<prose>",
-  "evidence": "<one or two lines>",
-  "brief_divergence": "<text or null>"
-}
-```
+See `.claude/agents/geo-generative.md` for the canonical JSON shape. Same shape applies here; do not duplicate.
 
 ---
 

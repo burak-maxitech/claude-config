@@ -69,7 +69,10 @@ Parse each found JSON-LD block. Check:
   - `FAQPage`: `mainEntity` (array of `Question` with `acceptedAnswer`)
   - `Organization`: `name`, `url`, `logo`
   - `BreadcrumbList`: `itemListElement` array with `position`, `name`, `item`
-- **Common rich-result blockers** (these prevent Google rich snippets even when schema validates):
+  - `Recipe`: `name`, `recipeIngredient`, `recipeInstructions`, `author`, `datePublished`
+  - `Event`: `name`, `startDate`, `location`
+  - `Person`: `name`
+- **Common rich-result blockers** — emit under `sub_dimension: "schema_validation"` (no separate `rich_result` bucket in the rubric):
   - `Article` missing `image` (no rich result eligibility)
   - `Product` with `offers` but no `priceCurrency`
   - `FAQPage` with answers that don't contain useful content (placeholder text, very short)
@@ -116,7 +119,7 @@ For each: if `Disallow: /` appears under that user-agent AND the project does no
 ```
 {
   "dimension": "structured_data" | "generative_engine",
-  "sub_dimension": "jsonld_coverage" | "schema_validation" | "rich_result" | "llms_txt" | "eeat" | "semantic_content" | "ai_bot_access",
+  "sub_dimension": "jsonld_coverage" | "schema_validation" | "llms_txt" | "eeat" | "semantic_content" | "ai_bot_access",
   "location": "<path>:<line-range>" | "<URL>",
   "title": "<one-line>",
   "severity": "low" | "medium" | "high",
@@ -145,7 +148,7 @@ For each: if `Disallow: /` appears under that user-agent AND the project does no
 - **Never fabricate content.** Fix-mode scaffolds insert TODO placeholders, never invented copy or facts.
 - **The fetched best-practices brief is primary source of truth.** When the brief and this file's heuristics diverge, prefer the brief and note divergence in `brief_divergence`.
 - **AI-bot access findings always default to `certainty: 0.5` or lower** — many sites block deliberately and it's the user's call.
-- **Skip vendored / generated dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `.next`, `.nuxt`, `out`, `_site`, `__generated__/`, `*.generated.*`.
+- **Skip vendored / generated / build dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `.next`, `.nuxt`, `out`, `_site`, `public/build`, `__generated__/`, `__pycache__`, `.cache`, `vendor`, `target/`, `coverage/`, `*.generated.*`, `*.d.ts`.
 - **Limit output to 30 findings**, ordered by `score_impact × certainty` desc.
 
 ## False-positive guards

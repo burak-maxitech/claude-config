@@ -133,6 +133,8 @@ Skip entirely if Step 0 detected no i18n.
 
 ## Sub-scan 6: Indexability Gotchas
 
+**Findings here emit under `sub_dimension: "robots_sitemap"`** — indexability is part of the crawl-control rubric bucket. Don't introduce a separate `indexability` sub_dim (it has no rubric allocation).
+
 - `Grep` for `<meta\s+name=["']robots["']\s+content=["'][^"']*noindex` in page templates.
 - Cross-reference with the page's path. If the path looks important (homepage `/`, blog index `/blog`, product roots `/products`, common service-page patterns), flag `severity: high`, `score_impact: 2`.
 - For obviously-not-indexable pages (login, admin, password-reset), `noindex` is correct — do not flag.
