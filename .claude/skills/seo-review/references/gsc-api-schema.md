@@ -1,0 +1,435 @@
+# Google Search Console API Schema — Canonical Reference
+
+Loaded by the orchestrator (Step 1.6) when the Search Console API is the configured Performance + Indexing ingestion path. This file is the **source-of-truth endpoint inventory + auth contract + enum reference** that `gsc-api-queries.md` and the SKILL.md dispatcher reference.
+
+For ingestion behaviour, digest shape, and the 12 sub-dim catalog, see `gsc-ingestion.md` (the "API ingestion" subsection is the byte-identical translation contract). For SQL-equivalent call templates, see `gsc-api-queries.md`. For config layout, see `bigquery-config-template.md` (config.yaml schema — `site_url` is the API path's required key; BQ keys remain for the alternative BQ path).
+
+**Schema source:** Google's published API references — [Search Analytics: searchanalytics.query](https://developers.google.com/webmaster-tools/v1/searchanalytics/query) + [URL Inspection: urlInspection.index.inspect](https://developers.google.com/webmaster-tools/v1/urlInspection/index/inspect) + [Sites: list](https://developers.google.com/webmaster-tools/v1/sites/list). Verified against documentation as of 2026-05-15. **Live-verification deferred to Phase 4 real-world dogfood** (requires gcloud SDK install on user's machine — not blocking Phase 0/1/2/3 work).
+
+---
+
+## Endpoints in scope
+
+The Search Console API exposes three endpoints used by `/seo-review`:
+
+| Endpoint | Purpose | Queried by v3.x? |
+|---|---|---|
+| `POST https://www.googleapis.com/webmasters/v3/sites/{siteUrl}/searchAnalytics/query` | Performance — queries/pages/impressions/CTR/position | **Yes** (Q1, Q2, Q3) |
+| `POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect` | Per-URL indexing diagnostics — `coverageState`, `pageFetchState`, canonicals, last crawl, mobile usability, rich results | **Yes** (one call per inspected URL, up to 100/run) |
+| `GET https://www.googleapis.com/webmasters/v3/sites` | List user's verified properties | **Yes** (active auth probe — Step 1.6.1 activation condition 5) |
+
+**Note two different base hosts**: `www.googleapis.com/webmasters/v3` for Search Analytics + Sites; `searchconsole.googleapis.com/v1` for URL Inspection. Same OAuth scope; same ADC token; different quota tracking (see "Quota model" below). Per Plan-agent B2.
+
+---
+
+## Authentication
+
+### OAuth scope
+
+Single scope required: `https://www.googleapis.com/auth/webmasters.readonly`
+
+This scope provides read-only access to all three endpoints. No write permissions required for v3.x — the skill never modifies GSC state.
+
+### ADC setup (gcloud SDK)
+
+The skill uses Application Default Credentials (ADC) via the `gcloud` CLI. One-time user setup:
+
+```
+gcloud auth application-default login \
+  --scopes=https://www.googleapis.com/auth/webmasters.readonly,https://www.googleapis.com/auth/cloud-platform
+
+gcloud auth application-default set-quota-project <your-gcp-project-id>
+```
+
+**Why `--scopes` flag is required (Plan-agent B7):** Default ADC scope is `cloud-platform`. Search Console API accepts cloud-platform-scoped tokens for some property/account combinations but this is undocumented behavior and has broken in the past. Explicit `webmasters.readonly` is the durable choice.
+
+**Why `set-quota-project` matters (Plan-agent B10):** Without it, API calls succeed but quota gets billed to a default consumer project that may rate-limit harder. Some account/project combinations require it explicitly.
+
+After setup, `gcloud auth application-default print-access-token` returns an OAuth bearer token valid for ~1 hour. The skill fetches **one token per run** (cached in shared context per Plan-agent S2) and reuses it across all API calls.
+
+### Token in HTTP requests
+
+All three endpoints accept the token via the `Authorization` header:
+
+```
+Authorization: Bearer ya29.xxx...
+```
+
+No alternative auth (API keys, service-account inline auth) supported by v3.x — ADC only.
+
+---
+
+## Site URL encoding (path parameter)
+
+The `siteUrl` path parameter appears in `searchAnalytics/query` and `sites.get` endpoints. **Manual percent-encoding required** (Plan-agent B5) — `curl --data-urlencode` operates on request body, not path params.
+
+| Property type | Raw `site_url` | Encoded path segment |
+|---|---|---|
+| Domain property | `sc-domain:example.com` | `sc-domain%3Aexample.com` |
+| Domain property with hyphen | `sc-domain:my-site.com` | `sc-domain%3Amy-site.com` |
+| URL-prefix property | `https://example.com/` | `https%3A%2F%2Fexample.com%2F` |
+| URL-prefix with subdomain | `https://www.example.com/` | `https%3A%2F%2Fwww.example.com%2F` |
+| URL-prefix with subdirectory | `https://example.com/blog/` | `https%3A%2F%2Fexample.com%2Fblog%2F` |
+
+The orchestrator builds the encoded URL in-context before passing to `curl`. Recommended substitution (manual or via `[uri]::EscapeDataString` on PowerShell):
+
+```
+encoded = site_url.replace(":", "%3A").replace("/", "%2F")
+```
+
+`sites.list` (no path param) is not affected.
+
+---
+
+## `searchanalytics.query` — Search Analytics
+
+### Request
+
+```
+POST https://www.googleapis.com/webmasters/v3/sites/{siteUrl_encoded}/searchAnalytics/query
+Authorization: Bearer <ADC_TOKEN>
+Content-Type: application/json
+
+{
+  "startDate": "YYYY-MM-DD",
+  "endDate": "YYYY-MM-DD",
+  "dimensions": ["query" | "page" | "country" | "device" | "date" | "searchAppearance"],
+  "rowLimit": <int, max 25000>,
+  "startRow": <int, default 0>,
+  "type": "web" | "image" | "video" | "news" | "discover" | "googleNews",
+  "dimensionFilterGroups": [optional filters],
+  "dataState": "all" | "final"
+}
+```
+
+**Required**: `startDate`, `endDate`. Date format: `YYYY-MM-DD`.
+
+**Defaults**:
+- `dimensions`: `[]` (returns single aggregate row)
+- `rowLimit`: `1000`
+- `startRow`: `0`
+- `type`: `web`
+- `dataState`: `all` (includes fresh data; `final` excludes recent partial)
+
+**Date range**: rolling 16 months. `startDate` cannot be more than 16 months before `endDate`. Older dates return empty result silently (no error).
+
+**Search type filter**: v3.x defaults to `type: "web"` only (matches GSC UI's default and v2/v3 CSV behavior). Future versions may aggregate across types.
+
+### Response
+
+```json
+{
+  "rows": [
+    {
+      "keys": ["dimension-value-1", "dimension-value-2"],
+      "clicks": 123,
+      "impressions": 456,
+      "ctr": 0.27,
+      "position": 5.43
+    }
+  ],
+  "responseAggregationType": "byProperty"
+}
+```
+
+**Field types** — IMPORTANT difference from BigQuery JSON encoding:
+
+| Field | JSON type | Translation |
+|---|---|---|
+| `keys[*]` | string array | passthrough |
+| `clicks` | **JSON number** (not quoted) | passthrough — no cast needed |
+| `impressions` | **JSON number** | passthrough |
+| `ctr` | **JSON number** (decimal 0-1) | passthrough |
+| `position` | **JSON number** (1-based decimal) | passthrough |
+
+Unlike BigQuery's `bq query --format=json` (which quotes every INT64/FLOAT64 as strings), the Search Analytics API returns native JSON numbers. Translation is simpler.
+
+**Empty rows**: when no data matches, `rows` is omitted from the response entirely. Treat absence of `rows` as `rows: []`.
+
+### rowLimit cap (Plan-agent B1)
+
+`rowLimit` is capped server-side at **25,000 per call**. Higher values are silently clamped to 25,000. For Q3 (`url_impressions_map`) on >25k-URL sites, the map silently truncates. Documented in `gsc-ingestion.md` "API ingestion → Plan-agent B1".
+
+Pagination via `startRow` is supported (`startRow + rowLimit` retrieves the next batch), but v3.x doesn't paginate per Locked Decision 5 — single call, accept the cap.
+
+### Position-band filter (Q1 — client-side)
+
+The API's `dimensionFilterGroups` supports filters on dimensions (query/page/country/device) but **NOT** on `position`. v3.x applies the position-band filter (5-20) and impression-floor filter (≥100) client-side after the response is received.
+
+---
+
+## `urlInspection.index.inspect` — URL Inspection
+
+### Request
+
+```
+POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
+Authorization: Bearer <ADC_TOKEN>
+Content-Type: application/json
+
+{
+  "inspectionUrl": "https://example.com/specific-page",
+  "siteUrl": "sc-domain:example.com",
+  "languageCode": "en"
+}
+```
+
+**Required**: `inspectionUrl`, `siteUrl`. **Note**: `siteUrl` here is a **request body field** (not a path parameter — no URL encoding needed). Use the raw string format.
+
+**Optional**: `languageCode` for localized issue messages. v3.x doesn't use issue messages, so this is left default.
+
+**Constraint**: `inspectionUrl` MUST belong to the property identified by `siteUrl`. Cross-property inspection returns HTTP 400.
+
+### Response
+
+```json
+{
+  "inspectionResult": {
+    "inspectionResultLink": "https://search.google.com/search-console/inspect?...",
+    "indexStatusResult": {
+      "verdict": "PASS",
+      "coverageState": "Submitted and indexed",
+      "robotsTxtState": "ALLOWED",
+      "indexingState": "INDEXING_ALLOWED",
+      "lastCrawlTime": "2026-05-13T10:30:00Z",
+      "pageFetchState": "SUCCESSFUL",
+      "googleCanonical": "https://example.com/canonical-page",
+      "userCanonical": "https://example.com/canonical-page",
+      "sitemap": ["https://example.com/sitemap.xml"],
+      "referringUrls": ["https://example.com/", "https://example.com/blog"],
+      "crawledAs": "MOBILE"
+    },
+    "mobileUsabilityResult": {
+      "verdict": "PASS",
+      "issues": []
+    },
+    "richResultsResult": {
+      "verdict": "PASS",
+      "detectedItems": []
+    }
+  }
+}
+```
+
+`indexStatusResult` is the primary block consumed by v3.x. `mobileUsabilityResult` and `richResultsResult` are present in response but not aggregated in v3.x (deferred to v3.y for mobile-usability sub-dim + rich-result-validation sub-dim).
+
+### `indexStatusResult` fields used by v3.x
+
+| Field | Type | Used for |
+|---|---|---|
+| `verdict` | enum | High-level pass/partial/fail/neutral (informational only) |
+| `coverageState` | string | Primary key in 9-reason lookup table (`gsc-api-queries.md`) |
+| `pageFetchState` | enum | Joint key with `coverageState` for ambiguous mappings (per Plan-agent B8) |
+| `robotsTxtState` | enum | Cross-check for sub-dim 7 `blocked_access` (robots variant) |
+| `indexingState` | enum | Surface in evidence for sub-dim 7 findings (`BLOCKED_BY_META_TAG` vs `BLOCKED_BY_HTTP_HEADER`) |
+| `lastCrawlTime` | ISO-8601 string | Sort key for `affected_urls` (descending — most-recent first); evidence on time-sensitive findings |
+| `googleCanonical` | URL string | Sub-dim 6 `canonical_conflict` evidence (per Plan-agent B9) |
+| `userCanonical` | URL string | Sub-dim 6 `canonical_conflict` evidence (per Plan-agent B9) |
+| `crawledAs` | enum | Evidence on sub-dim 6 (canonical conflict context) |
+| `sitemap` | URL string array | Cross-reference with local sitemap to detect "sitemap conflict" cases (informational) |
+
+### Enums
+
+**`verdict`** — overall index status:
+- `PASS` — URL is indexed cleanly
+- `PARTIAL` — URL is indexed with caveats (e.g., missing some sitemap)
+- `FAIL` — URL is not indexed
+- `NEUTRAL` — no opinion (e.g., URL unknown to Google)
+
+**`coverageState`** — primary diagnostic string. ~50 documented values. Most-relevant subset for the 9-reason mapping:
+
+```
+Submitted and indexed
+Indexed, not submitted in sitemap
+Indexed, though blocked by robots.txt
+Crawled - currently not indexed
+Discovered - currently not indexed
+Page with redirect
+Not found (404)
+Submitted URL not found (404)
+Alternate page with proper canonical tag
+Duplicate, Google chose different canonical than user
+Duplicate without user-selected canonical
+Excluded by 'noindex' tag
+Blocked by robots.txt
+Blocked due to access forbidden (403)
+Blocked due to other 4xx issue
+Server error (5xx)
+Soft 404
+URL is unknown to Google
+```
+
+Plus less common values (refresh notes, sitemap-specific variants). Full lookup table → `gsc-api-queries.md`.
+
+**`pageFetchState`** — what happened when Google last fetched the page:
+
+```
+SUCCESSFUL
+SOFT_404
+BLOCKED_ROBOTS_TXT
+NOT_FOUND
+ACCESS_DENIED
+SERVER_ERROR
+REDIRECT_ERROR
+ACCESS_FORBIDDEN
+BLOCKED_4XX
+```
+
+Joint key with `coverageState` for the lookup table (per Plan-agent B8). When `coverageState` is ambiguous (e.g., generic "Not found"), `pageFetchState` disambiguates (`NOT_FOUND` vs `SOFT_404`).
+
+**`robotsTxtState`** — robots.txt allowance:
+```
+ALLOWED
+DISALLOWED
+```
+
+**`indexingState`** — explicit reason for blocked indexing (when applicable):
+```
+INDEXING_ALLOWED
+BLOCKED_BY_META_TAG
+BLOCKED_BY_HTTP_HEADER
+BLOCKED_BY_ROBOTS_TXT
+```
+
+**`crawledAs`** — user agent:
+```
+DESKTOP
+MOBILE
+```
+
+---
+
+## `sites.list` — Sites list (auth probe)
+
+### Request
+
+```
+GET https://www.googleapis.com/webmasters/v3/sites
+Authorization: Bearer <ADC_TOKEN>
+```
+
+No body. No path params. No query params required.
+
+### Response
+
+```json
+{
+  "siteEntry": [
+    {
+      "siteUrl": "sc-domain:example.com",
+      "permissionLevel": "siteOwner"
+    },
+    {
+      "siteUrl": "https://other-example.com/",
+      "permissionLevel": "siteFullUser"
+    }
+  ]
+}
+```
+
+**`permissionLevel`** enum:
+- `siteOwner` — full ownership; verified
+- `siteFullUser` — full user; verified by owner
+- `siteRestrictedUser` — restricted user; verified by owner
+- `siteUnverifiedUser` — invited but not verified (cannot query data)
+
+For activation condition 6 (site_url verification), the orchestrator checks:
+1. Response is HTTP 200 (probe succeeded — ADC token works for Search Console API)
+2. `siteEntry` array contains an element where `siteUrl == config.site_url`
+3. That element's `permissionLevel` is one of `siteOwner` / `siteFullUser` / `siteRestrictedUser` (not `siteUnverifiedUser`)
+
+If condition 1 fails: ADC scope issue → surface `--scopes` remediation.
+If condition 2 fails: surface "site_url not in your verified properties — check the value or verify the property in GSC."
+If condition 3 fails: surface "you have invite-only access; ask the owner to verify your account on this property."
+
+**Empty `siteEntry` array** (response 200 with no properties): the authenticated account has zero GSC properties. Surface "no GSC properties found — verify a property in Google Search Console first."
+
+---
+
+## Quota model
+
+| Endpoint | Quota | Scope |
+|---|---|---|
+| `searchanalytics.query` | 1,200 QPM (queries per minute) | Per Search Console account |
+| `searchanalytics.query` | 100,000 QPD (queries per day) | Per project |
+| `urlInspection.index.inspect` | **2,000 URLs/day** | Per property |
+| `urlInspection.index.inspect` | **600 QPM** | Per project |
+| `sites.list` | 1,200 QPM | Per account |
+
+Per Plan-agent B3. The 600 QPM on URL Inspection per-project is the binding constraint, not 1,200 QPM general.
+
+**v3.x usage profile per `/seo-review` run:**
+- Search Analytics: 3 calls (Q1, Q2, Q3) — well under any limit
+- URL Inspection: ≤100 calls in a single parallel batch — burst fits in <1 minute (100 / 600 QPM ≈ 10 seconds wall time worst case)
+- Sites list: 1 call (auth probe)
+
+Total: ≤104 calls per run. Multiple runs per day on the same property: still well under 2,000/day. Multi-property concerns deferred to v3.x.x.
+
+---
+
+## Error response shape (Plan-agent B4)
+
+All endpoints return errors via a consistent envelope:
+
+```json
+{
+  "error": {
+    "code": 429,
+    "message": "Quota exceeded for quota metric 'Inspections per day'...",
+    "status": "RESOURCE_EXHAUSTED",
+    "errors": [
+      {
+        "message": "Quota exceeded...",
+        "domain": "global",
+        "reason": "rateLimitExceeded"
+      }
+    ],
+    "details": [...]
+  }
+}
+```
+
+**Stable parsing rule**: parse on `error.code` (HTTP status) + `error.status` (gRPC-style canonical name). The `message` text is human-readable and varies between per-minute/per-day quota exhaustion.
+
+### Error codes used by v3.x
+
+| `error.code` | `error.status` | Meaning | Skill behavior |
+|---|---|---|---|
+| 200 | (success) | Request succeeded | Continue |
+| 400 | `INVALID_ARGUMENT` | Malformed request (encoding, invalid date, etc.) | Footer error; skip signal |
+| 401 | `UNAUTHENTICATED` | Token expired or scope insufficient | Surface `--scopes` remediation; skip signal |
+| 403 | `PERMISSION_DENIED` | Property ACL — user lacks access | Surface property-verification check; skip signal |
+| 404 | `NOT_FOUND` | URL/property not found | URL Inspection: log "unknown to Google" + skip from cluster. Sites list: surface verify-property remediation. |
+| 429 | `RESOURCE_EXHAUSTED` | Quota exhausted (per-minute or per-day) | Graceful degrade (decision 10): stop sending, surface footer |
+| 5xx | (varies) | Transient server error | Print error + skip signal + DON'T retry (re-run skill) |
+
+---
+
+## Schema drift handling
+
+When an endpoint returns an error mentioning an unknown field, or when a `coverageState` value is not in our lookup table:
+
+1. Surface the exact error verbatim in the report footer
+2. Log: `Search Console API schema drift detected — field/enum '<X>' missing or new. v3.x schema was validated against Google API docs as of 2026-05-15. Re-validate against current docs: https://developers.google.com/webmaster-tools/v1/`
+3. Skip the affected signal for this run (no silent fallback)
+4. Continue with other API signals + other paths if applicable
+
+For unmapped `coverageState`: use "Other" bucket in `gsc-api-queries.md` lookup table. Footer notes the unmapped value count.
+
+DO NOT auto-retry with different params. DO NOT mark run partial-success silently — degraded signal is surfaced loudly.
+
+---
+
+## What v3.x does NOT do (deferred to v3.x.x or later)
+
+| Capability | Why deferred |
+|---|---|
+| Multi-property dispatch (multiple `site_url` entries) | v3.x is single-property. Multi-property deferred (matrix complexity + property-selection UX). |
+| Image/Video/News/Discover search type queries | v3.x queries `type: "web"` only. Matches v2/v3 implicit behavior. Other types = future. |
+| Country/device dimension splits | Adds dimensional noise without v1 finding emission. Deferred. |
+| Mobile usability findings (`mobileUsabilityResult` block from URL Inspection) | New sub-dim category — needs rubric weight allocation. v3.x.x. |
+| Rich-result validation findings (`richResultsResult` block) | Same as above — new sub-dim. v3.x.x. |
+| `dataState: "final"` vs `"all"` toggle | v3.x uses default (`all` — includes fresh partial data). v3.x.x may expose as config option. |
+| Custom date range (vs `lookback_days`) | v3.x uses `lookback_days` (default 90) from config.yaml. Custom date range = future. |
+| Pagination beyond rowLimit=25000 (per locked decision 5) | Accept silent truncation on >25k-URL sites; BQ alternative path remains uncapped. |
+| `sitemaps.list` / `sitemaps.get` (sitemap submission status) | Tier 2 — sitemap probe in Step 3.2 already covers URL health. v3.x.x for submission-status integration. |
