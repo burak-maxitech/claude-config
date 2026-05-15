@@ -323,9 +323,9 @@ The map is passed to **all dispatched subagents** (3 or 4 depending on `gsc_mode
 
 ---
 
-## Setup banner (one-time, sentinel-gated)
+## Setup banner — unified BQ + CSV (one-time, sentinel-gated)
 
-When the orchestrator runs `/seo-review` and no GSC CSVs are detected:
+When the orchestrator runs `/seo-review` and **no GSC data is detected** (no CSVs in `.seo-data/gsc/` AND no `config.yaml` — i.e., 4-state matrix resolves to heuristic-only):
 
 1. **Sentinel check.** Look for `.seo-data/.gsc-banner-shown`. If it exists → suppress the banner; nothing to do.
 2. **Print the banner** (text below). Then create the sentinel:
@@ -344,19 +344,37 @@ Console data to surface traffic-prioritized findings (which pages get
 impressions, which queries you rank for at position 5-20, which pages Google
 crawled but didn't index).
 
-To enable:
+Two paths are supported, both first-class. Pick either or both:
 
-1. Open Google Search Console for your property.
-2. Export these CSVs (see ".seo-data/gsc/README.md" once the folder exists for
-   the full step-by-step):
-   • Performance > Search results > Queries tab → Export → CSV
-   • Performance > Search results > Pages tab → Export → CSV
-   • Page indexing > Export "Why pages aren't indexed" table → CSV
-   • Page indexing > click each reason row → Export → CSV (up to 9 CSVs)
-3. Create .seo-data/gsc/{performance,indexing}/ in this repo.
-4. Drop each CSV into the matching subfolder. Rename to canonical names:
-   queries.csv, pages.csv, summary.csv, crawled-not-indexed.csv, etc.
-5. Re-run /seo-review.
+╭─ Path 1 (RECOMMENDED): BigQuery Bulk Data Export ────────────────────────╮
+│ Performance signal — full history, no row caps, daily-fresh.             │
+│                                                                          │
+│ 1. GSC > Settings > Bulk data export > Configure                         │
+│    Set destination GCP project + dataset name (conventional:             │
+│    "searchconsole"). Wait ~2 days for first export.                      │
+│ 2. Install gcloud SDK + run: gcloud auth application-default login       │
+│ 3. Create .seo-data/gsc/config.yaml (template auto-written on next run): │
+│      project_id: <your-gcp-project>                                      │
+│      dataset_id: searchconsole                                           │
+│      location: US                                                        │
+│ 4. Re-run /seo-review.                                                   │
+╰──────────────────────────────────────────────────────────────────────────╯
+
+╭─ Path 2 (REQUIRED for Page Indexing): CSV exports ───────────────────────╮
+│ Indexing signal — 9-reason report. BigQuery export does NOT include      │
+│ this data (Google product limitation).                                   │
+│ Also: CSV fallback for Performance when BigQuery isn't configured.       │
+│                                                                          │
+│ 1. GSC > Indexing > Pages > Export the "Why pages aren't indexed" table  │
+│    + click each reason row → Export → CSV (up to 9 reason CSVs)          │
+│ 2. (Optional, if not using BigQuery) GSC > Performance > Search results: │
+│    Queries tab → Export → CSV                                            │
+│    Pages tab → Export → CSV                                              │
+│ 3. Create .seo-data/gsc/{performance,indexing}/ in this repo.            │
+│ 4. Drop each CSV into the matching subfolder with canonical filenames    │
+│    (see .seo-data/gsc/README.md once the folder exists).                 │
+│ 5. Re-run /seo-review.                                                   │
+╰──────────────────────────────────────────────────────────────────────────╯
 
 This folder will be auto-gitignored (search queries can include brand-internal
 data — privacy default). You don't need to commit anything.
@@ -369,7 +387,7 @@ silence it manually.)
 ─────────────────────────────────────────────────────────────────────────────
 ```
 
-Banner skipped silently when `.seo-data/gsc/` exists (any state).
+Banner skipped silently when `.seo-data/gsc/` exists (any CSV or config.yaml present).
 
 ---
 

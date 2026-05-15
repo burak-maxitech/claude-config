@@ -42,6 +42,26 @@ Special cases:
 
 ## Section 1 — Context
 
+Render `## Context` heading, then — **conditionally** — the "No GSC data" banner, then the context block below.
+
+### Section 1 banner — "No GSC data" variant (heuristic-only mode only)
+
+When Step 1.6 resolves `mode_label == "heuristic-only"` (no BigQuery `config.yaml`, no CSVs in `.seo-data/gsc/`), prepend this banner immediately under the `## Context` heading, before the **Detected stack** line:
+
+```
+> ⚠ **No GSC data — code-only review.** Recommendations cannot be
+> traffic-prioritized. The /100 score is unaffected (GSC is informational),
+> but with GSC data the top-3 priorities can be re-ranked by real impressions
+> and 404 clusters can be auto-matched to recent code renames.
+>
+> See `.seo-data/gsc/README.md` to enable GSC-aware audit. The one-time
+> setup banner at the top of this run covers the quickest path.
+```
+
+In **all other modes** (any of Full GSC / BigQuery Performance only / CSV-only / Indexing-only / Performance-CSV-only), DO NOT render this banner — the mode-specific footer note from Step 1.6.3's matrix is sufficient. The banner exists only to surface the "code-only" caveat in the heuristic-only case where the audit is structurally degraded.
+
+### Context block (always renders)
+
 ```
 ## Context
 
@@ -49,6 +69,7 @@ Special cases:
 **Sitemap:** public/sitemap.xml (47 URLs, probed)
 **Best practices fetched:** 2026-05-14 from 5 sources (see footer for URLs)
 **Coverage mode:** static + sitemap URL probe (use `--url <base>` for live HTML diff)
+**GSC mode:** Full GSC (BigQuery: 47 days data, 2,445 URL rows; 11/11 indexing CSVs; freshness OK)
 
 ### Score breakdown by dimension
 
@@ -61,6 +82,8 @@ Special cases:
 | Performance | 8 | 10 | image_perf: -1; response_time: -1 |
 | **Total** | **72** | **100** | |
 ```
+
+The `**GSC mode:**` line uses the fragment string from Step 1.6.10 (one of 6 variants matching the 4-state matrix). Omit the line entirely in heuristic-only mode — the banner above already conveys the state.
 
 If the brief proposed weight adjustments, add a line: `Weight adjustments applied: Generative Engine +3 / Performance -2 / Structured Data -1 (from fetched brief).`
 

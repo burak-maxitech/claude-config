@@ -1,8 +1,8 @@
 ---
 name: seo-review
-description: Repo-wide SEO and Generative Engine Optimization audit for web projects. Rejects non-web repos. Fetches current best practices every run (SEO/GEO field evolves rapidly). Probes sitemap URLs for 4xx/5xx/redirect-chain/slow-response health. Optionally ingests Google Search Console CSV exports from .seo-data/gsc/ (queries, pages, all 9 page-indexing reasons) for traffic-aware recommendations + 35-day git-history overlap to flag "may already be fixed" against the GSC reporting lag. Three or four parallel Sonnet subagents (seo-technical / seo-content / geo-generative, plus seo-gsc-insights when GSC CSVs are present). Score stays /100 (purely heuristic) so docs/seo-history.md is comparable across runs with or without CSVs. Use when user mentions SEO audit, GEO audit, Generative Engine Optimization, AI search optimization, llms.txt, structured data, sitemap health, Google Search Console, GSC, search performance, or "make this site rank better."
+description: Repo-wide SEO and Generative Engine Optimization audit for web projects. Rejects non-web repos. Fetches current best practices every run (SEO/GEO field evolves rapidly). Probes sitemap URLs for 4xx/5xx/redirect-chain/slow-response health. Optionally ingests Google Search Console data via Bulk Data Export to BigQuery (Performance — queries + pages + per-URL impressions) and/or CSV exports from .seo-data/gsc/ (Page Indexing — all 9 reasons, and Performance fallback when BQ not configured). 4-state matrix governs the mix (BQ + indexing / BQ-only / CSV-only / heuristic-only). Plus 35-day git-history overlap to flag "may already be fixed" against the GSC reporting lag. Three or four parallel Sonnet subagents (seo-technical / seo-content / geo-generative, plus seo-gsc-insights when any GSC data is present). Score stays /100 (purely heuristic) so docs/seo-history.md is comparable across runs regardless of GSC mode. Use when user mentions SEO audit, GEO audit, Generative Engine Optimization, AI search optimization, llms.txt, structured data, sitemap health, Google Search Console, GSC, BigQuery, Bulk Data Export, search performance, or "make this site rank better."
 disable-model-invocation: true
-allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(jq:*), Bash(cat:*), Bash(head:*), Task
+allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(jq:*), Bash(cat:*), Bash(head:*), Bash(bq:*), Bash(gcloud:*), Task
 effort: high
 argument-hint: "[path] [--plan] [--fix] [--url <deployed-url>]"
 ---
@@ -50,11 +50,13 @@ If none match: output
 
 and stop the skill cleanly.
 
-**Otherwise, print the detected stack in one line.** The line includes the GSC-mode summary computed in Step 1.6 (e.g., `Mode: heuristic` when no CSVs present, `Mode: heuristic + GSC (N CSVs)` when CSVs detected). Examples:
+**Otherwise, print the detected stack in one line.** The line includes the GSC-mode summary computed in Step 1.6 (varies across the 4-state matrix outcomes — see Step 1.6.10 for exact phrasing per mode). Examples:
 
-> Detected: Next.js 14 app-router project, TypeScript, with sitemap.xml at /public/sitemap.xml and i18n via next-i18next. Mode: heuristic + GSC (7 CSVs present: queries, pages, 5/9 indexing reasons; freshness OK). Use `--url <base>` for live HTML diff and sitemap URL probe.
+> Detected: Next.js 14 app-router project, TypeScript, with sitemap.xml at /public/sitemap.xml and i18n via next-i18next. Mode: heuristic + GSC (BigQuery: 47 days data, 2,445 URL rows; 7/11 indexing CSVs; freshness OK). Use `--url <base>` for live HTML diff and sitemap URL probe.
 
-> Detected: Astro 4 project, TypeScript, no i18n. Mode: heuristic (drop GSC CSVs in `.seo-data/gsc/` for traffic-aware mode — see one-time setup banner above).
+> Detected: Astro 4 project, TypeScript, no i18n. Mode: heuristic + GSC (CSVs only — 13 files; freshness OK; enable BigQuery for full Performance coverage).
+
+> Detected: Hugo static site, no i18n. Mode: heuristic (no GSC data — see one-time setup banner above).
 
 **Detect i18n** for the hreflang scan: `next-i18next`, `nuxt-i18n`, `react-i18next`, `vue-i18n`, `@formatjs/intl`, `i18next`, `next-international` deps, or multi-locale folder structure (`pages/en/`, `pages/fr/`, etc.).
 
@@ -116,18 +118,30 @@ If WebSearch/WebFetch fail or return nothing useful (rare, but possible on flaky
 
 ## Parallel-batch note for Steps 1.5 + 1.6
 
-Steps 1.5 (git scan) and 1.6 (CSV ingestion) have **independent tool calls** that should fire in a **single parallel turn** — not back-to-back sequentially. In one tool-use block, batch:
+Steps 1.5 (git scan) and 1.6 (GSC ingestion via the 4-state matrix) have **independent tool calls** that should fire in a **single parallel turn** — not back-to-back sequentially. In one tool-use block, batch:
 
+**Turn 1 — Detection + optimistic Reads:**
 - `git rev-parse --is-shallow-repository` (Step 1.5.1)
 - `git log --since="35 days ago" --name-status ...` (Step 1.5.3)
-- `Glob .seo-data/gsc/**/*.csv` (Step 1.6.1)
-- `Glob .seo-data/gsc/README.md` (Step 1.6.2)
-- `Read .gitignore` (Step 1.6.2, idempotency check)
-- `Read references/gsc-setup-readme-template.md` (Step 1.6.2, only if needed — fire optimistically; discard if README already exists)
+- `Glob .seo-data/gsc/**/*.csv` (Step 1.6.1 CSV inventory)
+- `Glob .seo-data/gsc/config.yaml` (Step 1.6.1 BQ config presence)
+- `Glob .seo-data/gsc/README.md` (Step 1.6.4 idempotency)
+- `Read .gitignore` (Step 1.6.4 idempotency)
+- `Read references/gsc-setup-readme-template.md` (fire optimistically; discard if README already exists)
+- `Read references/gsc-ingestion.md` (always needed when any GSC mode is active — covers BQ subsection + CSV parsing rules + 12 sub-dim catalog)
+- `Read .seo-data/gsc/config.yaml` (optimistic; if file doesn't exist, the tool errors silently — interpret as `bq_configured = false`)
+- `Read references/bigquery-queries.md` (optimistic; only used when BQ activates — but reading early lets Turn 2 fire bq queries without an extra Read)
+- `Bash: bq --version 2>&1` (BigQuery CLI install detection; non-zero exit treated as not-installed)
+- `Bash: gcloud auth application-default print-access-token 2>&1` (ADC detection; empty/error output treated as not-authenticated)
 
-Only the **post-tool aggregation** (parsing the git log output, parsing each CSV, building the maps) runs sequentially. After this parallel batch returns, the CSV `Read` calls themselves (Step 1.6.3) also fire as a **second parallel batch** — one tool-use block containing one Read per canonical CSV path that the Glob confirmed exists.
+Only the **post-tool aggregation** (parsing git log, parsing config.yaml flat keys, resolving the 4-state mode, parsing CSVs or BQ JSON) runs sequentially.
 
-Without explicit batching, the orchestrator would run ~13 sequential tool turns just for Steps 1.5+1.6 ingestion. With batching: 2 turns total.
+**Turn 2 — Data ingestion** (conditional on Turn 1's mode resolution):
+- **If BQ active**: 5 parallel `Bash: bq query ...` calls (Q1-Q5 from `bigquery-queries.md`)
+- **If CSV path active**: parallel `Read` on each canonical CSV path the Turn 1 Glob confirmed exists (up to 13 — 2 Performance + 11 indexing)
+- **Hybrid (BQ active for Performance, indexing CSVs present)**: 5 BQ queries + 11 indexing CSV Reads — all in the same parallel turn
+
+Without explicit batching, the orchestrator would run ~15+ sequential tool turns for Steps 1.5+1.6. With batching: 2 turns total.
 
 ---
 
@@ -273,27 +287,90 @@ When shallow: `Git history scan: skipped (shallow clone — change-awareness ann
 
 ---
 
-## Step 1.6 — GSC CSV Ingestion (orchestrator-only)
+## Step 1.6 — GSC Ingestion (4-state matrix dispatcher)
 
-When the user has dropped Google Search Console CSV exports into `.seo-data/gsc/`, parse them into structured digests + maps for downstream subagent use. When absent, print a one-time setup banner and proceed heuristic-only.
+GSC data can arrive via two paths: **BigQuery Bulk Data Export** (Performance only — Google's product limit) and **CSV exports** (the only path for the 9-reason Page Indexing report, and a fallback for Performance when BQ not configured). This step resolves which paths are active and dispatches to the right ingestion logic.
 
-Read `references/gsc-ingestion.md` for the canonical reference (folder layout, expected headers, parsing rules, finding-type catalog, freshness policy, `.gitignore` auto-append rules). The reference is comprehensive; this step describes the orchestrator's call graph.
+Three reference files cover the implementation:
+- `references/gsc-ingestion.md` — canonical digest shapes, CSV parsing rules, BigQuery-→-digest translation contract, 12 sub-dim finding catalog, freshness policy, `.gitignore` auto-append rules
+- `references/bigquery-queries.md` — 5 parametrized SQL templates (Q1-Q5)
+- `references/bigquery-config-template.md` — flat-YAML config schema + setup walkthrough
 
-### 1.6.1 — Detection
+### The 4-state matrix
 
-1. `Glob` for `.seo-data/gsc/**/*.csv`.
-2. If **zero matches**:
-   - Check sentinel `.seo-data/.gsc-banner-shown`. If the sentinel file is **absent** → emit the setup banner (full text in `gsc-ingestion.md` "Setup banner"). Touch the sentinel file (`Write` an empty file).
-   - Set `gsc_mode: disabled` in shared context. Skip to Step 2 (Mode Dispatch).
-3. If **≥1 match**: proceed to 1.6.2.
+| BQ configured? | Indexing CSVs present? | Performance CSVs present? | Mode label | User-facing warning |
+|---|---|---|---|---|
+| ✓ | ✓ | (ignored) | **Full GSC** | none |
+| ✓ | ✗ | (ignored) | Performance-only | Footer note: `indexing signal missing — drop the 11 indexing CSVs in .seo-data/gsc/indexing/ for cluster detection` |
+| ✗ | ✓ | ✓ | CSV-only (v2 path) | Footer note: `Performance limited to ~1,000 rows — enable BigQuery Bulk Data Export for full coverage. See .seo-data/gsc/README.md.` |
+| ✗ | ✓ | ✗ | Indexing-only | Footer note: `Performance signal missing — enable BigQuery OR drop performance/queries.csv + pages.csv` |
+| ✗ | ✗ | ✓ | Performance-CSV-only | Footer note: `indexing missing + Performance limited — see .seo-data/gsc/README.md` |
+| ✗ | ✗ | ✗ | **Heuristic-only** | Section 1 banner: `⚠ No GSC data — code-only review. Recommendations cannot be traffic-prioritized.` |
 
-### 1.6.2 — README + .gitignore (idempotent)
+When BQ is configured AND a Q1-Q5 query fails at runtime: NO silent CSV fallback (per locked decision 10). Print the `bq` error in the footer, skip the Performance signal, and the matrix reads as if Performance source is missing. See `gsc-ingestion.md` "BQ-configured-and-failing — NO silent CSV fallback" for the rationale.
 
-The `Glob` for `.seo-data/gsc/README.md`, the `Read .gitignore`, and the optimistic `Read references/gsc-setup-readme-template.md` all fire in the first parallel batch (see "Parallel-batch note"). After the batch returns:
+### 1.6.1 — Detection (Turn 1, joins Step 1.5's parallel batch)
 
-**README:** If the Glob returned no README, write the template's **content block** (everything between the `## Template content (begin)` and `## Template content (end)` markers, inner-fenced block extracted) to `.seo-data/gsc/README.md`. If the README exists, discard the template Read result — user may have edited it.
+All GSC-related tool calls listed in the "Parallel-batch note" above (CSV Glob, config.yaml Glob + optimistic Read, README + .gitignore + template Reads, bigquery-queries.md + gsc-ingestion.md reference Reads, `bq --version`, `gcloud auth application-default print-access-token`) fire in Turn 1 alongside Step 1.5. After the batch returns, parse the results into:
 
-**.gitignore:** From the `Read .gitignore` result, Grep for the sentinel start marker `# /seo-review managed`. If absent, append:
+| Variable | Source | True/false condition |
+|---|---|---|
+| `perf_csvs_present` | Glob `.seo-data/gsc/performance/*.csv` | ≥1 of `queries.csv` or `pages.csv` |
+| `indexing_csvs_present` | Glob `.seo-data/gsc/indexing/*.csv` | ≥1 indexing CSV |
+| `config_yaml_present` | Read `.seo-data/gsc/config.yaml` | Read succeeded (non-error result) |
+| `bq_cli_installed` | `bq --version` exit + stdout | stdout contains a version string (regex `\d+\.\d+`) |
+| `adc_authenticated` | `gcloud auth application-default print-access-token` | stdout non-empty AND no `ERROR:` line |
+
+### 1.6.2 — Parse config.yaml and resolve `bq_configured`
+
+When `config_yaml_present`, parse the file's content (already Read in Turn 1) via line-by-line walk:
+
+1. Reject nested keys: any line matching `^\s+[a-z_]+:` (leading whitespace before key) → emit `Config error: nested keys not supported in .seo-data/gsc/config.yaml — use flat top-level keys only.` and set `bq_configured = false`. Skip rest of parse.
+2. Extract flat keys: lines matching `^([a-z_]+):\s*(.*)$` (no leading whitespace). Build `config: {key: value, ...}`.
+3. Validate required keys: `project_id`, `dataset_id`, `location` must all be present and non-empty after trimming. If any missing → `bq_configured = false`, log per-key reason in footer (`Config warning: required key '<X>' missing or empty`).
+4. Warn on unknown keys (not in `{project_id, dataset_id, location, site_url, lookback_days}`): log `Config warning: unknown key '<X>' — ignored.`
+5. Default `lookback_days = 90` when omitted. Validate range [7, 365] when present.
+
+If all checks pass: `bq_configured = true`.
+
+### 1.6.3 — Resolve 4-state mode
+
+```
+bq_active            = bq_configured AND bq_cli_installed AND adc_authenticated
+perf_source          = "bigquery" if bq_active else ("csv" if perf_csvs_present else "none")
+indexing_source      = "csv" if indexing_csvs_present else "none"
+gsc_mode             = "enabled" if (perf_source != "none" OR indexing_source != "none") else "disabled"
+```
+
+**Mode-label string** (used by Step 0 detected-line + Step 7 footer):
+
+| `(perf_source, indexing_source)` | `mode_label` |
+|---|---|
+| `("bigquery", "csv")` | `Full GSC (BigQuery + indexing CSVs)` |
+| `("bigquery", "none")` | `BigQuery Performance only (indexing missing)` |
+| `("csv", "csv")` | `CSV-only (v2 path)` |
+| `("csv", "none")` | `CSV Performance only (indexing missing)` |
+| `("none", "csv")` | `Indexing-only (Performance missing)` |
+| `("none", "none")` | `heuristic-only` |
+
+Stash `gsc_warning_text` per the matrix table above. Empty string when no warning.
+
+### 1.6.4 — Heuristic-only fast-path (gsc_mode == "disabled")
+
+When `gsc_mode == "disabled"`:
+
+1. Check sentinel `.seo-data/.gsc-banner-shown`. If **absent**: emit the unified setup banner (see `gsc-ingestion.md` "Setup banner — unified BQ + CSV"). Touch the sentinel (`Write` empty file).
+2. Set `gsc_mode_summary = "heuristic-only"` for Step 0's detected line.
+3. Stash `section_1_banner = "⚠ No GSC data — code-only review. Recommendations cannot be traffic-prioritized. See .seo-data/gsc/README.md to enable GSC-aware audit."` for Section 1 rendering.
+4. Skip to Step 2 (Mode Dispatch). No data ingestion needed.
+
+### 1.6.5 — README + .gitignore (idempotent — runs whenever .seo-data/gsc/ exists)
+
+If `.seo-data/gsc/` exists (any CSV OR config.yaml detected):
+
+**README**: if `.seo-data/gsc/README.md` is absent (from Turn 1 Glob), write the template's content block from `references/gsc-setup-readme-template.md` (extract between `## Template content (begin)` and `## Template content (end)` markers, inner-fenced block). If README exists, discard the optimistic template Read.
+
+**.gitignore**: from the Turn 1 `Read .gitignore` result, Grep for sentinel start marker `# /seo-review managed`. If absent, append:
 
 ```
 # /seo-review managed — do not edit between markers
@@ -302,74 +379,126 @@ The `Glob` for `.seo-data/gsc/README.md`, the `Read .gitignore`, and the optimis
 # /end /seo-review managed
 ```
 
-If `.gitignore` doesn't exist, create it with the sentinel block as sole content. Print a one-line notice: `Added .seo-data/gsc/ to .gitignore (sentinel-marked block).` Subsequent runs are silent.
+Notice the block also covers `config.yaml` (under `.seo-data/gsc/`) — BQ config contains `project_id` which is non-secret but project-identifying, so the default of "don't commit" is right. If `.gitignore` doesn't exist, create it with the sentinel block. Print `Added .seo-data/gsc/ to .gitignore (sentinel-marked block).` on first append; silent thereafter.
 
-### 1.6.3 — Parse each canonical CSV
+### 1.6.6 — Data ingestion (Turn 2, parallel batch)
 
-After 1.6.1's Glob returns the list of present canonical CSV paths, fire **a single parallel turn batching one `Read` per confirmed-present path** (this is the second parallel batch from the "Parallel-batch note" above). Up to 13 CSV reads → 1 tool turn.
+Per the matrix's `(perf_source, indexing_source)` resolution, fire a single parallel batch:
 
-After the batch returns, walk each parsed content sequentially:
-
-1. Parse per `gsc-ingestion.md` "Parsing rules" — strip BOM, validate headers case-insensitively, walk rows respecting CSV quoting, normalize CTR/Position/dates.
-2. Build digest per `gsc-ingestion.md` "Digest caps" (top-50 per CSV by the documented sort key).
-3. Track `total_count` (full row count) separately from digest length — clusters use total_count in headlines.
-
-Failure modes (all log to footer + continue, never block):
-- Unknown CSV path → log `unknown CSV ignored: <path>`.
-- Missing required header → log `CSV skipped: <path> — expected <X>, detected <Y>`.
-- Malformed rows → tally `malformed_rows: <count>` per CSV.
-
-### 1.6.4 — Build cross-subagent maps
-
-After all CSVs parsed:
-
-- **page_type_map**: `{url → page_type}` over the union of URLs from `performance/pages.csv` digest + any `indexing/*.csv` digests + sitemap URLs (from Step 3.2 probe results when available, else from sitemap parsing). Classification heuristics: `gsc-ingestion.md` "page_type_map building" (mirrors `scan-geo.md:25-37` patterns).
-- **url_impressions_map**: `{url → impressions}` from `performance/pages.csv` rows. Used by ALL 4 subagents in Step 6 ranking — supplies `traffic_weight` when a finding's affected URL has GSC impression data (`rubric.md` "Traffic-weighted ranking").
-
-### 1.6.5 — Freshness check
-
-For each parsed CSV, compute `days_old = floor((now - file_mtime) / 1 day)`. Accumulate `freshness_summary: [{file, days_old}, ...]` for the footer. Per `gsc-ingestion.md` "Freshness policy":
-- <30 days: no warning
-- 30-90: footer warning "consider re-export"
-- >90: stronger warning "data may be misleading"
-
-Never block on freshness.
-
-### 1.6.6 — Compute GSC mode summary (consumed by Step 0)
-
-Build the GSC-mode fragment for Step 0's detected-stack line:
-
-- Disabled: `heuristic (drop GSC CSVs in .seo-data/gsc/ for traffic-aware mode — see one-time setup banner above)`
-- Enabled: `heuristic + GSC (<N> CSVs present: <inventory summary>; freshness <OK | warning>)`
-
-Where `<inventory summary>` lists categories present, e.g., `queries, pages, 5/9 indexing reasons`.
-
-### 1.6.7 — Pass to all dispatched subagents (Step 5 shared context)
-
-The orchestrator's Step 5 shared-context block (the base block passed to all subagents) gains a GSC section:
+**When `perf_source == "bigquery"`** — fire **5 parallel `Bash: bq query` calls** using the templates from `references/bigquery-queries.md` (already Read in Turn 1). Substitute placeholders per the parsed `config`:
 
 ```
-GSC Mode: enabled | disabled
+bq query \
+  --use_legacy_sql=false \
+  --maximum_bytes_billed=1000000000 \
+  --format=json \
+  --location=<config.location> \
+  '<SQL with <<PROJECT>>, <<DATASET>>, <<LOOKBACK_DAYS>> substituted>'
+```
 
-When enabled:
-- CSVs detected: <list of canonical paths>
-- Digests:
-  - performance/queries.csv: <top-50 structured records>
-  - performance/pages.csv: <top-50 structured records>
-  - indexing/summary.csv: <full table, ≤11 rows>
-  - indexing/<reason>.csv: <top-50 by last_crawled desc>, total_count=<N>
+Run Q1 (queries digest), Q2 (pages digest), Q3 (url_impressions_map), Q4 (orphan candidates — can be elided since Q3's keys serve), Q5 (freshness probe).
+
+**When `perf_source == "csv"`** — fire parallel `Read` on `.seo-data/gsc/performance/queries.csv` and `pages.csv` (whichever the Glob confirmed exist).
+
+**When `indexing_source == "csv"`** — fire parallel `Read` on each canonical indexing CSV path the Glob confirmed exists (up to 11 files).
+
+All of the above fire in the **same parallel turn** — one tool-use block containing the mix of bq queries + CSV Reads dictated by the active sources. Worst case (Full GSC mode): 5 BQ + 11 indexing CSV Reads = 16 parallel tool calls in 1 turn.
+
+### 1.6.7 — Parse outputs into byte-identical digests
+
+After Turn 2 returns, walk results per `references/gsc-ingestion.md`:
+
+**BigQuery JSON outputs** — translate per `gsc-ingestion.md` "BigQuery ingestion (primary path for Performance) → Digest shape — byte-identical to CSV path":
+- Cast every INT64 / FLOAT64 field (returned as quoted JSON string) to JS Number on ingest
+- Map BQ field names → digest field names (e.g., `avg_position` → `position`)
+- Top-50 ordering already enforced server-side via `LIMIT 50` in Q1/Q2
+- Build `url_impressions_map` from Q3's uncapped output
+
+**CSV outputs** — parse per `gsc-ingestion.md` "Parsing rules" (BOM strip, header validation, quoted-comma handling, CTR `%`-strip and `/100`, position float-parse).
+
+**Failure modes** (all log to footer, never block):
+- BQ query fails → `bq_query_failed: true`, footer captures stderr verbatim, that signal skipped (no CSV fallback)
+- BQ schema drift (column not found error) → footer note pointing to `bigquery-schema.md` for re-validation
+- Unknown CSV path → `unknown CSV ignored: <path>`
+- Missing required CSV header → `CSV skipped: <path> — expected <X>, detected <Y>`
+- Malformed CSV rows → `malformed_rows: <count>` per file
+
+Track `total_count` per cluster source (BQ Q1/Q2 truncate at 50 server-side; indexing CSVs may have unbounded source rows).
+
+### 1.6.8 — Build cross-subagent maps
+
+After all parsing complete (single source produces both):
+
+- **page_type_map**: `{url → page_type}` over the union of URLs from Q2 / `performance/pages.csv` digest (whichever was active — top-50 only, NOT Q3's uncapped map) + any indexing CSV digests + sitemap URLs (Step 3.2). Classification per `gsc-ingestion.md` "page_type_map building".
+- **url_impressions_map**: `{url → impressions}` — from Q3's uncapped output when BQ active, or from `performance/pages.csv` digest when CSV active. Passed to all subagents in Step 6 ranking (`rubric.md` "Traffic-weighted ranking").
+
+### 1.6.9 — Freshness check (source-dependent)
+
+**BigQuery path:** consume Q5's `latest_data_date`. Compute `days_old = today - latest_data_date`. Thresholds from `gsc-ingestion.md` "Freshness policy (BQ-specific)".
+
+**CSV path:** per-file `mtime` → `days_old`. Same `<30 / 30-90 / >90` thresholds.
+
+Never block on freshness. Note the GSC pipeline normally lags real-time by ~2 days — `days_old: 2` is fresh.
+
+### 1.6.10 — Compute mode summary fragment (consumed by Step 0)
+
+Build the GSC-mode fragment for Step 0's detected-stack line per `mode_label` from 1.6.3:
+
+| `mode_label` | Step 0 fragment example |
+|---|---|
+| Full GSC | `Mode: heuristic + GSC (BigQuery: 47 days data, 2,445 URL rows; 7/11 indexing CSVs; freshness OK)` |
+| BigQuery Performance only | `Mode: heuristic + GSC (BigQuery Performance only — drop indexing CSVs for cluster detection)` |
+| CSV-only (v2) | `Mode: heuristic + GSC (CSVs only — 13 files; freshness OK; enable BigQuery for full Performance coverage)` |
+| Indexing-only | `Mode: heuristic + GSC (indexing CSVs only — enable BigQuery OR drop performance/*.csv)` |
+| CSV Performance only | `Mode: heuristic + GSC (Performance CSVs only — indexing missing)` |
+| heuristic-only | `Mode: heuristic (no GSC data — see one-time setup banner above)` |
+
+### 1.6.11 — Pass to all dispatched subagents (Step 5 shared context)
+
+The orchestrator's Step 5 shared-context block (passed to all subagents) gains a GSC section:
+
+```
+GSC Mode: <mode_label from 1.6.3>
+Performance source: <bigquery | csv | none>
+Indexing source: <csv | none>
+
+When perf_source or indexing_source != "none":
+- Sources detected:
+    - BigQuery: project=<x> dataset=<y> location=<z> lookback_days=<N>, latest_data_date=<YYYY-MM-DD> (Q5)
+    - CSVs: <list of canonical paths present>
+- Digests (byte-identical shape regardless of source — see gsc-ingestion.md):
+  - queries digest: <top-50 records {query, impressions, clicks, ctr, position}>
+  - pages digest: <top-50 records {url, impressions, clicks, ctr, position}>
+  - indexing/summary digest: <full table, ≤11 rows>  ← CSV-sourced when indexing present
+  - indexing/<reason> digests: <top-50 by last_crawled desc>, total_count=<N>  ← CSV-sourced
 - page_type_map: {<url>: <page_type>, ...}
-- url_impressions_map: {<url>: <impressions>, ...}   ← for traffic_weight lookups
-- Freshness summary: [{file, days_old}, ...]
+- url_impressions_map: {<url>: <impressions>, ...}   ← used for traffic_weight lookups
+- Freshness summary: [{source, days_old}, ...]
 - Malformed rows: {<file>: <count>} (omit when all zero)
+- BQ query failures: [...] (omit when none)
 - Unknown CSVs ignored: [<paths>] (omit when empty)
 
-When disabled:
+When both perf_source AND indexing_source == "none":
 - gsc_mode: disabled
-- Reason: "no .seo-data/gsc/" | "no canonical CSVs found"
+- Reason: "no .seo-data/gsc/" | "no BQ config + no CSVs"
 ```
 
 **Primary consumer:** `seo-gsc-insights` subagent (dispatched as 4th parallel Task in Step 5 when `gsc_mode: enabled`). Other 3 subagents use `url_impressions_map` for traffic_weight when ranking their own findings; the rest is informational.
+
+Subagents do NOT need to know which source produced the digest — the contract from `gsc-ingestion.md` guarantees byte-identical shape across paths.
+
+### 1.6.12 — Footer addition
+
+Append to Step 5's footer (after the Step 1.5.7 git-history line):
+
+```
+GSC mode: <mode_label from 1.6.3>. Performance source: <bigquery | csv | none>. Indexing source: <csv | none>.
+<gsc_warning_text from matrix, if non-empty>
+<freshness summary, single line>
+<BQ query failures verbatim, if any — one line per failed query>
+```
+
+In heuristic-only mode, render only the first line: `GSC mode: heuristic-only. Performance source: none. Indexing source: none.` — the Section 1 banner carries the user-facing call to action; the footer line is a machine-readable audit record.
 
 ---
 
