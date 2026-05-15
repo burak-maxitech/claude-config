@@ -18,8 +18,9 @@ GSC mode is **enabled** when all of these conditions hold:
 1. `.seo-data/gsc/config.yaml` exists with non-empty `site_url:` key
 2. `gcloud` SDK installed (`gcloud --version` returns)
 3. ADC authenticated (`gcloud auth application-default print-access-token` returns a token)
-4. Active probe: `curl GET https://www.googleapis.com/webmasters/v3/sites` with the ADC token returns HTTP 200 + valid JSON
-5. The configured `site_url` appears in the returned `siteEntry[*].siteUrl` list with a non-`siteUnverifiedUser` `permissionLevel`
+4. ADC quota project set (`jq -r .quota_project_id` on `application_default_credentials.json` returns a non-empty project ID — written by `gcloud auth application-default set-quota-project <id>`). The skill sends this value as the `x-goog-user-project` header on every API call.
+5. Active probe: `curl GET https://www.googleapis.com/webmasters/v3/sites` with both the ADC token AND `x-goog-user-project` header returns HTTP 200 + valid JSON
+6. The configured `site_url` appears in the returned `siteEntry[*].siteUrl` list with a non-`siteUnverifiedUser` `permissionLevel`
 
 Otherwise → **heuristic-only mode**. The skill runs normally; subagents get an empty GSC block; Section 1 banner fires if it's a first encounter (sentinel-gated).
 
@@ -36,7 +37,7 @@ When GSC mode is enabled, ingest data from the Search Console API per `gsc-api-q
 
 All Performance calls dispatch in one parallel Bash turn. URL Inspection calls dispatch in a second parallel turn after Performance (URL selection uses Q3's `url_impressions_map`).
 
-**Token caching**: fetch the ADC token once at the start of Turn 2, reuse across all curl invocations. Tokens have a 1-hour TTL; a single Step 1.6 dispatch finishes in seconds.
+**Token + quota-project caching**: Turn 1's probe already fetched both the ADC token (`gcloud auth application-default print-access-token`) and the ADC quota project (`jq -r .quota_project_id` on `application_default_credentials.json`). Both are reused as shared context across all Turn 2 curl invocations — every call must include `Authorization: Bearer $TOKEN` AND `x-goog-user-project: $QUOTA_PROJECT` headers. Tokens have a 1-hour TTL; a single Step 1.6 dispatch finishes in seconds, so one Turn 1 fetch is reused.
 
 ### Digest shape
 
@@ -176,9 +177,11 @@ The ~2-day lag is Google's pipeline delay, not the skill's. Recommendations may 
 |---|---|---|
 | Pre-query | `gcloud` not installed | Activation condition 2 fails → heuristic-only. Footer: install link |
 | Pre-query | ADC not authenticated | Activation condition 3 fails → heuristic-only. Footer: `gcloud auth application-default login` remediation |
+| Pre-query | ADC quota project not set | Activation condition 4 fails → heuristic-only. Footer: run `gcloud auth application-default set-quota-project <id>` + `gcloud services enable searchconsole.googleapis.com --project=<id>` |
 | Pre-query | `site_url` empty in config.yaml | Activation condition 1 fails → heuristic-only |
-| Pre-query | Active probe returns 401 | Activation condition 4 fails. Footer: `--scopes` remediation (per gsc-api-schema.md "Authentication") |
-| Pre-query | Active probe returns 200 but `site_url` not in list | Activation condition 5 fails. Footer: verify site_url is owned by your Google account |
+| Pre-query | Active probe returns 401 | Activation condition 5 fails. Footer: `--scopes` remediation (per gsc-api-schema.md "Authentication") |
+| Pre-query | Active probe returns 403 with `SERVICE_DISABLED` | Activation condition 5 fails. Footer: enable Search Console API on quota project — `gcloud services enable searchconsole.googleapis.com --project=<adc_quota_project>` |
+| Pre-query | Active probe returns 200 but `site_url` not in list | Activation condition 6 fails. Footer: verify site_url is owned by your Google account |
 | Query runtime | `searchanalytics.query` returns 429 | Print error + skip Performance signal |
 | Query runtime | `urlInspection` returns 429 mid-batch | Graceful degrade: surface count succeeded/skipped in footer |
 | Query runtime | Single `urlInspection` returns 404 | URL unknown to Google — exclude from cluster, footer count |
@@ -210,14 +213,21 @@ position 5-20, which pages Google considers crawled-but-not-indexed).
 Setup (one-time, ~5 minutes):
 
 1. Install Google Cloud SDK: https://cloud.google.com/sdk/docs/install
-2. Authenticate (opens browser for OAuth):
+2. Pick or create a GCP project (any project works — Search Console API is
+   free within quota). List with:  gcloud projects list
+3. Enable Search Console API on the project:
+     gcloud services enable searchconsole.googleapis.com \
+       --project=<your-gcp-project>
+4. Authenticate (opens browser for OAuth) + set quota project (required —
+   Google Cloud APIs called via user-credential ADC need a billable project
+   for quota tracking, even when the API itself is free):
      gcloud auth application-default login \
        --scopes=https://www.googleapis.com/auth/webmasters.readonly,\
                 https://www.googleapis.com/auth/cloud-platform
      gcloud auth application-default set-quota-project <your-gcp-project>
-3. Create .seo-data/gsc/config.yaml with your GSC property URL:
+5. Create .seo-data/gsc/config.yaml with your GSC property URL:
      site_url: sc-domain:example.com    # or "https://example.com/"
-4. Re-run /seo-review.
+6. Re-run /seo-review.
 
 The Google account you sign in with must be a verified user on the GSC
 property — check at https://search.google.com/search-console > Settings.

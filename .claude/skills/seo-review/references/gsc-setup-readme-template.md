@@ -35,17 +35,28 @@ configured or not.
 
 1. **A GCP project.** Any GCP project will do — the Search Console API is
    free within quota (1,200 QPM Performance / 2,000 URLs/day for URL
-   Inspection). Create one at https://console.cloud.google.com/ if you
-   don't have one.
+   Inspection). List existing projects with `gcloud projects list`, or
+   create one at https://console.cloud.google.com/ if you don't have one.
 2. **`gcloud` CLI installed.** Install: https://cloud.google.com/sdk/docs/install.
    On Windows, the installer adds `gcloud` to PATH.
 3. **Google account with verified GSC property access.** The Google
    account you sign in with during `gcloud auth` must be the same one
    that has the GSC property registered + verified.
 
+### Enable the API on your project
+
+4. Enable Search Console API on the project that will track quota:
+   ```
+   gcloud services enable searchconsole.googleapis.com --project=<your-gcp-project-id>
+   ```
+
+   This is required even though Search Console API is free — Google Cloud's
+   quota infrastructure needs the API explicitly enabled on the billable
+   project. Skipping this step returns HTTP 403 SERVICE_DISABLED on first call.
+
 ### Authenticate
 
-4. Run once (opens browser for OAuth):
+5. Run once (opens browser for OAuth):
    ```
    gcloud auth application-default login \
      --scopes=https://www.googleapis.com/auth/webmasters.readonly,https://www.googleapis.com/auth/cloud-platform
@@ -55,14 +66,19 @@ configured or not.
    accepts default `cloud-platform` scope, but this is undocumented and
    has broken in the past. Explicit `webmasters.readonly` is durable.
 
-5. Set quota project (mandatory for some account/project combinations):
+6. **Set quota project (required, not optional):**
    ```
    gcloud auth application-default set-quota-project <your-gcp-project-id>
    ```
 
+   Google Cloud APIs called via user-credential ADC require a quota project
+   to bill against. The skill reads this value and sends it on every API call
+   via the `x-goog-user-project` header. Without it, all calls return
+   HTTP 403 SERVICE_DISABLED — even when auth is otherwise valid.
+
 ### Configure `/seo-review`
 
-6. Create `.seo-data/gsc/config.yaml`:
+7. Create `.seo-data/gsc/config.yaml`:
 
    ```yaml
    site_url: sc-domain:example.com    # or "https://example.com/" for URL-prefix properties
@@ -76,8 +92,35 @@ configured or not.
    - Domain properties look like: `sc-domain:example.com`
    - URL-prefix properties look like: `https://example.com/` (with trailing slash)
 
-7. Run `/seo-review`. The "Detected:" line should now say
+8. Run `/seo-review`. The "Detected:" line should now say
    `Mode: heuristic + GSC (Search Console API — ...)`.
+
+### Quick verification (optional)
+
+You can sanity-check auth + quota project before running the skill. PowerShell:
+
+```powershell
+$TOKEN = gcloud auth application-default print-access-token
+$QUOTA = (Get-Content "$env:APPDATA\gcloud\application_default_credentials.json" | ConvertFrom-Json).quota_project_id
+Invoke-RestMethod -Method Get `
+  -Uri "https://www.googleapis.com/webmasters/v3/sites" `
+  -Headers @{Authorization = "Bearer $TOKEN"; "x-goog-user-project" = $QUOTA} | `
+  ConvertTo-Json -Depth 5
+```
+
+Bash:
+
+```bash
+TOKEN=$(gcloud auth application-default print-access-token)
+ADC_DIR=$(gcloud info --format="value(config.paths.global_config_dir)")
+QUOTA=$(jq -r '.quota_project_id' "$ADC_DIR/application_default_credentials.json")
+curl -s -H "Authorization: Bearer $TOKEN" \
+     -H "x-goog-user-project: $QUOTA" \
+     "https://www.googleapis.com/webmasters/v3/sites" | jq
+```
+
+Expected: a JSON object with a `siteEntry` array listing every GSC property
+your account can read. Empty array means no properties on this account.
 
 ### Verify the first run
 
@@ -109,8 +152,11 @@ Nothing else is needed.
 |---|---|---|
 | Mode says "heuristic-only" despite `config.yaml` filled in | `gcloud` CLI not installed | Install gcloud SDK: https://cloud.google.com/sdk/docs/install |
 | Same, with `gcloud` available | ADC not configured | Run `gcloud auth application-default login --scopes=...` (see Authenticate above) |
+| Footer says `ADC quota project not set` | Skipped step 6 above | Run `gcloud auth application-default set-quota-project <your-gcp-project>` |
+| Footer says `Search Console API not enabled on quota project '<X>'` | Skipped step 4 above | Run `gcloud services enable searchconsole.googleapis.com --project=<X>` |
 | Footer says `Search Console API auth failed: 401 UNAUTHENTICATED` | OAuth scope insufficient | Re-run `gcloud auth application-default login` with the `--scopes=https://www.googleapis.com/auth/webmasters.readonly,...` flag |
-| Footer says `Search Console API access denied: 403 PERMISSION_DENIED` | The Google account isn't verified on this GSC property | Verify property ownership in https://search.google.com/search-console > Settings, or switch ADC to an account that owns the property |
+| Footer says `403 PERMISSION_DENIED` with `SERVICE_DISABLED` in details | API not enabled OR `x-goog-user-project` header missing (skill bug) | Run `gcloud services enable searchconsole.googleapis.com --project=<your-gcp-project>` and `gcloud auth application-default set-quota-project <your-gcp-project>` |
+| Footer says `Search Console API access denied: 403 PERMISSION_DENIED` (no SERVICE_DISABLED) | The Google account isn't verified on this GSC property | Verify property ownership in https://search.google.com/search-console > Settings, or switch ADC to an account that owns the property |
 | Footer says `site_url '<X>' not in your verified properties` | `site_url` value doesn't match what's registered in GSC | Check exact format at https://search.google.com/search-console > Settings > Property settings. `sc-domain:example.com` for Domain properties; `https://example.com/` (with trailing slash) for URL-prefix |
 | Footer says `Config error: nested keys not supported` | `config.yaml` has indented keys | Use flat single-level keys only (`site_url: x` not `gsc:\n  site_url: x`) |
 | Footer says `URL Inspection quota exhausted` | Hit 2,000/day per-property cap | Re-run tomorrow — graceful degrade kept the run going |

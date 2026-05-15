@@ -130,7 +130,7 @@ Steps 1.5 (git scan) and 1.6 (GSC API ingestion when configured, else heuristic-
 - `Read references/gsc-api-queries.md` (optimistic; only used when API activates — reading early avoids an extra Read in Turn 2)
 - `Read references/gsc-api-schema.md` (optimistic; reference for API response parsing)
 - `Bash: gcloud --version 2>&1` (gcloud SDK install detection)
-- `Bash: TOKEN=$(gcloud auth application-default print-access-token 2>&1); echo "TOKEN_LEN:${#TOKEN}"; curl -s -w "\nHTTP_STATUS:%{http_code}\n" -H "Authorization: Bearer $TOKEN" "https://www.googleapis.com/webmasters/v3/sites"` (combined ADC + API auth probe in one Bash invocation; orchestrator parses TOKEN_LEN and HTTP_STATUS to determine ADC + API reachability)
+- `Bash: TOKEN=$(gcloud auth application-default print-access-token 2>&1); ADC_DIR=$(gcloud info --format="value(config.paths.global_config_dir)" 2>/dev/null); QUOTA_PROJECT=$(jq -r '.quota_project_id // empty' "$ADC_DIR/application_default_credentials.json" 2>/dev/null); echo "TOKEN_LEN:${#TOKEN}"; echo "QUOTA_PROJECT:$QUOTA_PROJECT"; curl -s -w "\nHTTP_STATUS:%{http_code}\n" -H "Authorization: Bearer $TOKEN" -H "x-goog-user-project: $QUOTA_PROJECT" "https://www.googleapis.com/webmasters/v3/sites"` (combined ADC + quota-project + API auth probe in one Bash invocation; orchestrator parses `TOKEN_LEN:`, `QUOTA_PROJECT:`, and `HTTP_STATUS:` to determine ADC + quota project + API reachability. The `x-goog-user-project` header is required on every Search Console API call to bill quota to the user-controlled project; ADC stores the value in `application_default_credentials.json` after `gcloud auth application-default set-quota-project <id>`. Without it, all calls return 403 SERVICE_DISABLED.)
 
 Only the **post-tool aggregation** (parsing git log, parsing config.yaml, resolving API or heuristic mode, parsing sites.list response) runs sequentially.
 
@@ -313,6 +313,7 @@ All GSC-related tool calls listed in the "Parallel-batch note" above fire in Tur
 | `config_yaml_present` | Read `.seo-data/gsc/config.yaml` | Read succeeded (non-error result) |
 | `gcloud_cli_installed` | `gcloud --version` exit + stdout | stdout contains version string (regex `\d+\.\d+\.\d+`) |
 | `adc_authenticated` | combined probe `TOKEN_LEN:` line | `TOKEN_LEN` is a positive integer (token returned, non-empty) |
+| `adc_quota_project` | combined probe `QUOTA_PROJECT:` line | the string after `QUOTA_PROJECT:` (empty when `set-quota-project` was never run); cached in shared context for Turn 2 reuse |
 | `api_probe_succeeded` | combined probe `HTTP_STATUS:` line + body | `HTTP_STATUS:200` present AND body parses as JSON containing `siteEntry` array |
 | `api_probe_response` | same | full JSON body — used in 1.6.3 to check `site_url` membership |
 
@@ -332,6 +333,7 @@ When `config_yaml_present`, parse the file's content (already Read in Turn 1) vi
 api_active = api_configured
            AND gcloud_cli_installed
            AND adc_authenticated
+           AND adc_quota_project is non-empty
            AND api_probe_succeeded
            AND <config.site_url appears in api_probe_response.siteEntry[*].siteUrl>
            AND <matched entry's permissionLevel != "siteUnverifiedUser">
@@ -341,10 +343,12 @@ gsc_mode = "enabled" if api_active else "disabled"
 
 **Probe failure handling** — when `api_configured == true` but `api_active == false`:
 - Surface the exact error in footer (parse `error.code` + `error.status` per gsc-api-schema.md):
-  - `gcloud_cli_installed == false` → `gcloud SDK not installed. Install: https://cloud.google.com/sdk/docs/install. Then run "gcloud auth application-default login --scopes=https://www.googleapis.com/auth/webmasters.readonly,https://www.googleapis.com/auth/cloud-platform"`
+  - `gcloud_cli_installed == false` → `gcloud SDK not installed. Install: https://cloud.google.com/sdk/docs/install. Then run "gcloud auth application-default login --scopes=https://www.googleapis.com/auth/webmasters.readonly,https://www.googleapis.com/auth/cloud-platform" + "gcloud auth application-default set-quota-project <your-gcp-project>"`
   - `adc_authenticated == false` → `ADC not authenticated. Run "gcloud auth application-default login --scopes=https://www.googleapis.com/auth/webmasters.readonly,https://www.googleapis.com/auth/cloud-platform"`
+  - `adc_quota_project` empty → `ADC quota project not set. Run "gcloud auth application-default set-quota-project <your-gcp-project>" — required for Google Cloud APIs to bill quota. Also ensure "gcloud services enable searchconsole.googleapis.com --project=<your-gcp-project>" has been run on that project.`
   - HTTP 401 → `Search Console API auth failed: 401 UNAUTHENTICATED. Re-run "gcloud auth application-default login" with the --scopes flag above (scope likely insufficient).`
-  - HTTP 403 → `Search Console API access denied: 403 PERMISSION_DENIED. The configured site_url '<X>' isn't accessible by your Google account. Verify property ownership in GSC > Settings.`
+  - HTTP 403 + error body mentions "SERVICE_DISABLED" or "quota project" → `Search Console API not enabled on quota project '<adc_quota_project>'. Run "gcloud services enable searchconsole.googleapis.com --project=<adc_quota_project>".`
+  - HTTP 403 (other) → `Search Console API access denied: 403 PERMISSION_DENIED. The configured site_url '<X>' isn't accessible by your Google account. Verify property ownership in GSC > Settings.`
   - HTTP 200 but `site_url` not in `siteEntry` → `site_url '<X>' not in your verified GSC properties. Check the exact format at https://search.google.com/search-console > Settings.`
 - Fall through to heuristic-only mode for this run.
 
@@ -378,17 +382,23 @@ The block covers `config.yaml` (which contains `site_url` — non-secret but pro
 
 Only fires when `api_active == true`. Skipped in heuristic-only mode.
 
-**Token cache**: at the start of Turn 2, fetch the ADC token once and reuse across all curl invocations:
+**Token + quota-project cache**: Turn 1's probe already produced both. Reuse from shared context across all curl invocations — no new gcloud calls needed in Turn 2:
 
 ```
-TOKEN=$(gcloud auth application-default print-access-token)
+TOKEN  = <from Turn 1 TOKEN_LEN-paired stdout (the token string itself, not the length)>
+QUOTA_PROJECT = <from Turn 1 QUOTA_PROJECT: line, validated non-empty in Step 1.6.3>
 ```
+
+If the Turn 2 dispatch needs to re-fetch (e.g., token approaching 1-hour TTL on long-running flows): re-run the same `gcloud auth application-default print-access-token` + `jq` chain. In practice a single run completes in seconds — one Turn 1 fetch is reused.
+
+**Every Turn 2 curl call MUST include both headers:** `Authorization: Bearer $TOKEN` AND `x-goog-user-project: $QUOTA_PROJECT`. Omitting the quota-project header returns 403 SERVICE_DISABLED even when auth is otherwise valid.
 
 **Turn 2a — Performance (3 parallel curl calls)** for Q1 (queries digest) + Q2 (pages digest) + Q3 (`url_impressions_map`), using templates from `references/gsc-api-queries.md`. Substitute `<<LOOKBACK_DAYS>>` and the URL-encoded `site_url` (`:` → `%3A`, `/` → `%2F` per `gsc-api-schema.md`):
 
 ```
 curl -s -X POST \
   -H "Authorization: Bearer $TOKEN" \
+  -H "x-goog-user-project: $QUOTA_PROJECT" \
   -H "Content-Type: application/json" \
   -d '<JSON_BODY>' \
   "https://www.googleapis.com/webmasters/v3/sites/<SITE_URL_ENCODED>/searchAnalytics/query"
@@ -399,6 +409,7 @@ curl -s -X POST \
 ```
 curl -s -X POST \
   -H "Authorization: Bearer $TOKEN" \
+  -H "x-goog-user-project: $QUOTA_PROJECT" \
   -H "Content-Type: application/json" \
   -d '{"inspectionUrl":"<URL>","siteUrl":"<config.site_url RAW>"}' \
   "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect"

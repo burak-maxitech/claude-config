@@ -15,21 +15,24 @@ For endpoint inventory, auth, quota model, and enum reference, see `gsc-api-sche
 
 ## Invocation contract
 
-### Token acquisition (once per run, cached)
+### Token + quota-project acquisition (once per run, cached)
 
-At the start of Step 1.6.6 Turn 2, before any API call:
+Both values are produced by Step 1.6's Turn 1 probe and reused across all Turn 2 calls. Re-fetch only if needed (e.g., token approaches 1-hour TTL):
 
 ```
 TOKEN=$(gcloud auth application-default print-access-token)
+ADC_DIR=$(gcloud info --format="value(config.paths.global_config_dir)")
+QUOTA_PROJECT=$(jq -r '.quota_project_id // empty' "$ADC_DIR/application_default_credentials.json")
 ```
 
-Single fetch per run. Pass via shared context to all subsequent curl invocations.
+`QUOTA_PROJECT` is the ADC quota project written by `gcloud auth application-default set-quota-project <id>`. **Required on every Search Console API call** — without the `x-goog-user-project` header, all calls return HTTP 403 with `reason: SERVICE_DISABLED` (Google Cloud APIs need a billable project even though Search Console API itself is free).
 
 ### Search Analytics call shape
 
 ```
 curl -s -X POST \
   -H "Authorization: Bearer $TOKEN" \
+  -H "x-goog-user-project: $QUOTA_PROJECT" \
   -H "Content-Type: application/json" \
   -d '<JSON_BODY>' \
   "https://www.googleapis.com/webmasters/v3/sites/<SITE_URL_ENCODED>/searchAnalytics/query"
@@ -42,6 +45,7 @@ Where `<SITE_URL_ENCODED>` is the `site_url` from config.yaml with `:` → `%3A`
 ```
 curl -s -X POST \
   -H "Authorization: Bearer $TOKEN" \
+  -H "x-goog-user-project: $QUOTA_PROJECT" \
   -H "Content-Type: application/json" \
   -d '{"inspectionUrl":"<URL>","siteUrl":"<SITE_URL_RAW>"}' \
   "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect"
@@ -52,6 +56,8 @@ curl -s -X POST \
 ### Parameter substitution
 
 Templates use placeholders:
+- `<<TOKEN>>` — ADC access token from `gcloud auth application-default print-access-token`
+- `<<QUOTA_PROJECT>>` — ADC quota project (parsed from `application_default_credentials.json:quota_project_id`)
 - `<<LOOKBACK_DAYS>>` — from `config.yaml.lookback_days` (default 90)
 - `<<SITE_URL_ENCODED>>` — `site_url` URL-encoded for path
 - `<<SITE_URL_RAW>>` — raw `site_url` for request body

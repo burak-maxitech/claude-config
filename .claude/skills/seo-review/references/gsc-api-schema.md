@@ -32,30 +32,54 @@ This scope provides read-only access to all three endpoints. No write permission
 
 ### ADC setup (gcloud SDK)
 
-The skill uses Application Default Credentials (ADC) via the `gcloud` CLI. One-time user setup:
+The skill uses Application Default Credentials (ADC) via the `gcloud` CLI. One-time user setup (4 commands):
 
 ```
 gcloud auth application-default login \
   --scopes=https://www.googleapis.com/auth/webmasters.readonly,https://www.googleapis.com/auth/cloud-platform
+
+gcloud services enable searchconsole.googleapis.com --project=<your-gcp-project-id>
 
 gcloud auth application-default set-quota-project <your-gcp-project-id>
 ```
 
 **Why `--scopes` flag is required:** Default ADC scope is `cloud-platform`. Search Console API accepts cloud-platform-scoped tokens for some property/account combinations but this is undocumented behavior and has broken in the past. Explicit `webmasters.readonly` is the durable choice.
 
-**Why `set-quota-project` matters:** Without it, API calls succeed but quota gets billed to a default consumer project that may rate-limit harder. Some account/project combinations require it explicitly.
+**Why `services enable searchconsole.googleapis.com` is required:** Even though Search Console API is free, Google Cloud's quota infrastructure requires the API to be explicitly enabled on the project that will be billed for quota usage. Skipping this step returns HTTP 403 with `reason: SERVICE_DISABLED` on first call.
+
+**Why `set-quota-project` is required:** Google Cloud APIs called via user-credential ADC (as opposed to service-account auth) require a quota project to bill against. The skill reads this value from ADC's stored credentials file and passes it as the `x-goog-user-project` header on every request. Without `set-quota-project`, the header is empty and all API calls return 403 SERVICE_DISABLED.
 
 After setup, `gcloud auth application-default print-access-token` returns an OAuth bearer token valid for ~1 hour. The skill fetches **one token per run** (cached in shared context) and reuses it across all API calls.
 
-### Token in HTTP requests
+### HTTP request headers
 
-All three endpoints accept the token via the `Authorization` header:
+All three endpoints require **two** headers on every request:
 
 ```
 Authorization: Bearer ya29.xxx...
+x-goog-user-project: <ADC quota project ID>
 ```
 
+| Header | Required? | Source |
+|---|---|---|
+| `Authorization: Bearer <token>` | Always | `gcloud auth application-default print-access-token` |
+| `x-goog-user-project: <project_id>` | Always | `jq -r '.quota_project_id' "$ADC_DIR/application_default_credentials.json"` where `ADC_DIR` comes from `gcloud info --format="value(config.paths.global_config_dir)"` |
+| `Content-Type: application/json` | POST only | static |
+
+**Omitting `x-goog-user-project`** returns HTTP 403 with `error.status: PERMISSION_DENIED` and `details[*].reason: SERVICE_DISABLED`, even when the token is otherwise valid. The error message references the default consumer project (e.g., `projects/764086051850` — gcloud's shared client project) rather than the user's project. Diagnosis: this header is missing.
+
 No alternative auth (API keys, service-account inline auth) supported — ADC only.
+
+### Quota project resolution
+
+The orchestrator reads the ADC quota project from `application_default_credentials.json` cross-platform via `gcloud info`:
+
+```
+ADC_DIR=$(gcloud info --format="value(config.paths.global_config_dir)")
+QUOTA_PROJECT=$(jq -r '.quota_project_id // empty' "$ADC_DIR/application_default_credentials.json")
+```
+
+`gcloud info` resolves the platform-specific config dir (Windows: `%APPDATA%\gcloud\`; macOS/Linux: `~/.config/gcloud/`). The `// empty` jq filter returns empty string if the field is absent (i.e., user hasn't run `set-quota-project`) — Step 1.6.3 catches this and surfaces remediation in the footer.
 
 ---
 
@@ -88,6 +112,7 @@ encoded = site_url.replace(":", "%3A").replace("/", "%2F")
 ```
 POST https://www.googleapis.com/webmasters/v3/sites/{siteUrl_encoded}/searchAnalytics/query
 Authorization: Bearer <ADC_TOKEN>
+x-goog-user-project: <ADC_QUOTA_PROJECT>
 Content-Type: application/json
 
 {
@@ -165,6 +190,7 @@ The API's `dimensionFilterGroups` supports filters on dimensions (query/page/cou
 ```
 POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
 Authorization: Bearer <ADC_TOKEN>
+x-goog-user-project: <ADC_QUOTA_PROJECT>
 Content-Type: application/json
 
 {
@@ -306,6 +332,7 @@ MOBILE
 ```
 GET https://www.googleapis.com/webmasters/v3/sites
 Authorization: Bearer <ADC_TOKEN>
+x-goog-user-project: <ADC_QUOTA_PROJECT>
 ```
 
 No body. No path params. No query params required.
@@ -393,15 +420,16 @@ All endpoints return errors via a consistent envelope:
 
 ### Error codes used by the skill
 
-| `error.code` | `error.status` | Meaning | Skill behavior |
-|---|---|---|---|
-| 200 | (success) | Request succeeded | Continue |
-| 400 | `INVALID_ARGUMENT` | Malformed request (encoding, invalid date, etc.) | Footer error; skip signal |
-| 401 | `UNAUTHENTICATED` | Token expired or scope insufficient | Surface `--scopes` remediation; skip signal |
-| 403 | `PERMISSION_DENIED` | Property ACL — user lacks access | Surface property-verification check; skip signal |
-| 404 | `NOT_FOUND` | URL/property not found | URL Inspection: log "unknown to Google" + skip from cluster. Sites list: surface verify-property remediation. |
-| 429 | `RESOURCE_EXHAUSTED` | Quota exhausted (per-minute or per-day) | Graceful degrade (decision 10): stop sending, surface footer |
-| 5xx | (varies) | Transient server error | Print error + skip signal + DON'T retry (re-run skill) |
+| `error.code` | `error.status` | `details[*].reason` | Meaning | Skill behavior |
+|---|---|---|---|---|
+| 200 | (success) | — | Request succeeded | Continue |
+| 400 | `INVALID_ARGUMENT` | — | Malformed request (encoding, invalid date, etc.) | Footer error; skip signal |
+| 401 | `UNAUTHENTICATED` | — | Token expired or scope insufficient | Surface `--scopes` remediation; skip signal |
+| 403 | `PERMISSION_DENIED` | `SERVICE_DISABLED` | Search Console API not enabled on quota project, OR `x-goog-user-project` header missing | Surface remediation: run `gcloud services enable searchconsole.googleapis.com --project=<id>` + `gcloud auth application-default set-quota-project <id>`. Skill bug if header is missing — file a bug. |
+| 403 | `PERMISSION_DENIED` | (other) | Property ACL — user lacks access to the configured `site_url` | Surface property-verification check; skip signal |
+| 404 | `NOT_FOUND` | — | URL/property not found | URL Inspection: log "unknown to Google" + skip from cluster. Sites list: surface verify-property remediation. |
+| 429 | `RESOURCE_EXHAUSTED` | — | Quota exhausted (per-minute or per-day) | Graceful degrade (decision 10): stop sending, surface footer |
+| 5xx | (varies) | — | Transient server error | Print error + skip signal + DON'T retry (re-run skill) |
 
 ---
 
