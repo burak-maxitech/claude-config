@@ -101,7 +101,7 @@ want to commit anyway (e.g., team-shared config), remove the
 └── config.yaml       (API configuration — site_url + optional lookback_days)
 ```
 
-Nothing else is needed. No CSV exports, no BigQuery dataset configuration.
+Nothing else is needed.
 
 ## Troubleshooting
 

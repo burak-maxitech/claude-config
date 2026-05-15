@@ -122,28 +122,28 @@ Repeat per dimension. Don't render detail blocks for every finding — only #1 p
 
 ## Section 3 — GSC Insights (only when `gsc_mode: enabled`)
 
-Render this section between Findings (Section 2) and Score History (Section 4) **only when at least one GSC CSV was parsed in Step 1.6**. Skip entirely otherwise — no banner, no placeholder. The section has 6 sub-blocks (Indexing coverage / Top-impact GSC findings / CTR opportunities / Position-band query opportunities / Traffic orphans / Code-already-fixed annotations); render only those that have data (e.g., skip the indexing-summary block if `indexing/summary.csv` wasn't present).
+Render this section between Findings (Section 2) and Score History (Section 4) **only when GSC API ingestion produced findings in Step 1.6**. Skip entirely otherwise — no banner, no placeholder. The section has 6 sub-blocks (Indexing coverage / Top-impact GSC findings / CTR opportunities / Position-band query opportunities / Traffic orphans / Code-already-fixed annotations); render only those that have data.
 
 ```
 ## GSC Insights
 
 Real-world signal from Google Search Console — informational, does NOT affect /100 score.
 
-### Indexing coverage (from indexing/summary.csv)
+### Indexing coverage (from URL Inspection sample)
 
-3,530 pages not indexed of 5,260 known (67% non-index rate).
+Of 95 inspected URLs, 67 (71%) are not indexed cleanly. Per-reason breakdown from the sample:
 
-| Reason                                          | Pages | Most actionable |
-|-------------------------------------------------|-------|-----------------|
-| Crawled - currently not indexed                 | 1,146 | ✓ content quality / E-E-A-T |
-| Discovered - currently not indexed              |   726 | ✓ crawl budget / internal links |
-| Not found (404)                                 |   775 | ✓ bulk redirect / sitemap clean |
-| Page with redirect                              |   766 | ✓ sitemap hygiene |
-| Blocked due to access forbidden (403)           |    99 | usually intentional |
-| Duplicate, Google chose different canonical     |     9 | ✓ canonical investigation |
-| Blocked due to other 4xx                        |     6 | usually intentional |
-| Alternate page with proper canonical tag        |     5 | OK |
-| Soft 404                                        |     1 | ✓ rendering fix |
+| Reason                                          | Inspected URLs | Most actionable |
+|-------------------------------------------------|----------------|-----------------|
+| Crawled - currently not indexed                 | 28 | ✓ content quality / E-E-A-T |
+| Discovered - currently not indexed              | 14 | ✓ crawl budget / internal links |
+| Not found (404)                                 | 12 | ✓ bulk redirect / sitemap clean |
+| Page with redirect                              |  6 | ✓ sitemap hygiene |
+| Blocked due to access forbidden (403)           |  3 | usually intentional |
+| Duplicate, Google chose different canonical     |  2 | ✓ canonical investigation |
+| Soft 404                                        |  2 | ✓ rendering fix |
+
+(Counts reflect the inspected-URL sample, not site-wide truth. URL Inspection samples high-impression + recently-changed URLs — see `gsc-api-queries.md` "URL Inspection — selection algorithm".)
 
 ### Top-impact GSC findings
 
@@ -157,7 +157,7 @@ Real-world signal from Google Search Console — informational, does NOT affect 
 
 (Top 5 from N total GSC findings. Full list ranked by impressions × certainty / effort_weight.)
 
-### CTR opportunities (high impressions, low CTR — top 5 from pages.csv)
+### CTR opportunities (high impressions, low CTR — top 5 from Q2 pages digest)
 
 | URL                          | Impressions | CTR   | Median CTR | Position |
 |------------------------------|-------------|-------|------------|----------|
@@ -169,7 +169,7 @@ Real-world signal from Google Search Console — informational, does NOT affect 
 
 Title + meta rewrites on these 5 pages alone could recover an estimated 200-400 clicks/month.
 
-### Position-band query opportunities (positions 5-20 with ≥100 imps — top 5 from queries.csv)
+### Position-band query opportunities (positions 5-20 with ≥100 imps — top 5 from Q1 queries digest)
 
 | Query                        | Impressions | Clicks | CTR  | Position |
 |------------------------------|-------------|--------|------|----------|
@@ -190,7 +190,7 @@ Moving any of these from position 8-14 to position 3-5 typically 3-5x's clicks. 
 3 of 18 GSC findings flagged `code_changed_since_gsc_window: true` (recent commits touched the affected paths within 35 days). Confidence lowered to 0.4 for these. They may resolve in the next GSC update cycle (2-4 weeks). Manually request indexing via GSC for the highest-traffic ones to accelerate.
 ```
 
-If `gsc_mode: disabled`, this entire section is omitted. The skill operates exactly as it did pre-GSC — score, findings, ranking all heuristic-only.
+If `gsc_mode: disabled`, this entire section is omitted. The skill produces score, findings, and ranking purely from heuristic signals.
 
 ---
 
@@ -210,7 +210,7 @@ If `gsc_mode: disabled`, this entire section is omitted. The skill operates exac
 
 Show last 5 entries. If history has >5 entries, link to the file.
 
-**`[gsc]` prefix** on a top-3 priority string indicates the priority came from a GSC finding (see `rubric.md` "History row format"). Lets readers see why a row's priorities shifted between runs — e.g., user added or removed CSVs between two runs. Heuristic priorities have no prefix.
+**`[gsc]` prefix** on a top-3 priority string indicates the priority came from a GSC finding (see `rubric.md` "History row format"). Lets readers see why a row's priorities shifted between runs — e.g., user enabled or disabled the GSC API between two runs. Heuristic priorities have no prefix.
 
 ---
 
@@ -263,12 +263,10 @@ Probe cap: 100 URLs (47 in this sitemap; no cap hit)
 
 Git history scan: 35d, 23 SEO-relevant commits across 14 files. Shallow: no.
 
-GSC CSVs: 7 present (queries, pages, 5/9 indexing reasons).
-Freshness: 6 fresh (<30d), 1 stale (queries.csv at 47d ⚠ — consider re-export).
+GSC API: Q1+Q2+Q3 succeeded; URL Inspection 95/100 (5 skipped — 4 unknown to Google, 1 transient 5xx).
 Page-type map: 84 URLs classified (54 article / 18 product / 12 other).
 URL impressions map: 312 URLs with traffic data.
-Malformed rows: 0.
-Unknown CSVs ignored: 0.
+API call failures: 0.
 
 Files scanned: 84
 Files skipped (per .gitignore + vendored dirs): 312
@@ -286,12 +284,10 @@ Other footer notes:
 
 **GSC-mode footer additions** (when `gsc_mode: enabled`):
 - `Git history scan: 35d, <N> SEO-relevant commits across <M> files. Shallow: <true | false>.` — when shallow: `Git history scan: skipped (shallow clone).`
-- `GSC CSVs: <N> present (<inventory summary>).` — list categories present; e.g., `queries, pages, 5/9 indexing reasons`.
-- `Freshness: <fresh-count> fresh (<30d), <stale-count> stale (<files at days>).` — only when at least one CSV is stale.
+- `GSC API: Q1+Q2+Q3 <succeeded|N/3 failed>; URL Inspection <N>/<budget> (<skip count + reasons if any>).`
 - `Page-type map: <N> URLs classified (<distribution>).`
 - `URL impressions map: <N> URLs with traffic data.`
-- `Malformed rows: <count by file>.` — only when any CSV had malformed rows.
-- `Unknown CSVs ignored: [<list>].` — only when any unknown CSV was found.
+- `API call failures: <N> (<endpoint, http_status, error_status per line>).` — only when any API call failed.
 
 **GSC-mode subtotal-check addendum:** append `| gsc_findings: <count> (info-only, 0 score impact)` to the subtotal_check line so reviewers can confirm GSC ran without affecting the score.
 

@@ -2,7 +2,7 @@
 
 Loaded by the orchestrator in **Step 1.6** of `SKILL.md`. This file is the source of truth for:
 - Activation conditions (when GSC mode is active vs heuristic-only)
-- API ingestion contract — byte-identical digest shape consumed by subagents
+- API ingestion contract — digest shape consumed by subagents
 - Setup banner (one-time, sentinel-gated)
 - `.gitignore` auto-append rules
 - Finding-type catalog (12 sub-dims) populated from Search Console API output
@@ -38,9 +38,9 @@ All Performance calls dispatch in one parallel Bash turn. URL Inspection calls d
 
 **Token caching**: fetch the ADC token once at the start of Turn 2, reuse across all curl invocations. Tokens have a 1-hour TTL; a single Step 1.6 dispatch finishes in seconds.
 
-### Digest shape — byte-identical contract
+### Digest shape
 
-Subagents consume a digest shape that doesn't reference the API source. The translation:
+Subagents consume a digest shape defined here; the translator maps API row fields to digest fields:
 
 **Queries digest** (Q1 → consumed by sub-dim 11 `position_band_opportunity`):
 
@@ -122,7 +122,7 @@ Edge case: all-zero CTR → median = 0 → threshold = 0 → no sub-dim 10 findi
 
 ### page_type_map sources
 
-Same composition as v2 CSV path used:
+Composition (3 sources):
 
 1. **Top-50 URLs from Q2 Pages digest** (NOT Q3's uncapped map — bounded classification scope)
 2. **Inspected URLs from URL Inspection batch**
@@ -265,7 +265,7 @@ Each ingestion call (Search Analytics + URL Inspection) produces 0+ findings. Al
 
 ### 1. `indexing_coverage` (site-wide non-index rate)
 
-**API-only limitation**: site-wide non-index rate cannot be computed from per-URL URL Inspection results. v3.x emits this only as an informational footer note when ≥1 inspected URL has `coverageState != "Submitted and indexed"`:
+Site-wide non-index rate cannot be computed from per-URL URL Inspection results (you'd need full-sitemap coverage to extrapolate reliably). Emit only as an informational footer note when ≥1 inspected URL has `coverageState != "Submitted and indexed"`:
 
 > `Of N inspected pages, M ({M/N*100}%) are not indexed cleanly. See per-reason breakdown in sub-dims 2-9 below.`
 
@@ -329,7 +329,7 @@ No score-headline finding emitted (the site-wide rate isn't reliably computable 
 
 ### 6. `canonical_conflict` (URL Inspection: `coverageState` matches "Duplicate, Google chose different canonical" / "Duplicate without user-selected canonical")
 
-**Trigger:** ≥1 matched. The API gives `googleCanonical` and `userCanonical` directly — much richer signal than CSV path provided.
+**Trigger:** ≥1 matched. The API gives `googleCanonical` and `userCanonical` directly — strong signal for canonical disambiguation.
 
 **Per-URL findings** (cap 5), or cluster if N > 5:
 

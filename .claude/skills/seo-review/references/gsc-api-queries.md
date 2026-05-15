@@ -10,7 +10,6 @@ Loaded by the orchestrator (Step 1.6) when the Search Console API is the active 
 
 For endpoint inventory, auth, quota model, and enum reference, see `gsc-api-schema.md`. For digest field translation and integration with the 12 sub-dim catalog, see `gsc-ingestion.md` "API ingestion" subsection.
 
-**Q4 (orphan candidates) and Q5 (freshness probe) intentionally dropped per Plan-agent S4** — Q4 reuses Q3's keys for orphan set-diff; Q5 has no API equivalent (replaced by static footer note "API path: real-time view of GSC's ~2-day-lagged pipeline").
 
 ---
 
@@ -24,7 +23,7 @@ At the start of Step 1.6.6 Turn 2, before any API call:
 TOKEN=$(gcloud auth application-default print-access-token)
 ```
 
-Single fetch per run. Pass via shared context to all subsequent curl invocations. Per Plan-agent S2.
+Single fetch per run. Pass via shared context to all subsequent curl invocations.
 
 ### Search Analytics call shape
 
@@ -177,7 +176,7 @@ filter rows where:
 build map: row.keys[0] → row.impressions
 ```
 
-No client-side cap on rows kept. Plan-agent B1: **silent truncation at rowLimit=25000** for sites with >25k URLs. Documented in `gsc-ingestion.md`.
+No client-side cap on rows kept. **Silent truncation at rowLimit=25000** for sites with >25k URLs — see `gsc-api-schema.md` rowLimit cap section.
 
 ### Output shape
 
@@ -201,7 +200,7 @@ URLs not in the map → `traffic_weight = 1.0` (formula collapses to legacy `sco
 
 ## URL Inspection — per-URL call template
 
-One call per URL inspected. The orchestrator dispatches N parallel calls in a single tool-use block (N capped at 100 per Plan-agent S3).
+One call per URL inspected. The orchestrator dispatches N parallel calls in a single tool-use block (N capped at 100 — see selection algorithm below).
 
 ### Request body
 
@@ -224,7 +223,7 @@ Extract from `inspectionResult.indexStatusResult`:
 | API field | Carried as | Used by sub-dim |
 |---|---|---|
 | `lastCrawlTime` | `evidence.last_crawl_time` | All sub-dims (sort key for `affected_urls`) |
-| `googleCanonical` | `evidence.google_canonical` | Sub-dim 6 `canonical_conflict` (per Plan-agent B9) |
+| `googleCanonical` | `evidence.google_canonical` | Sub-dim 6 `canonical_conflict`  |
 | `userCanonical` | `evidence.user_canonical` | Sub-dim 6 `canonical_conflict` |
 | `crawledAs` | `evidence.crawled_as` | Sub-dim 6 evidence context |
 | `indexingState` | `evidence.indexing_state` | Sub-dim 7 `blocked_access` (distinguishes meta-tag vs HTTP-header vs robots blocking) |
@@ -234,48 +233,45 @@ Extract from `inspectionResult.indexStatusResult`:
 
 ## URL Inspection — selection algorithm
 
-Hard budget: **100 URLs per run** (Plan-agent S3). Well under the 2,000/day per-property quota; leaves headroom for multi-run usage same day.
+Hard budget: **100 URLs per run**. Well under the 2,000/day per-property quota; leaves headroom for multi-run usage same day.
 
 ### Source allocation
 
 | Source | Count | Selection rule |
 |---|---|---|
-| **Top 50 from `url_impressions_map`** | 50 | Highest impressions across the lookback window. Rationale: URLs that actually drive traffic deserve depth-of-diagnostic priority. |
-| **Sitemap probe failures** (Step 3.2) | 30 | URLs returning 4xx / 5xx / redirect chains from the sitemap URL probe (Step 3.2). Rationale: known-broken URLs benefit from Google's view of why they're broken. |
-| **Recent git changes resolved to URLs** | 20 | File paths from Step 1.5's 35-day git scan, resolved to URLs via `page_type_map` heuristics OR direct match in `url_impressions_map`. Plan-agent B6: git emits file paths, not URLs — only candidates that resolve cleanly are included. |
+| **Top 80 from `url_impressions_map`** | 80 | Highest impressions across the lookback window. URLs that drive traffic deserve depth-of-diagnostic priority. |
+| **Recent git changes resolved to URLs** | 20 | File paths from Step 1.5's 35-day git scan, resolved to URLs via `page_type_map` heuristics OR direct match in `url_impressions_map`. Git emits file paths, not URLs — only candidates that resolve cleanly are included. |
+
+Both sources are available within Step 1.6 (Q3 from Turn 2a + Step 1.5's digest from Turn 1). Sitemap probe failures (Step 3.2) are intentionally NOT used as a source — Step 3.2 runs after Step 1.6, and waiting for it would push GSC ingestion into 60+ seconds wall time. The probe's URL-health findings already cover broken-sitemap-URL signals; URL Inspection adds Google's view on the URLs that matter most by traffic.
 
 ### Deduplication
 
-A URL appearing in multiple sources counts **once**. Dedup order (winner keeps the slot):
-1. `url_impressions_map` source (highest signal)
-2. Sitemap probe failures
-3. Git-changed (after path→URL resolution)
+A URL appearing in both sources counts **once**. Dedup precedence: `url_impressions_map` source wins.
 
 After dedup, hard cap at 100. If fewer than 100 candidates after dedup, the budget shrinks accordingly (no padding).
 
 ### Source unavailable
 
-- `url_impressions_map` empty (Q3 failed or no traffic): use top 50 sitemap URLs by document order instead
-- Sitemap probe disabled (no `--url` + relative sitemap URLs): skip the 30-URL bucket; redirect budget to remaining sources (up to 80 from impressions + 20 from git)
+- `url_impressions_map` empty (Q3 failed or no traffic): skip the 80-URL bucket; budget falls to whatever git resolves (typically 0-20)
 - Step 1.5 git-history shallow or scan failed: skip the 20-URL bucket
 
-When all three sources are empty: skip URL Inspection batch entirely. Footer notes "0 URLs to inspect — no high-priority candidates this run." No indexing findings emitted this run.
+When both sources are empty: skip URL Inspection batch entirely. Footer notes "0 URLs to inspect — no high-priority candidates this run." No indexing findings emitted this run.
 
 ### Pre-flight budget log
 
 Before dispatching the batch, log to footer:
 
 ```
-URL Inspection budget: 50 by impressions + 27 sitemap failures + 18 git-changed (resolved 18/24) = 95 URLs. Quota remaining: 1905/2000 today.
+URL Inspection budget: 73 by impressions + 18 git-changed (resolved 18/24) = 91 URLs. Quota remaining: ~1909/2000 today.
 ```
 
-(Remaining-quota figure approximate — API doesn't expose a precise counter; back-of-envelope from "2000/day total minus inspections this run.")
+Remaining-quota figure is approximate — the API doesn't expose a precise counter; back-of-envelope from "2000/day total minus inspections this run."
 
 ---
 
 ## `coverageState` + `pageFetchState` → 9-reason lookup table
 
-Per Plan-agent B8 — joint key for reliable classification. Disambiguates ambiguous `coverageState` values via `pageFetchState`.
+Joint key for reliable classification. Disambiguates ambiguous `coverageState` values via `pageFetchState` (e.g., "Not found" alone is ambiguous; `pageFetchState == NOT_FOUND` vs `SOFT_404` distinguishes).
 
 | `coverageState` | `pageFetchState` | Cluster sub-dim | Notes |
 |---|---|---|---|

@@ -158,4 +158,4 @@ api_calls_made: { searchanalytics: <int>, urlInspection: <int> }
 
 These are read by the orchestrator's Step 7 for the new Section 3 "GSC Insights" rendering (`report-template.md`).
 
-**No `_score` fields** in the addendum — gsc_insights has no score allocation by Phase 0 contract.
+**No `_score` fields** in the addendum — gsc_insights has no score allocation.

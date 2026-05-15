@@ -4,7 +4,7 @@ Loaded by the orchestrator (Step 1.6) when the Search Console API is the configu
 
 For ingestion behaviour, digest shape, and the 12 sub-dim catalog, see `gsc-ingestion.md` (the "API ingestion contract" section is the digest contract). For call templates, see `gsc-api-queries.md`. The skill's config layout is documented in `gsc-setup-readme-template.md` — `site_url` is the single required key in `config.yaml`.
 
-**Schema source:** Google's published API references — [Search Analytics: searchanalytics.query](https://developers.google.com/webmaster-tools/v1/searchanalytics/query) + [URL Inspection: urlInspection.index.inspect](https://developers.google.com/webmaster-tools/v1/urlInspection/index/inspect) + [Sites: list](https://developers.google.com/webmaster-tools/v1/sites/list). Verified against documentation as of 2026-05-15. **Live-verification deferred to Phase 4 real-world dogfood** (requires gcloud SDK install on user's machine — not blocking Phase 0/1/2/3 work).
+**Schema source:** Google's published API references — [Search Analytics: searchanalytics.query](https://developers.google.com/webmaster-tools/v1/searchanalytics/query) + [URL Inspection: urlInspection.index.inspect](https://developers.google.com/webmaster-tools/v1/urlInspection/index/inspect) + [Sites: list](https://developers.google.com/webmaster-tools/v1/sites/list). Verified against documentation as of 2026-05-15.
 
 ---
 
@@ -18,7 +18,7 @@ The Search Console API exposes three endpoints used by `/seo-review`:
 | `POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect` | Per-URL indexing diagnostics — `coverageState`, `pageFetchState`, canonicals, last crawl, mobile usability, rich results | **Yes** (one call per inspected URL, up to 100/run) |
 | `GET https://www.googleapis.com/webmasters/v3/sites` | List user's verified properties | **Yes** (active auth probe — Step 1.6.1 activation condition 5) |
 
-**Note two different base hosts**: `www.googleapis.com/webmasters/v3` for Search Analytics + Sites; `searchconsole.googleapis.com/v1` for URL Inspection. Same OAuth scope; same ADC token; different quota tracking (see "Quota model" below). Per Plan-agent B2.
+**Note two different base hosts**: `www.googleapis.com/webmasters/v3` for Search Analytics + Sites; `searchconsole.googleapis.com/v1` for URL Inspection. Same OAuth scope; same ADC token; different quota tracking (see "Quota model" below).
 
 ---
 
@@ -41,11 +41,11 @@ gcloud auth application-default login \
 gcloud auth application-default set-quota-project <your-gcp-project-id>
 ```
 
-**Why `--scopes` flag is required (Plan-agent B7):** Default ADC scope is `cloud-platform`. Search Console API accepts cloud-platform-scoped tokens for some property/account combinations but this is undocumented behavior and has broken in the past. Explicit `webmasters.readonly` is the durable choice.
+**Why `--scopes` flag is required:** Default ADC scope is `cloud-platform`. Search Console API accepts cloud-platform-scoped tokens for some property/account combinations but this is undocumented behavior and has broken in the past. Explicit `webmasters.readonly` is the durable choice.
 
-**Why `set-quota-project` matters (Plan-agent B10):** Without it, API calls succeed but quota gets billed to a default consumer project that may rate-limit harder. Some account/project combinations require it explicitly.
+**Why `set-quota-project` matters:** Without it, API calls succeed but quota gets billed to a default consumer project that may rate-limit harder. Some account/project combinations require it explicitly.
 
-After setup, `gcloud auth application-default print-access-token` returns an OAuth bearer token valid for ~1 hour. The skill fetches **one token per run** (cached in shared context per Plan-agent S2) and reuses it across all API calls.
+After setup, `gcloud auth application-default print-access-token` returns an OAuth bearer token valid for ~1 hour. The skill fetches **one token per run** (cached in shared context) and reuses it across all API calls.
 
 ### Token in HTTP requests
 
@@ -61,7 +61,7 @@ No alternative auth (API keys, service-account inline auth) supported — ADC on
 
 ## Site URL encoding (path parameter)
 
-The `siteUrl` path parameter appears in `searchAnalytics/query` and `sites.get` endpoints. **Manual percent-encoding required** (Plan-agent B5) — `curl --data-urlencode` operates on request body, not path params.
+The `siteUrl` path parameter appears in `searchAnalytics/query` and `sites.get` endpoints. **Manual percent-encoding required** — `curl --data-urlencode` operates on request body, not path params.
 
 | Property type | Raw `site_url` | Encoded path segment |
 |---|---|---|
@@ -146,9 +146,9 @@ All numeric fields are native JSON numbers — no string-to-number cast needed d
 
 **Empty rows**: when no data matches, `rows` is omitted from the response entirely. Treat absence of `rows` as `rows: []`.
 
-### rowLimit cap (Plan-agent B1)
+### rowLimit cap
 
-`rowLimit` is capped server-side at **25,000 per call**. Higher values are silently clamped to 25,000. For Q3 (`url_impressions_map`) on >25k-URL sites, the map silently truncates. Documented in `gsc-ingestion.md` "API ingestion → Plan-agent B1".
+`rowLimit` is capped server-side at **25,000 per call**. Higher values are silently clamped to 25,000. For Q3 (`url_impressions_map`) on >25k-URL sites, the map silently truncates — URLs not in the top-25k get `traffic_weight = 1.0` fallback in Step 6.6.
 
 Pagination via `startRow` is supported (`startRow + rowLimit` retrieves the next batch), but the skill doesn't paginate — single call, accept the cap.
 
@@ -219,12 +219,12 @@ Content-Type: application/json
 |---|---|---|
 | `verdict` | enum | High-level pass/partial/fail/neutral (informational only) |
 | `coverageState` | string | Primary key in 9-reason lookup table (`gsc-api-queries.md`) |
-| `pageFetchState` | enum | Joint key with `coverageState` for ambiguous mappings (per Plan-agent B8) |
+| `pageFetchState` | enum | Joint key with `coverageState` for ambiguous mappings |
 | `robotsTxtState` | enum | Cross-check for sub-dim 7 `blocked_access` (robots variant) |
 | `indexingState` | enum | Surface in evidence for sub-dim 7 findings (`BLOCKED_BY_META_TAG` vs `BLOCKED_BY_HTTP_HEADER`) |
 | `lastCrawlTime` | ISO-8601 string | Sort key for `affected_urls` (descending — most-recent first); evidence on time-sensitive findings |
-| `googleCanonical` | URL string | Sub-dim 6 `canonical_conflict` evidence (per Plan-agent B9) |
-| `userCanonical` | URL string | Sub-dim 6 `canonical_conflict` evidence (per Plan-agent B9) |
+| `googleCanonical` | URL string | Sub-dim 6 `canonical_conflict` evidence  |
+| `userCanonical` | URL string | Sub-dim 6 `canonical_conflict` evidence  |
 | `crawledAs` | enum | Evidence on sub-dim 6 (canonical conflict context) |
 | `sitemap` | URL string array | Cross-reference with local sitemap to detect "sitemap conflict" cases (informational) |
 
@@ -275,7 +275,7 @@ ACCESS_FORBIDDEN
 BLOCKED_4XX
 ```
 
-Joint key with `coverageState` for the lookup table (per Plan-agent B8). When `coverageState` is ambiguous (e.g., generic "Not found"), `pageFetchState` disambiguates (`NOT_FOUND` vs `SOFT_404`).
+Joint key with `coverageState` for the lookup table. When `coverageState` is ambiguous (e.g., generic "Not found"), `pageFetchState` disambiguates (`NOT_FOUND` vs `SOFT_404`).
 
 **`robotsTxtState`** — robots.txt allowance:
 ```
@@ -356,7 +356,7 @@ If condition 3 fails: surface "you have invite-only access; ask the owner to ver
 | `urlInspection.index.inspect` | **600 QPM** | Per project |
 | `sites.list` | 1,200 QPM | Per account |
 
-Per Plan-agent B3. The 600 QPM on URL Inspection per-project is the binding constraint, not 1,200 QPM general.
+The 600 QPM on URL Inspection per-project is the binding constraint, not 1,200 QPM general.
 
 **Usage profile per `/seo-review` run:**
 - Search Analytics: 3 calls (Q1, Q2, Q3) — well under any limit
@@ -367,7 +367,7 @@ Total: ≤104 calls per run. Multiple runs per day on the same property: still w
 
 ---
 
-## Error response shape (Plan-agent B4)
+## Error response shape
 
 All endpoints return errors via a consistent envelope:
 

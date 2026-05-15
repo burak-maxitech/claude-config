@@ -146,7 +146,7 @@ In heuristic-only mode, Step 1.6 finishes after Turn 1 (no data to ingest).
 
 ## Step 1.5 — SEO-Relevant Change Scan (last 35 days)
 
-Scan git history for SEO-relevant code changes in the last 35 days — roughly the typical Google recrawl + position-stabilization cycle. Produces a ~30-line digest of recent commits + renames + touched files. Used by `seo-gsc-insights` (Phase 4) to annotate findings with `code_changed_since_gsc_window`, and by `--plan` Phase 1 to detect routing-rename + 404-cluster co-occurrence (bulk-redirect signal).
+Scan git history for SEO-relevant code changes in the last 35 days — roughly the typical Google recrawl + position-stabilization cycle. Produces a ~30-line digest of recent commits + renames + touched files. Used by `seo-gsc-insights` to annotate findings with `code_changed_since_gsc_window`, and by `--plan` Phase 1 to detect routing-rename + 404-cluster co-occurrence (bulk-redirect signal).
 
 **Critical context:** GSC's reports reflect Google's view of the site at crawl time, which can lag the actual codebase by 4-5 weeks. Without this scan, the skill would confidently recommend "add meta description to /pricing" while the user's commit history shows they added it 18 days ago. The annotation lets the recommendation become "may already be fixed — wait for next GSC cycle or request indexing manually."
 
@@ -394,7 +394,7 @@ curl -s -X POST \
   "https://www.googleapis.com/webmasters/v3/sites/<SITE_URL_ENCODED>/searchAnalytics/query"
 ```
 
-**Turn 2b — URL Inspection (N parallel curl calls, N ≤ 100)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (50 by impressions from Q3 + 30 sitemap-probe-failures from Step 3.2 + 20 git-changed paths from Step 1.5 resolved via `page_type_map`, dedup, hard cap 100). Then fire N parallel calls:
+**Turn 2b — URL Inspection (N parallel curl calls, N ≤ 100)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (top 80 by impressions from Q3 + 20 git-changed paths from Step 1.5 resolved via `page_type_map`, dedup, hard cap 100). Then fire N parallel calls:
 
 ```
 curl -s -X POST \
@@ -437,7 +437,7 @@ After all parsing complete:
   - Top-50 URLs from Q2 Pages digest (NOT Q3's uncapped map)
   - Inspected URLs from URL Inspection batch
   - Sitemap URLs (Step 3.2)
-  Classification per `gsc-ingestion.md` "page_type_map building".
+  Classification per `gsc-ingestion.md` "page_type_map sources".
 - **url_impressions_map**: `{url → impressions}` from Q3's output. Passed to all subagents for `traffic_weight` lookups in Step 6 ranking.
 
 ### 1.6.9 — Freshness annotation (API path is real-time)
@@ -475,7 +475,7 @@ When gsc_mode == "enabled":
 
 When gsc_mode == "disabled":
 - gsc_mode: disabled
-- Reason: <specific blocker — config missing / site_url empty / gcloud not installed / ADC not authenticated / probe failure code>
+- (no further fields — subagents have no action to take on the specific blocker; the audit reason lives in Step 1.6.12 footer instead)
 ```
 
 **Primary consumer:** `seo-gsc-insights` subagent (dispatched as 4th parallel Task in Step 5 when `gsc_mode: enabled`). Other 3 subagents use `url_impressions_map` for traffic_weight when ranking their own findings.
@@ -578,11 +578,10 @@ Weight adjustments (validated in Step 1: |each| ≤ 5, sum = 0):
 
 Scope file list: <paths>
 
-# GSC + git context (always present; values vary by mode)
+# GSC + git context
 
 GSC Mode: enabled | disabled
-[When enabled, full GSC block from Step 1.6.7 — CSVs detected, digests, page_type_map, url_impressions_map, freshness summary, malformed rows]
-[When disabled, just: gsc_mode: disabled, Reason: ...]
+[When enabled: full GSC block per Step 1.6.11 spec — source, digests, page_type_map, url_impressions_map, inspection budget. When disabled: just `gsc_mode: disabled` — no further fields; orchestrator-side reason audit lives in footer, subagents don't need it.]
 
 Git history scan: 35d window, <N> commits across <M> files. Shallow: <true|false>.
 [Recent SEO-Relevant Changes digest from Step 1.5.5, ~30 lines]
@@ -602,7 +601,7 @@ Return raw findings only — do NOT format a final report.
 - **`seo-technical` only** — also pass the **Sitemap URL probe results** (full record list) AND the **Rendered HTML excerpt** if `--url` was provided.
 - **`seo-content` only** — also pass the **Rendered HTML excerpt** if `--url` was provided. Do NOT pass probe results (it doesn't use them).
 - **`geo-generative`** — base block only. No probe results (doesn't use them); no rendered HTML (JSON-LD lives in source most reliably). Keeps geo-generative's prompt smallest of the three.
-- **`seo-gsc-insights`** (only when `gsc_mode: enabled`) — base block only (GSC + git digests are already in the base block). Sitemap URL list from Step 3.2 is passed separately so the agent can compute `traffic_orphan` findings (sitemap URLs not appearing in `performance/pages.csv`).
+- **`seo-gsc-insights`** (only when `gsc_mode: enabled`) — base block only (GSC + git digests are already in the base block). Sitemap URL list from Step 3.2 is passed separately so the agent can compute `traffic_orphan` findings (sitemap URLs not appearing in the Q3 `url_impressions_map`).
 
 ### Agent 1: seo-technical
 Read `references/scan-technical.md`, dispatch `seo-technical` with the file + shared context. Owns Technical SEO (25) + Performance signals (10) = 35 points. Consumes sitemap probe results.
@@ -614,7 +613,7 @@ Read `references/scan-content.md`, dispatch `seo-content` with the file + shared
 Read `references/scan-geo.md`, dispatch `geo-generative` with the file + shared context. Owns Structured Data (20) + Generative Engine (20) = 40 points. Source-only (no rendered HTML).
 
 ### Agent 4: seo-gsc-insights (only when `gsc_mode: enabled`)
-Read `references/gsc-ingestion.md` (the same reference used by the orchestrator in Step 1.6 — the "Finding-type catalog" section is the agent's spec) and dispatch `seo-gsc-insights` with the reference content + shared context + sitemap URL list. Owns `gsc_insights` dimension with 12 sub-dims and **0 score allocation** (informational by Phase 0 contract). All findings emit `source: "gsc"` and `score_impact: 0`.
+Read `references/gsc-ingestion.md` (the same reference used by the orchestrator in Step 1.6 — the "Finding-type catalog" section is the agent's spec) and dispatch `seo-gsc-insights` with the reference content + shared context + sitemap URL list. Owns `gsc_insights` dimension with 12 sub-dims and **0 score allocation** (informational only). All findings emit `source: "gsc"` and `score_impact: 0`.
 
 When `gsc_mode: disabled`, do not dispatch the 4th agent — only dispatch 3.
 

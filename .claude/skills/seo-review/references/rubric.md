@@ -118,20 +118,20 @@ This is **the single point of enforcement**. Subagent files don't need to track 
 
 GSC findings use their own `dimension: "gsc_insights"` with 12 sub-dimensions for structural organization. No score allocation — these are routing labels, not score buckets:
 
-| Sub-dim | Source CSV | Notes |
+| Sub-dim | Source | Notes |
 |---|---|---|
-| `indexing_coverage` | `indexing/summary.csv` | Overall non-index rate (informational headline) |
-| `crawled_not_indexed` | `indexing/crawled-not-indexed.csv` | Content quality / E-E-A-T cluster |
-| `discovered_not_indexed` | `indexing/discovered-not-indexed.csv` | Crawl-budget / internal-linking cluster |
-| `not_found_404` | `indexing/not-found-404.csv` | Sitemap-vs-actual 404 cluster (dedupes with sitemap probe — see below) |
-| `redirect_hygiene` | `indexing/page-with-redirect.csv` | Sitemap entries pointing to redirected URLs |
-| `canonical_conflict` | `indexing/duplicate-google-chose-different.csv` | Declared canonical disagrees with Google's chosen canonical |
-| `blocked_access` | `indexing/blocked-4xx.csv` + `blocked-403.csv` + `alternate-canonical.csv` | Usually intentional; low-severity info |
-| `soft_404` | `indexing/soft-404.csv` | 200-but-empty pages |
-| `server_errors` | `indexing/server-error-5xx.csv` | High-severity availability signal |
-| `ctr_opportunity` | `performance/pages.csv` | High-impressions, below-median CTR |
-| `position_band_opportunity` | `performance/queries.csv` | Position 5-20 queries with ≥100 impressions |
-| `traffic_orphan` | `performance/pages.csv` + sitemap | Sitemap URLs with 0 impressions in the data window |
+| `indexing_coverage` | inspection-set non-index rate (info-only footer) | Site-wide rate not computable from per-URL inspection — info only |
+| `crawled_not_indexed` | URL Inspection — `coverageState` matches | Content quality / E-E-A-T cluster |
+| `discovered_not_indexed` | URL Inspection — `coverageState` matches | Crawl-budget / internal-linking cluster |
+| `not_found_404` | URL Inspection — `coverageState` matches | Sitemap-vs-actual 404 cluster (dedupes with sitemap probe — see below) |
+| `redirect_hygiene` | URL Inspection — `coverageState` matches | Sitemap entries pointing to redirected URLs |
+| `canonical_conflict` | URL Inspection — `coverageState` matches (with `googleCanonical` + `userCanonical` evidence) | Declared canonical disagrees with Google's chosen canonical |
+| `blocked_access` | URL Inspection — `coverageState` matches | Usually intentional; low-severity info |
+| `soft_404` | URL Inspection — `coverageState` matches | 200-but-empty pages |
+| `server_errors` | URL Inspection — `coverageState` matches | High-severity availability signal |
+| `ctr_opportunity` | Q2 pages digest | High-impressions, below-median CTR |
+| `position_band_opportunity` | Q1 queries digest | Position 5-20 queries with ≥100 impressions |
+| `traffic_orphan` | Q3 `url_impressions_map` + sitemap | Sitemap URLs with 0 impressions in the data window |
 
 ### Per-finding output shape — GSC additions
 
@@ -140,8 +140,8 @@ GSC findings extend the canonical 10-field per-finding shape (defined in each sc
 | Field | Type | Notes |
 |---|---|---|
 | `source` | `"gsc" \| "heuristic"` | **Required on every finding.** `"gsc"` triggers orchestrator-side score_impact:0 enforcement. Heuristic findings keep `"heuristic"` and have all GSC fields null. |
-| `impressions` | `int \| null` | From queries.csv / pages.csv |
-| `clicks` | `int \| null` | From queries.csv / pages.csv |
+| `impressions` | `int \| null` | From Q1 queries digest / Q2 pages digest |
+| `clicks` | `int \| null` | From Q1 queries digest / Q2 pages digest |
 | `ctr` | `float \| null` | Click-through rate, 0.0-1.0 |
 | `avg_position` | `float \| null` | Average position in SERP |
 | `affected_urls` | `[str]` | Sample of URLs in the cluster (cap 10 inline; full list in subagent output addendum) |
