@@ -12,17 +12,17 @@ It's written verbatim — no variable substitution. The target audience is the *
 # Google Search Console — Data Drop Zone
 
 This folder feeds traffic-aware audit data into `/seo-review`. There are
-**two supported paths**, both first-class — you can use either or both:
+**three supported paths** — pick whichever fits your setup (Path 1 recommended
+for new users):
 
-| Path | Best for | Setup effort | Data freshness |
+| Path | Covers | Setup effort | Data freshness |
 |---|---|---|---|
-| **BigQuery Bulk Data Export** | Performance (queries, pages, impressions) | One-time GCP setup (~10 min) | Daily, ~2-day lag |
-| **CSV exports** | Page indexing (9-reason report — REQUIRED for indexing signal) and Performance fallback | Manual export per run (~5 min for 13 CSVs) | Whatever you last exported |
+| **Path 1: Search Console API** (RECOMMENDED) | Performance + Indexing in one auth | gcloud SDK install + OAuth (~5 min) | Real-time (~2-day GSC pipeline lag) |
+| **Path 1b: BigQuery Bulk Data Export** (ALTERNATIVE) | Performance only (full history) | gcloud SDK install + GCP project + 2-day export wait (~10 min + waiting) | Daily, ~2-day lag |
+| **Path 2: CSV exports** (FALLBACK) | Performance + Indexing (manual) | No install — manual exports per run (~5 min for 13 CSVs) | Whatever you last exported |
 
-Page Indexing data is **CSV-only** — Google's BigQuery export doesn't
-include it. So even if you use BigQuery for Performance (recommended),
-you'll still drop the 11 indexing CSVs here for the 9-reason cluster
-findings.
+You can mix Path 1b with Path 2 (BigQuery for Performance + CSVs for Indexing,
+since BigQuery doesn't include indexing data). Path 1 alone covers both signals.
 
 ## What does the skill do with this data?
 
@@ -35,31 +35,87 @@ findings.
 - Reranks all findings by traffic impact (impressions-weighted)
 
 The /100 score does **not** change based on this data — GSC is informational.
-Your `docs/seo-history.md` stays comparable across runs whether GSC data
-is present or not, and whether it came from BigQuery or CSVs.
+Your `docs/seo-history.md` stays comparable across runs regardless of path
+(API / BigQuery / CSV).
 
 ---
 
-## Path 1 (RECOMMENDED): BigQuery Bulk Data Export — Performance
+## Path 1 (RECOMMENDED): Search Console API
 
-BigQuery gives you the full Performance dataset: no ~1,000-row CSV cap,
-full history (not just the 16-month UI window), daily-fresh, and the 28
-rich-appearance booleans (is_video, is_review_snippet, is_faq, etc.) that
-CSVs don't expose.
+The Search Console API covers both Performance AND Indexing through a single
+auth surface. Simplest setup; richest signal (per-URL indexing diagnostics
+that aren't available via CSV exports).
 
 ### Prerequisites
 
-1. **A GCP project with BigQuery API enabled.** Create one at
-   https://console.cloud.google.com/ if you don't have one. Free tier
-   includes 1 TB of query processing per month — far more than this
-   skill ever uses (~1-10 MB per run).
-2. **`gcloud` CLI installed** with the `bq` component. Install:
-   https://cloud.google.com/sdk/docs/install. On Windows, the installer
-   adds both `gcloud` and `bq` (as `gcloud.cmd` / `bq.cmd`) to PATH.
-3. **Application Default Credentials.** Run once:
-   `gcloud auth application-default login` — opens a browser, completes
-   OAuth, writes credentials to `~/.config/gcloud/`.
-4. **IAM** (if you don't already own the project): you need at least
+1. **A GCP project.** Any GCP project will do — the API is free within
+   quota (1,200 QPM Performance / 2,000 URLs/day per property for
+   Inspection). Create one at https://console.cloud.google.com/ if you
+   don't have one.
+2. **`gcloud` CLI installed.** Install: https://cloud.google.com/sdk/docs/install.
+   On Windows, the installer adds `gcloud` (and `bq`, `gsutil`) to PATH.
+3. **Google account with verified GSC property access.** The Google
+   account you sign in with during `gcloud auth` must be the same one
+   that has the GSC property registered + verified.
+
+### Authenticate
+
+4. Run once, opens browser for OAuth:
+   ```
+   gcloud auth application-default login \
+     --scopes=https://www.googleapis.com/auth/webmasters.readonly,https://www.googleapis.com/auth/cloud-platform
+   ```
+   The explicit `--scopes` flag is important — Search Console API often
+   accepts the default `cloud-platform` scope but this is undocumented and
+   has broken in the past. Explicit `webmasters.readonly` is durable.
+
+5. Set quota project (mandatory for some account/project combinations):
+   ```
+   gcloud auth application-default set-quota-project <your-gcp-project-id>
+   ```
+
+### Configure `/seo-review` for API
+
+6. Create `.seo-data/gsc/config.yaml`:
+
+   ```yaml
+   site_url: sc-domain:example.com    # or "https://example.com/" for URL-prefix properties
+
+   # Optional:
+   # lookback_days: 90                # 7-365, default 90
+   ```
+
+   The exact `site_url` format must match what's registered in GSC.
+   Check at https://search.google.com/search-console > Settings.
+
+7. Run `/seo-review`. The "Detected:" line should say
+   `Mode: heuristic + GSC (Search Console API — ...)`.
+
+### Verify the first run
+
+- API auth probe: `gcloud auth application-default print-access-token` should print a token. The skill calls `GET /webmasters/v3/sites` at start of each run to verify access; failures surface in footer with specific remediation.
+- Performance: 3 `searchanalytics.query` calls per run (Q1 queries digest, Q2 pages digest, Q3 url_impressions_map).
+- Indexing: up to 100 `urlInspection.index.inspect` calls per run, prioritizing high-impression URLs + sitemap probe failures + recently-changed paths. Well under the 2,000/day per-property quota.
+
+---
+
+## Path 1b (ALTERNATIVE for unlimited history): BigQuery Bulk Data Export
+
+Use this path when you specifically want **unlimited Performance history**
+(the API caps at 16 months rolling). BigQuery's export accumulates daily
+and never expires. You'll still need CSVs for Page Indexing — BigQuery
+doesn't include indexing data.
+
+### Prerequisites
+
+1. **A GCP project with BigQuery API enabled.** Free tier includes 1 TB
+   of query processing per month — far more than this skill ever uses
+   (~1-10 MB per run).
+2. **`gcloud` CLI installed** with the `bq` component (ships with gcloud
+   SDK). Same setup as Path 1.
+3. **Application Default Credentials.** Same as Path 1 — the `--scopes`
+   flag covers both API and BQ.
+4. **IAM** (if you don't already own the project): at least
    `roles/bigquery.dataViewer` on the dataset + `roles/bigquery.jobUser`
    on the project.
 
@@ -69,7 +125,7 @@ CSVs don't expose.
    **Bulk data export** → **Configure**.
 6. Set destination project + dataset name. Conventional dataset name:
    `searchconsole`. **The dataset must not already exist** — GSC creates
-   it on first export. (If it exists, GSC refuses.)
+   it on first export.
 7. **Wait ~2 days.** First export takes 24-48 hours. Subsequent exports
    run daily and lag ~2 days behind real-time.
 8. Verify: `bq ls <your-project>:searchconsole` should list
@@ -78,8 +134,7 @@ CSVs don't expose.
 
 ### Configure `/seo-review` for BigQuery
 
-9. Create `.seo-data/gsc/config.yaml` (the next `/seo-review` run will
-   auto-create an unfilled template if you skip this):
+9. Create `.seo-data/gsc/config.yaml`:
 
    ```yaml
    project_id: <your-gcp-project>
@@ -87,16 +142,20 @@ CSVs don't expose.
    location: US
 
    # Optional:
-   # site_url: sc-domain:example.com    # only if dataset has multiple properties
+   # site_url: sc-domain:example.com    # ALSO add this to enable Path 1 (API) alongside
    # lookback_days: 90                  # 7-365, default 90
    ```
 
-10. Run `/seo-review`. The "Detected:" line should say
-    `Mode: heuristic + GSC (BigQuery: ...)`.
+10. Drop indexing CSVs in `.seo-data/gsc/indexing/` (Path 2 below).
+11. Run `/seo-review`. The "Detected:" line should say
+    `Mode: heuristic + GSC (hybrid — Performance: BigQuery; ...)`.
+
+**Note**: if you add `site_url` to config.yaml AND BQ keys, **the API
+path wins per precedence**. To force BQ-only, omit `site_url`.
 
 ---
 
-## Path 2 (REQUIRED for Page Indexing — even when using BigQuery): CSV exports
+## Path 2 (FALLBACK or REQUIRED for indexing when using Path 1b): CSV exports
 
 Page indexing reports (the 9-reason breakdown of why pages aren't indexed)
 are **only available via CSV export** — Google's BigQuery export doesn't
@@ -123,7 +182,7 @@ Navigate to **Indexing** > **Pages**.
 
 Skip any reason row that's empty (count = 0) — no need to export an empty CSV.
 
-### Performance CSVs (only if NOT using BigQuery)
+### Performance CSVs (only if NOT using Path 1 API or Path 1b BigQuery)
 
 Navigate to **Performance** > **Search results**.
 
@@ -132,9 +191,12 @@ Navigate to **Performance** > **Search results**.
 | **Queries tab** → ⬇ Export → Download CSV | `performance/queries.csv` |
 | **Pages tab** → ⬇ Export → Download CSV | `performance/pages.csv` |
 
-**If `config.yaml` is configured and BigQuery is reachable, these Performance
-CSVs are ignored** — BigQuery wins. Drop the Performance CSVs ONLY if you
-don't have BigQuery set up. The 11 indexing CSVs above are always read.
+**Path precedence**: if `config.yaml` is configured for API (site_url) or
+BigQuery (project_id+dataset_id+location) and the path is reachable, these
+Performance CSVs are ignored. Path 1 (API) wins over Path 1b (BQ) over Path
+2 (CSV) for Performance. Drop the Performance CSVs ONLY if you don't have
+API or BigQuery set up. The 11 indexing CSVs above are read when API isn't
+available for indexing (Path 1b + Path 2 hybrid).
 
 ## GSC export quirks (CSVs)
 
@@ -171,11 +233,11 @@ weeks matches Google's recrawl + position-stabilization cycle.
 ```
 .seo-data/gsc/
 ├── README.md                              (this file)
-├── config.yaml                            (BigQuery connection — Path 1)
-├── performance/                           (Path 2 — only if NOT using BigQuery)
+├── config.yaml                            (API or BigQuery config — Path 1 or 1b)
+├── performance/                           (Path 2 — only if NOT using API or BQ)
 │   ├── queries.csv
 │   └── pages.csv
-├── indexing/                              (Path 2 — REQUIRED, even with BigQuery)
+├── indexing/                              (Path 2 — REQUIRED with Path 1b, optional with Path 1)
 │   ├── summary.csv
 │   ├── crawled-not-indexed.csv
 │   ├── discovered-not-indexed.csv
@@ -192,16 +254,23 @@ weeks matches Google's recrawl + position-stabilization cycle.
 └── sitemaps.csv                           (Tier 2 — recognized, not parsed in v1)
 ```
 
-## 4-state matrix — what mode you'll see
+## Mode labels — what state you'll see
 
-| BigQuery configured? | Indexing CSVs present? | Performance CSVs present? | Mode label |
-|---|---|---|---|
-| ✓ | ✓ | (ignored) | **Full GSC** (best) |
-| ✓ | ✗ | (ignored) | BigQuery Performance only |
-| ✗ | ✓ | ✓ | CSV-only (v2 path) |
-| ✗ | ✓ | ✗ | Indexing-only |
-| ✗ | ✗ | ✓ | Performance-CSV-only |
-| ✗ | ✗ | ✗ | Heuristic-only (Section 1 banner fires) |
+The skill computes which paths are reachable (API + BQ + CSV) and collapses
+to one of four user-facing modes:
+
+| Mode label | Condition | What happens |
+|---|---|---|
+| **Full GSC (API)** | API reachable for both Performance + Indexing | best state — most signal, no warnings |
+| **Full GSC (hybrid)** | Both signals present but mixed sources (e.g., API + CSV indexing; BQ + CSV indexing; CSV+CSV) | footer note showing source per signal |
+| **Partial GSC** | Exactly one signal present, one missing | footer note + upgrade hint |
+| **Heuristic-only** | No API, no BQ, no CSVs | Section 1 banner fires; report runs heuristic-only |
+
+The precedence order per signal:
+- **Performance**: Search Console API > BigQuery > CSV > none
+- **Indexing**: Search Console API > CSV > none
+
+(BigQuery doesn't cover Indexing — Google's product limitation.)
 
 ## Troubleshooting
 
@@ -215,17 +284,29 @@ weeks matches Google's recrawl + position-stabilization cycle.
 | Footer says "freshness: queries.csv is 47 days old" | Time to re-export | Re-export and replace the file |
 | Mode says "Heuristic-only" despite files present | Folder structure wrong | Check files are in `performance/` and `indexing/` subfolders, not the root |
 
-### BigQuery-related
+### Search Console API-related (Path 1)
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Mode falls back to CSV despite `config.yaml` filled in | `bq` CLI not installed | Install gcloud SDK: https://cloud.google.com/sdk/docs/install |
+| Mode falls back to BQ/CSV despite `site_url` set | `gcloud` CLI not installed | Install gcloud SDK: https://cloud.google.com/sdk/docs/install |
+| Same, with `gcloud` available | ADC not configured | Run `gcloud auth application-default login --scopes=...` (see Path 1 setup above) |
+| Footer says `Search Console API auth failed: 401 UNAUTHENTICATED` | OAuth scope insufficient | Re-run `gcloud auth application-default login` with the `--scopes=https://www.googleapis.com/auth/webmasters.readonly,...` flag |
+| Footer says `Search Console API access denied: 403 PERMISSION_DENIED` | The Google account isn't verified on this GSC property | Verify property ownership in https://search.google.com/search-console > Settings, or switch ADC to an account that owns the property |
+| Footer says `site_url '<X>' not found in your verified properties` | `site_url` value doesn't match what's registered in GSC | Check exact format at https://search.google.com/search-console > Settings > Property settings. `sc-domain:example.com` for Domain properties; `https://example.com/` (with trailing slash) for URL-prefix |
+| Footer says `URL Inspection quota exhausted` | Hit 2,000/day per-property cap | Re-run tomorrow, OR lower the inspection budget in `gsc-api-queries.md`, OR upgrade GCP project quota |
+| Mode says "Partial GSC (perf: api, indexing: none)" | API auth works but quota for URL Inspection was hit | Same as above — graceful degrade |
+
+### BigQuery-related (Path 1b)
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Mode falls back to CSV despite BQ keys filled in | `bq` CLI not installed | Install gcloud SDK: https://cloud.google.com/sdk/docs/install (includes `bq`) |
 | Same, with `gcloud` available | ADC not configured | Run `gcloud auth application-default login` |
 | Footer says `Config error: nested keys not supported` | `config.yaml` has indented keys | Use flat single-level keys only (`project_id: x` not `bigquery:\n  project_id: x`) |
 | Footer says `Access Denied` on dataset | Missing IAM | Grant `roles/bigquery.dataViewer` on the dataset + `roles/bigquery.jobUser` on the project |
-| Footer says `Column 'X' not found` | Google changed the schema | Open an issue — `bigquery-schema.md` needs updating |
+| Footer says `Column 'X' not found` | Google changed the BQ schema | Open an issue — `bigquery-schema.md` needs updating |
 | Footer says `Query exceeded maximum_bytes_billed (1 GB)` | Site too large for default cap | Lower `lookback_days` in `config.yaml` (e.g., `lookback_days: 30`) |
-| Mode says "BigQuery Performance only" | Indexing CSVs missing | Export the 11 indexing CSVs into `indexing/` |
+| Mode says "BigQuery Performance only" | Indexing CSVs missing AND API not configured | Either add `site_url` to use Path 1 for indexing OR export the 11 indexing CSVs (Path 2) |
 | First export shows 0 rows | Export just started, < 2 days ago | Wait — first BigQuery export takes 24-48 hours after enabling |
 
 ## Removing GSC integration
@@ -234,9 +315,11 @@ To go back to heuristic-only mode: delete or empty the `.seo-data/gsc/`
 folder (CSVs + `config.yaml` both). The next `/seo-review` will note
 "Mode: heuristic" and behave exactly as it did before any GSC data was added.
 
-To switch from BigQuery back to CSV-only: delete `config.yaml` (the BQ
-path's activation depends on it). Indexing CSVs stay; add Performance
-CSVs if you want full coverage.
+To switch between paths:
+- **API → CSV-only**: remove `site_url` from `config.yaml` (API deactivates). Indexing CSVs become primary.
+- **API → BigQuery**: replace `site_url` with `project_id`+`dataset_id`+`location`. BQ becomes primary for Performance; CSV still required for Indexing.
+- **BigQuery → API**: replace BQ keys with `site_url`. API becomes primary for both signals. Indexing CSVs become optional.
+- **Any → heuristic**: delete `config.yaml` and `.seo-data/gsc/` folder entirely.
 ```
 
 ## Template content (end)

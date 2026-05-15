@@ -610,7 +610,7 @@ The map is passed to **all dispatched subagents** (3 or 4 depending on `gsc_mode
 
 ---
 
-## Setup banner — unified BQ + CSV (one-time, sentinel-gated)
+## Setup banner — Path 1 (API) / Path 1b (BQ) / Path 2 (CSV) (one-time, sentinel-gated)
 
 When the orchestrator runs `/seo-review` and **no GSC data is detected** (no CSVs in `.seo-data/gsc/` AND no `config.yaml` — i.e., 4-state matrix resolves to heuristic-only):
 
@@ -629,34 +629,50 @@ GSC INTEGRATION AVAILABLE — Make /seo-review traffic-aware
 This run used static signals only. /seo-review can incorporate Google Search
 Console data to surface traffic-prioritized findings (which pages get
 impressions, which queries you rank for at position 5-20, which pages Google
-crawled but didn't index).
+considers crawled-but-not-indexed).
 
-Two paths are supported, both first-class. Pick either or both:
+Three paths are supported. Pick one (Path 1 recommended for new users):
 
-╭─ Path 1 (RECOMMENDED): BigQuery Bulk Data Export ────────────────────────╮
-│ Performance signal — full history, no row caps, daily-fresh.             │
+╭─ Path 1 (RECOMMENDED): Search Console API ──────────────────────────────╮
+│ Covers Performance + Indexing in ONE auth surface. Simplest setup.       │
 │                                                                          │
-│ 1. GSC > Settings > Bulk data export > Configure                         │
-│    Set destination GCP project + dataset name (conventional:             │
-│    "searchconsole"). Wait ~2 days for first export.                      │
-│ 2. Install gcloud SDK + run: gcloud auth application-default login       │
-│ 3. Create .seo-data/gsc/config.yaml (template auto-written on next run): │
+│ 1. Install Google Cloud SDK: https://cloud.google.com/sdk/docs/install   │
+│ 2. Run (one-time, opens browser for OAuth):                              │
+│      gcloud auth application-default login \                             │
+│        --scopes=https://www.googleapis.com/auth/webmasters.readonly,\    │
+│                 https://www.googleapis.com/auth/cloud-platform           │
+│      gcloud auth application-default set-quota-project <your-gcp-project>│
+│ 3. Create .seo-data/gsc/config.yaml with your GSC property URL:          │
+│      site_url: sc-domain:example.com   # or "https://example.com/"       │
+│ 4. Re-run /seo-review.                                                   │
+│                                                                          │
+│ The skill calls Search Analytics (Performance) + URL Inspection          │
+│ (per-URL indexing diagnostics) via the API. No CSVs needed.              │
+╰──────────────────────────────────────────────────────────────────────────╯
+
+╭─ Path 1b (ALTERNATIVE for unlimited history): BigQuery Bulk Export ─────╮
+│ Use this when you want unlimited Performance history (vs API's 16-mo).   │
+│ Indexing still uses CSVs (BigQuery export doesn't include indexing).     │
+│                                                                          │
+│ 1. GSC > Settings > Bulk data export > Configure → destination GCP       │
+│    project + dataset name (conventional: "searchconsole"). Wait ~2 days. │
+│ 2. Install gcloud SDK + same auth setup as Path 1.                       │
+│ 3. Create .seo-data/gsc/config.yaml:                                     │
 │      project_id: <your-gcp-project>                                      │
 │      dataset_id: searchconsole                                           │
 │      location: US                                                        │
-│ 4. Re-run /seo-review.                                                   │
+│ 4. ALSO export indexing CSVs (Path 2, indexing-only).                    │
+│ 5. Re-run /seo-review.                                                   │
 ╰──────────────────────────────────────────────────────────────────────────╯
 
-╭─ Path 2 (REQUIRED for Page Indexing): CSV exports ───────────────────────╮
-│ Indexing signal — 9-reason report. BigQuery export does NOT include      │
-│ this data (Google product limitation).                                   │
-│ Also: CSV fallback for Performance when BigQuery isn't configured.       │
+╭─ Path 2 (FALLBACK): CSV exports ────────────────────────────────────────╮
+│ Universal fallback — no gcloud SDK install required. Slower data         │
+│ (manual export per run). REQUIRED for Indexing when using Path 1b.       │
 │                                                                          │
 │ 1. GSC > Indexing > Pages > Export the "Why pages aren't indexed" table  │
 │    + click each reason row → Export → CSV (up to 9 reason CSVs)          │
-│ 2. (Optional, if not using BigQuery) GSC > Performance > Search results: │
-│    Queries tab → Export → CSV                                            │
-│    Pages tab → Export → CSV                                              │
+│ 2. (Optional, if not using API or BigQuery) GSC > Performance >          │
+│    Search results > Queries tab → Export → CSV; Pages tab → Export → CSV │
 │ 3. Create .seo-data/gsc/{performance,indexing}/ in this repo.            │
 │ 4. Drop each CSV into the matching subfolder with canonical filenames    │
 │    (see .seo-data/gsc/README.md once the folder exists).                 │
@@ -666,15 +682,15 @@ Two paths are supported, both first-class. Pick either or both:
 This folder will be auto-gitignored (search queries can include brand-internal
 data — privacy default). You don't need to commit anything.
 
-Score will stay /100 either way — GSC enriches the *recommendations*, not the
-score, so docs/seo-history.md stays comparable across runs.
+Score will stay /100 regardless of path — GSC enriches the *recommendations*,
+not the score, so docs/seo-history.md stays comparable across runs.
 
 (This banner shows once per project. Touch .seo-data/.gsc-banner-shown to
 silence it manually.)
 ─────────────────────────────────────────────────────────────────────────────
 ```
 
-Banner skipped silently when `.seo-data/gsc/` exists (any CSV or config.yaml present).
+Banner skipped silently when `.seo-data/gsc/` exists (any CSV, config.yaml, or sentinel present).
 
 ---
 
