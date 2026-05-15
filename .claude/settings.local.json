@@ -19,13 +19,7 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
       "Skill(plan-feature)",
-      "Bash(awk '/^## Key Decisions/,/^## /' CLAUDE.md)",
-      "Bash(grep -c \"^| [A-Z\\\\`]\")",
-      "Bash(grep -n \"^### Session 21\\\\|^### Session 22\\\\|^---$\" /Users/burakarik/Development/projects/claude-config/docs/session-history.md)",
-      "Bash(awk '/^## Key Decisions/{flag=1; next} /^## /{flag=0} flag' /Users/burakarik/Development/projects/claude-config/CLAUDE.md)",
-      "Bash(awk '/^### Session 21 - 2026-05-07/,0' /Users/burakarik/Development/projects/claude-config/docs/session-history.md)",
       "Bash(python3)",
-      "Bash(awk '/^## Key Decisions/{flag=1; next} flag && /^## /{flag=0} flag' /Users/burakarik/Development/projects/claude-config/CLAUDE.md)",
       "Bash(awk *)"
     ]
   }
