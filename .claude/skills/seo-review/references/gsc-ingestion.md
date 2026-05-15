@@ -279,6 +279,293 @@ All failure modes are non-fatal to the run — `/seo-review` always produces a s
 
 ---
 
+## API ingestion (canonical path for Performance + Indexing)
+
+When `.seo-data/gsc/config.yaml` has `site_url` filled + `gcloud` SDK installed + ADC authenticated + active API probe succeeds, **the Search Console API replaces both BigQuery (Performance) and indexing CSVs**. Single auth surface (gcloud ADC), three endpoints, both Performance + Indexing covered.
+
+Activation precedence vs other paths: **API > BigQuery > CSV** for Performance signal; **API > CSV** for Indexing signal. When API is active, BQ Performance queries are not fired and indexing CSVs are not parsed (the API supersedes both).
+
+See `gsc-api-schema.md` for endpoint inventory + auth + quota model + `coverageState` + `pageFetchState` enums. See `gsc-api-queries.md` for the 3 parametrized `curl` templates + URL Inspection selection algorithm + `coverageState`+`pageFetchState` → 9-reason lookup table.
+
+> **Worked example status (Phase 0 deferred):** The API response shapes documented below are taken from Google's published API reference (https://developers.google.com/webmaster-tools/v1/searchanalytics + https://developers.google.com/webmaster-tools/v1/urlInspection). Live-verification against a real GSC property is deferred to Phase 4 real-world dogfood (requires gcloud SDK install on the user's machine). All documented shapes are stable per Google's public API contract.
+
+### Activation conditions (4-state matrix interaction)
+
+The matrix in `SKILL.md` Step 1.6 governs which path wins. The API path is active when **all** of:
+
+1. `.seo-data/gsc/config.yaml` exists
+2. `config.yaml.site_url` is non-empty (the property identifier — `sc-domain:example.com` for Domain properties, `https://example.com/` for URL-prefix properties)
+3. `gcloud --version` returns (gcloud SDK installed; on Windows ships as `gcloud.cmd`)
+4. `gcloud auth application-default print-access-token` returns a non-empty token (ADC configured)
+5. `curl GET https://www.googleapis.com/webmasters/v3/sites` with the ADC token returns HTTP 200 + a JSON body containing a `siteEntry` array
+6. The configured `site_url` appears in the returned list's `siteEntry[*].siteUrl` (per Plan-agent B11 — catches "ADC valid + GSC access exists but for a different property than configured")
+
+If any of these fails → fall through to BQ path (if BQ keys configured), then CSV path, then heuristic-only. Surface the specific blocker in the report footer.
+
+**OAuth scope note (Plan-agent B7):** ADC tokens issued by `gcloud auth application-default login` without explicit scopes default to `cloud-platform`. Search Console API often accepts cloud-platform-scoped tokens but this is undocumented behavior. The setup walkthrough instructs:
+
+```
+gcloud auth application-default login --scopes=https://www.googleapis.com/auth/webmasters.readonly,https://www.googleapis.com/auth/cloud-platform
+```
+
+The active probe (condition 5) is what catches scope insufficiency at runtime — token returns 401 from `/sites` → footer surfaces the `--scopes` remediation.
+
+**Quota project (Plan-agent B10):** After login, users should also run `gcloud auth application-default set-quota-project <project-id>`. Without this, API calls succeed but quota gets billed to a default consumer project that may rate-limit harder. Documented in `gsc-setup-readme-template.md`.
+
+### API-configured-and-failing — NO silent CSV/BQ fallback
+
+When API is active per activation conditions BUT a runtime call fails (auth revoked mid-run, scope insufficiency surfacing after probe, quota exhausted, transient API error):
+
+- Print the exact API error to the report footer (parse on `error.code: 429` + `error.status: "RESOURCE_EXHAUSTED"` per Plan-agent B4)
+- Skip the affected signal entirely. For Performance: digest empty. For Indexing: inspected URLs partial.
+- **Do NOT silently fall back to BQ or CSV path** for the same signal. When API is configured, API is the source. Silent fallback would mask the failure across a different data window.
+- The 4-state matrix reads the resulting state as the relevant signal missing → footer note
+
+To restore BQ Performance behaviour, user removes `site_url` from `config.yaml`. Activation condition 2 then fails and BQ takes over cleanly.
+
+### Query execution
+
+#### Search Analytics (3 parallel calls per Plan-agent S4 — Q4 + Q5 dropped)
+
+All 3 queries dispatch in a **single parallel Bash turn**. Per-query invocation:
+
+```
+curl -s -X POST \
+  -H "Authorization: Bearer <ADC_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '<JSON_BODY>' \
+  "https://www.googleapis.com/webmasters/v3/sites/<SITE_URL_ENCODED>/searchAnalytics/query"
+```
+
+Where `<SITE_URL_ENCODED>` is the `site_url` with `:` → `%3A` and `/` → `%2F` (per Plan-agent B5 — `curl --data-urlencode` only handles request body, not path params):
+- `sc-domain:example.com` → `sc-domain%3Aexample.com`
+- `https://example.com/` → `https%3A%2F%2Fexample.com%2F`
+
+The orchestrator builds the encoded URL in-context before the curl call.
+
+#### URL Inspection (N parallel calls — N ≤ 100/run per Plan-agent S3)
+
+```
+curl -s -X POST \
+  -H "Authorization: Bearer <ADC_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"inspectionUrl":"<URL>","siteUrl":"<SITE_URL>"}' \
+  "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect"
+```
+
+Note: URL Inspection uses a **different base host** (`searchconsole.googleapis.com/v1`) than Search Analytics (`www.googleapis.com/webmasters/v3`). Same OAuth scope; same ADC token. Per Plan-agent B2.
+
+#### Token caching (Plan-agent S2)
+
+**One** `gcloud auth application-default print-access-token` call per run, at the start of Turn 2 (Step 1.6.6). Token is cached in shared context and reused across all curl calls. ADC tokens have a 1-hour TTL; a single Step 1.6 dispatch finishes in seconds.
+
+#### Per-query failure handling
+
+A single failed call is non-fatal — other calls' results are still consumed. Failure mode codes:
+- HTTP 401 → ADC scope issue (per B7) — surface `--scopes` remediation
+- HTTP 403 → property ACL mismatch — user lacks Search Console access on the configured `site_url`
+- HTTP 404 → `site_url` not registered in GSC OR encoding error
+- HTTP 429 + `error.status: "RESOURCE_EXHAUSTED"` → quota exhausted (graceful degrade per decision 10)
+- HTTP 5xx → transient — print error, skip signal, don't retry
+
+### Digest shape — byte-identical to CSV + BQ paths
+
+The translator produces digests with **identical field names + types + semantics** as the CSV parser and BQ translator. Subagents (12 sub-dim catalog) read API-sourced digests indistinguishably from other sources.
+
+#### Performance digests
+
+**Queries digest** (Q1 — replaces v2's `performance/queries.csv` + v3's BQ Q1):
+
+API call:
+```json
+{
+  "startDate": "<CURRENT_DATE - lookback_days>",
+  "endDate": "<CURRENT_DATE>",
+  "dimensions": ["query"],
+  "rowLimit": 25000,
+  "type": "web"
+}
+```
+
+API response:
+```json
+{
+  "rows": [
+    {"keys": ["topkapi palace istanbul"], "clicks": 0, "impressions": 1092, "ctr": 0.0, "position": 27.87}
+  ],
+  "responseAggregationType": "byProperty"
+}
+```
+
+Translation:
+
+| API row field | Digest field | Coercion |
+|---|---|---|
+| `keys[0]` | `query` | passthrough (STRING) |
+| `impressions` | `impressions` | passthrough (already JSON number — no cast needed) |
+| `clicks` | `clicks` | passthrough (already JSON number) |
+| `ctr` | `ctr` | passthrough (already decimal 0-1) |
+| `position` | `position` | passthrough (already 1-based decimal) |
+
+**Client-side filter** (the API doesn't support `position`-range filter via `dimensionFilterGroups`):
+
+After receiving response, apply:
+- `impressions >= 100` (HAVING-equivalent)
+- `position BETWEEN 5.0 AND 20.0` (position-band)
+- Sort descending by `impressions`
+- Take top 50
+
+**Pages digest** (Q2 — replaces `performance/pages.csv` + BQ Q2):
+
+API call: same shape with `dimensions: ["page"]`, `rowLimit: 25000`. Client-side filter: `impressions >= 10`, top 50 by impressions desc.
+
+**url_impressions_map** (Q3 — replaces BQ Q3):
+
+API call: same shape with `dimensions: ["page"]`, `rowLimit: 25000`. **No client-side cap** — all returned rows go into the map.
+
+**Plan-agent B1 — silent truncation on >25k URLs**: the API caps a single call at `rowLimit: 25000`. For sites with >25k URLs in the lookback window, `url_impressions_map` truncates at 25k. BQ remains uncapped for large sites. Affected behavior: `traffic_weight` on findings whose URL is not in the top-25k falls through to `1.0` (defensible — same as no-GSC behavior).
+
+#### Indexing digests (from URL Inspection — replaces 11 indexing CSVs)
+
+The 11 indexing CSVs (sub-dims 2-9) get rebuilt from per-URL inspection results. **Cluster into the existing 9-reason catalog** via the `coverageState` + `pageFetchState` joint lookup table.
+
+URL Inspection response (per Google API reference):
+
+```json
+{
+  "inspectionResult": {
+    "inspectionResultLink": "https://search.google.com/search-console/inspect?...",
+    "indexStatusResult": {
+      "verdict": "PASS | PARTIAL | FAIL | NEUTRAL",
+      "coverageState": "<one of ~50 enum strings, see gsc-api-schema.md>",
+      "robotsTxtState": "ALLOWED | DISALLOWED",
+      "indexingState": "INDEXING_ALLOWED | BLOCKED_BY_META_TAG | BLOCKED_BY_HTTP_HEADER | BLOCKED_BY_ROBOTS_TXT",
+      "lastCrawlTime": "2026-05-13T10:30:00Z",
+      "pageFetchState": "SUCCESSFUL | SOFT_404 | BLOCKED_ROBOTS_TXT | NOT_FOUND | ACCESS_DENIED | SERVER_ERROR | REDIRECT_ERROR | ACCESS_FORBIDDEN | BLOCKED_4XX",
+      "googleCanonical": "<URL>",
+      "userCanonical": "<URL>",
+      "sitemap": ["<URL>"],
+      "referringUrls": ["<URL>"],
+      "crawledAs": "DESKTOP | MOBILE"
+    },
+    "mobileUsabilityResult": { "verdict": "...", "issues": [] },
+    "richResultsResult": { "verdict": "...", "detectedItems": [] }
+  }
+}
+```
+
+**`coverageState` + `pageFetchState` → 9-reason lookup table** (Plan-agent B8 — full table in `gsc-api-queries.md`; summary below):
+
+| `coverageState` | `pageFetchState` | 9-reason sub-dim |
+|---|---|---|
+| "Submitted and indexed" | SUCCESSFUL | (no finding — healthy state) |
+| "Indexed, not submitted in sitemap" | SUCCESSFUL | (info-only — surface in footer) |
+| "Indexed, though blocked by robots.txt" | * | (info — robots.txt conflict) |
+| "Crawled - currently not indexed" | SUCCESSFUL | sub-dim 2 `crawled_not_indexed` |
+| "Discovered - currently not indexed" | * | sub-dim 3 `discovered_not_indexed` |
+| "Not found (404)" | NOT_FOUND | sub-dim 4 `not_found_404` |
+| "Submitted URL not found (404)" | NOT_FOUND | sub-dim 4 `not_found_404` (variant) |
+| "Page with redirect" | REDIRECT_ERROR | sub-dim 5 `redirect_hygiene` |
+| "Alternate page with proper canonical tag" | * | sub-dim 7 `blocked_access` (alternate-canonical variant) |
+| "Duplicate, Google chose different canonical than user" | * | sub-dim 6 `canonical_conflict` |
+| "Duplicate without user-selected canonical" | * | sub-dim 6 `canonical_conflict` (variant) |
+| "Excluded by 'noindex' tag" | * | sub-dim 7 `blocked_access` (intentional) |
+| "Blocked by robots.txt" | BLOCKED_ROBOTS_TXT | sub-dim 7 `blocked_access` |
+| "Blocked due to access forbidden (403)" | ACCESS_FORBIDDEN | sub-dim 7 `blocked_access` (403 variant) |
+| "Blocked due to other 4xx issue" | BLOCKED_4XX | sub-dim 7 `blocked_access` (4xx variant) |
+| "Server error (5xx)" | SERVER_ERROR | sub-dim 9 `server_errors` |
+| "Soft 404" | SOFT_404 | sub-dim 8 `soft_404` |
+| "URL is unknown to Google" | * | (no finding — Google hasn't seen the URL) |
+| (any unmapped `coverageState`) | * | "Other" bucket — info-only footer note |
+
+#### Indexing cluster aggregation
+
+After all inspected URLs are classified via the lookup table, the orchestrator groups them by sub-dim and emits findings using the existing catalog (sub-dims 2-9). Each cluster's:
+- `total_count` = number of inspected URLs matching that sub-dim
+- `affected_urls` = top 10 by `lastCrawlTime` descending (matches CSV path)
+- `evidence` carries per-URL diagnostic detail (Plan-agent B9):
+  - `evidence.google_canonical` / `evidence.user_canonical` / `evidence.crawled_as` populated from inspection response when sub-dim 6 (`canonical_conflict`)
+  - `evidence.last_crawl_time` for time-sensitive findings
+  - `evidence.indexing_state` for blocked findings
+
+**Critical**: `total_count` from API inspection is **inspected-URL-count**, NOT site-wide truth. If the skill inspected 100 URLs and 12 had `coverageState: "Crawled - currently not indexed"`, the finding says "12 inspected pages are crawled-not-indexed". This is more conservative than CSV path (which gives site-wide count). Footer notes the inspection budget explicitly so the user knows the scale.
+
+### URL Inspection budget + selection algorithm
+
+Per Plan-agent S3 — hard target **100 URLs/run**, split:
+
+| Source | Count | Rationale |
+|---|---|---|
+| Top 50 from `url_impressions_map` (highest impressions) | 50 | Cover the URLs that actually matter for traffic. |
+| Sitemap probe failures (4xx/5xx URLs from Step 3.2) | 30 | High-signal indexing failures Google sees as broken. |
+| Git-changed paths (35-day window) resolved to URLs via `page_type_map` | 20 | Recently-touched URLs may have indexing changes pending. Plan-agent B6: only candidates that resolve via `page_type_map` heuristics OR appear in `url_impressions_map` — git emits paths, not URLs. |
+
+Dedup across the three sources (a URL in both Performance top-50 and recent git changes counts once). Hard cap **100 URLs total** before dispatching inspection batch. Well under the 2,000/day per-property quota.
+
+### Quota handling (Plan-agent B3)
+
+- **Search Analytics**: 1,200 QPM per Search Console account. With 3 calls/run, won't hit limit.
+- **URL Inspection**: 2,000/day per property + 600/min per project. The 100-URL budget per run stays well under both.
+
+Mid-run quota exhaustion (rare with the 100-URL cap): per decision 10, graceful degrade. Stop sending inspection calls, surface in footer:
+
+```
+URL Inspection: 73/100 succeeded, 27 skipped (quota exhausted). Re-run tomorrow for remaining.
+```
+
+Indexing findings emit from the inspected subset only. Performance signal unaffected (uses Search Analytics which has separate quota).
+
+### page_type_map sources (API path)
+
+Same composition as CSV/BQ path:
+
+1. **Top-50 URLs from Q2 Pages digest** (NOT Q3's uncapped url_impressions_map)
+2. **Inspected URLs** from URL Inspection batch (replaces "URLs from indexing CSVs")
+3. **Sitemap probe URLs** (Step 3.2)
+
+Classification logic unchanged.
+
+### Freshness policy (API-specific)
+
+No `MAX(data_date)` equivalent — the API returns the live view of GSC's pipeline. Footer note:
+
+```
+GSC API path: real-time view of GSC's pipeline (typically ~2-day lag from real-world events).
+```
+
+Per Plan-agent S4 — Q5 (freshness probe) dropped entirely for API path; static footer line suffices.
+
+### Edge cases
+
+| Case | Behaviour |
+|---|---|
+| `searchanalytics.query` returns 0 rows (small site or no traffic in window) | Empty Performance digests. Sub-dims 10-12 emit no findings. No error. |
+| `urlInspection.index.inspect` returns 404 for a candidate URL | URL not yet known to Google. Skip from cluster (no sub-dim assignment). Track as "URLs unknown to Google: N" in footer. |
+| All inspected URLs return `coverageState: "Submitted and indexed"` | No indexing findings emitted. Healthy state — surface as footer "All N inspected pages are indexed cleanly". |
+| `coverageState` returns an unmapped value (Google added a new enum) | Use "Other" bucket from lookup table. Footer note: "Unmapped coverageState: <value> on N URLs — update gsc-api-queries.md lookup table." |
+| URL Inspection budget = 0 (no candidates from any source) | Skip URL Inspection batch entirely. No indexing findings. Footer note. |
+| ADC token expires mid-run (>1 hour wall time) | Won't happen — Step 1.6 finishes in seconds. If it ever did: 401 on subsequent call → graceful degrade per decision 10. |
+| `site_url` in config but not verified by user's Google account | Active probe (activation condition 6) fails → fall through. Footer surfaces "site_url not in your verified properties list". |
+| Encoding error (special chars in URL) | Use `[uri]::EscapeDataString` equivalent in-context. Test in Phase 4 dogfood. |
+
+### Failure mode summary
+
+| Stage | Failure | Effect |
+|---|---|---|
+| Pre-query | `gcloud` not installed | Fall through to BQ/CSV path (activation condition 3 fails) |
+| Pre-query | ADC not authenticated | Fall through (activation condition 4 fails); surface `gcloud auth application-default login` remediation |
+| Pre-query | `site_url` empty in config.yaml | Fall through (activation condition 2 fails) |
+| Pre-query | Active probe returns 401 | Surface `--scopes` remediation; fall through |
+| Pre-query | Active probe returns 200 but `site_url` not in list | Surface "verify site_url is owned by your Google account"; fall through |
+| Query runtime | `searchanalytics.query` returns 429 | Print error + skip Performance, no silent BQ/CSV fallback |
+| Query runtime | `urlInspection` returns 429 mid-batch | Graceful degrade per decision 10: surface count succeeded/skipped |
+| Query runtime | Single `urlInspection` returns 404 | URL unknown to Google — exclude from cluster, footer count |
+| Per-query partial | Q1 fails but Q2 + Q3 succeed | Empty queries digest + footer note. Pages + url_impressions_map still produced. |
+
+All failure modes are non-fatal — `/seo-review` always produces a score + report.
+
+---
+
 ## Digest caps (per CSV)
 
 Each CSV's parsed rows are reduced to a **digest** of at most **50 rows** before being passed to the `seo-gsc-insights` subagent. This keeps prompt size bounded.

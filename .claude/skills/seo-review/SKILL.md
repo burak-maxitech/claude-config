@@ -2,7 +2,7 @@
 name: seo-review
 description: Repo-wide SEO and Generative Engine Optimization audit for web projects. Rejects non-web repos. Fetches current best practices every run (SEO/GEO field evolves rapidly). Probes sitemap URLs for 4xx/5xx/redirect-chain/slow-response health. Optionally ingests Google Search Console data via Bulk Data Export to BigQuery (Performance — queries + pages + per-URL impressions) and/or CSV exports from .seo-data/gsc/ (Page Indexing — all 9 reasons, and Performance fallback when BQ not configured). 4-state matrix governs the mix (BQ + indexing / BQ-only / CSV-only / heuristic-only). Plus 35-day git-history overlap to flag "may already be fixed" against the GSC reporting lag. Three or four parallel Sonnet subagents (seo-technical / seo-content / geo-generative, plus seo-gsc-insights when any GSC data is present). Score stays /100 (purely heuristic) so docs/seo-history.md is comparable across runs regardless of GSC mode. Use when user mentions SEO audit, GEO audit, Generative Engine Optimization, AI search optimization, llms.txt, structured data, sitemap health, Google Search Console, GSC, BigQuery, Bulk Data Export, search performance, or "make this site rank better."
 disable-model-invocation: true
-allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(jq:*), Bash(cat:*), Bash(head:*), Bash(bq:*), Bash(gcloud:*), Task
+allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(jq:*), Bash(cat:*), Bash(head:*), Bash(bq:*), Bash(gcloud:*), Bash(curl:*), Task
 effort: high
 argument-hint: "[path] [--plan] [--fix] [--url <deployed-url>]"
 ---
