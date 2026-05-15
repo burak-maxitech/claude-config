@@ -18,7 +18,7 @@ GSC mode is **enabled** when all of these conditions hold:
 1. `.seo-data/gsc/config.yaml` exists with non-empty `site_url:` key
 2. `gcloud` SDK installed (`gcloud --version` returns)
 3. ADC authenticated (`gcloud auth application-default print-access-token` returns a token)
-4. ADC quota project set (`jq -r .quota_project_id` on `application_default_credentials.json` returns a non-empty project ID — written by `gcloud auth application-default set-quota-project <id>`). The skill sends this value as the `x-goog-user-project` header on every API call.
+4. ADC quota project set (`grep -oE '"quota_project_id"...' | sed ...` on `application_default_credentials.json` returns a non-empty project ID — written by `gcloud auth application-default set-quota-project <id>`). The skill sends this value as the `x-goog-user-project` header on every API call. grep+sed used instead of `jq` since `jq` isn't on PATH in many bash environments.
 5. Active probe: `curl GET https://www.googleapis.com/webmasters/v3/sites` with both the ADC token AND `x-goog-user-project` header returns HTTP 200 + valid JSON
 6. The configured `site_url` appears in the returned `siteEntry[*].siteUrl` list with a non-`siteUnverifiedUser` `permissionLevel`
 
@@ -37,7 +37,7 @@ When GSC mode is enabled, ingest data from the Search Console API per `gsc-api-q
 
 All Performance calls dispatch in one parallel Bash turn. URL Inspection calls dispatch in a second parallel turn after Performance (URL selection uses Q3's `url_impressions_map`).
 
-**Token + quota-project caching**: Turn 1's probe already fetched both the ADC token (`gcloud auth application-default print-access-token`) and the ADC quota project (`jq -r .quota_project_id` on `application_default_credentials.json`). Both are reused as shared context across all Turn 2 curl invocations — every call must include `Authorization: Bearer $TOKEN` AND `x-goog-user-project: $QUOTA_PROJECT` headers. Tokens have a 1-hour TTL; a single Step 1.6 dispatch finishes in seconds, so one Turn 1 fetch is reused.
+**Token + quota-project caching**: Turn 1's probe already fetched both the ADC token (`gcloud auth application-default print-access-token`) and the ADC quota project (extracted from `application_default_credentials.json` via `grep -oE '"quota_project_id"...' | sed -E '...'` — see Step 1.6.1 for the exact line). Both are reused as shared context across all Turn 2 curl invocations — every call must include `Authorization: Bearer $TOKEN` AND `x-goog-user-project: $QUOTA_PROJECT` headers. Tokens have a 1-hour TTL; a single Step 1.6 dispatch finishes in seconds, so one Turn 1 fetch is reused.
 
 ### Digest shape
 

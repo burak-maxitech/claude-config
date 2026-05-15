@@ -108,16 +108,18 @@ Invoke-RestMethod -Method Get `
   ConvertTo-Json -Depth 5
 ```
 
-Bash:
+Bash (works without `jq` — uses bash core grep + sed for JSON-flat-field extraction):
 
 ```bash
 TOKEN=$(gcloud auth application-default print-access-token)
 ADC_DIR=$(gcloud info --format="value(config.paths.global_config_dir)")
-QUOTA=$(jq -r '.quota_project_id' "$ADC_DIR/application_default_credentials.json")
+QUOTA=$(grep -oE '"quota_project_id"[[:space:]]*:[[:space:]]*"[^"]+"' "$ADC_DIR/application_default_credentials.json" | head -1 | sed -E 's/.*"([^"]+)"$/\1/')
 curl -s -H "Authorization: Bearer $TOKEN" \
      -H "x-goog-user-project: $QUOTA" \
-     "https://www.googleapis.com/webmasters/v3/sites" | jq
+     "https://www.googleapis.com/webmasters/v3/sites"
 ```
+
+(If you have `jq` installed, pipe the curl output through `| jq` for pretty-printed JSON. Plain output is fine for verifying.)
 
 Expected: a JSON object with a `siteEntry` array listing every GSC property
 your account can read. Empty array means no properties on this account.

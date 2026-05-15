@@ -22,10 +22,12 @@ Both values are produced by Step 1.6's Turn 1 probe and reused across all Turn 2
 ```
 TOKEN=$(gcloud auth application-default print-access-token)
 ADC_DIR=$(gcloud info --format="value(config.paths.global_config_dir)")
-QUOTA_PROJECT=$(jq -r '.quota_project_id // empty' "$ADC_DIR/application_default_credentials.json")
+QUOTA_PROJECT=$(grep -oE '"quota_project_id"[[:space:]]*:[[:space:]]*"[^"]+"' "$ADC_DIR/application_default_credentials.json" | head -1 | sed -E 's/.*"([^"]+)"$/\1/')
 ```
 
 `QUOTA_PROJECT` is the ADC quota project written by `gcloud auth application-default set-quota-project <id>`. **Required on every Search Console API call** — without the `x-goog-user-project` header, all calls return HTTP 403 with `reason: SERVICE_DISABLED` (Google Cloud APIs need a billable project even though Search Console API itself is free).
+
+**Why grep + sed instead of `jq`:** `jq` is the obvious tool for JSON extraction but it isn't on PATH in many bash environments (notably claude-code's Bash on Windows; minimal Linux containers; CI runners without explicit install). `grep -oE` + `sed -E` are part of bash core and always available. The trade-off is the regex is JSON-flat-only (works because `quota_project_id` is a top-level string field) — acceptable for this one-shot extraction.
 
 ### Search Analytics call shape
 

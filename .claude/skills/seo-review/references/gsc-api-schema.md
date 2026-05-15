@@ -63,7 +63,7 @@ x-goog-user-project: <ADC quota project ID>
 | Header | Required? | Source |
 |---|---|---|
 | `Authorization: Bearer <token>` | Always | `gcloud auth application-default print-access-token` |
-| `x-goog-user-project: <project_id>` | Always | `jq -r '.quota_project_id' "$ADC_DIR/application_default_credentials.json"` where `ADC_DIR` comes from `gcloud info --format="value(config.paths.global_config_dir)"` |
+| `x-goog-user-project: <project_id>` | Always | `grep -oE '"quota_project_id"[[:space:]]*:[[:space:]]*"[^"]+"' "$ADC_DIR/application_default_credentials.json" \| head -1 \| sed -E 's/.*"([^"]+)"$/\1/'` where `ADC_DIR` comes from `gcloud info --format="value(config.paths.global_config_dir)"`. (grep+sed used instead of `jq` since `jq` is not on PATH in many bash environments including claude-code's on Windows.) |
 | `Content-Type: application/json` | POST only | static |
 
 **Omitting `x-goog-user-project`** returns HTTP 403 with `error.status: PERMISSION_DENIED` and `details[*].reason: SERVICE_DISABLED`, even when the token is otherwise valid. The error message references the default consumer project (e.g., `projects/764086051850` — gcloud's shared client project) rather than the user's project. Diagnosis: this header is missing.
@@ -76,10 +76,10 @@ The orchestrator reads the ADC quota project from `application_default_credentia
 
 ```
 ADC_DIR=$(gcloud info --format="value(config.paths.global_config_dir)")
-QUOTA_PROJECT=$(jq -r '.quota_project_id // empty' "$ADC_DIR/application_default_credentials.json")
+QUOTA_PROJECT=$(grep -oE '"quota_project_id"[[:space:]]*:[[:space:]]*"[^"]+"' "$ADC_DIR/application_default_credentials.json" 2>/dev/null | head -1 | sed -E 's/.*"([^"]+)"$/\1/')
 ```
 
-`gcloud info` resolves the platform-specific config dir (Windows: `%APPDATA%\gcloud\`; macOS/Linux: `~/.config/gcloud/`). The `// empty` jq filter returns empty string if the field is absent (i.e., user hasn't run `set-quota-project`) — Step 1.6.3 catches this and surfaces remediation in the footer.
+`gcloud info` resolves the platform-specific config dir (Windows: `%APPDATA%\gcloud\`; macOS/Linux: `~/.config/gcloud/`). If the field is absent (i.e., user hasn't run `set-quota-project`), grep returns no match → `QUOTA_PROJECT` ends up empty → Step 1.6.3 catches this and surfaces remediation in the footer. Using `grep -oE` + `sed -E` instead of `jq` since `jq` is not on PATH in many bash environments — `application_default_credentials.json` is flat JSON where the field is a top-level string, so regex extraction is safe here.
 
 ---
 
