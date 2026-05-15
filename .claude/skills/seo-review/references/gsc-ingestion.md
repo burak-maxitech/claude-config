@@ -112,6 +112,173 @@ Per-row parsing pseudocode (executed by orchestrator in-context, line by line):
 
 ---
 
+## BigQuery ingestion (primary path for Performance)
+
+When `.seo-data/gsc/config.yaml` is present + filled + `bq` CLI works + ADC authenticated, **BigQuery replaces the CSV path for Performance only**. Indexing (the 9-reason report) remains CSV-only — Google's Bulk Data Export to BigQuery does not include indexing tables.
+
+See `bigquery-config-template.md` for config schema, `bigquery-schema.md` for table inventory + JSON encoding rules, `bigquery-queries.md` for the 5 SQL templates (Q1-Q5).
+
+### Activation conditions (4-state matrix interaction)
+
+The matrix in `SKILL.md` Step 1.6 (built in Phase 2) governs which Performance source wins. BigQuery is active when **all** of:
+
+1. `.seo-data/gsc/config.yaml` exists
+2. Required keys (`project_id`, `dataset_id`, `location`) are non-empty
+3. `bq --version` returns a version string (CLI installed; on Windows `bq.cmd` via gcloud SDK counts)
+4. `gcloud auth application-default print-access-token` returns a non-empty token (ADC configured)
+
+If any of these fails → fall through to CSV path (`.seo-data/gsc/performance/queries.csv` + `pages.csv`). Surface the specific blocker in the report footer.
+
+### BQ-configured-and-failing — NO silent CSV fallback
+
+When BQ is active per activation conditions BUT a Q1-Q5 query fails at runtime (auth revoked mid-run, schema drift, scan-cap exceeded, transient API error):
+
+- Print the exact `bq` error to the report footer
+- Skip the Performance signal entirely (digest empty for queries + pages)
+- **Do NOT fall back to Perf CSVs** even if they exist. This is intentional (per locked decision 10): when BQ is configured, BQ is the Performance source. Silent fallback to a different data window or set of rows would mask the failure.
+- Indexing CSVs still load and produce findings
+- The 4-state matrix reads the resulting state as "Performance-missing" → footer note (matches matrix row 2: Performance-only with Performance failed = Indexing-only)
+
+To restore Perf CSV behaviour, the user removes/empties `config.yaml`. The activation conditions then fail at step 1 and the CSV path takes over cleanly.
+
+### Query execution
+
+All 5 queries dispatch in a **single parallel Bash turn** (matches the existing Step 1.5/1.6 parallel-Read pattern for CSVs). Per-query Bash invocation:
+
+```
+bq query \
+  --use_legacy_sql=false \
+  --maximum_bytes_billed=1000000000 \
+  --format=json \
+  --location=<location_from_config> \
+  '<SQL_with_substituted_params>'
+```
+
+Per-query failure is non-fatal — the other queries' results are still consumed. Partial-coverage is surfaced in the footer per query (e.g., "Q3 url_impressions_map: failed — traffic_weight degraded to 1.0 for all findings").
+
+### Digest shape — byte-identical to CSV path
+
+The translator produces digests with the **same field names + same value types + same value semantics** as the CSV parser. Sub-dim catalog code (sub-dims 10, 11, 12 in the section below) reads either path's digest identically.
+
+**Queries digest** (replaces `performance/queries.csv` digest, consumed by sub-dim 11 `position_band_opportunity`):
+
+```
+[
+  {
+    query:       string,        // BQ row.query passthrough
+    impressions: number,        // Number(BQ row.impressions) — INT64 returns as quoted string
+    clicks:      number,        // Number(BQ row.clicks)
+    ctr:         number,        // parseFloat(BQ row.ctr) — decimal 0-1, NOT percentage
+    position:    number,        // parseFloat(BQ row.avg_position) — already 1-based per Q1 SQL
+  },
+  ... up to 50 rows, ordered by impressions desc, enforced by LIMIT 50 in Q1 SQL
+]
+```
+
+**Pages digest** (replaces `performance/pages.csv` digest, consumed by sub-dim 10 `ctr_opportunity` + feeds `page_type_map` + feeds traffic-orphan computation):
+
+```
+[
+  {
+    url:         string,
+    impressions: number,
+    clicks:      number,
+    ctr:         number,
+    position:    number,
+  },
+  ... up to 50 rows, ordered by impressions desc, enforced by LIMIT 50 in Q2 SQL
+]
+```
+
+**`url_impressions_map`** (replaces the URL→impressions mapping built from pages.csv; consumed by Step 6.6 `traffic_weight` computation + passed to all dispatched subagents):
+
+```
+{
+  "<url>": <impressions number>,
+  ...
+}
+// Uncapped (Q3 has no LIMIT). One row per URL with impressions >= 1.
+// Translator: for each Q3 row, parsed_map[row.url] = Number(row.impressions)
+```
+
+**Traffic-orphan computation** (sub-dim 12 `traffic_orphan`): same set-diff logic as CSV path — `sitemap_urls - keys(url_impressions_map)`. Q4 exists as a documentation point; in practice the orchestrator reuses Q3's keys for the diff.
+
+### JSON encoding rules (INT64 + FLOAT64 → string)
+
+`bq query --format=json` quotes every numeric column. Verified with the Q1 worked example:
+
+```json
+{
+  "query": "topkapi palace istanbul",
+  "impressions": "1092",        // INT64 → quoted string
+  "clicks": "0",                // INT64 → quoted string
+  "ctr": "0.0",                 // FLOAT64 → quoted string
+  "avg_position": "27.873626373626372"  // FLOAT64 → quoted string, 15-17dp precision
+}
+```
+
+The translator MUST cast every numeric field to JavaScript `Number` on ingest. Arithmetic on raw row fields silently concatenates strings (`row.impressions / row.clicks` returns `"1092/0"` → `NaN`, not `Infinity`).
+
+Display rounding: `position` and `ctr` are rounded to 2 decimal places for report rendering; full precision is preserved for arithmetic (median computation, ranking).
+
+### Median CTR computation (Pages digest → sub-dim 10)
+
+Same as v2 CSV path: after Q2's 50 rows are translated, compute `median_ctr` over all rows' `ctr` field. Sub-dim 10 fires on rows where `impressions >= 500 AND ctr < (median_ctr * 0.5)`.
+
+Edge case (verified against user's Topkapi sample): if all rows have `ctr = 0` (new site, no clicks yet), `median_ctr = 0` → threshold = 0 → no row has `ctr < 0` → no findings emitted. Correct behaviour — zero-CTR site doesn't trigger false CTR-opportunity findings.
+
+### page_type_map sources (BQ path)
+
+Same composition as CSV path:
+
+1. **Top-50 URLs from Q2 Pages digest** (matches CSV path's "URLs in performance/pages.csv top 50 by impressions") — NOT all URLs from Q3's uncapped url_impressions_map
+2. URLs from indexing CSVs (unchanged from v2)
+3. URLs from sitemap probe (Step 3.2)
+
+Classification logic (path-pattern → page_type) is unchanged from the existing `page_type_map building` section below.
+
+Why cap at top-50 instead of using Q3's uncapped set: the classification work is bounded, the subagent context size stays predictable, and Q3's uncapped result exists for traffic_weight lookups at finding-emission time (a different use case where misses gracefully fall through to `traffic_weight = 1.0`).
+
+### Freshness policy (BQ-specific)
+
+Q5 returns `latest_data_date`. Compute `days_old = (current_date - latest_data_date).days`. Thresholds match the CSV mtime policy:
+
+| `days_old` | Behaviour |
+|---|---|
+| ≤ 30 | Fresh — no annotation. (Note: GSC's pipeline lags real-time by ~2 days, so a freshly-running export typically shows `days_old = 2` — still fresh.) |
+| 30 - 90 | Footer warning: `BigQuery export stale — latest data_date YYYY-MM-DD (N days old). Verify export is still running in GSC Settings > Bulk data export.` |
+| > 90 | Footer warning escalates: `BigQuery export significantly stale — latest data_date YYYY-MM-DD (N days old). Recommendations may not reflect recent GSC state.` |
+
+Never blocks the run. `partition_count == 1` in Q5 output is normal for a freshly-enabled export (one day of data so far) — not an error.
+
+### Edge cases
+
+| Case | Behaviour |
+|---|---|
+| Q1 returns 0 rows (no queries pass HAVING — small site or strict filters) | Empty queries digest. Sub-dim 11 emits no findings. No error. |
+| Q2 returns 0 rows (no URLs meet impression floor) | Empty pages digest. Sub-dim 10 emits no findings. `page_type_map` source #1 empty (sources #2 + #3 still feed). No error. |
+| All Q2 rows have `ctr = 0` (new site) | Median = 0 → threshold = 0 → no sub-dim 10 findings emitted. Correct — no false positives. |
+| Q3 returns >10k rows (large site) | Translator stores the full map; size scales to ~200KB JSON for 10k URLs. Subagent context budget can handle this; if a future site exceeds, cap with `LIMIT` in Q3 SQL (not yet needed). |
+| Q5 reports `latest_data_date = NULL` (table empty) | Treat as max-staleness; surface footer warning `BigQuery dataset present but no data — wait ~2 days after enabling GSC export`. Skip Performance signal. Indexing CSVs still load. |
+| Anonymized-query rows leak through (filter logic error) | Defense-in-depth: translator also drops rows where `query` is empty string. Should never happen given Q1's WHERE filter, but cheap to enforce. |
+
+### Failure mode summary
+
+| Stage | Failure | Effect |
+|---|---|---|
+| Pre-query | `bq` not installed | Fall through to CSV path (activation condition 3 fails) |
+| Pre-query | ADC not authenticated | Fall through to CSV path (activation condition 4 fails) |
+| Pre-query | `config.yaml` keys empty | Fall through to CSV path (activation condition 2 fails) |
+| Query runtime | `Access Denied` on dataset | Print error + skip Performance, no silent CSV fallback |
+| Query runtime | Schema drift (column not found) | Print error + skip Performance + footer note pointing to `bigquery-schema.md` |
+| Query runtime | Scan-cap exceeded (>1 GB) | Print error + suggest reducing `lookback_days` + skip Performance |
+| Query runtime | Transient API error (timeout, 5xx) | Print error + skip Performance (don't retry — re-run the skill) |
+| Per-query partial | Q1 fails but Q2-Q5 succeed | Empty queries digest + footer note. Pages + url_impressions_map still produced. |
+
+All failure modes are non-fatal to the run — `/seo-review` always produces a score + report.
+
+---
+
 ## Digest caps (per CSV)
 
 Each CSV's parsed rows are reduced to a **digest** of at most **50 rows** before being passed to the `seo-gsc-insights` subagent. This keeps prompt size bounded.
