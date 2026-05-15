@@ -2,7 +2,7 @@
 
 Loaded by the orchestrator (Step 1.6) when the Search Console API is the configured Performance + Indexing ingestion path. This file is the **source-of-truth endpoint inventory + auth contract + enum reference** that `gsc-api-queries.md` and the SKILL.md dispatcher reference.
 
-For ingestion behaviour, digest shape, and the 12 sub-dim catalog, see `gsc-ingestion.md` (the "API ingestion" subsection is the byte-identical translation contract). For SQL-equivalent call templates, see `gsc-api-queries.md`. For config layout, see `bigquery-config-template.md` (config.yaml schema — `site_url` is the API path's required key; BQ keys remain for the alternative BQ path).
+For ingestion behaviour, digest shape, and the 12 sub-dim catalog, see `gsc-ingestion.md` (the "API ingestion contract" section is the digest contract). For call templates, see `gsc-api-queries.md`. The skill's config layout is documented in `gsc-setup-readme-template.md` — `site_url` is the single required key in `config.yaml`.
 
 **Schema source:** Google's published API references — [Search Analytics: searchanalytics.query](https://developers.google.com/webmaster-tools/v1/searchanalytics/query) + [URL Inspection: urlInspection.index.inspect](https://developers.google.com/webmaster-tools/v1/urlInspection/index/inspect) + [Sites: list](https://developers.google.com/webmaster-tools/v1/sites/list). Verified against documentation as of 2026-05-15. **Live-verification deferred to Phase 4 real-world dogfood** (requires gcloud SDK install on user's machine — not blocking Phase 0/1/2/3 work).
 
@@ -12,7 +12,7 @@ For ingestion behaviour, digest shape, and the 12 sub-dim catalog, see `gsc-inge
 
 The Search Console API exposes three endpoints used by `/seo-review`:
 
-| Endpoint | Purpose | Queried by v3.x? |
+| Endpoint | Purpose | Queried by the skill? |
 |---|---|---|
 | `POST https://www.googleapis.com/webmasters/v3/sites/{siteUrl}/searchAnalytics/query` | Performance — queries/pages/impressions/CTR/position | **Yes** (Q1, Q2, Q3) |
 | `POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect` | Per-URL indexing diagnostics — `coverageState`, `pageFetchState`, canonicals, last crawl, mobile usability, rich results | **Yes** (one call per inspected URL, up to 100/run) |
@@ -28,7 +28,7 @@ The Search Console API exposes three endpoints used by `/seo-review`:
 
 Single scope required: `https://www.googleapis.com/auth/webmasters.readonly`
 
-This scope provides read-only access to all three endpoints. No write permissions required for v3.x — the skill never modifies GSC state.
+This scope provides read-only access to all three endpoints. No write permissions required — the skill never modifies GSC state.
 
 ### ADC setup (gcloud SDK)
 
@@ -55,7 +55,7 @@ All three endpoints accept the token via the `Authorization` header:
 Authorization: Bearer ya29.xxx...
 ```
 
-No alternative auth (API keys, service-account inline auth) supported by v3.x — ADC only.
+No alternative auth (API keys, service-account inline auth) supported — ADC only.
 
 ---
 
@@ -113,7 +113,7 @@ Content-Type: application/json
 
 **Date range**: rolling 16 months. `startDate` cannot be more than 16 months before `endDate`. Older dates return empty result silently (no error).
 
-**Search type filter**: v3.x defaults to `type: "web"` only (matches GSC UI's default and v2/v3 CSV behavior). Future versions may aggregate across types.
+**Search type filter**: defaults to `type: "web"` only (matches GSC UI's default behavior). Future versions may aggregate across image/video/news/discover types.
 
 ### Response
 
@@ -132,17 +132,17 @@ Content-Type: application/json
 }
 ```
 
-**Field types** — IMPORTANT difference from BigQuery JSON encoding:
+**Field types**:
 
 | Field | JSON type | Translation |
 |---|---|---|
 | `keys[*]` | string array | passthrough |
-| `clicks` | **JSON number** (not quoted) | passthrough — no cast needed |
-| `impressions` | **JSON number** | passthrough |
-| `ctr` | **JSON number** (decimal 0-1) | passthrough |
-| `position` | **JSON number** (1-based decimal) | passthrough |
+| `clicks` | JSON number (not quoted) | passthrough — no cast needed |
+| `impressions` | JSON number | passthrough |
+| `ctr` | JSON number (decimal 0-1) | passthrough |
+| `position` | JSON number (1-based decimal) | passthrough |
 
-Unlike BigQuery's `bq query --format=json` (which quotes every INT64/FLOAT64 as strings), the Search Analytics API returns native JSON numbers. Translation is simpler.
+All numeric fields are native JSON numbers — no string-to-number cast needed during translation.
 
 **Empty rows**: when no data matches, `rows` is omitted from the response entirely. Treat absence of `rows` as `rows: []`.
 
@@ -150,11 +150,11 @@ Unlike BigQuery's `bq query --format=json` (which quotes every INT64/FLOAT64 as 
 
 `rowLimit` is capped server-side at **25,000 per call**. Higher values are silently clamped to 25,000. For Q3 (`url_impressions_map`) on >25k-URL sites, the map silently truncates. Documented in `gsc-ingestion.md` "API ingestion → Plan-agent B1".
 
-Pagination via `startRow` is supported (`startRow + rowLimit` retrieves the next batch), but v3.x doesn't paginate per Locked Decision 5 — single call, accept the cap.
+Pagination via `startRow` is supported (`startRow + rowLimit` retrieves the next batch), but the skill doesn't paginate — single call, accept the cap.
 
 ### Position-band filter (Q1 — client-side)
 
-The API's `dimensionFilterGroups` supports filters on dimensions (query/page/country/device) but **NOT** on `position`. v3.x applies the position-band filter (5-20) and impression-floor filter (≥100) client-side after the response is received.
+The API's `dimensionFilterGroups` supports filters on dimensions (query/page/country/device) but **NOT** on `position`. The skill applies the position-band filter (5-20) and impression-floor filter (≥100) client-side after the response is received.
 
 ---
 
@@ -176,7 +176,7 @@ Content-Type: application/json
 
 **Required**: `inspectionUrl`, `siteUrl`. **Note**: `siteUrl` here is a **request body field** (not a path parameter — no URL encoding needed). Use the raw string format.
 
-**Optional**: `languageCode` for localized issue messages. v3.x doesn't use issue messages, so this is left default.
+**Optional**: `languageCode` for localized issue messages. The skill doesn't use issue messages, so this is left default.
 
 **Constraint**: `inspectionUrl` MUST belong to the property identified by `siteUrl`. Cross-property inspection returns HTTP 400.
 
@@ -211,9 +211,9 @@ Content-Type: application/json
 }
 ```
 
-`indexStatusResult` is the primary block consumed by v3.x. `mobileUsabilityResult` and `richResultsResult` are present in response but not aggregated in v3.x (deferred to v3.y for mobile-usability sub-dim + rich-result-validation sub-dim).
+`indexStatusResult` is the primary block consumed by the skill. `mobileUsabilityResult` and `richResultsResult` are present in response but not aggregated (deferred — would add mobile-usability + rich-result-validation sub-dims; each needs rubric weight allocation).
 
-### `indexStatusResult` fields used by v3.x
+### `indexStatusResult` fields used by the skill
 
 | Field | Type | Used for |
 |---|---|---|
@@ -358,12 +358,12 @@ If condition 3 fails: surface "you have invite-only access; ask the owner to ver
 
 Per Plan-agent B3. The 600 QPM on URL Inspection per-project is the binding constraint, not 1,200 QPM general.
 
-**v3.x usage profile per `/seo-review` run:**
+**Usage profile per `/seo-review` run:**
 - Search Analytics: 3 calls (Q1, Q2, Q3) — well under any limit
 - URL Inspection: ≤100 calls in a single parallel batch — burst fits in <1 minute (100 / 600 QPM ≈ 10 seconds wall time worst case)
 - Sites list: 1 call (auth probe)
 
-Total: ≤104 calls per run. Multiple runs per day on the same property: still well under 2,000/day. Multi-property concerns deferred to v3.x.x.
+Total: ≤104 calls per run. Multiple runs per day on the same property: still well under 2,000/day. Multi-property concerns deferred to future.
 
 ---
 
@@ -391,7 +391,7 @@ All endpoints return errors via a consistent envelope:
 
 **Stable parsing rule**: parse on `error.code` (HTTP status) + `error.status` (gRPC-style canonical name). The `message` text is human-readable and varies between per-minute/per-day quota exhaustion.
 
-### Error codes used by v3.x
+### Error codes used by the skill
 
 | `error.code` | `error.status` | Meaning | Skill behavior |
 |---|---|---|---|
@@ -410,7 +410,7 @@ All endpoints return errors via a consistent envelope:
 When an endpoint returns an error mentioning an unknown field, or when a `coverageState` value is not in our lookup table:
 
 1. Surface the exact error verbatim in the report footer
-2. Log: `Search Console API schema drift detected — field/enum '<X>' missing or new. v3.x schema was validated against Google API docs as of 2026-05-15. Re-validate against current docs: https://developers.google.com/webmaster-tools/v1/`
+2. Log: `Search Console API schema drift detected — field/enum '<X>' missing or new. Schema was validated against Google API docs as of 2026-05-15. Re-validate against current docs: https://developers.google.com/webmaster-tools/v1/`
 3. Skip the affected signal for this run (no silent fallback)
 4. Continue with other API signals + other paths if applicable
 
@@ -420,16 +420,16 @@ DO NOT auto-retry with different params. DO NOT mark run partial-success silentl
 
 ---
 
-## What v3.x does NOT do (deferred to v3.x.x or later)
+## What's NOT done (deferred)
 
 | Capability | Why deferred |
 |---|---|
-| Multi-property dispatch (multiple `site_url` entries) | v3.x is single-property. Multi-property deferred (matrix complexity + property-selection UX). |
-| Image/Video/News/Discover search type queries | v3.x queries `type: "web"` only. Matches v2/v3 implicit behavior. Other types = future. |
+| Multi-property dispatch (multiple `site_url` entries) | the skill is single-property. Multi-property deferred (matrix complexity + property-selection UX). |
+| Image/Video/News/Discover search type queries | Skill queries `type: "web"` only. Other types deferred — most SEO/GEO findings target web search. |
 | Country/device dimension splits | Adds dimensional noise without v1 finding emission. Deferred. |
-| Mobile usability findings (`mobileUsabilityResult` block from URL Inspection) | New sub-dim category — needs rubric weight allocation. v3.x.x. |
-| Rich-result validation findings (`richResultsResult` block) | Same as above — new sub-dim. v3.x.x. |
-| `dataState: "final"` vs `"all"` toggle | v3.x uses default (`all` — includes fresh partial data). v3.x.x may expose as config option. |
-| Custom date range (vs `lookback_days`) | v3.x uses `lookback_days` (default 90) from config.yaml. Custom date range = future. |
-| Pagination beyond rowLimit=25000 (per locked decision 5) | Accept silent truncation on >25k-URL sites; BQ alternative path remains uncapped. |
-| `sitemaps.list` / `sitemaps.get` (sitemap submission status) | Tier 2 — sitemap probe in Step 3.2 already covers URL health. v3.x.x for submission-status integration. |
+| Mobile usability findings (`mobileUsabilityResult` block from URL Inspection) | New sub-dim category — needs rubric weight allocation. future. |
+| Rich-result validation findings (`richResultsResult` block) | Same as above — new sub-dim. future. |
+| `dataState: "final"` vs `"all"` toggle | the skill uses default (`all` — includes fresh partial data). future may expose as config option. |
+| Custom date range (vs `lookback_days`) | the skill uses `lookback_days` (default 90) from config.yaml. Custom date range = future. |
+| Pagination beyond rowLimit=25000 | Accept silent truncation on >25k-URL sites; `traffic_weight` falls through to 1.0 for URLs not in the top-25k. |
+| `sitemaps.list` / `sitemaps.get` (sitemap submission status) | Tier 2 — sitemap probe in Step 3.2 already covers URL health. future for submission-status integration. |

@@ -9,18 +9,18 @@ After the report is built, group findings into 6 phases (indexing & crawl hygien
 1. **Phase 1: Indexing & Crawl Hygiene** (sitemap probe 4xx/5xx + GSC `not_found_404` + `redirect_hygiene` + `server_errors` + `soft_404` clusters)
 2. **Phase 2: Quick wins** (allowlist-eligible mechanical scaffolds)
 3. **Phase 3: Structural improvements** (heading hierarchy, internal linking, redirect chains)
-4. **Phase 4: Content rewrites** (titles, meta descriptions, alt text — human judgment required, GSC-prioritized when CSVs present)
+4. **Phase 4: Content rewrites** (titles, meta descriptions, alt text — human judgment required, GSC-prioritized when API is configured)
 5. **Phase 5: Structured data buildout** (JSON-LD per content type)
 6. **Phase 6: Generative-engine optimization** (llms.txt + E-E-A-T + AI-citability)
 
 ## Phase 1 — Indexing & Crawl Hygiene
 
-Surface findings from **both** the sitemap URL probe (Step 3.2) and the GSC indexing CSVs (`seo-gsc-insights` subagent when GSC mode enabled). Order by severity, then by traffic impact when GSC data is present (`impressions × certainty / effort_weight` for GSC findings; URL-health probe findings stay at the top because they have direct score impact).
+Surface findings from **both** the sitemap URL probe (Step 3.2) and the GSC URL Inspection clusters (`seo-gsc-insights` subagent when GSC mode enabled). Order by severity, then by traffic impact when GSC data is present (`impressions × certainty / effort_weight` for GSC findings; URL-health probe findings stay at the top because they have direct score impact).
 
 **Source signals folded into Phase 1:**
 - `technical_seo.url_health` findings from sitemap probe (Step 3.2): 4xx, 5xx, redirect-chain
 - `gsc_insights.not_found_404` cluster from GSC (often a superset of the probe-sample, since GSC sees URLs the probe didn't reach)
-- `gsc_insights.redirect_hygiene` cluster (sitemap entries pointing to redirected URLs — from `indexing/page-with-redirect.csv`)
+- `gsc_insights.redirect_hygiene` cluster (sitemap entries pointing to redirected URLs — from GSC URL Inspection)
 - `gsc_insights.server_errors` cluster
 - `gsc_insights.soft_404` cluster
 
@@ -47,20 +47,20 @@ When a GSC `not_found_404` cluster carries `routing_rename_match: true` (Phase 4
 **1.2** Bulk 404 cluster: /blog/2023/* (12 URLs) — matches recent routing rename
 
 Detection:
-- 12 URLs under /blog/2023/* return 404 at Google's view (from indexing/not-found-404.csv).
+- 12 URLs under /blog/2023/* return 404 at Google's view (from GSC URL Inspection — not_found_404 cluster).
 - Git history (last 35 days) shows a rename: src/content/posts/* → src/app/blog/* on 2026-04-10 (commit ghi789, "restructure blog routing").
 - Affected URL pattern: /blog/2023/<slug> — derived from old paths src/content/posts/2023/<slug>.md.
 
 Hand-off:
 \`\`\`
-/plan-feature "12 URLs under /blog/2023/* now return 404 at Google's view (from .seo-data/gsc/indexing/not-found-404.csv). Git history shows commit ghi789 on 2026-04-10 ('restructure blog routing') renamed src/content/posts/2023/* → src/app/blog/*. Investigate whether the renamed paths map 1:1 to new URLs:
+/plan-feature "12 URLs under /blog/2023/* now return 404 at Google's view (from GSC URL Inspection — not_found_404 cluster). Git history shows commit ghi789 on 2026-04-10 ('restructure blog routing') renamed src/content/posts/2023/* → src/app/blog/*. Investigate whether the renamed paths map 1:1 to new URLs:
 
 1. Pick 3 sample URLs from the 404 list. For each, find the corresponding new URL by searching src/app/blog/ for matching slug.
 2. If 1:1 mapping confirmed (3 of 3 samples found) → write bulk 301 redirects in next.config.js redirects() function mapping /blog/2023/<slug> → /blog/<slug>. Also remove 404 entries from public/sitemap.xml.
 3. If mapping is NOT 1:1 (some slugs missing, restructured) → for each missing URL, decide per-URL: redirect to closest match, redirect to /blog/ index, or accept as gone (remove from sitemap).
 4. Verify all 12 with parallel curl after deploy. Re-run /seo-review in 2-3 weeks to confirm GSC has caught up.
 
-Sample affected URLs: <list 5 from the cluster>. Full list: see .seo-data/gsc/indexing/not-found-404.csv."
+Sample affected URLs: <list 5 from the cluster>. Full list: see GSC URL Inspection — not_found_404 cluster."
 \`\`\`
 ```
 
@@ -71,7 +71,7 @@ When `routing_rename_match: false` on a `not_found_404` cluster, fall back to th
 
 Hand-off:
 \`\`\`
-/plan-feature "12 blog posts under /blog/2023/* return 404 at Google's view (from .seo-data/gsc/indexing/not-found-404.csv). No matching rename detected in the last 35 days of git history. Investigate whether (a) the year-2023 folder was deliberately retired — if so, remove all 12 entries from sitemap.xml, (b) they were moved to a new structure (e.g., /blog/<slug> flat) — if so, add 301 redirects in bulk via the framework redirects config and update sitemap entries, (c) they should be restored from a backup. Sample URLs: /blog/2023/jan-update, /blog/2023/feb-update, /blog/2023/march-roundup. Verify all 12 with a parallel curl after fix."
+/plan-feature "12 blog posts under /blog/2023/* return 404 at Google's view (from GSC URL Inspection — not_found_404 cluster). No matching rename detected in the last 35 days of git history. Investigate whether (a) the year-2023 folder was deliberately retired — if so, remove all 12 entries from sitemap.xml, (b) they were moved to a new structure (e.g., /blog/<slug> flat) — if so, add 301 redirects in bulk via the framework redirects config and update sitemap entries, (c) they should be restored from a backup. Sample URLs: /blog/2023/jan-update, /blog/2023/feb-update, /blog/2023/march-roundup. Verify all 12 with a parallel curl after fix."
 \`\`\`
 ```
 
@@ -84,7 +84,7 @@ GSC `server_errors` findings indicate Google encountered 5xx during crawl. These
 
 Hand-off:
 \`\`\`
-/plan-feature "3 URLs returned 5xx errors when Google crawled (from .seo-data/gsc/indexing/server-error-5xx.csv): /api/legacy-export (2026-04-18), /products/large-catalog (2026-04-22), /search?q=<long-query> (2026-04-25). Cross-reference server logs around those timestamps. Common causes: deployment-window errors, timeouts on heavy pages, dependency outages. If errors persist, harden the endpoints; if transient, no fix needed but worth knowing."
+/plan-feature "3 URLs returned 5xx errors when Google crawled (from GSC URL Inspection — server_errors cluster): /api/legacy-export (2026-04-18), /products/large-catalog (2026-04-22), /search?q=<long-query> (2026-04-25). Cross-reference server logs around those timestamps. Common causes: deployment-window errors, timeouts on heavy pages, dependency outages. If errors persist, harden the endpoints; if transient, no fix needed but worth knowing."
 \`\`\`
 ```
 
@@ -97,7 +97,7 @@ Soft 404s (Google detected empty/error content despite 200 status) need renderin
 
 Hand-off:
 \`\`\`
-/plan-feature "N URLs return 200 OK but Google detected empty/error content (from .seo-data/gsc/indexing/soft-404.csv): <list>. Visit each URL in a browser — pages may be loading stub/placeholder/error content that returns 200. Either fix the rendering so real content loads (preferred — these URLs may have legitimate intent), or set proper 404 status when content is missing. Common SPA pattern: client-side router renders 'not found' message but the HTML response is 200."
+/plan-feature "N URLs return 200 OK but Google detected empty/error content (from GSC URL Inspection — soft_404 cluster): <list>. Visit each URL in a browser — pages may be loading stub/placeholder/error content that returns 200. Either fix the rendering so real content loads (preferred — these URLs may have legitimate intent), or set proper 404 status when content is missing. Common SPA pattern: client-side router renders 'not found' message but the HTML response is 200."
 \`\`\`
 ```
 
@@ -173,7 +173,7 @@ Hand-off (GSC enabled — traffic visible):
 4. src/app/about/page.tsx (1,800 impressions, CTR 0.8%)
 5-12. [lower-traffic pages, full list from findings]
 
-Each description should be 150-160 chars, summarize the page's value, use action-oriented language. Reference the page's H1, first paragraph, AND the top 3-5 queries from .seo-data/gsc/performance/queries.csv filtered by this URL when writing — those are the actual search intents driving impressions. Goal: recover ~3 points on On-Page SEO + lift CTR on the top-traffic pages toward the site median."
+Each description should be 150-160 chars, summarize the page's value, use action-oriented language. Reference the page's H1, first paragraph, AND the top 3-5 queries from GSC Search Analytics Q1 queries digest filtered by this URL when writing — those are the actual search intents driving impressions. Goal: recover ~3 points on On-Page SEO + lift CTR on the top-traffic pages toward the site median."
 \`\`\`
 
 Hand-off (GSC disabled — alphabetical):
@@ -204,14 +204,14 @@ When `gsc_mode: enabled` AND the GSC scan emitted `ctr_opportunity` findings:
 
 Hand-off:
 \`\`\`
-/plan-feature "Rewrite <title> and <meta name='description'> for N pages identified as high-impressions / low-CTR by GSC (from .seo-data/gsc/performance/pages.csv):
+/plan-feature "Rewrite <title> and <meta name='description'> for N pages identified as high-impressions / low-CTR by GSC (from GSC Search Analytics Q2 pages digest):
 
 1. /pricing (12,420 imps, 0.4% CTR vs 1.8% median, position 4.2)
 2. /docs/getting-started (8,100 imps, 0.9% CTR, position 5.7)
 3. /blog/llms-explained (6,400 imps, 1.1% CTR, position 6.1)
 [...]
 
-For each, pull the top 3-5 queries from .seo-data/gsc/performance/queries.csv that drive impressions to this URL. Rewrite title + meta to address those specific search intents. Target: lift CTR to at least the median (1.8%). If half the pages reach median CTR, estimated +200-400 clicks/month."
+For each, pull the top 3-5 queries from GSC Search Analytics Q1 queries digest that drive impressions to this URL. Rewrite title + meta to address those specific search intents. Target: lift CTR to at least the median (1.8%). If half the pages reach median CTR, estimated +200-400 clicks/month."
 \`\`\`
 ```
 
@@ -222,7 +222,7 @@ For each, pull the top 3-5 queries from .seo-data/gsc/performance/queries.csv th
 
 Hand-off:
 \`\`\`
-/plan-feature "Improve on-page signals for N queries currently ranking at position 5-20 (from .seo-data/gsc/performance/queries.csv):
+/plan-feature "Improve on-page signals for N queries currently ranking at position 5-20 (from GSC Search Analytics Q1 queries digest):
 
 1. 'best widgets' (4,200 imps, position 8.3, 2.1% CTR)
 2. 'how to configure widgets' (2,100 imps, position 11.4, 1.5%)

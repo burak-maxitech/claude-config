@@ -68,7 +68,7 @@ Per-call failure is non-fatal. Failed call's signal is skipped; other calls proc
 
 ## Q1 — Queries digest (top-50, position 5-20, imps ≥ 100)
 
-**Replaces v2's `performance/queries.csv` digest + v3's BQ Q1.** Emits queries where the site ranks in the "page 2 / low page 1" band — the high-leverage band for on-page optimization.
+Emits queries where the site ranks in the "page 2 / low page 1" band — the high-leverage band for on-page optimization.
 
 ### Request body
 
@@ -84,7 +84,7 @@ Per-call failure is non-fatal. Failed call's signal is skipped; other calls proc
 
 ### Client-side post-processing
 
-The API does not support a `position`-range filter via `dimensionFilterGroups`. v3.x applies the HAVING-equivalent filter after receiving the response:
+The API does not support a `position`-range filter via `dimensionFilterGroups`. The skill applies the HAVING-equivalent filter after receiving the response:
 
 ```
 filter rows where:
@@ -110,7 +110,7 @@ Consumed by sub-dim 11 `position_band_opportunity` (trigger: rows with `impressi
 
 ## Q2 — Pages digest (top-50 by impressions)
 
-**Replaces `performance/pages.csv` digest + BQ Q2.** Emits the highest-traffic pages with their aggregate CTR + position. Feeds the median-CTR baseline for sub-dim 10 `ctr_opportunity`.
+Emits the highest-traffic pages with their aggregate CTR + position. Feeds the median-CTR baseline for sub-dim 10 `ctr_opportunity`.
 
 ### Request body
 
@@ -153,7 +153,7 @@ Edge case (all-zero CTR): `median_ctr = 0` → threshold = 0 → no sub-dim 10 f
 
 ## Q3 — `url_impressions_map` (all-URL → impressions, for traffic_weight)
 
-**Replaces BQ Q3.** Uncapped attempt — all URLs with impressions ≥ 1 in the window. Result becomes the `url_impressions_map` consumed by Step 6.6 `traffic_weight` formula.
+Uncapped attempt — all URLs with impressions ≥ 1 in the window. Result becomes the `url_impressions_map` consumed by Step 6.6 `traffic_weight` formula.
 
 ### Request body
 
@@ -167,7 +167,7 @@ Edge case (all-zero CTR): `median_ctr = 0` → threshold = 0 → no sub-dim 10 f
 }
 ```
 
-(Same request shape as Q2 — they could collapse to a single call. Kept separate for narrative parallelism with v3 BQ Q1-Q5 structure and to allow independent failure handling.)
+(Same request shape as Q2 — they could collapse to a single call. Kept separate to allow independent failure handling: Q2 captures the top-50 digest; Q3 captures the full impressions map for `traffic_weight` lookups across the whole audit.)
 
 ### Client-side post-processing
 
@@ -259,7 +259,7 @@ After dedup, hard cap at 100. If fewer than 100 candidates after dedup, the budg
 - Sitemap probe disabled (no `--url` + relative sitemap URLs): skip the 30-URL bucket; redirect budget to remaining sources (up to 80 from impressions + 20 from git)
 - Step 1.5 git-history shallow or scan failed: skip the 20-URL bucket
 
-When all three sources are empty: skip URL Inspection batch entirely. Footer notes "0 URLs to inspect — no high-priority candidates this run." No indexing findings emitted via API; if indexing CSVs are present they fall through to CSV path. If not: indexing signal empty for this run.
+When all three sources are empty: skip URL Inspection batch entirely. Footer notes "0 URLs to inspect — no high-priority candidates this run." No indexing findings emitted this run.
 
 ### Pre-flight budget log
 
@@ -328,21 +328,23 @@ finding = {
 }
 ```
 
-**Important `total_count` semantics for API path**: `total_count` is the **inspected-URL-count**, not site-wide truth. If 100 URLs were inspected and 12 matched `crawled_not_indexed`, the finding says "12 of 100 inspected pages...". This is more conservative than v2 CSV path (which had site-wide counts). The finding title surfaces this:
+**Important `total_count` semantics**: `total_count` is the **inspected-URL-count**, not site-wide truth. If 100 URLs were inspected and 12 matched `crawled_not_indexed`, the finding says "12 of 100 inspected pages...". The finding title surfaces this explicitly:
 
 > "12 of 100 inspected pages crawled-not-indexed (content quality signal — sampled from highest-impression + sitemap-failure + recent-change URLs)"
 
 ---
 
-## Sub-dim 1 (`indexing_coverage`) — special case
+## Sub-dim 1 (`indexing_coverage`) — informational only
 
-v2's sub-dim 1 (`indexing_coverage`) emits a single headline finding from `indexing/summary.csv` — site-wide non-index rate. **The API path cannot compute this directly** (URL Inspection is per-URL, no site-wide aggregate).
+Sub-dim 1's site-wide non-index rate **cannot be computed reliably from per-URL inspection results** (URL Inspection is per-URL; you'd need the full sitemap inspected to extrapolate to a site-wide rate).
 
-API-path behavior for sub-dim 1:
-- If indexing CSV `indexing/summary.csv` is ALSO present alongside API → use the CSV (more accurate)
-- If only API → emit a "limited indexing coverage view" footer note: `Site-wide indexing coverage rate requires indexing/summary.csv (API path is per-URL only). N of M inspected pages are not indexed.` No score-headline finding; informational only.
+Behavior: emit an informational footer note when ≥1 inspected URL has `coverageState != "Submitted and indexed"`:
 
-Alternative interpretation: skip sub-dim 1 entirely in API-only mode. Subagent docs note this explicitly. Sub-dims 2-9 carry the indexing-cluster signals; sub-dim 1 is the umbrella headline that's hard to reconstruct from inspection-only data.
+```
+Of N inspected pages, M ({M/N*100}%) are not indexed cleanly. See sub-dims 2-9 for per-reason breakdown.
+```
+
+No score-headline finding emitted. Sub-dims 2-9 carry the cluster-level signals; the site-wide umbrella rate isn't reliably computable from a sampled subset.
 
 ---
 
@@ -369,7 +371,7 @@ If Q3 fails: `url_impressions_map` empty → `traffic_weight = 1.0` everywhere �
 
 ### Auth probe 429
 
-Highly unlikely on a 1-call probe. If it happens: surface "GSC API quota exhausted on probe — retry later" + fall through to BQ / CSV path.
+Highly unlikely on a 1-call probe. If it happens: surface "GSC API quota exhausted on probe — retry later" + fall through to heuristic-only mode.
 
 ---
 
@@ -398,15 +400,15 @@ If both Performance + Indexing signals are needed, the Step 1.6 dispatcher fires
 
 ---
 
-## What v3.x does NOT do in queries (deferred)
+## What's NOT done in queries (deferred)
 
 | Capability | Why deferred |
 |---|---|
-| Country/device dimension splits in Q1-Q3 | Dimensional explosion without v1 finding emission. v3.x.x. |
-| Pagination beyond rowLimit=25000 | Accept silent truncation; BQ alternative remains uncapped. |
-| Discover impressions (`type: "discover"`) | v1 catalog scope is web/image/video. v3.x.x. |
-| Rich-result aggregation queries | URL Inspection's `richResultsResult` block exists but not aggregated. v3.x.x. |
-| `mobileUsabilityResult` aggregation | Same — new sub-dim category. v3.x.x. |
-| Custom inspection URL list (user-supplied via config) | v3.x uses algorithmic selection only. v3.x.x may add `inspection_urls:` config key. |
-| Per-day time-series (`dimensions: ["date"]`) | Trend findings need separate digest shape. v3.x.x. |
-| Sitemap submission status (`sitemaps.list`) | Sitemap probe in Step 3.2 covers URL health. v3.x.x for submission-status integration. |
+| Country/device dimension splits in Q1-Q3 | Dimensional explosion without v1 finding emission. future. |
+| Pagination beyond rowLimit=25000 | Accept silent truncation; `traffic_weight = 1.0` fallback covers URLs not in the top-25k. |
+| Discover impressions (`type: "discover"`) | v1 catalog scope is web/image/video. future. |
+| Rich-result aggregation queries | URL Inspection's `richResultsResult` block exists but not aggregated. future. |
+| `mobileUsabilityResult` aggregation | Same — new sub-dim category. future. |
+| Custom inspection URL list (user-supplied via config) | Skill uses algorithmic selection only. May add `inspection_urls:` config key later. |
+| Per-day time-series (`dimensions: ["date"]`) | Trend findings need separate digest shape. future. |
+| Sitemap submission status (`sitemaps.list`) | Sitemap probe in Step 3.2 covers URL health. future for submission-status integration. |
