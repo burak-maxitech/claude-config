@@ -428,6 +428,7 @@ After Turn 2 returns, walk results per `references/gsc-ingestion.md` "API ingest
 - Map API row fields → digest field names: `keys[0]` → `query` (Q1) or `url` (Q2/Q3); `impressions` / `clicks` / `ctr` / `position` passthrough.
 - Apply client-side filters: Q1 keeps `impressions >= 100 AND position BETWEEN 5.0 AND 20.0`; Q2 keeps `impressions >= 10`. Sort by impressions desc, take top 50.
 - Q3's full result becomes `url_impressions_map`. **Silent truncation at rowLimit=25000** for sites with >25k URLs (documented in `gsc-api-schema.md`).
+- **Cap-hit capture**: for each of Q1/Q2/Q3, record `rows_received` (len of `rows` array) and `rowLimit_requested` (what the call sent). Stash as `{q1: {received, limit}, q2: {...}, q3: {...}}` for Step 1.6.12 footer rendering. Cap-hit = `received == limit`, surfaces as a truncation warning. False-positive case (sample size genuinely equals limit) is accepted — the warning is "likely truncated", actionable as a follow-up pagination probe, not a hard error.
 
 **URL Inspection output**:
 - Walk each `inspectionResult.indexStatusResult`, apply the `coverageState` + `pageFetchState` joint lookup table from `gsc-api-queries.md` to assign each URL to a sub-dim 2-9 cluster (or "no finding" / "Other" bucket).
@@ -499,7 +500,25 @@ Append to Step 5's footer (after the Step 1.5.7 git-history line):
 GSC mode: <enabled | disabled>. <source detail when enabled>
 <freshness line — "real-time view of GSC's ~2-day-lagged pipeline" when enabled; absent when disabled>
 <URL Inspection status when api active — "Inspected N/M URLs; quota remaining ~Y/2000 today">
+<Search Analytics rows when api active — "Search Analytics rows: Q1 <N1>/<L1>, Q2 <N2>/<L2>, Q3 <N3>/<L3> (rowLimit cap). ✓ no truncation" OR "⚠ Q<X> hit rowLimit cap — likely truncated; consider raising rowLimit or paginating with startRow for fuller coverage. Q3 cap-hit affects url_impressions_map completeness → URLs outside top-25k get traffic_weight=1.0 fallback in Step 6.6 ranking">
 <API call failures, if any — one line per failed call with HTTP status + error_status>
+```
+
+**Search Analytics row line — examples:**
+
+Healthy (no truncation):
+```
+Search Analytics rows: Q1 1304/25000, Q2 1304/25000, Q3 1304/25000 (rowLimit cap). ✓ no truncation.
+```
+
+Suspicious (orchestrator improvised to API default of 1000, OR site has exactly 1000 unique queries):
+```
+Search Analytics rows: Q1 1000/1000, Q2 1000/1000, Q3 1304/25000 (rowLimit cap). ⚠ Q1+Q2 hit rowLimit cap — likely truncated. If site has ≤1000 unique queries/pages this is genuine; otherwise raise rowLimit in the request body or paginate with startRow.
+```
+
+Truncated url_impressions_map (large site):
+```
+Search Analytics rows: Q1 18400/25000, Q2 25000/25000, Q3 25000/25000 (rowLimit cap). ⚠ Q2+Q3 hit rowLimit cap — likely truncated. Q3 truncation affects url_impressions_map completeness → URLs outside top-25k by impressions get traffic_weight=1.0 fallback in Step 6.6 ranking (rankings still work but lose some traffic-prioritization signal). Pagination via startRow not yet implemented; revisit when a dogfood surfaces this on a real site.
 ```
 
 In heuristic-only mode, render only: `GSC mode: disabled. Reason: <blocker from 1.6.3>.` — the Section 1 banner carries the user-facing call to action; the footer line is a machine-readable audit record.

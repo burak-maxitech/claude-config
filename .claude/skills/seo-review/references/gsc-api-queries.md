@@ -71,6 +71,27 @@ The orchestrator computes substitutions in-context before each curl call.
 
 Per-call failure is non-fatal. Failed call's signal is skipped; other calls proceed. See `gsc-api-schema.md` "Error response shape" for the failure code table.
 
+### Cap-hit detection (per-call)
+
+After each Q1/Q2/Q3 response, capture:
+
+```
+rows_received = len(response.rows or [])
+rowLimit_requested = <the rowLimit value sent in the request body, default 25000 per spec>
+cap_hit = (rows_received == rowLimit_requested)
+```
+
+`cap_hit = true` signals **likely truncation** — either the site has >rowLimit unique candidates and we lost data past the cap, OR the site genuinely has exactly rowLimit candidates (false-positive). Either way the user wants to know.
+
+Stash `{q1: {received, limit, cap_hit}, q2: {...}, q3: {...}}` in shared context for SKILL.md Step 1.6.12 footer rendering. The orchestrator emits the cap-hit summary line and (if any cap was hit) a truncation warning recommending raised rowLimit or startRow pagination.
+
+**Why this matters per-call:**
+- **Q1 (queries digest):** cap-hit means top-50 by impressions may exclude lower-position-band winners. Less critical since position 5-20 filter is what matters most.
+- **Q2 (pages digest):** cap-hit means top-50 by impressions may be incomplete. Real impact: median_ctr baseline (used by sub-dim 10 `ctr_opportunity`) drifts toward higher-traffic pages.
+- **Q3 (url_impressions_map):** cap-hit is the **highest-impact case** — every URL outside the top-25k by impressions falls through to `traffic_weight = 1.0` in Step 6.6 ranking. The skill still works (heuristic-only fallback for those URLs) but loses GSC traffic-weighting signal for long-tail pages.
+
+**Pagination NOT implemented yet** — for sites where Q3 cap-hits matter, the spec deliberately defers. Add when a dogfood surfaces the failure on a real site (e.g., a Wikipedia-class property). For now, the footer warning surfaces the gap so it's visible.
+
 ---
 
 ## Q1 — Queries digest (top-50, position 5-20, imps ≥ 100)
