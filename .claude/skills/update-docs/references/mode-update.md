@@ -32,6 +32,7 @@ Hold all results in working memory for the rest of this run. Derive:
 - **TaskList state** → drives Part 0
 - **Row counts**: Key Decisions in CLAUDE.md, `^### Session` in `docs/session-history.md` → drive Parts 5, 6 probes and Part 1.10 caps
 - **Sentinel presence**: rollup notes in `session-history.md` and `key-decisions.md` → drive Parts 5.2, 6.2 first-run gates
+- **CLAUDE.md total size + per-section sizes**: total via `wc -c`; per-section via the `awk` one-liner in Part 7.2 → drives Part 1.9 advisory, Part 7 size-pressure rollup, and Fast Path drift warning. Cache as `{total, sections: [{name, chars, over_threshold}]}` so Parts 1.9 / 7 / drift-warning all read the same snapshot.
 
 After Step 0, do not re-read these files unless a Part has just modified one and needs to verify post-write state.
 
@@ -56,7 +57,7 @@ Targeted at the daily-cycle case: a session produced commits and task progress b
    - **1.8** — append last-session block to CLAUDE.md **and** write the detailed entry to `docs/session-history.md`
 3. **Drift probes** — run cheap counts on already-loaded files (no new reads), surface warnings, **do not enforce**
 4. **Plan-then-batch** — gather every CLAUDE.md change from step 2 above into a single Write of the full file, or non-overlapping parallel Edits in one turn
-5. **Part 7** — commit checkpoint (full logic, unchanged; respects `--skip-commit`)
+5. **Part 8** — commit checkpoint (full logic, unchanged; respects `--skip-commit`)
 
 **Skipped in Fast Path:**
 - Part 0.5 (migration) — handled by Full Path if it ever fires
@@ -65,6 +66,7 @@ Targeted at the daily-cycle case: a session produced commits and task progress b
 - Part 4 (auto-memory sync)
 - Part 5 (session rollup)
 - Part 6 (Key Decisions rollup)
+- Part 7 (size-pressure rollup) — replaced by drift warning when CLAUDE.md > 35k
 - Part 1.10 (caps enforcement) — replaced by drift warning
 
 **Drift warning format** (show only lines whose probe fires):
@@ -73,7 +75,8 @@ Targeted at the daily-cycle case: a session produced commits and task progress b
 >  - [N] sessions in `docs/session-history.md` ready for rollup (count > 5)
 >  - Key Decisions table in CLAUDE.md at [M] rows (cap 20)
 >  - README.md or `docs/*.md` touched in [K] commits since last full sweep
->  - CLAUDE.md at [X]k chars (target 17k, soft cap 35k)"
+>  - CLAUDE.md at [X]k chars (target 17k, soft cap 35k) — Part 7 size-pressure rollup will fire on Full Path
+>  - Sections over Part 7 threshold: [section1] ([Y]k), [section2] ([Z]k) (run Full Path to actively shrink)"
 
 Drift warnings are the safety valve: `--fast` runs daily without losing visibility into accumulated debt. If a probe shows nothing has drifted, omit the warning entirely.
 
@@ -308,11 +311,13 @@ Session history is split between CLAUDE.md (brief) and docs/session-history.md (
    - CLAUDE.md should only ever contain ONE session block (the most recent).
    - All previous sessions live exclusively in `docs/session-history.md`.
 
-### 1.9 Size Check
-After all updates, check CLAUDE.md file size:
+### 1.9 Size Check (early advisory)
+After all updates to CLAUDE.md sections, check file size:
 1. If CLAUDE.md exceeds **35k characters**, warn the user:
-   > "CLAUDE.md is [X]k chars — approaching the 40k limit. Consider condensing sections or moving more content to reference files."
+   > "CLAUDE.md is [X]k chars — approaching the 40k limit. Part 7 (Size-Pressure Rollup) will run after the count-based rollups to actively shrink over-threshold sections."
 2. Target is ~17k chars. If significantly over, suggest specific sections to trim.
+
+This is the early advisory only — active enforcement happens in **Part 7 (Size-Pressure Rollup)** after Parts 5/6 have had a chance to bring the file under threshold via count-based rollups. If 1.9 fires, expect Part 7 to also fire.
 
 ### 1.10 Cap Enforcement
 
@@ -550,9 +555,94 @@ This note is the gating sentinel: its presence tells future runs that the user h
 
 If 0 rows were moved, skip the report.
 
-## Part 7: Commit Checkpoint
+## Part 7: Size-Pressure Rollup
 
-After all documentation updates **and rollups** are complete, remind the user to commit. This runs last so that Part 5 and Part 6 changes are included in the same commit as the session updates.
+After the count-based rollups in Parts 5 and 6 finish, re-measure CLAUDE.md. If still over the soft cap, this part is the active-enforcement counterpart to Part 1.9's advisory. Where Parts 5/6 trigger on **row count** (≥5 sessions, ≥20 decisions), Part 7 triggers on **char size per section** — closes the gap where each row or item is at-cap-by-count but massive-by-content.
+
+**If `--skip-size-pressure` is in `$ARGUMENTS`, skip this step entirely.**
+
+### 7.1 Re-measure after Parts 5/6
+
+Compute `claude_md_size` = char count of CLAUDE.md as it stands post-rollups.
+
+- If `claude_md_size <= 35000` → skip the rest of Part 7 silently. The count-based rollups did the job.
+- Otherwise proceed.
+
+### 7.2 Section size diagnostic
+
+Compute per-section char counts (sections delimited by `^## ` headers):
+
+```bash
+awk 'BEGIN{section="HEADER"; size=0} /^## /{if(section)printf "%6d  %s\n", size, section; section=$0; size=0; next} {size+=length($0)+1} END{printf "%6d  %s\n", size, section}' CLAUDE.md | sort -rn
+```
+
+Display the top-5 sections to the user as a single table:
+
+> CLAUDE.md is [X]k chars after Parts 5/6 rollups (over the 35k soft cap). Top sections:
+> 
+> | Section | Chars | % | Over threshold? |
+> |---|---|---|---|
+> | Architecture Summary | 12,929 | 27% | YES (4000) |
+> | Key Decisions | 12,750 | 27% | YES (8000) |
+> | In Progress | 6,439 | 14% | YES (3000) |
+> | Next Steps | 5,206 | 11% | YES (3000) |
+> | Session History | 3,896 |  8% | — |
+
+### 7.3 Per-section thresholds + shrinkers
+
+For each section over its threshold, propose a specific shrinker. The thresholds and actions:
+
+| Section | Threshold | Shrinker action |
+|---|---|---|
+| `## Key Decisions` (any variant: `(condensed)` etc.) | 8000 chars | **Size-based rollup** — move oldest rows (FIFO from top, same anchor rule as Part 6.3) to `docs/key-decisions.md` until section is under 6000 chars. Runs even when row count is ≤20. Adds `Rolled up from CLAUDE.md → docs/key-decisions.md in S<N> by size pressure` suffix to each moved row's rationale. |
+| `## Architecture Summary` | 4000 chars | **Extract to `docs/architecture.md`** — create file if missing with header (`# Architecture\n\n> Full architecture detail. Referenced from [CLAUDE.md](../CLAUDE.md).\n\n---`); append current full content; replace CLAUDE.md section with a 1-paragraph summary (200-400 chars) + `> Full architecture: [docs/architecture.md](docs/architecture.md)` link. The 1-paragraph summary is user-authored when consent prompt fires (skill proposes a draft from the current content's first paragraph; user can accept or rewrite). |
+| `## In Progress` | 3000 chars | **Per-item collapse** — for each bullet, trim prose to 2-3 sentences + commit hash refs / file paths preserved. Move completed sub-bullets (`✅`, "Done", "Shipped", strikethrough) to `docs/completed-work.md`. Do NOT delete items entirely — collapse text only. |
+| `## Next Steps` | 3000 chars | **Flatten + extract detail** — collapse sub-section headers (`### High Priority`, `### Queued`, `### Nice to Have`) into a flat top-10 priority-ordered list. For items with 3+ sentences of detail, move detail to `docs/next-steps-backlog.md` (create if missing); keep 1-sentence summary + `→ docs/next-steps-backlog.md#<anchor>` link. |
+| `## Session History` (last-session block) | 2000 chars | **Bullet trim** — if the last-session block has >5 bullets, trim to top 3 (most architecturally significant) + append `> Full session detail: docs/session-history.md S<N>` reference. |
+| `## Completed` (foregrounded feature paragraph) | 1500 chars | **Paragraph trim** — replace foregrounded multi-sentence paragraph with a single bullet pointing at `docs/completed-work.md`. Keep the count summary line. |
+
+Sections not in this table (project-specific like `## Quick Commands`, `## Don't Modify`, `## Environment Variables`) are **tolerated as-is** — Part 7 only acts on known shrinkable sections. If a project-specific section is the dominant bloat source, Part 7 reports it but takes no action, deferring to user judgment.
+
+### 7.4 Per-section consent gate
+
+For each over-threshold section, ask via `AskUserQuestion` (or numbered fallback):
+
+> "Section `## [name]` is [N] chars (threshold [T]). Proposed shrinker: [one-line action description]. Apply? (yes / no / skip-all)"
+
+- **yes** → execute the shrinker for this section
+- **no** → leave this section alone this run (re-ask next run if still over)
+- **skip-all** → exit Part 7 entirely; the rest of the run proceeds to Part 8 unchanged
+
+`AskUserQuestion` cap is 4 questions per turn. If 5+ sections are over threshold, batch as: first 4 in one turn, remainder in a second turn after the first batch's actions complete.
+
+Default action is `no` if user dismisses without explicit choice (don't apply destructive trims without consent).
+
+### 7.5 Execution invariants
+
+When executing any shrinker:
+
+1. **Move, never delete.** Every shrinker writes the trimmed content to a reference file before removing from CLAUDE.md. The `docs/architecture.md`, `docs/next-steps-backlog.md`, and `docs/completed-work.md` files are the destinations. If a destination doesn't exist, create it with a standard header.
+2. **Preserve commit refs.** Specific commit hashes (`abc1234`, `commit X`), file paths, and links MUST survive into either the trimmed summary or the extracted detail file — these are search anchors users rely on.
+3. **Surface the destination.** Every shrinker's output in CLAUDE.md gains a `> Full [thing]: [docs/path.md](docs/path.md)` link so future `/resume-work` sessions can chase the detail.
+4. **Don't compound losses.** If a section was already shrunk to a summary in a prior run (detectable by the `> Full [thing]:` link), Part 7 does NOT trim further. Re-prompt only fires when the user has manually re-grown the section.
+
+### 7.6 Report
+
+After all consented shrinkers complete, re-measure:
+
+> "CLAUDE.md: [old-size]k → [new-size]k chars. [N] sections shrunk: [list]. [M] sections still over threshold (skipped per user choice)."
+
+If still over 40k hard cap after all consents: log a final warning, do not block the commit.
+
+### 7.7 Idempotency
+
+Part 7 is safe to re-run. The shrinkers detect already-shrunk state via the `> Full [thing]:` sentinel link and skip those sections. The only way a re-shrunk section grows again is user editing — which is fine, and Part 7 will catch it next run.
+
+---
+
+## Part 8: Commit Checkpoint
+
+After all documentation updates **and rollups** are complete, remind the user to commit. This runs last so that Parts 5, 6, and 7 changes are included in the same commit as the session updates.
 
 **If `--skip-commit` is in `$ARGUMENTS`, skip this step entirely.**
 

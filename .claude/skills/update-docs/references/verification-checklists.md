@@ -85,6 +85,7 @@ Provide complete content for each file created or significantly modified.
 - [ ] CLAUDE.md has all required sections intact
 - [ ] CLAUDE.md is under 35k chars (warn if exceeded, target ~17k)
 - [ ] Cap enforcement (Part 1.10) ran — Current Status ≤10, Next Steps ≤10, In Progress ≤5 (or warnings issued)
+- [ ] Size-pressure rollup (Part 7) ran when CLAUDE.md exceeded 35k post-Parts 5/6, or skipped silently when under threshold
 - [ ] README.md matches current features
 - [ ] README.md links to actual docs/ files
 - [ ] Relevant docs/*.md files updated
