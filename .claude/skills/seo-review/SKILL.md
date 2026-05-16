@@ -508,6 +508,70 @@ Quota tracking is approximate (the API doesn't expose a precise counter — back
 
 ---
 
+## Ingestion conventions (cross-cutting, applies to Step 1.6 + Step 3.2)
+
+Three rules the orchestrator must follow when ingesting external data. Surfaced from S30 dogfood (the first end-to-end run): the model improvised in three ways that the original spec under-specified.
+
+### Disk-write boundary
+
+`.seo-data/gsc/` is reserved for **user configuration + skill-auto-generated content only**:
+
+- `config.yaml` (user-authored)
+- `README.md` (skill-auto-written on first detection)
+- `.gsc-banner-shown` (sentinel — sits in `.seo-data/` not `.seo-data/gsc/`)
+
+**Never write raw API responses, parsed JSON, intermediate inspection results, or any other ephemeral data to `.seo-data/gsc/`.** When the orchestrator needs disk-cache for parsing (e.g., a Search Analytics response of 200KB+ that would burn too much context to keep raw), write to **system temp** instead:
+
+```
+TMPFILE=$(mktemp -t gsc-q1-XXXXXX.json)
+curl ... > "$TMPFILE"
+# parse...
+rm -f "$TMPFILE"
+```
+
+`mktemp` resolves to `/tmp/` or `$TMPDIR` on Unix and `%TEMP%` on Windows (via MSYS/git-bash). The temp file is discarded after parsing. The `.seo-data/gsc/` folder stays minimal so users can read it as their config-only space.
+
+### JSON parser fallback chain
+
+The skill doesn't require any specific parser to be installed. Preferred order:
+
+1. **`jq`** — best ergonomics for filters, BUT not on PATH in claude-code's Bash on Windows + many Linux containers
+2. **`python`** — single-call form. **Windows note:** prefer `python` over `python3` — on Windows, `python3` frequently resolves to the Microsoft Store install stub which exits non-zero with "Python was not found" output
+3. **`python3`** — fallback after `python`
+4. **Bash core (`grep -oE` + `sed -E`)** — portable for shallow JSON (top-level string fields), regex extraction only
+
+Detection pattern:
+
+```
+PY=$(command -v python 2>/dev/null || command -v python3 2>/dev/null || true)
+JQ=$(command -v jq 2>/dev/null || true)
+[ -n "$JQ" ] && JSON_PARSER="jq" \
+  || { [ -n "$PY" ] && JSON_PARSER="$PY" \
+  || { echo "ERR: install jq or python for GSC JSON parsing"; exit 1; }; }
+```
+
+Surface the chosen parser in the footer's debug line when ingesting GSC data.
+
+### Budget utilization expectation
+
+When the spec defines a budget (URL Inspection cap = 100, sitemap probe cap = 100), the orchestrator **MUST attempt to fill the budget** when candidates are available. The cap is the ceiling, not the target.
+
+**Common failure mode (S30 dogfood):** orchestrator used 40 URLs for URL Inspection and 13 URLs for sitemap probe despite having 1,304 URLs in the impressions map and 2,895 URLs in the sitemap. The under-utilization wasted ~60% of the diagnostic value of the run.
+
+Rules:
+- **Take the literal top-N** by the spec's sort key (impressions desc for URL Inspection, document order or `<priority>` desc for sitemap probe). Apply no additional minimum thresholds, "quality" filters, or "key URLs only" subjective trims.
+- If the candidate pool is smaller than the budget (e.g., only 30 URLs have any impressions), take all available and surface the actual count.
+- If genuine constraints reduce the budget (quota near-exhaustion, candidate pool actually smaller), surface the REASON in the budget log line.
+- "Conservative because the model is uncertain" is NOT a valid reason to under-shoot. Take the full budget; the per-URL findings carry their own certainty.
+
+Footer must include actual / budget counts:
+```
+URL Inspection: 97/100 attempted (top 80 by impressions + 17 git-resolved; dedup removed 3); 96/97 succeeded; quota remaining ~1904/2000.
+Sitemap URL probe: 100/100 attempted (top 100 by document order from 2,895 total sitemap entries); 98/100 succeeded (2 timeouts).
+```
+
+---
+
 ## Step 2 — Mode Dispatch
 
 Interpret `$ARGUMENTS`:
@@ -542,7 +606,7 @@ Runs **always when sitemap.xml exists locally** AND (sitemap URLs are absolute O
    - If URLs are absolute (start with `http://` / `https://`) → use them as-is.
    - If URLs are relative AND `--url <base>` provided → synthesize: `<base>` + relative path.
    - If URLs are relative AND no `--url` provided → **skip the probe**, add a footer note: "URL probe skipped — sitemap.xml has relative URLs; re-run with `--url <base>` for live URL health check."
-4. **Cap at top 100 URLs** by document order, or by `<priority>` descending if present.
+4. **Cap at top 100 URLs** by document order (or by `<priority>` descending if present). The cap is the ceiling, not the target — **take the literal top 100** (or all available if fewer). Do not under-sample to a "representative subset" or skip URLs based on perceived non-importance. See "Ingestion conventions → Budget utilization" for the contract.
 5. **Probe each URL in a single parallel turn** — multiple `WebFetch` calls in one tool-use block with a minimal prompt:
    > "Report the HTTP status code, final URL after any redirects, redirect chain hop count, and response time in seconds. Do not return page content."
 6. **Collect results** into structured records: `{url, status, redirect_hops, response_seconds}`. Classify response time into buckets: `fast` (<1s), `medium` (1-3s), `slow` (>3s).

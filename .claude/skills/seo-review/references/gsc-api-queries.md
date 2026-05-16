@@ -247,8 +247,8 @@ Hard budget: **100 URLs per run**. Well under the 2,000/day per-property quota; 
 
 | Source | Count | Selection rule |
 |---|---|---|
-| **Top 80 from `url_impressions_map`** | 80 | Highest impressions across the lookback window. URLs that drive traffic deserve depth-of-diagnostic priority. |
-| **Recent git changes resolved to URLs** | 20 | File paths from Step 1.5's 35-day git scan, resolved to URLs via `page_type_map` heuristics OR direct match in `url_impressions_map`. Git emits file paths, not URLs — only candidates that resolve cleanly are included. |
+| **Top 80 from `url_impressions_map`** | up to 80 | Take the **literal top 80 URLs by impressions desc** from Q3's full uncapped map. Apply **no additional minimum impression threshold** — even URLs with 1 impression count. If fewer than 80 URLs have any impressions, take all available. **Do not add subjective filters** ("only high-quality URLs", "skip thin pages", etc.). The point is depth-of-diagnostic on the URLs that drive traffic at any level. |
+| **Recent git changes resolved to URLs** | up to 20 | File paths from Step 1.5's 35-day git scan, resolved to URLs via `page_type_map` heuristics OR direct match in `url_impressions_map`. Git emits file paths, not URLs — only candidates that resolve cleanly are included. Take all that resolve, capped at 20. |
 
 Both sources are available within Step 1.6 (Q3 from Turn 2a + Step 1.5's digest from Turn 1). Sitemap probe failures (Step 3.2) are intentionally NOT used as a source — Step 3.2 runs after Step 1.6, and waiting for it would push GSC ingestion into 60+ seconds wall time. The probe's URL-health findings already cover broken-sitemap-URL signals; URL Inspection adds Google's view on the URLs that matter most by traffic.
 
@@ -256,7 +256,9 @@ Both sources are available within Step 1.6 (Q3 from Turn 2a + Step 1.5's digest 
 
 A URL appearing in both sources counts **once**. Dedup precedence: `url_impressions_map` source wins.
 
-After dedup, hard cap at 100. If fewer than 100 candidates after dedup, the budget shrinks accordingly (no padding).
+After dedup, hard cap at 100. If fewer than 100 candidates after dedup, the budget shrinks accordingly (no padding with arbitrary URLs).
+
+**The 100-URL cap is the ceiling, not the target.** Per the `SKILL.md` "Ingestion conventions → Budget utilization" contract, the orchestrator MUST attempt to fill the budget when candidates are available. Cutting to 40 URLs when 1,300+ URLs are in the impressions map (S30 dogfood failure mode) violates the spec. The URLs that don't drive massive traffic still provide diagnostic value for indexing/canonical decisions.
 
 ### Source unavailable
 
@@ -267,10 +269,16 @@ When both sources are empty: skip URL Inspection batch entirely. Footer notes "0
 
 ### Pre-flight budget log
 
-Before dispatching the batch, log to footer:
+Before dispatching the batch, log to footer. Include the source breakdown so under-utilization is auditable:
 
 ```
-URL Inspection budget: 73 by impressions + 18 git-changed (resolved 18/24) = 91 URLs. Quota remaining: ~1909/2000 today.
+URL Inspection budget: 80 by impressions (from 1,304 URLs in url_impressions_map) + 17 git-resolved (resolved 17/22 git-changed paths via page_type_map); dedup removed 0 → 97/100 attempted. Quota remaining: ~1903/2000 today.
+```
+
+If under-utilizing the 100-URL cap (because candidate pool is smaller), surface the reason explicitly:
+
+```
+URL Inspection budget: 30 by impressions (only 30 URLs have any impressions in lookback window) + 8 git-resolved → 38/100 attempted. Reason: low-traffic property. Quota remaining: ~1962/2000.
 ```
 
 Remaining-quota figure is approximate — the API doesn't expose a precise counter; back-of-envelope from "2000/day total minus inspections this run."
