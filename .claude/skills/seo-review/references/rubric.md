@@ -116,7 +116,7 @@ This is **the single point of enforcement**. Subagent files don't need to track 
 
 ### gsc_insights dimension + sub-dim enum
 
-GSC findings use their own `dimension: "gsc_insights"` with 12 sub-dimensions for structural organization. No score allocation — these are routing labels, not score buckets:
+GSC findings use their own `dimension: "gsc_insights"` with 13 sub-dimensions for structural organization. No score allocation — these are routing labels, not score buckets:
 
 | Sub-dim | Source | Notes |
 |---|---|---|
@@ -129,9 +129,10 @@ GSC findings use their own `dimension: "gsc_insights"` with 12 sub-dimensions fo
 | `blocked_access` | URL Inspection — `coverageState` matches | Usually intentional; low-severity info |
 | `soft_404` | URL Inspection — `coverageState` matches | 200-but-empty pages |
 | `server_errors` | URL Inspection — `coverageState` matches | High-severity availability signal |
-| `ctr_opportunity` | Q2 pages digest | High-impressions, below-median CTR |
+| `ctr_opportunity` | Q2 pages digest | High-impressions, below-median CTR — dual trigger: position-band (5-20) OR high-volume override (imp ≥ 10k AND ctr < 0.5%). S31 dogfood fix. |
 | `position_band_opportunity` | Q1 queries digest | Position 5-20 queries with ≥100 impressions |
 | `traffic_orphan` | Q3 `url_impressions_map` + sitemap | Sitemap URLs with 0 impressions in the data window |
+| `brand_query_anomaly` | Q1 queries digest ∩ Schema/CLAUDE.md brand-name | Brand queries (Person.name / Organization.name / CLAUDE.md first proper noun) ranking >pos 3 OR CTR <10% → entity-recognition deficit. Cross-links to Schema `Person.@id` split + `Person.sameAs` Wikidata findings. **S31 dogfood codification of emergent capability.** |
 
 ### Per-finding output shape — GSC additions
 
@@ -215,7 +216,7 @@ Technical SEO total stays at 25 either way. Report notes "hreflang not applicabl
 
 ## Probe-skipped case
 
-When sitemap URL probe didn't run (no sitemap, relative URLs without --url), the `url_health` sub-dimension is 0/0 — no points deducted, but the maximum is also 0 for this dim. To keep the total at 100, the missing 8 points redistribute proportionally across other Technical SEO sub-dims that ran:
+When sitemap URL probe didn't run (no sitemap, dynamic sitemap.ts handler with no static output, relative URLs without `--url`), the `url_health` sub-dimension is 0/0 — no points deducted, but the maximum is also 0 for this sub-dim. To keep the dimension total at 25, the missing 8 points redistribute proportionally across other Technical SEO sub-dims that ran:
 
 | Sub-dim | Probe ran | Probe skipped |
 |---|---|---|
@@ -225,5 +226,34 @@ When sitemap URL probe didn't run (no sitemap, relative URLs without --url), the
 | hreflang | 3 | 4 |
 | redirects | 3 | 4 |
 | url_health | 8 | 0 |
+
+### Rendering the redistribution (S31 dogfood fix)
+
+The S31 dogfood showed `url_health: 0/0 (probe skipped)` in the report — correct, but **opaque about where the 8 points went**. Users saw a "good" `url_health: 0/0` and didn't realize the other Technical SEO sub-dims now had elevated caps absorbing the redistribution.
+
+**Reporting requirement (consumed by `report-template.md` Section 1 — Score breakdown):** When probe is skipped, the Sub-dim breakdown column for Technical SEO MUST render the redistribution explicitly. Two acceptable forms:
+
+**Form A (compact)** — append a redistribution note after the deductions line:
+
+```
+| Technical SEO | 16 | 25 | canonicals: -5.25; hreflang: -2; robots_sitemap: -1.5; redirects: -0.5; url_health: 0/0 (probe skipped, 8pts redistributed: canonicals +2, robots_sitemap +2, mobile +2, hreflang +1, redirects +1) |
+```
+
+**Form B (explicit)** — add a dedicated row above the dimension showing the active caps:
+
+```
+| Technical SEO (probe skipped — caps redistributed) | — | — | canonicals→6, robots_sitemap→6, mobile→5, hreflang→4, redirects→4, url_health→0 |
+| Technical SEO | 16 | 25 | canonicals: -5.25 (cap 6); robots_sitemap: -1.5 (cap 6); hreflang: -2 (cap 4); ... |
+```
+
+Form A is preferred (compact, single row per dimension). Form B is for `--verbose` reporting if added later.
+
+**Footer note (in addition to per-dim breakdown):**
+
+```
+URL probe skipped: <reason — e.g., "dynamic sitemap.ts handler with no static output; re-run with --url <base> for live URL health check.">. 8 url_health points redistributed across other Technical SEO sub-dims (per rubric.md "Probe-skipped case").
+```
+
+Same pattern applies if the hreflang sub-dim is redistributed for non-i18n projects (existing rubric rule). When BOTH conditions hold (no i18n AND probe skipped), the two redistributions stack — 8 url_health pts + 3 hreflang pts = 11 pts redistribute. The probe-ran-with-i18n table above is the baseline; when both adjustments fire, recompute caps by applying both rules in sequence (hreflang to 0 first, then redistribute url_health's 8 pts across the remaining 4 sub-dims proportionally to their probe-ran-without-i18n weights).
 
 Footer notes "URL probe skipped — Technical SEO sub-dim weights redistributed." User can re-run with `--url <base>` to get URL health scored.

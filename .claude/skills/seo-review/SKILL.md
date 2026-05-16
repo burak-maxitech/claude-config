@@ -125,7 +125,7 @@ Steps 1.5 (git scan) and 1.6 (GSC API ingestion when configured, else heuristic-
 - `Glob .seo-data/gsc/README.md` (Step 1.6.5 idempotency)
 - `Read .gitignore` (Step 1.6.5 idempotency)
 - `Read references/gsc-setup-readme-template.md` (fire optimistically; discard if README already exists)
-- `Read references/gsc-ingestion.md` (always needed when API is configured — covers API ingestion contract + 12 sub-dim catalog)
+- `Read references/gsc-ingestion.md` (always needed when API is configured — covers API ingestion contract + 13 sub-dim catalog)
 - `Read .seo-data/gsc/config.yaml` (optimistic; if file doesn't exist the tool errors silently — interpret as `api_configured = false`)
 - `Read references/gsc-api-queries.md` (optimistic; only used when API activates — reading early avoids an extra Read in Turn 2)
 - `Read references/gsc-api-schema.md` (optimistic; reference for API response parsing)
@@ -572,7 +572,7 @@ rm -f "$TMPFILE"
 The skill doesn't require any specific parser to be installed. Preferred order:
 
 1. **`jq`** — best ergonomics for filters, BUT not on PATH in claude-code's Bash on Windows + many Linux containers
-2. **`python`** — single-call form. **Windows note:** prefer `python` over `python3` — on Windows, `python3` frequently resolves to the Microsoft Store install stub which exits non-zero with "Python was not found" output
+2. **`python`** — invoke via the shipped helper script (see "Helper script" below), NOT via inline heredocs. **Windows note:** prefer `python` over `python3` — on Windows, `python3` frequently resolves to the Microsoft Store install stub which exits non-zero with "Python was not found" output
 3. **`python3`** — fallback after `python`
 4. **Bash core (`grep -oE` + `sed -E`)** — portable for shallow JSON (top-level string fields), regex extraction only
 
@@ -587,6 +587,41 @@ JQ=$(command -v jq 2>/dev/null || true)
 ```
 
 Surface the chosen parser in the footer's debug line when ingesting GSC data.
+
+#### UTF-8 enforcement on every Python invocation
+
+**Critical (S31 dogfood fix).** Python 3 on Windows defaults `open()` to charmap encoding, which crashes on UTF-8 content like Turkish characters or the GSC prompt-injection garbage queries (`"do not update memories..."`). The dogfood's Q1 parse died with `UnicodeDecodeError` and cancelled parallel Q2/Q3 calls.
+
+**Two enforcement layers (use both — belt-and-suspenders):**
+
+1. **Env vars on every Python invocation** — preserve across `python -c`, heredocs (if used), and helper scripts. Even when the script declares `encoding='utf-8'` explicitly, stdin/stdout pipes still inherit the charmap default without these:
+
+```bash
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python <script_or_args>
+```
+
+2. **Explicit `encoding='utf-8'` on every `open()` inside Python code.** The shipped helper script (`gsc-parse-helper.py`) does this; if you write any other Python that reads cache JSON, mirror the pattern. Never rely on the platform default.
+
+Same class of bug as the S30 `jq`-missing fix — the spec under-specified a platform-dependent default. Codified after S31 caught it.
+
+#### Helper script (don't inline Python heredocs)
+
+**S31 dogfood lesson.** Across one run the orchestrator wrote 5+ different inline Python invocations (Q1 parse, Q2 parse, Q3 parse, CTR opportunities, cluster aggregation), each with different bash quoting/escaping strategies. One heredoc failed with `unexpected EOF` (single quotes inside `<<'PY'` block). The fallback was to write `_parse_clusters.py` into `.seo-data/gsc/cache/` — **violating the disk-write boundary** (cache dir is response-JSON-only).
+
+**Rule:** GSC JSON parsing MUST go through the shipped helper at `references/gsc-parse-helper.py`. Invoke with subcommand args:
+
+```bash
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "$SKILL_REF_DIR/gsc-parse-helper.py" q1 .seo-data/gsc/cache/sa-q1-<hash>.json
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "$SKILL_REF_DIR/gsc-parse-helper.py" q2 .seo-data/gsc/cache/sa-q2-<hash>.json
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "$SKILL_REF_DIR/gsc-parse-helper.py" q3 .seo-data/gsc/cache/sa-q3-<hash>.json
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "$SKILL_REF_DIR/gsc-parse-helper.py" ctr .seo-data/gsc/cache/sa-q2-<hash>.json
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "$SKILL_REF_DIR/gsc-parse-helper.py" clusters .seo-data/gsc/cache
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "$SKILL_REF_DIR/gsc-parse-helper.py" brand .seo-data/gsc/cache/sa-q1-<hash>.json "Burak Arık"
+```
+
+Where `$SKILL_REF_DIR` resolves to the orchestrator's reference directory (e.g., `~/.claude/skills/seo-review/references/` on Mac/Linux, the equivalent on Windows). The orchestrator resolves this path once per run.
+
+If the helper script itself is missing (skill install integrity issue): emit a footer error `gsc-parse-helper.py not found at <path> — GSC parsing aborted, falling back to heuristic-only mode` and continue without GSC findings.
 
 ### Budget utilization expectation
 
@@ -727,7 +762,7 @@ Read `references/scan-content.md`, dispatch `seo-content` with the file + shared
 Read `references/scan-geo.md`, dispatch `geo-generative` with the file + shared context. Owns Structured Data (20) + Generative Engine (20) = 40 points. Source-only (no rendered HTML).
 
 ### Agent 4: seo-gsc-insights (only when `gsc_mode: enabled`)
-Read `references/gsc-ingestion.md` (the same reference used by the orchestrator in Step 1.6 — the "Finding-type catalog" section is the agent's spec) and dispatch `seo-gsc-insights` with the reference content + shared context + sitemap URL list. Owns `gsc_insights` dimension with 12 sub-dims and **0 score allocation** (informational only). All findings emit `source: "gsc"` and `score_impact: 0`.
+Read `references/gsc-ingestion.md` (the same reference used by the orchestrator in Step 1.6 — the "Finding-type catalog" section is the agent's spec) and dispatch `seo-gsc-insights` with the reference content + shared context + sitemap URL list. Owns `gsc_insights` dimension with 13 sub-dims and **0 score allocation** (informational only). All findings emit `source: "gsc"` and `score_impact: 0`.
 
 When `gsc_mode: disabled`, do not dispatch the 4th agent — only dispatch 3.
 
@@ -821,22 +856,43 @@ If no `docs/seo-history.md` exists yet, drop the delta clause: `**SEO/GEO score:
 
 **Only in default review-only mode.** Skip the history append entirely when `--plan` or `--fix` is in `$ARGUMENTS` — those are follow-ups to a recent audit, not new audits; writing duplicate score rows pollutes the history with no information gain.
 
-In default mode, after rendering the report, append (or create) `docs/seo-history.md`:
+**Same-commit dedup (S31 dogfood fix).** Before appending, check whether a previous run on the same `last_commit_sha` already wrote an entry. The skill's score has known methodology variance (the same codebase scored 60 → 48 → 40 → 55 across 4 runs on a single day in the S31 dogfood — last commit was docs-only). Writing 4 rows with different scores misleads the delta column and accumulates noise.
+
+Detection + handling:
+
+1. **Capture `current_commit_sha`** at run start via `git -C <repo> rev-parse HEAD` (orchestrator runs this in Step 0 or 1.5 batch).
+2. **Embed the sha as an HTML comment** on every appended row so future runs can match: `| YYYY-MM-DD | <score> | <priorities> | <!-- commit:abc1234 -->`
+3. **Read the last row of `docs/seo-history.md`** (just the tail, not full file) and grep for `<!-- commit:<sha7>` matching `current_commit_sha[:7]`.
+4. **If matched** (previous run was on the same commit):
+   - **Skip the append entirely.** Do NOT overwrite the existing row — preserving the first run's data is more honest than picking a "winner" between methodology-variant scores.
+   - Report to the user instead:
+     > "⚠ Score history not appended — last commit (`abc1234`) already has an entry in `docs/seo-history.md` from <date>. The skill's score has known methodology variance across runs on identical codebases; preserving the first run's data is more honest than appending variant scores. Make a code change before the next `/seo-review` run to log new progress, or run `/seo-review --plan` / `--fix` to act on the existing audit."
+   - Also drop the delta clause from the headline (rendered at Step 7 first line): show `**SEO/GEO score: 55/100** — Top 3 opportunities: ...` without the `(Δ +X)` part, since "delta vs same-commit run" is misleading.
+5. **If NOT matched** (new code since last entry, OR no previous entries at all) → proceed with normal append.
+
+**Methodology-variance disclaimer in headline.** When same-commit dedup triggers AND the user explicitly forces a re-run anyway (re-running `/seo-review` is allowed for second opinions), the report's Section 0 headline gains a one-line disclaimer:
+
+> `**SEO/GEO score: 55/100** — Top 3 opportunities: ... | ⚠ same-commit re-run (previous score: 40); score variance is methodology-driven, not codebase change.`
+
+In default mode (first run on this commit), after the dedup check passes, render or create `docs/seo-history.md`:
 
 If file doesn't exist, create with header:
 ```markdown
 # SEO/GEO Score History
 
 > Auto-managed by `/seo-review`. Append-only, never delete entries. Each row captures the score + top-3 priorities so progress is visible across runs.
+> **Same-commit dedup:** only one entry per `last_commit_sha`. Re-runs on the same commit are silently skipped — score has known methodology variance that would misrepresent as code-driven delta.
 
 | Date | Score | Top-3 priorities |
 |------|-------|------------------|
 ```
 
-Append row:
+Append row (with embedded commit sha):
 ```
-| 2026-05-14 | 72 | Missing meta descriptions (12 pages); No llms.txt; Broken URL /products/v1 (404) |
+| 2026-05-14 | 72 | Missing meta descriptions (12 pages); No llms.txt; Broken URL /products/v1 (404) | <!-- commit:abc1234 -->
 ```
+
+The `<!-- commit:abc1234 -->` HTML comment is invisible in the rendered Markdown table but parseable by the next run's dedup check.
 
 **Rules for the history file:**
 - Create if missing — never assume it exists.
@@ -844,6 +900,7 @@ Append row:
 - Each row always has all 3 columns. If fewer than 3 priorities surfaced, use "-" placeholders.
 - Date is `YYYY-MM-DD`.
 - This file is in-repo and git-tracked deliberately — the user can see history across machines / commits / team members.
+- One row per `last_commit_sha`. Same-commit re-runs are silently skipped per the dedup rule above.
 
 ### Mode-specific tail
 

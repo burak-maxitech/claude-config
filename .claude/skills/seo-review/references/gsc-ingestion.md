@@ -5,7 +5,7 @@ Loaded by the orchestrator in **Step 1.6** of `SKILL.md`. This file is the sourc
 - API ingestion contract — digest shape consumed by subagents
 - Setup banner (one-time, sentinel-gated)
 - `.gitignore` auto-append rules
-- Finding-type catalog (12 sub-dims) populated from Search Console API output
+- Finding-type catalog (13 sub-dims) populated from Search Console API output
 
 For the **finding output shape**, ranking formulas, and `score_impact: 0` invariant, see `rubric.md` — that file is the contract; this file is the implementation reference. For endpoint inventory + auth setup, see `gsc-api-schema.md`. For SQL-equivalent call templates + URL Inspection selection + `coverageState` → 9-reason lookup table, see `gsc-api-queries.md`.
 
@@ -269,7 +269,7 @@ The orchestrator prints a one-line notice on first append: `Added .seo-data/gsc/
 
 ---
 
-## Finding-type catalog (12 sub-dims)
+## Finding-type catalog (13 sub-dims)
 
 Each ingestion call (Search Analytics + URL Inspection) produces 0+ findings. All findings have `source: "gsc"`, `score_impact: 0` (enforced orchestrator-side in Step 6.0a).
 
@@ -389,16 +389,24 @@ No score-headline finding emitted (the site-wide rate isn't reliably computable 
 
 ### 10. `ctr_opportunity` (from Q2 pages digest)
 
-**Trigger:** rows with `impressions >= 500 AND ctr < (median_ctr * 0.5)`.
+**Dual trigger (S31 dogfood fix):**
 
-**Per-URL findings** (cap 5):
+1. **Standard band:** rows with `impressions >= 500 AND ctr < (median_ctr * 0.5) AND 5.0 <= position <= 20.0`.
+2. **High-volume override:** rows with `impressions >= 10000 AND ctr < 0.005` — regardless of position.
 
-- `severity`: `medium`
-- `certainty`: `0.7`
+**Why the override.** The S31 dogfood surfaced `/en/article/smartphone-vs-mirrorless-2026` at 59,679 impressions, position 4.65, CTR 0.28%. The original trigger excluded it because position 4.65 is "above the 5-20 band" — but the orchestrator immediately overrode and flagged it as `#1 opportunity` manually. A page that generates 59,679 monthly impressions at 0.28% CTR is THE most actionable finding regardless of position. The override codifies this: at ≥10,000 impressions and <0.5% CTR, the title/meta is so misaligned with query intent that position doesn't matter.
+
+**Per-URL findings** (cap 5; high-volume-override findings sort first):
+
+- `severity`: `medium` for standard band, **`high`** for high-volume-override (the volume-weighted impact is much bigger)
+- `certainty`: `0.7` for standard band, **`0.85`** for high-volume-override (catastrophic CTR is hard signal)
 - `effort_estimate`: `small`
-- `impressions`, `clicks`, `ctr` populated
-- `title`: `"CTR opportunity on <URL> (<X>K impressions, <Y>% CTR vs <Z>% median)"`
-- `recommended_action`: `"Rewrite <title> + <meta name='description'> to be more compelling. Test against top SERP results for the page's primary queries. Target CTR: at least median (<Z>%)."`
+- `impressions`, `clicks`, `ctr`, `position` populated
+- `trigger_reason`: `"position_band"` OR `"high_volume_anomaly"` (parseable field for the report's #1-opportunity ordering)
+- `title`:
+  - Standard: `"CTR opportunity on <URL> (<X>K impressions, <Y>% CTR vs <Z>% median, pos <P>)"`
+  - High-volume-override: `"⚠ CTR CATASTROPHE on <URL> (<X>K impressions, <Y>% CTR @ pos <P> — title/meta misaligned with query intent)"`
+- `recommended_action`: `"Rewrite <title> + <meta name='description'> to be more compelling. Audit top GSC queries for the page (Search Analytics → Queries tab filtered by Page) — front-load query intent in the title, mirror query phrasing in the meta description's first 110 chars (mobile SERP truncation). Target CTR: at least median (<Z>%) for standard-band; >1% for high-volume-override cases."`
 
 ### 11. `position_band_opportunity` (from Q1 queries digest)
 
@@ -425,6 +433,34 @@ No score-headline finding emitted (the site-wide rate isn't reliably computable 
 - `affected_urls`: top 10 by document order
 - `title`: `"<N> sitemap URLs received 0 impressions in GSC's data window (traffic orphans)"`
 - `recommended_action`: `"Audit these pages — they're indexed (in sitemap) but no one's finding them. Options: improve content + internal linking, remove from sitemap if they shouldn't rank, or accept as legitimate low-traffic pages. Sample: <list>."`
+
+### 13. `brand_query_anomaly` (from Q1 queries digest — S31 dogfood fix)
+
+**Codified after S31 dogfood** caught the orchestrator emergently detecting "burak arık" at pos 7.91 with 1.93% CTR as a brand-query displacement signal. Brand queries SHOULD rank at position 1 with CTR >30%; when they don't, it's a hard entity-recognition deficit — Google can't unambiguously identify your brand. Almost always traces to fragmented Schema (Person `@id` split across templates, missing `Person.sameAs` Wikidata link, no Organization schema).
+
+**Brand-name resolution** (orchestrator runs at Step 1, passes to subagent):
+
+1. **Primary:** parse `Person.name` / `Organization.name` from any JSON-LD in source files (Grep `"name"` within `<script type="application/ld+json">` blocks).
+2. **Secondary:** parse the `## Project Overview` section of `CLAUDE.md` for first proper-noun phrase (e.g., "**burakarik6** — Photography portfolio site for Burak Arık").
+3. **Tertiary:** infer from `package.json` `name` or repo name as last resort (lowest signal — repo names like `burakarik6` are weak brand matches).
+
+Pass the brand name + 1-2 aliases (e.g., `"Burak Arık"` + `"burakarik"` + `"burak arik"` to catch diacritic-normalized search queries) to the helper script.
+
+**Trigger:** Q1 query strings (case-insensitive) containing any brand alias as a substring AND (`position > 3.0` OR `ctr < 0.10`). The `>3.0` threshold is permissive — brand queries should ALWAYS be position 1; pos 2-3 is borderline (acceptable when competing brands share the name). CTR <10% on a brand query is catastrophic — searchers typing your name aren't clicking.
+
+**Per-anomaly findings** (cap 3 — usually only 1-2 brand-name variants surface):
+
+- `severity`: `high` (entity-recognition deficits compound across every GEO/SEO downstream signal)
+- `certainty`: `0.95` (this is hard evidence — Google's own ranking + click data)
+- `effort_estimate`: `medium`
+- `impressions`, `position`, `clicks`, `ctr`, `query`, `matched_alias` populated
+- `cross_link_findings`: array of related finding IDs from this run — populate with any `schema_validation` finding referencing `Person.@id` AND any `eeat` finding referencing `Person.sameAs` Wikidata. Surfaces the causal chain to the user.
+- `title`: `"⚠ Brand query '<query>' ranks at pos <P> with <C>% CTR — entity-recognition deficit (Google can't unambiguously identify <brand>)"`
+- `recommended_action`: `"Brand queries should rank at position 1 with CTR >30%. Three root causes, in order of impact: (1) Add Wikidata entity to Person.sameAs[] across ALL Person Schema blocks (homepage / about / article / guide / contact — same @id everywhere). Create a Wikidata Q-item if one doesn't exist yet. (2) Unify Person @id across all templates — split #photographer vs #author creates two distinct entity nodes Google can't stitch. (3) Add Organization Schema with logo + sameAs[] to the homepage publisher slot. Cross-link to findings: <cross_link_findings>."`
+
+**Why this matters more than ranking band findings.** Sub-dims 10 (CTR opportunity) and 11 (position-band opportunity) target per-page on-page optimization. Sub-dim 13 targets entity-level recognition — the prerequisite signal that determines how AI Overviews + LLM retrievers attribute citations. The 2026 brief consistently flags entity disambiguation as the highest-leverage GEO investment; this sub-dim makes the symptom visible.
+
+**No false-positive risk** when the brand name resolution is wrong. If the orchestrator picks the wrong brand name (e.g., resolves to "Photography" because it's the first proper noun in CLAUDE.md), Q1 queries matching "photography" would be common search-intent queries, NOT brand queries — they wouldn't trigger the anomaly threshold (CTR would be normal-low across the position band). Defensive design: the trigger only fires when both name-match AND ranking-anomaly conditions hold.
 
 ---
 

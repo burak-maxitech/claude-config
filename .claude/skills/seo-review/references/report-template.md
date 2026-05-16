@@ -87,6 +87,14 @@ The `**GSC mode:**` line uses the fragment string from Step 1.6.10 (one of two: 
 
 If the brief proposed weight adjustments, add a line: `Weight adjustments applied: Generative Engine +3 / Performance -2 / Structured Data -1 (from fetched brief).`
 
+**Probe-skipped rendering (S31 dogfood fix).** When the sitemap URL probe didn't run (dynamic sitemap.ts, no static output, no `--url` flag) and `url_health` is 0/0, the Technical SEO Sub-dim breakdown column MUST surface the redistribution explicitly. The dogfood report rendered `url_health: 0/0 (probe skipped)` without explaining that the missing 8 points elevated the other sub-dims' caps — users couldn't audit the score. Use Form A from `rubric.md` "Rendering the redistribution":
+
+```
+| Technical SEO | 16 | 25 | canonicals: -5.25; hreflang: -2; robots_sitemap: -1.5; redirects: -0.5; url_health: 0/0 (probe skipped, 8pts redistributed: canonicals +2, robots_sitemap +2, mobile +2, hreflang +1, redirects +1) |
+```
+
+When the hreflang sub-dim is also redistributed (non-i18n project), stack both: `(probe skipped + no-i18n, 11pts redistributed: ...)`.
+
 ---
 
 ## Section 2 — Findings
