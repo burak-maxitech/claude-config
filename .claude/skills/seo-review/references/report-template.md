@@ -285,6 +285,7 @@ Other footer notes:
 **GSC-mode footer additions** (when `gsc_mode: enabled`):
 - `Git history scan: 35d, <N> SEO-relevant commits across <M> files. Shallow: <true | false>.` — when shallow: `Git history scan: skipped (shallow clone).`
 - `GSC API: Q1+Q2+Q3 <succeeded|N/3 failed>; URL Inspection <N>/<budget> (<skip count + reasons if any>).`
+- `GSC API cache: <N>/<M> hits (24h TTL<; fresh-call details>). Use --no-cache to force refresh.` — see `gsc-cache.md` "Footer line" for full format examples (full-hit, partial-hit, full-miss/bypass variants).
 - `Page-type map: <N> URLs classified (<distribution>).`
 - `URL impressions map: <N> URLs with traffic data.`
 - `API call failures: <N> (<endpoint, http_status, error_status per line>).` — only when any API call failed.

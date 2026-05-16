@@ -70,6 +70,7 @@ If a source disappears or its URL structure changes, edit this file (not embedde
 | `"ChatGPT search" content optimization 2026` | OpenAI's search/citation behavior |
 | `"E-E-A-T" Generative AI signals 2026` | How experience/expertise/authoritativeness/trust translate to AI citation |
 | `Anthropic Claude search citation` | Claude's web search + citation behavior (when active) |
+| `"Kevin Indig" AI citations text position 2026` | Indig's primary research on ChatGPT citation position bias (44.2% of citations come from first 30% of text, 1.2M-citation analysis). Justifies the "answer-first" detection in `scan-geo.md`. Better authority than third-party paraphrases. |
 
 **Curated WebFetch URLs:**
 
@@ -79,8 +80,9 @@ If a source disappears or its URL structure changes, edit this file (not embedde
 | `https://platform.openai.com/docs/bots` | OpenAI's bot user-agents (GPTBot, OAI-SearchBot, ChatGPT-User) |
 | `https://docs.anthropic.com/en/docs/agents-and-tools/computer-use` *(if relevant)* | Anthropic crawler docs when available |
 | `https://www.perplexity.ai/hub/blog` | Perplexity's blog — discusses crawler + citation behavior |
+| `https://www.onely.com/blog/generative-engine-optimization-geo-checklist-optimize/` | GEO checklist with code-detectable patterns: missing/incomplete `Author` schema, FAQ paragraph length, question-format headings, `llms.txt` presence + permissive AI-crawler rules, `FAQPage` schema/front-end alignment, SSR/client-rendering check. Cites Ahrefs (web-mentions 0.664 vs backlinks 0.218 correlation), McKinsey ($750B / 16% tracking). Filter out the agency-case-study claims ("300% in 90 days", "1,561% ROI") at synthesis time — those are unverified. Last verified 2026-05. |
 
-**Note:** GEO sources are unstable. WebSearch is usually more useful than fixed WebFetch URLs here. The orchestrator should prefer WebSearch for this category, then WebFetch only the highest-signal results.
+**Note:** GEO sources are unstable. WebSearch is usually more useful than fixed WebFetch URLs here. The orchestrator should prefer WebSearch for this category, then WebFetch only the highest-signal results. The Onely URL is included because the checklist's patterns map directly to `scan-geo.md` detection scope; refetch each run because the page may be updated.
 
 ---
 

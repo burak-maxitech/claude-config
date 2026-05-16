@@ -143,10 +143,22 @@ want to commit anyway (e.g., team-shared config), remove the
 ```
 .seo-data/gsc/
 ├── README.md         (this file)
-└── config.yaml       (API configuration — site_url + optional lookback_days)
+├── config.yaml       (API configuration — site_url + optional lookback_days)
+└── cache/            (auto-managed API response cache; 24h TTL — safe to delete)
 ```
 
-Nothing else is needed.
+The `cache/` subdirectory is created by the skill on first GSC-enabled run. It holds JSON responses from `searchanalytics.query` (Q1/Q2/Q3) and `urlInspection.index.inspect` so reruns within 24 hours don't burn API quota. You don't need to manage it — the skill prunes entries older than 7 days automatically.
+
+## Cache + quota preservation
+
+The 2,000-calls/day URL Inspection quota is the scarce resource. To preserve it across iterative runs:
+
+- **Default behavior:** Every API call is wrapped in a 24h disk cache. Same-day reruns hit cache → zero quota consumed.
+- **Force refresh:** `/seo-review --no-cache` bypasses the cache lookup and refetches everything. Fresh responses still get written to cache for the next run. Use when you've pushed a fix and want Google's current view, or when you suspect cached data is wrong.
+- **Manual cache reset:** `rm -rf .seo-data/gsc/cache/` — safe; the cache is reproducible from the API on demand.
+- **Inspect cache:** `ls -la .seo-data/gsc/cache/` — shows per-call files with timestamps.
+
+The footer of each run reports cache hit/miss stats so you can see how much quota was actually consumed.
 
 ## Troubleshooting
 
@@ -161,8 +173,10 @@ Nothing else is needed.
 | Footer says `Search Console API access denied: 403 PERMISSION_DENIED` (no SERVICE_DISABLED) | The Google account isn't verified on this GSC property | Verify property ownership in https://search.google.com/search-console > Settings, or switch ADC to an account that owns the property |
 | Footer says `site_url '<X>' not in your verified properties` | `site_url` value doesn't match what's registered in GSC | Check exact format at https://search.google.com/search-console > Settings > Property settings. `sc-domain:example.com` for Domain properties; `https://example.com/` (with trailing slash) for URL-prefix |
 | Footer says `Config error: nested keys not supported` | `config.yaml` has indented keys | Use flat single-level keys only (`site_url: x` not `gsc:\n  site_url: x`) |
-| Footer says `URL Inspection quota exhausted` | Hit 2,000/day per-property cap | Re-run tomorrow — graceful degrade kept the run going |
-| First run takes 10-15 seconds | Normal — up to 100 parallel URL inspections + 3 Performance queries | No action needed |
+| Footer says `URL Inspection quota exhausted` | Hit 2,000/day per-property cap | Re-run tomorrow — graceful degrade kept the run going. Future reruns within 24h will hit the disk cache and won't consume more quota. |
+| First run takes 10-15 seconds | Normal — up to 100 parallel URL inspections + 3 Performance queries | No action needed. Subsequent same-day reruns finish in 1-2 seconds (cache hits, no network). |
+| Worried about quota when iterating on a fix | The default 24h disk cache handles this — reruns within the day are free | Just rerun. Use `--no-cache` only when you genuinely need Google's current view (e.g., after pushing a fix and waiting for recrawl). |
+| Want to clear cache without running with `--no-cache` | Cache is plain JSON files in `.seo-data/gsc/cache/` | `rm -rf .seo-data/gsc/cache/` — next run starts fresh |
 
 ## Removing GSC integration
 

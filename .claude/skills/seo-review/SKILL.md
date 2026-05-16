@@ -4,7 +4,7 @@ description: Repo-wide SEO and Generative Engine Optimization audit for web proj
 disable-model-invocation: true
 allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(grep:*), Bash(sed:*), Bash(cat:*), Bash(head:*), Bash(gcloud:*), Bash(curl:*), Task
 effort: high
-argument-hint: "[path] [--plan] [--fix] [--url <deployed-url>]"
+argument-hint: "[path] [--plan] [--fix] [--url <deployed-url>] [--no-cache]"
 ---
 
 # SEO Review — Repo-Wide SEO + Generative Engine Optimization Audit
@@ -129,6 +129,8 @@ Steps 1.5 (git scan) and 1.6 (GSC API ingestion when configured, else heuristic-
 - `Read .seo-data/gsc/config.yaml` (optimistic; if file doesn't exist the tool errors silently — interpret as `api_configured = false`)
 - `Read references/gsc-api-queries.md` (optimistic; only used when API activates — reading early avoids an extra Read in Turn 2)
 - `Read references/gsc-api-schema.md` (optimistic; reference for API response parsing)
+- `Read references/gsc-cache.md` (optimistic; cache wrapper template + TTL policy used by Turn 2 dispatch)
+- `Bash: mkdir -p .seo-data/gsc/cache 2>/dev/null; find .seo-data/gsc/cache -type f -mtime +7 -delete 2>/dev/null; ls .seo-data/gsc/cache 2>/dev/null | wc -l` (cache dir setup + 7-day prune + count of remaining entries — produces `<N>` for the footer cache stats line. `mkdir` here is load-bearing — the Turn 2 wrapper assumes the dir exists and does NOT recreate it per call. See `references/gsc-cache.md` "Eviction policy".)
 - `Bash: gcloud --version 2>&1` (gcloud SDK install detection)
 - `Bash: TOKEN=$(gcloud auth application-default print-access-token 2>&1); ADC_DIR=$(gcloud info --format="value(config.paths.global_config_dir)" 2>/dev/null); QUOTA_PROJECT=$(grep -oE '"quota_project_id"[[:space:]]*:[[:space:]]*"[^"]+"' "$ADC_DIR/application_default_credentials.json" 2>/dev/null | head -1 | sed -E 's/.*"([^"]+)"$/\1/'); echo "TOKEN_LEN:${#TOKEN}"; echo "QUOTA_PROJECT:$QUOTA_PROJECT"; curl -s -w "\nHTTP_STATUS:%{http_code}\n" -H "Authorization: Bearer $TOKEN" -H "x-goog-user-project: $QUOTA_PROJECT" "https://www.googleapis.com/webmasters/v3/sites"` (combined ADC + quota-project + API auth probe in one Bash invocation; orchestrator parses `TOKEN_LEN:`, `QUOTA_PROJECT:`, and `HTTP_STATUS:` to determine ADC + quota project + API reachability. The `x-goog-user-project` header is required on every Search Console API call to bill quota to the user-controlled project; ADC stores the value in `application_default_credentials.json` after `gcloud auth application-default set-quota-project <id>`. Without it, all calls return 403 SERVICE_DISABLED. **Extraction uses `grep -oE` + `sed -E` instead of `jq`** — `jq` isn't on PATH in many bash environments (notably claude-code's Bash on Windows + minimal Linux containers); grep + sed are always available.)
 
@@ -290,10 +292,11 @@ When shallow: `Git history scan: skipped (shallow clone — change-awareness ann
 
 GSC data is ingested via the **Search Console API**: `searchanalytics.query` for Performance signal, `urlInspection.index.inspect` per-URL for Indexing signal. Configuration is a single key (`site_url`) in `.seo-data/gsc/config.yaml`. When not configured or unreachable, the skill runs heuristic-only.
 
-Three reference files cover the implementation:
+Four reference files cover the implementation:
 - `references/gsc-ingestion.md` — digest shapes, 12 sub-dim finding catalog, `coverageState` → 9-reason lookup, setup banner, `.gitignore` auto-append rules
 - `references/gsc-api-schema.md` — Search Console API endpoint inventory, auth/scope, quota model, `coverageState`/`pageFetchState` enums
 - `references/gsc-api-queries.md` — 3 parametrized `curl` templates (Q1/Q2/Q3) + URL Inspection per-URL template + URL selection algorithm + lookup table
+- `references/gsc-cache.md` — 24h TTL response cache for `searchanalytics.query` + `urlInspection.index.inspect`. Cache wrapper bash template (atomic write, skip-cache-on-non-200, stat portability). `--no-cache` bypass behavior. 7-day eviction policy. Footer line format.
 
 ### Mode resolution (binary)
 
@@ -393,10 +396,12 @@ If the Turn 2 dispatch needs to re-fetch (e.g., token approaching 1-hour TTL on 
 
 **Every Turn 2 curl call MUST include both headers:** `Authorization: Bearer $TOKEN` AND `x-goog-user-project: $QUOTA_PROJECT`. Omitting the quota-project header returns 403 SERVICE_DISABLED even when auth is otherwise valid.
 
-**Turn 2a — Performance (3 parallel curl calls)** for Q1 (queries digest) + Q2 (pages digest) + Q3 (`url_impressions_map`), using templates from `references/gsc-api-queries.md`. Substitute `<<LOOKBACK_DAYS>>` and the URL-encoded `site_url` (`:` → `%3A`, `/` → `%2F` per `gsc-api-schema.md`):
+**Cache-aware dispatch.** Each curl call wraps in the cache pattern from `references/gsc-cache.md` "Cache wrapper" — 24h TTL, atomic write, skip-cache-on-non-200. The wrapper checks `.seo-data/gsc/cache/<prefix>-<hash>.json` and returns the cached body on hit (printing `CACHE_STATUS:HIT age=<N>s` as first line), else issues a fresh curl and writes the response atomically on HTTP 200 (printing `CACHE_STATUS:MISS http=<code>`). The orchestrator parses the first line for footer stats and treats the rest of stdout as the JSON body. **Cache bypass:** when `$ARGUMENTS` includes `--no-cache`, set `NO_CACHE=1` in the per-call environment before invocation — the wrapper skips the lookup but still writes fresh responses to cache.
+
+**Turn 2a — Performance (3 parallel cache-or-curl calls)** for Q1 (queries digest) + Q2 (pages digest) + Q3 (`url_impressions_map`), using templates from `references/gsc-api-queries.md`. Per-call substitutions: `<<LOOKBACK_DAYS>>`, URL-encoded `site_url` (`:` → `%3A`, `/` → `%2F` per `gsc-api-schema.md`), and the per-Q cache filename prefix (`sa-q1`/`sa-q2`/`sa-q3`). Each call uses the `references/gsc-cache.md` "Cache wrapper" bash block — fully shown there, NOT inlined here. The fresh-path curl inside the wrapper is:
 
 ```
-curl -s -X POST \
+curl -s -w '%{http_code}' -o "$TMP" -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "x-goog-user-project: $QUOTA_PROJECT" \
   -H "Content-Type: application/json" \
@@ -404,10 +409,10 @@ curl -s -X POST \
   "https://www.googleapis.com/webmasters/v3/sites/<SITE_URL_ENCODED>/searchAnalytics/query"
 ```
 
-**Turn 2b — URL Inspection (N parallel curl calls, N ≤ 100)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (top 80 by impressions from Q3 + 20 git-changed paths from Step 1.5 resolved via `page_type_map`, dedup, hard cap 100). Then fire N parallel calls:
+**Turn 2b — URL Inspection (N parallel cache-or-curl calls, N ≤ 100)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (top 80 by impressions from Q3 + 20 git-changed paths from Step 1.5 resolved via `page_type_map`, dedup, hard cap 100). Each URL gets its own cache slot (`ui-<sha1(site_url|inspection_url)>.json`) — partial cache hits across the batch are expected (e.g., 80 cached + 20 fresh after a rerun). Fresh-path curl inside the wrapper:
 
 ```
-curl -s -X POST \
+curl -s -w '%{http_code}' -o "$TMP" -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "x-goog-user-project: $QUOTA_PROJECT" \
   -H "Content-Type: application/json" \
@@ -417,7 +422,9 @@ curl -s -X POST \
 
 Note: `siteUrl` in this request is a **body field** (raw, no URL encoding) — distinct from Search Analytics where it's a path param.
 
-Step 1.6 total: 3 turns max (Turn 1 detection + Turn 2a Performance + Turn 2b Inspection). Heuristic-only mode finishes after Turn 1.
+**Per-call cache stats capture.** For each call (Q1/Q2/Q3 + each URL Inspection), record `cache_status: hit | miss` and `age_seconds` (when hit) from the wrapper's first-line output. Aggregate into `{cache_hits: N, cache_misses: M, miss_call_tags: [...]}` for the Step 1.6.12 footer line. Quota tracking adjusts: cache hits don't count against the 2,000/day URL Inspection quota — only `cache_misses` consume quota.
+
+Step 1.6 total: 3 turns max (Turn 1 detection + Turn 2a Performance + Turn 2b Inspection). Heuristic-only mode finishes after Turn 1. Full-cache-hit run (all 103 calls served from cache) consumes zero API quota and shaves several seconds off wall time.
 
 ### 1.6.7 — Parse outputs into digests
 
@@ -500,8 +507,15 @@ Append to Step 5's footer (after the Step 1.5.7 git-history line):
 GSC mode: <enabled | disabled>. <source detail when enabled>
 <freshness line — "real-time view of GSC's ~2-day-lagged pipeline" when enabled; absent when disabled>
 <URL Inspection status when api active — "Inspected N/M URLs; quota remaining ~Y/2000 today">
+<GSC API cache when api active — see "Cache stats line" below>
 <Search Analytics rows when api active — "Search Analytics rows: Q1 <N1>/<L1>, Q2 <N2>/<L2>, Q3 <N3>/<L3> (rowLimit cap). ✓ no truncation" OR "⚠ Q<X> hit rowLimit cap — likely truncated; consider raising rowLimit or paginating with startRow for fuller coverage. Q3 cap-hit affects url_impressions_map completeness → URLs outside top-25k get traffic_weight=1.0 fallback in Step 6.6 ranking">
 <API call failures, if any — one line per failed call with HTTP status + error_status>
+```
+
+**Cache stats line — canonical example** (full variant set in `references/gsc-cache.md` "Footer line" — full-hit / partial-hit / full-miss / bypass forms):
+
+```
+GSC API cache: 83/103 hits (24h TTL; 20 fresh calls — typically new URLs from this run's git scan). Use --no-cache to force refresh.
 ```
 
 **Search Analytics row line — examples:**
@@ -521,9 +535,9 @@ Truncated url_impressions_map (large site):
 Search Analytics rows: Q1 18400/25000, Q2 25000/25000, Q3 25000/25000 (rowLimit cap). ⚠ Q2+Q3 hit rowLimit cap — likely truncated. Q3 truncation affects url_impressions_map completeness → URLs outside top-25k by impressions get traffic_weight=1.0 fallback in Step 6.6 ranking (rankings still work but lose some traffic-prioritization signal). Pagination via startRow not yet implemented; revisit when a dogfood surfaces this on a real site.
 ```
 
-In heuristic-only mode, render only: `GSC mode: disabled. Reason: <blocker from 1.6.3>.` — the Section 1 banner carries the user-facing call to action; the footer line is a machine-readable audit record.
+In heuristic-only mode, render only: `GSC mode: disabled. Reason: <blocker from 1.6.3>.` — the Section 1 banner carries the user-facing call to action; the footer line is a machine-readable audit record. No cache stats line in heuristic-only mode (nothing to cache).
 
-Quota tracking is approximate (the API doesn't expose a precise counter — back-of-envelope: `2000/day per property minus inspections this run`).
+Quota tracking is approximate (the API doesn't expose a precise counter — back-of-envelope: `2000/day per property minus cache_misses this run`). Cache hits do NOT consume quota and should not be counted toward the daily total.
 
 ---
 
@@ -537,9 +551,12 @@ Three rules the orchestrator must follow when ingesting external data. Surfaced 
 
 - `config.yaml` (user-authored)
 - `README.md` (skill-auto-written on first detection)
+- `cache/` (skill-auto-managed; **TTL'd API response cache** — see `references/gsc-cache.md`)
 - `.gsc-banner-shown` (sentinel — sits in `.seo-data/` not `.seo-data/gsc/`)
 
-**Never write raw API responses, parsed JSON, intermediate inspection results, or any other ephemeral data to `.seo-data/gsc/`.** When the orchestrator needs disk-cache for parsing (e.g., a Search Analytics response of 200KB+ that would burn too much context to keep raw), write to **system temp** instead:
+The `cache/` subdirectory is the only sanctioned location for persisted API responses. The orchestrator owns its lifecycle (creates on Turn 1, writes via atomic mv in Turn 2, prunes entries >7d at the start of each run). Cache content is reproducible from the API on demand — safe to delete manually.
+
+**Never write raw API responses, parsed JSON, intermediate inspection results, or any other ephemeral data anywhere else under `.seo-data/gsc/`.** When the orchestrator needs short-lived parsing scratch space (e.g., decoding a 200KB JSON body that doesn't belong in cache), write to **system temp** instead:
 
 ```
 TMPFILE=$(mktemp -t gsc-q1-XXXXXX.json)
@@ -602,8 +619,11 @@ Interpret `$ARGUMENTS`:
 | `--plan` | After report, emit phased rewrite brief (read `references/plan-mode-seo.md`) |
 | `--fix` | After report, apply strict-allowlist mechanical fixes with per-finding diff preview (read `references/fix-allowlist.md`) |
 | `--url <deployed-url>` | Live HTML fetch for SSR/SSG checks AND synthesizes sitemap URL probe bases when sitemap URLs are relative |
+| `--no-cache` | Bypass the 24h GSC API response cache. Forces fresh `searchanalytics.query` + `urlInspection.index.inspect` calls. Fresh responses are still written to cache for next run. Use when iterating on a fix and you need Google's current view, or when you suspect cached data is wrong. See `references/gsc-cache.md` for TTL policy + manual cache management. |
 
 `--plan` and `--fix` are mutually exclusive. If both supplied: "Pick one — `--plan` emits a brief, `--fix` applies edits."
+
+`--no-cache` is compatible with all other flags. No-op when `gsc_mode: disabled` (nothing to cache).
 
 ---
 

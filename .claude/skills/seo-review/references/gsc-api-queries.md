@@ -8,7 +8,7 @@ Loaded by the orchestrator (Step 1.6) when the Search Console API is the active 
 - `coverageState` + `pageFetchState` → 9-reason **lookup table** (full)
 - Quota degradation rules
 
-For endpoint inventory, auth, quota model, and enum reference, see `gsc-api-schema.md`. For digest field translation and integration with the 12 sub-dim catalog, see `gsc-ingestion.md` "API ingestion" subsection.
+For endpoint inventory, auth, quota model, and enum reference, see `gsc-api-schema.md`. For digest field translation and integration with the 12 sub-dim catalog, see `gsc-ingestion.md` "API ingestion" subsection. **For the disk-cache wrapper that wraps every Q1/Q2/Q3/URL-Inspection call (24h TTL, atomic write, skip-on-non-200), see `gsc-cache.md` — the curl shapes in this file are the fresh-path body inside the wrapper, not standalone invocations.**
 
 
 ---
@@ -31,8 +31,10 @@ QUOTA_PROJECT=$(grep -oE '"quota_project_id"[[:space:]]*:[[:space:]]*"[^"]+"' "$
 
 ### Search Analytics call shape
 
+The orchestrator wraps every call in the `gsc-cache.md` "Cache wrapper" pattern (24h TTL by default, bypassed when `--no-cache` flag is set). Inside the wrapper, the fresh-path curl is:
+
 ```
-curl -s -X POST \
+curl -s -w '%{http_code}' -o "$TMP" -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "x-goog-user-project: $QUOTA_PROJECT" \
   -H "Content-Type: application/json" \
@@ -40,18 +42,24 @@ curl -s -X POST \
   "https://www.googleapis.com/webmasters/v3/sites/<SITE_URL_ENCODED>/searchAnalytics/query"
 ```
 
+`$TMP` is the per-call temp file (`$CACHE_FILE.tmp.$$`) — atomic rename to `$CACHE_FILE` on HTTP 200, discarded on non-200. Cache filename uses the `sa-q1`/`sa-q2`/`sa-q3` prefix per call. Cache key inputs documented in `gsc-cache.md` "Search Analytics" section.
+
 Where `<SITE_URL_ENCODED>` is the `site_url` from config.yaml with `:` → `%3A` and `/` → `%2F`. See `gsc-api-schema.md` "Site URL encoding".
 
 ### URL Inspection call shape
 
+Same cache wrapper. Fresh-path curl:
+
 ```
-curl -s -X POST \
+curl -s -w '%{http_code}' -o "$TMP" -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "x-goog-user-project: $QUOTA_PROJECT" \
   -H "Content-Type: application/json" \
   -d '{"inspectionUrl":"<URL>","siteUrl":"<SITE_URL_RAW>"}' \
   "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect"
 ```
+
+Cache filename uses the `ui-<sha1(site_url|inspection_url)>` prefix — one slot per inspected URL, so partial cache hits across a 100-URL batch are common after the first run of the day.
 
 **Note**: URL Inspection uses `siteUrl` as a **request body field** (raw, no encoding). Search Analytics uses it as a **path parameter** (encoded). Don't confuse them.
 
@@ -73,7 +81,7 @@ Per-call failure is non-fatal. Failed call's signal is skipped; other calls proc
 
 ### Cap-hit detection (per-call)
 
-After each Q1/Q2/Q3 response, capture:
+After each Q1/Q2/Q3 response (cache hit OR fresh fetch — applies to both), capture:
 
 ```
 rows_received = len(response.rows or [])
@@ -81,7 +89,7 @@ rowLimit_requested = <the rowLimit value sent in the request body, default 25000
 cap_hit = (rows_received == rowLimit_requested)
 ```
 
-`cap_hit = true` signals **likely truncation** — either the site has >rowLimit unique candidates and we lost data past the cap, OR the site genuinely has exactly rowLimit candidates (false-positive). Either way the user wants to know.
+`cap_hit = true` signals **likely truncation** — either the site has >rowLimit unique candidates and we lost data past the cap, OR the site genuinely has exactly rowLimit candidates (false-positive). Either way the user wants to know. **Cap-hit detection runs on the response body regardless of cache state** — a cached response stays as-truncated as when it was originally fetched, so the warning is still accurate.
 
 Stash `{q1: {received, limit, cap_hit}, q2: {...}, q3: {...}}` in shared context for SKILL.md Step 1.6.12 footer rendering. The orchestrator emits the cap-hit summary line and (if any cap was hit) a truncation warning recommending raised rowLimit or startRow pagination.
 
@@ -410,7 +418,7 @@ Highly unlikely on a 1-call probe. If it happens: surface "GSC API quota exhaust
 
 ## Parallel dispatch
 
-All Q1-Q3 fire in a **single parallel Bash turn**. URL Inspection batch fires in a **second parallel Bash turn** after Q3 returns (since Q3's output feeds the URL Inspection selection algorithm). Total wall time: ~5-15 seconds typical (3 fast searchanalytics + 100 parallel inspections).
+All Q1-Q3 fire in a **single parallel Bash turn**. URL Inspection batch fires in a **second parallel Bash turn** after Q3 returns (since Q3's output feeds the URL Inspection selection algorithm). Total wall time: ~5-15 seconds typical (3 fast searchanalytics + 100 parallel inspections). Cache-hit responses are served from disk synchronously inside each Bash invocation — there's no special "cache-aware" turn structure; every call goes through the same cache-wrapped Bash block in `gsc-cache.md`. A full-cache-hit rerun completes Turn 2 in ~1-2 seconds (no network).
 
 Schematically:
 
