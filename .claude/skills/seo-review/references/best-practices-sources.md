@@ -23,14 +23,13 @@ If a source disappears or its URL structure changes, edit this file (not embedde
 
 **Curated WebFetch URLs** (last verified 2026-05 — refresh if 404):
 
-| URL | What it covers | Priority |
-|---|---|---|
-| `https://developers.google.com/search/docs/fundamentals/ai-optimization-guide` | **Google's first-party AI Search optimization guide** (published 2026-05). Directly addresses AEO/GEO. Explicitly says: AEO/GEO is SEO (same foundations apply, no special tactics); `llms.txt` is **not needed** ("no need to create new machine readable files, AI text files, markup, or Markdown"); structured data is **not required** for generative AI search ("no special schema.org markup"); content chunking + AI-specific rewrites are **unnecessary**; debunks pursuing inauthentic mentions. Reframes RAG + query fan-out as making traditional SEO directly relevant. **Authoritative counterweight to third-party GEO speculation.** | **priority** — always fetch every run |
-| `https://developers.google.com/search/docs/fundamentals/seo-starter-guide` | The official starter guide; entrypoint for crawling/indexing basics | |
-| `https://developers.google.com/search/docs/appearance/structured-data` | Structured data overview + supported types | |
-| `https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview` | Sitemap format + best practices | |
-| `https://web.dev/learn/seo` | web.dev SEO course (refreshed regularly) | |
-| `https://web.dev/articles/vitals` | Current Core Web Vitals definitions + thresholds | |
+| URL | What it covers |
+|---|---|
+| `https://developers.google.com/search/docs/fundamentals/seo-starter-guide` | The official starter guide; entrypoint for crawling/indexing basics |
+| `https://developers.google.com/search/docs/appearance/structured-data` | Structured data overview + supported types |
+| `https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview` | Sitemap format + best practices |
+| `https://web.dev/learn/seo` | web.dev SEO course (refreshed regularly) |
+| `https://web.dev/articles/vitals` | Current Core Web Vitals definitions + thresholds |
 
 ---
 
@@ -83,8 +82,6 @@ If a source disappears or its URL structure changes, edit this file (not embedde
 
 **Note:** GEO sources are unstable. WebSearch is usually more useful than fixed WebFetch URLs here. The orchestrator should prefer WebSearch for this category, then WebFetch only the highest-signal results.
 
-**Authoritative cross-reference:** Google's AI Optimization Guide (Category 1, priority URL) is the **first-party** source on Google's stance toward AEO/GEO and explicitly debunks several third-party patterns (separate llms.txt files, AI-specific content rewrites, special schema.org markup for AI). When the brief synthesis encounters conflicting guidance, the Google guide wins on Google-search-specific topics; third-party blogs win on cross-engine citation behavior (Perplexity, ChatGPT, Claude — Google's guide doesn't cover those).
-
 ---
 
 ## Source category 4: Third-party authority blogs (synthesis)
@@ -107,14 +104,13 @@ If a source disappears or its URL structure changes, edit this file (not embedde
 Step 1 of `SKILL.md` instructs:
 
 1. Run all queries from categories 1-4 in parallel (single turn) via `WebSearch`.
-2. **Always fetch URLs marked `priority`** regardless of WebSearch results (Google AI Optimization Guide etc.) — these are first-party authoritative sources whose presence in the brief is non-negotiable.
-3. From WebSearch results, pick the top 1-2 most authoritative URLs per category and `WebFetch` them in parallel (alongside priority URLs in the same turn).
-4. Synthesize into the ~50-line best-practices brief. **When priority-source guidance conflicts with third-party/blog guidance on Google-search-specific topics, the priority source wins** — surface the divergence in the brief with `(per Google AI Optimization Guide)` annotation so subagents can prefer it.
-5. Pass the brief to all 3 subagents (4 when GSC API enabled).
+2. From WebSearch results, pick the top 1-2 most authoritative URLs per category and `WebFetch` them in parallel.
+3. Synthesize into the ~50-line best-practices brief.
+4. Pass the brief to all 3 subagents.
 
 **Optimization:** if `Step 0` detected a specific framework (Next.js, Astro, Rails, etc.), add one framework-specific WebSearch query (`"<framework> SEO best practices 2026"`) to the batch.
 
-**Failure handling:** if WebSearch / WebFetch return nothing useful (network failure, rate limit, etc.), the orchestrator falls back to embedded heuristics in the scan-*.md files and notes the fallback in the report footer. **Priority-URL fetch failure** is logged separately in the footer (e.g., "Google AI Optimization Guide fetch failed — falling back to embedded heuristics for AI-search topics; result may diverge from Google's current first-party guidance").
+**Failure handling:** if WebSearch / WebFetch return nothing useful (network failure, rate limit, etc.), the orchestrator falls back to embedded heuristics in the scan-*.md files and notes the fallback in the report footer.
 
 ---
 
