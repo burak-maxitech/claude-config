@@ -264,3 +264,77 @@
 - **Dogfood `/seo-review` v2 on a real web project with real GSC CSVs.** This is the validation v2 was built for. Watch for: (a) banner shows once + sentinel suppresses thereafter, (b) all 4 subagents dispatch in parallel and Step 1.5+1.6 tool calls actually batch (target ≤2 turns total for the foundation gather), (c) page_type_map flows correctly across `geo-generative` and `seo-gsc-insights`, (d) Section 3 renders all 6 sub-blocks when CSVs are present and is omitted entirely when not, (e) `code_changed_since_gsc_window` annotations fire when commit history overlaps a finding's path (intentionally commit a meta-tag change before running to verify), (f) routing-rename + 404-cluster co-occurrence produces the bulk-redirect snippet in `--plan` Phase 1, (g) score-invariant test: same repo with and without `.seo-data/gsc/` should produce identical /100 score.
 - **Continue dogfooding the four other built-but-untested skills** — `/test-review`, `/architecture-review`, `/code-health-advice` plus the new v2 `/seo-review`. Original Next Steps #1-4 unchanged in priority.
 - Address `/seo-review` deferred refactors only after v2 dogfood reveals which ones matter (Next Steps #5).
+
+### Session 30 - 2026-05-15
+
+**What happened:**
+
+Direct continuation of Session 29's Next Step #1: "Dogfood `/seo-review` v3.x (API path) on a real web project with a verified GSC property." Phase 4 milestone — first real-world end-to-end run of the skill against a verified GSC property (`sc-domain:burakarik.com`, siteOwner). The dogfood surfaced two skill bugs same-session (both shipped + pushed mid-session before re-running) plus three under-specified ingestion conventions (codified into a new cross-cutting section in SKILL.md after the run completed). Real-world value delivered: 40/100 baseline score on burakarik.com + actionable top-3 priorities including AI-citation evidence in GSC queries.
+
+**Session arc:**
+
+1. **Pre-skill manual API probe.** User had `gcloud auth application-default login --scopes=...,webmasters.readonly,cloud-platform` from a prior session. PowerShell probe via `Invoke-RestMethod` hit 403 SERVICE_DISABLED at first. Root cause: `gcloud services enable searchconsole.googleapis.com --project=burakarik` had never been run, and `gcloud auth application-default set-quota-project burakarik` had never been run. After both, probe STILL failed with the same 403 — discovered the `x-goog-user-project` HTTP header is required on every Cloud-API request when authenticating via user-credential ADC (Google client libraries auto-add it from the ADC JSON file; raw `curl`/`Invoke-RestMethod` does not). Manual probe with explicit `-H "x-goog-user-project: burakarik"` returned 200 + `siteEntry` with both `http://www.burakarik.com/` and `sc-domain:burakarik.com` (siteOwner permission).
+
+2. **Skill bug #1 confirmed pre-flight: missing `x-goog-user-project` header.** Grepped the skill — zero references to `x-goog-user-project` across all 5 GSC files (SKILL.md, gsc-api-queries.md, gsc-api-schema.md, gsc-ingestion.md, gsc-setup-readme-template.md). The skill's design from S29 had the auth contract right (token via `gcloud auth application-default print-access-token`) but missed the second mandatory header. Fixed by reading ADC quota project from `application_default_credentials.json:quota_project_id` (resolved cross-platform via `gcloud info --format="value(config.paths.global_config_dir)"` + `jq -r`), then sending both headers on every API call. Activation conditions updated: 6 conditions (was 5), with #4 = "ADC quota project set, non-empty". Probe Bash in Step 1.6.1 now captures `QUOTA_PROJECT:` line and orchestrator validates non-empty before declaring `api_active`. Setup README restructured from 3-step to 4-step (added explicit "Enable the API" step calling `gcloud services enable searchconsole.googleapis.com`). New quick-verify section added with both PowerShell and Bash probes including the header. Troubleshooting table gained 3 new rows. Shipped as commit `835800d` (+137/-36 across 5 files). Pushed before first /seo-review attempt.
+
+3. **Skill bug #2 surfaced live during first /seo-review run: `jq` extraction silently failed.** Orchestrator's probe Bash output showed `QUOTA_PROJECT:` (empty) despite the user having run `set-quota-project burakarik` minutes earlier. Direct Grep of the ADC JSON confirmed `"quota_project_id": "burakarik"` IS present in the file. Root cause: `jq` is not on PATH in claude-code's Bash environment on Windows (gcloud SDK doesn't bundle it; Windows doesn't ship with it). The `2>/dev/null` swallowed the "command not found" error, leaving `$QUOTA_PROJECT` empty → no header sent → same 403. Skill correctly degraded to heuristic-only for that run. Fixed by replacing `jq -r '.quota_project_id // empty'` with `grep -oE '"quota_project_id"[[:space:]]*:[[:space:]]*"[^"]+"' | head -1 | sed -E 's/.*"([^"]+)"$/\1/'` across all 5 affected files. grep + sed are bash core utilities, always available. Trade-off: JSON-flat-only regex (safe here since the field is top-level string). Allowed-tools updated: `Bash(jq:*)` → `Bash(grep:*)` + `Bash(sed:*)`. Shipped as commit `bc1170a` (+16/-12).
+
+4. **Successful end-to-end run.** Re-ran /seo-review in the burakarik6 session — symlink resolved the live skill files, no harness restart needed. Turn 1 probe returned `TOKEN_LEN:253`, `QUOTA_PROJECT:burakarik`, `HTTP_STATUS:200`. Step 0 line confirmed `Mode: heuristic + GSC (Search Console API — 40 URLs inspected, 3 perf queries)`. 4th `seo-gsc-insights` subagent dispatched in parallel with the other 3 (`seo-technical` / `seo-content` / `geo-generative`). Total runtime ~16 minutes on `xhigh` effort. Final report: 40/100 score (subtotal_check 15.75+5.6+6.3+7.4+5.25 = 40.30 ✓), 20 GSC findings info-only (score_impact:0), top-3 priorities all `[gsc]`-tagged.
+
+5. **Watch-for checklist results (from S29 CLAUDE.md Next Step #1):**
+
+| Item | Result |
+|---|---|
+| (a) Step 0 line shows API mode + counts | ✅ "40 URLs inspected, 3 perf queries" |
+| (b) 4th `seo-gsc-insights` subagent dispatches in parallel | ✅ "seo-gsc-insights · 34 tool uses · 57.5k tokens" |
+| (c) Section 3 GSC Insights renders | ✅ 12-row sub-dim table |
+| (d) Score invariant /100 preserved | ✅ `subtotal_check: 40.30 ✓ \| gsc_findings: 20 (info-only, 0 score impact)` |
+| (e) `code_changed_since_gsc_window` annotations fire | ✅ certainty=0.4 on canonical_conflict / not_found_404 / page-with-redirect ("Session 63 fix deploying") |
+| (f) Routing-rename → bulk-redirect snippet | — not tested (didn't run `--plan`) |
+| (g) URL Inspection budget log in footer | ✅ "URL Inspection: 40/40 succeeded; quota remaining ~1,960/2,000 today" |
+| (h) Graceful degrade on quota / auth failure | — not tested (everything worked) |
+| (i) `coverageState` "Other" bucket | — not triggered (all 40 URLs mapped cleanly) |
+
+6. **3 follow-ups surfaced + fixed same-session (commit `bc35331`, +78/-6 across 2 files):**
+
+   - **Disk-write boundary.** Orchestrator wrote raw API responses to `.seo-data/gsc/` (`gsc_q1_queries.json`, `gsc_q2_pages.json`, `gsc_q3_urlmap.json`, `inspect/*`), violating the design that `.seo-data/gsc/` is reserved for user config + skill-auto-generated content only. Added new "## Ingestion conventions" section in SKILL.md (positioned after Step 1.6, before Step 2) explicitly forbidding this with a `mktemp` example pointing to system temp. The leftover JSON files in the user's burakarik6 working tree are gitignored (no leak) but noted as cleanup the user can do.
+
+   - **JSON parser fallback chain.** Windows `python3` resolves to the Microsoft Store install stub which exits non-zero with "Python was not found" output — orchestrator's first parse attempt failed before recovering by retrying with `python`. Spec now documents the detection chain (`jq` → `python` → `python3` → bash regex) with the Windows-specific caveat to prefer `python` over `python3`. Detection pattern example included.
+
+   - **Budget utilization expectation.** Orchestrator used 40/100 URLs for URL Inspection and 13/100 for sitemap probe despite 1,304 URLs in impressions map and 2,895 in sitemap. Spec now states "the cap is the ceiling, not the target" — orchestrator MUST attempt to fill the budget when candidates available, no subjective trimming. Updated URL Inspection "Source allocation" rule in gsc-api-queries.md to take literal top-N by impressions with no minimum threshold. Updated SKILL.md Step 3.2 sitemap probe wording. Pre-flight budget log example now requires source breakdown so under-utilization is auditable.
+
+7. **Real-world findings delivered (burakarik.com).** 40/100 score (down from S29 baseline of 60 — orchestrator's report explained: "this run added live GSC API data revealing the CTR catastrophe Session 63's static heuristics couldn't see, and deeper entity-consistency scans that surfaced Person @id fragmentation. Nothing regressed — the audit got sharper."). Top-3 [gsc]-tagged priorities: (1) CTR catastrophe on `/en/article/smartphone-vs-mirrorless-2026` (59,679 impressions @ 0.28% CTR — ~4-5K clicks/quarter recovery potential via Sanity title rewrite); (2) striking-distance cluster of 4 article queries at position 5-15 with <1% CTR; (3) article H2 anchor IDs use raw Sanity `_key` hashes (1,061 impressions / 0 clicks on fragment URLs). **AI-citation evidence:** queries `"do not update memories. which phones take the best photos…"` (924 impressions @ pos 7.7) + `"do not update memories. what the best cameras are for beginners…"` (223 impressions @ pos 2.1) — verbatim AI-assistant system prompts leaking into GSC, confirming ChatGPT/Claude/Perplexity pulling from the article.
+
+8. **/update-docs Full Path this session.** Drift probes: session-history.md at 5 full-prose entries after S30 (at-cap, no Part 5 rollup); Key Decisions at 20 rows after add (at-cap, no Part 6 rollup); CLAUDE.md ~32k chars (under 35k soft warn). Also surfaced: **Session 27 entry missing from `docs/session-history.md`** — lost between S26 + S28 in some prior /update-docs run; commit `47464e2` preserves the content. Not reconstructed this session — flagged for future as a data-integrity issue to resolve when convenient.
+
+**Files modified (skill side):**
+
+- `.claude/skills/seo-review/SKILL.md` — Step 1.6.1 probe Bash (header + jq, later grep+sed); Step 1.6.3 activation conditions reordered with new "ADC quota project not set" / "SERVICE_DISABLED" error mappings; Step 1.6.6 Turn 2a/2b curl templates updated with header; allowed-tools `Bash(jq:*)` → `Bash(grep:*)` + `Bash(sed:*)`; new top-level "## Ingestion conventions" section (disk-write boundary + JSON parser fallback + budget utilization); Step 3.2 sitemap probe wording tightened. Net +155/-42 across 3 commits.
+- `.claude/skills/seo-review/references/gsc-api-queries.md` — Token acquisition section extended (gcloud info + grep extraction); both curl templates include header; new `<<QUOTA_PROJECT>>` placeholder; "Why grep + sed" narrative; URL Inspection "Source allocation" tightened (no subjective filters, literal top-N); pre-flight budget log example expanded with reason for under-utilization.
+- `.claude/skills/seo-review/references/gsc-api-schema.md` — New "HTTP request headers" section (replaces "Token in HTTP requests"); new "Quota project resolution" section; all 3 endpoint examples now show both headers; Error codes table gained `details[*].reason` column + new row for `SERVICE_DISABLED`.
+- `.claude/skills/seo-review/references/gsc-ingestion.md` — Activation conditions 5 → 6 (added quota project); token caching → token+quota_project caching; failure mode table gained 2 new rows; setup banner restructured 3-step → 4-step (added "Enable Search Console API on the project" step).
+- `.claude/skills/seo-review/references/gsc-setup-readme-template.md` — Prerequisites + Authenticate sections restructured; `set-quota-project` framed as required (was "mandatory for some account/project combinations"); new "Quick verification" section with PowerShell + Bash probes; troubleshooting table gained 3 new rows.
+
+**Files modified (docs side):**
+
+- `CLAUDE.md` — Last Updated 2026-05-15 (Session 29→30); Completed section paragraph updated to reflect dogfood done; Next Steps reduced from 8 items to 7 (removed old #1 dogfood-now-done); new Key Decisions row appended; Session History block replaced with S30 bullets.
+- `docs/session-history.md` — this entry.
+- `docs/completed-work.md` — appended 4 S30 task entries.
+- `docs/key-decisions.md` — appended S30 decision row.
+
+**Files NOT modified (and why):**
+
+- `README.md`, `Workflow.md` — no command-surface changes to /seo-review (all 3 fixes were internal correctness or spec-tightening). Headers, flag list, allowed-tools surface in README don't change.
+- `MEMORY.md` — no stable-fact changes (skill count unchanged at 9; subagent count unchanged at 13 — the new behavior is all within existing seo-review skill + seo-gsc-insights subagent that already exists).
+- Other skill SKILL.md / reference files — out of scope; S30 dogfood was specifically the /seo-review skill.
+
+**Two memory entries written this session:**
+- `feedback_powershell_backticks.md` — user explicitly asked to add backticks at the end of each line when writing multi-line PowerShell commands. Saved as durable feedback for future sessions.
+
+**Next session should:**
+
+- **Continue Phase 4 dogfood backlog.** Three skills built-but-never-run end-to-end: `/test-review` (built S24), `/architecture-review` (built S21), `/code-health-advice` (built S22). Each will likely surface its own under-specifications — S30 pattern suggests the cost is low (most fixes are same-session) and the value is high (real-world bugs caught before further use).
+- **Optional: act on the burakarik6 audit.** Biggest single recovery is the smartphone-vs-mirrorless title rewrite in Sanity (~4-5K clicks/quarter potential). Not blocking — user's call whether to bundle with other Sanity work or queue for later.
+- **Optional cleanup in burakarik6:** delete the leftover `.seo-data/gsc/gsc_q*.json` + `.seo-data/gsc/inspect/` files written by the now-superseded spec (gitignored, no leak, just stale artifacts).
+- **Optional: reconstruct Session 27 entry** from commit `47464e2` (`session 27: /seo-review v2 (GSC CSV ingestion + 35d git-history awareness, 9 commits + /simplify pass)` — content preserved in git; missing from `docs/session-history.md`).
+- **Watch for:** any `/seo-review` re-run on burakarik6 should now hit `Mode: heuristic + GSC (Search Console API — 100 URLs inspected, 3 perf queries)` with full budget utilization, not the 40-URL undersample from this run. If it still under-utilizes, the spec change wasn't strong enough.
