@@ -1,6 +1,7 @@
 ---
 name: seo-review
-description: Repo-wide SEO and Generative Engine Optimization audit for web projects. Rejects non-web repos. Fetches current best practices every run (SEO/GEO field evolves rapidly). Probes sitemap URLs for 4xx/5xx/redirect-chain/slow-response health. Optionally ingests Google Search Console data via the Search Console API (Performance via searchanalytics.query + per-URL Indexing via urlInspection.index.inspect) — opt-in by configuring `.seo-data/gsc/config.yaml` with `site_url:` after running `gcloud auth application-default login`. Plus 35-day git-history overlap to flag "may already be fixed" against the GSC reporting lag. Three or four parallel Sonnet subagents (seo-technical / seo-content / geo-generative, plus seo-gsc-insights when GSC API is configured). Score stays /100 (purely heuristic) so docs/seo-history.md is comparable across runs regardless of GSC availability. Use when user mentions SEO audit, GEO audit, Generative Engine Optimization, AI search optimization, llms.txt, structured data, sitemap health, Google Search Console, GSC, search performance, or "make this site rank better."
+description: Audits a web project for SEO and Generative Engine Optimization (GEO). Fetches current best practices every run, probes sitemap URL health, and optionally ingests Google Search Console data via API. Score `/100` headline + top-3 priorities, tracked in `docs/seo-history.md`.
+when_to_use: When user mentions SEO audit, GEO audit, Generative Engine Optimization, AI search optimization, llms.txt, structured data / JSON-LD, sitemap health, Google Search Console, GSC, search performance, AI citability, or "make this site rank better". Web projects only — rejects non-web repos silently. Distinct from generic code-review skills (no SEO awareness) and from `/architecture-review` (code structure, not SEO).
 disable-model-invocation: true
 allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(grep:*), Bash(sed:*), Bash(cat:*), Bash(head:*), Bash(gcloud:*), Bash(curl:*), Task
 effort: high
@@ -608,18 +609,18 @@ Same class of bug as the S30 `jq`-missing fix — the spec under-specified a pla
 
 **S31 dogfood lesson.** Across one run the orchestrator wrote 5+ different inline Python invocations (Q1 parse, Q2 parse, Q3 parse, CTR opportunities, cluster aggregation), each with different bash quoting/escaping strategies. One heredoc failed with `unexpected EOF` (single quotes inside `<<'PY'` block). The fallback was to write `_parse_clusters.py` into `.seo-data/gsc/cache/` — **violating the disk-write boundary** (cache dir is response-JSON-only).
 
-**Rule:** GSC JSON parsing MUST go through the shipped helper at `references/gsc-parse-helper.py`. Invoke with subcommand args:
+**Rule:** GSC JSON parsing MUST go through the shipped helper at `${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py`. Invoke with subcommand args:
 
 ```bash
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "$SKILL_REF_DIR/gsc-parse-helper.py" q1 .seo-data/gsc/cache/sa-q1-<hash>.json
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "$SKILL_REF_DIR/gsc-parse-helper.py" q2 .seo-data/gsc/cache/sa-q2-<hash>.json
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "$SKILL_REF_DIR/gsc-parse-helper.py" q3 .seo-data/gsc/cache/sa-q3-<hash>.json
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "$SKILL_REF_DIR/gsc-parse-helper.py" ctr .seo-data/gsc/cache/sa-q2-<hash>.json
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "$SKILL_REF_DIR/gsc-parse-helper.py" clusters .seo-data/gsc/cache
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "$SKILL_REF_DIR/gsc-parse-helper.py" brand .seo-data/gsc/cache/sa-q1-<hash>.json "Burak Arık"
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" q1 .seo-data/gsc/cache/sa-q1-<hash>.json
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" q2 .seo-data/gsc/cache/sa-q2-<hash>.json
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" q3 .seo-data/gsc/cache/sa-q3-<hash>.json
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" ctr .seo-data/gsc/cache/sa-q2-<hash>.json
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" clusters .seo-data/gsc/cache
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" brand .seo-data/gsc/cache/sa-q1-<hash>.json "Burak Arık"
 ```
 
-Where `$SKILL_REF_DIR` resolves to the orchestrator's reference directory (e.g., `~/.claude/skills/seo-review/references/` on Mac/Linux, the equivalent on Windows). The orchestrator resolves this path once per run.
+`${CLAUDE_SKILL_DIR}` is a Claude Code string substitution that resolves automatically to the skill's own directory (cross-platform, CWD-independent). No orchestrator-side path resolution needed — works whether the user runs `/seo-review` from the repo root or any sub-directory of the target project.
 
 If the helper script itself is missing (skill install integrity issue): emit a footer error `gsc-parse-helper.py not found at <path> — GSC parsing aborted, falling back to heuristic-only mode` and continue without GSC findings.
 

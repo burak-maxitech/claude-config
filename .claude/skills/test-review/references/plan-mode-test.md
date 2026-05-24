@@ -1,5 +1,7 @@
 # --plan Mode (test-review)
 
+ultrathink — sequencing coverage gaps, T01-T05 rewrites, and economics findings into a coherent phased plan benefits from deep reasoning. Each phase boundary is a judgment call (provably-safe deletions vs. judgment-required rewrites vs. coverage fills).
+
 Transform the report's findings into a phased rewrite/fill brief that hands off cleanly to `/plan-feature`. Each phase becomes a self-contained payload the user can drop into a fresh session.
 
 The shape mirrors `architecture-review/references/plan-mode.md` but the phases and hand-off snippets are test-specific.

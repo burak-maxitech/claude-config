@@ -14,21 +14,54 @@ The available skills you route between are: `/resume-work`, `/code-review`, `/re
 
 ---
 
-## Step 1 — Inspect State (single parallel turn)
+## Step 1 — Repo state (pre-injected)
 
-Run all of these in **one turn** (they are independent):
+The snapshots below were captured by Claude Code's shell-injection layer **before** this skill content was loaded into context. Use them directly — no need to invoke Bash. (If you do need a follow-up command, use the `allowed-tools` list; the rest of the skill assumes the pre-injection is the source of truth.)
 
-- `git status --porcelain` — count uncommitted files
-- `git log --oneline -10` — recent activity
-- `git log -1 --format=%cr` — how long since last commit (relative)
-- `git rev-parse --abbrev-ref HEAD` — current branch
-- `git rev-list --count HEAD ^origin/main 2>/dev/null` — commits ahead of main (may fail if no remote; ignore)
-- `gh pr view --json number,state,title 2>/dev/null` — open PR for current branch (ignore failure)
-- Read `CLAUDE.md` if it exists at repo root — extract `## Current Status`, `## In Progress`, `## Next Steps`, `Last Updated` date
-- `wc -l` over a quick `git ls-files | head -200` if you need a rough size signal
-- **Lightweight web-project detection** (drives whether to suggest `/seo-review`): set `is_web: true` if **any** of these are observed — `package.json` with a frontend-framework dep (next/nuxt/vue/svelte/astro/remix/gatsby/angular/react-router), OR `index.html` at root / `public/` / `static/`, OR `templates/` directory alongside a `pyproject.toml`/`Gemfile`/`composer.json`. This is a coarse signal; the authoritative rule lives in `/seo-review` Step 0 and that's the skill that actually rejects non-web repos. You're only deciding whether it's worth *mentioning* `/seo-review` in the recommended/alternative flow.
+### Git state
 
-If `CLAUDE.md` is missing, note that in the report and proceed with git signals only.
+- **Uncommitted files:** !`git status --porcelain 2>/dev/null | wc -l | tr -d ' '`
+- **Current branch:** !`git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "(not a git repo)"`
+- **Time since last commit:** !`git log -1 --format=%cr 2>/dev/null || echo "(no commits)"`
+- **Commits ahead of origin/main:** !`git rev-list --count HEAD ^origin/main 2>/dev/null || echo "(no remote tracking)"`
+
+**Recent commits (last 10):**
+```!
+git log --oneline -10 2>/dev/null || echo "(no commits)"
+```
+
+**Open PR for current branch (via gh):**
+```!
+gh pr view --json number,state,title 2>/dev/null || echo "(no open PR or gh unavailable)"
+```
+
+### CLAUDE.md sections (Current Status / In Progress / Next Steps / Last Updated)
+```!
+if [ -f CLAUDE.md ]; then
+  grep -i "Last Updated" CLAUDE.md | head -1
+  echo "---"
+  awk '/^## Current Status/,/^## [^C]/' CLAUDE.md | head -25
+  echo "---"
+  awk '/^## In Progress/,/^## [^I]/' CLAUDE.md | head -20
+  echo "---"
+  awk '/^## Next Steps/,/^## [^N]/' CLAUDE.md | head -20
+else
+  echo "(no CLAUDE.md at repo root)"
+fi
+```
+
+### Web-project signals (drives whether `/seo-review` belongs in the routing)
+```!
+if [ -f package.json ]; then
+  grep -E '"(next|nuxt|vue|svelte|astro|remix|gatsby|angular|react-router)"' package.json 2>/dev/null | head -3
+fi
+ls index.html public/index.html static/index.html templates/ 2>/dev/null | head -5
+echo "(absence of all signals above = is_web:false; presence of any = is_web:true and `/seo-review` may belong in the flow)"
+```
+
+The presence/absence of these signals is a coarse hint only — the authoritative web/non-web rule lives in `/seo-review` Step 0; this skill just decides whether mentioning `/seo-review` is worth the line in the report.
+
+If any pre-injected field shows "(no ...)" or "(no remote)" or "(not a git repo)", note it briefly in the report and proceed with the available signals.
 
 ---
 

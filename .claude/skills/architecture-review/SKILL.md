@@ -1,6 +1,7 @@
 ---
 name: architecture-review
-description: Repo-wide architecture audit. Surfaces structural debt, complexity hotspots, refactor opportunities, performance suspects, AND over-engineering/almost-dead code (single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config). Reports lines-deletable as a top-line metric. Use when user mentions architecture review, refactoring opportunities, technical debt at the repo level, "is this codebase over-engineered", "make the codebase smaller", or "where's the complexity in this codebase". Different from /code-review (diff-scoped, daily driver), /review-deep (thorough senior-engineer review), /ultrareview (PR-scoped cloud review), and /code-cleanup (file-level deletion only).
+description: Repo-wide architecture audit. Surfaces structural debt, complexity hotspots, refactor opportunities, performance suspects, AND over-engineering/almost-dead code (single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config). Reports `lines_deletable` as a top-line metric.
+when_to_use: When user mentions architecture review, refactoring opportunities, technical debt at the repo level, "is this codebase over-engineered", "make the codebase smaller", or "where's the complexity in this codebase". Different from `/code-review` (diff-scoped, daily driver), `/review-deep` (thorough senior-engineer review), `/ultrareview` (PR-scoped cloud review), and `/code-cleanup` (file-level deletion only).
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(pip:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(cat:*), Bash(head:*), Task
 effort: high

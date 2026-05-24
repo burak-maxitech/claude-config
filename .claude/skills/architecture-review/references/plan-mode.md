@@ -1,5 +1,7 @@
 # --plan Mode
 
+ultrathink — phased refactor briefs require synthesizing across structure/refactors/performance/simplification subagent output and sequencing for risk + leverage. Deep reasoning materially improves phase grouping and hand-off snippet quality.
+
 Transform the report's findings into a phased refactor brief that hands off cleanly to `/plan-feature` (or directly to TaskCreate). Each phase becomes a self-contained payload the user can drop into a fresh session.
 
 ## Phase grouping

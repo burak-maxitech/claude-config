@@ -252,6 +252,54 @@ The `.claude/agents/` folder contains subagent definitions used by skills. These
 | `geo-generative` | `/seo-review` | Structured Data (20 pts) + Generative Engine readiness (20 pts): Schema.org JSON-LD coverage + rich-result eligibility, llms.txt presence + format, E-E-A-T signals (author bios, dates, citations), semantic content patterns (topic sentences, list/table structure, question-headings), AI-bot crawl access (GPTBot/ClaudeBot/PerplexityBot/etc.). Fetched best-practices brief is primary source of truth (GEO evolves fast); `brief_divergence` field surfaces when heuristic disagrees. |
 | `seo-gsc-insights` | `/seo-review` (only when `.seo-data/gsc/` present) | Ingests orchestrator-parsed Google Search Console CSV digests (queries, pages, 9 page-indexing per-reason CSVs) + 35-day git-history change digest. Emits 12 sub-dim info-only findings (`indexing_coverage`, `crawled_not_indexed`, `discovered_not_indexed`, `not_found_404` with routing-rename match for bulk-redirect detection, `redirect_hygiene`, `canonical_conflict`, `blocked_access`, `soft_404`, `server_errors`, `ctr_opportunity`, `position_band_opportunity`, `traffic_orphan`). `score_impact: 0` enforced agent-side AND orchestrator-side — GSC enriches recommendations, never the /100 score. Annotates each finding with `code_changed_since_gsc_window` (lowers certainty to 0.4 + rewrites recommendation when matched commit detected). |
 
+## Optional: SessionStart hook for auto-orientation
+
+The repo ships `.claude/scripts/session-start-context.{sh,ps1}` — a cheap (<1s) read-only script that emits project orientation as system context at the start of every Claude Code session, before the user's first prompt. It eliminates the need to type `/resume-work` for routine starts (deep orientation still works via the explicit slash command).
+
+**What it emits:**
+- Branch + uncommitted-file count + age of last commit
+- 5 most recent commit subjects
+- CLAUDE.md `## Current Status` table + `Last Updated` line
+- Stale-doc warning if commits are newer than CLAUDE.md by >2 days
+- Open-PR title/number (best-effort via `gh`)
+
+**Silent fallbacks:** emits nothing if outside a git repo; emits less when `gh` or `CLAUDE.md` are missing.
+
+### Install (per-project)
+
+Add to the target project's `.claude/settings.json`:
+
+```jsonc
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/Development/projects/claude-config/.claude/scripts/session-start-context.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+On Windows, swap to `.ps1` and prefix with `pwsh -NoProfile -File `.
+
+### Install (global, all projects)
+
+Add the same block to `~/.claude/settings.json`. The script is silent on non-repo dirs, so it stays out of the way for one-off chats.
+
+### Why a hook *and* `/resume-work`
+
+The hook gets you oriented for *free* on every session start. `/resume-work` does the deeper work the hook deliberately skips: reads all docs in parallel, runs the health-check ladder, hydrates the task tracker via `TaskCreate`. Use the hook for routine starts; reach for `/resume-work` when returning to a project after a long absence or when you want the live task list.
+
+If `disableSkillShellExecution: true` is set, the hook still runs (it's a hook, not a skill's shell injection) — but skill-internal `` !`<cmd>` `` blocks (e.g., in `/code-health-advice`) won't. That setting is independently warned about by the `start-claude` scripts.
+
 ## Interop with Claude Code 2.1 features
 
 These skills are standalone `.claude/` configuration, which is the approach [the official docs recommend](https://code.claude.com/docs/en/plugins#when-to-use-plugins-vs-standalone-configuration) for personal workflows. They coexist happily with installed marketplace plugins — no migration needed.

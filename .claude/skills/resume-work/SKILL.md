@@ -59,23 +59,37 @@ This is a single turn -- do NOT read these sequentially.
 
 ---
 
-## Step 2: Analyze Current Codebase (Parallel)
+## Step 2: Codebase state (pre-injected git state)
 
-**Run all git commands and structure scan in a single parallel call:**
+The git state below was captured by Claude Code's shell-injection layer **before** this skill content was loaded. Use it directly — no need to invoke Bash for these.
 
-Execute these simultaneously (all are independent):
-- `git log --oneline -10` -- recent commits
-- `git diff --stat HEAD~5` -- what files changed recently
-- `git status` -- any uncommitted changes
-- `ls -la` and `ls -la */` -- verify project structure matches docs
+**Recent commits:**
+```!
+git log --oneline -10 2>/dev/null || echo "(no commits)"
+```
 
-This is a single turn -- do NOT run these sequentially.
+**Files changed in last 5 commits:**
+```!
+git diff --stat HEAD~5 2>/dev/null || echo "(fewer than 5 commits)"
+```
 
-### After the parallel scan:
+**Working-tree status:**
+```!
+git status --short 2>/dev/null || echo "(not a git repo)"
+```
+
+**Top-level structure:**
+```!
+ls -1 2>/dev/null | head -30
+```
+
+### After reading the snapshots above:
 Based on CLAUDE.md "In Progress" and "Next Steps," identify and briefly review:
 - Files currently being worked on
 - Files that need modification next
 - Entry points (main.py, index.js, etc.)
+
+If a deeper directory tour is warranted, you may still issue follow-up `Glob`/`ls` calls — the pre-injection covers the routine 4-command opening turn, not every possible follow-up.
 
 ---
 

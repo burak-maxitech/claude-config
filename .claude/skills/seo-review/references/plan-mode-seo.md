@@ -1,5 +1,7 @@
 # --plan Mode (seo-review)
 
+ultrathink — 6-phase sequencing across indexing/crawl hygiene, mechanical scaffolds, structural improvements, content rewrites, structured data, and generative-engine readiness requires synthesizing heuristic + GSC findings against the fetched best-practices brief. Deep reasoning materially improves traffic-weighted ranking and phase boundaries.
+
 Transform `/seo-review` findings into a phased improvement brief. Each phase becomes a self-contained `/plan-feature <brief>` payload the user can drop into a fresh session.
 
 ## Phase grouping

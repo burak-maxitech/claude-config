@@ -2,6 +2,7 @@
 name: code-cleanup
 description: Codebase-wide cleanup audit that finds dead code, unused files, stale dependencies, and technical debt. Use when user mentions dead code, unused files, cleanup, technical debt, code hygiene, dependency audit, removing unused CSS, stale imports, or any form of codebase pruning — even casually like "this repo is messy" or "let's clean things up." This is different from /code-review (which reviews recent changes for quality) — this skill audits the entire codebase for things that can be removed.
 disable-model-invocation: true
+effort: high
 allowed-tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(sort:*), Bash(uniq:*), Bash(sed:*), Bash(awk:*), Bash(git:*), Bash(jq:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(pip:*), Bash(pip-audit:*), Bash(safety:*), Bash(cargo:*), Bash(composer:*), Bash(govulncheck:*), Bash(bundle:*), Bash(gh:*), Task
 ---
 
