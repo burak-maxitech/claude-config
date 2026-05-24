@@ -15,18 +15,18 @@ Each bucket maps an observable repo state to a recommended skill flow. The orche
 
 **Recommended flow:**
 ```
-/simplify → /code-review → /code-review --verify → commit → /update-docs
+/code-review → /review-deep → /review-deep --verify → commit → /update-docs
 ```
 
 Why this order:
-- `/simplify` first because it works on *what you just wrote* — best signal closest to the change. Fix obvious quality issues before a structured review sees them.
-- `/code-review` next for diff-scoped correctness/security — narrower than `/simplify` but more rigorous.
-- `/code-review --verify` runs your test/lint suite (parallel-backgrounded since S19) — catches regressions before commit.
+- `/code-review` (built-in, lightweight) first because it works on *what you just wrote* — best signal closest to the change. Fix obvious quality issues before a structured review sees them.
+- `/review-deep` next for diff-scoped correctness/security — same diff scope but more rigorous (custom skill with codebase-convention scan + git-blame context).
+- `/review-deep --verify` runs your test/lint suite (parallel-backgrounded since S19) — catches regressions before commit.
 - Commit, then `/update-docs` at session end so the work is captured in `CLAUDE.md`.
 
 **Alternative:** *If the change touches auth, payments, data migrations, or anything that pages someone at 3 AM:*
 ```
-/simplify → /code-review --security → /code-review --verify → commit → push → /ultrareview <PR#> → merge → /update-docs
+/code-review → /review-deep --security → /review-deep --verify → commit → push → /ultrareview <PR#> → merge → /update-docs
 ```
 
 `/ultrareview` adds 5–20 cloud subagents (10–20 min) and is overkill for routine work but the right call for high-risk code.
@@ -44,11 +44,11 @@ Why this order:
 
 **Recommended flow:**
 ```
-/code-review --security → /ultrareview <PR#>
+/review-deep --security → /ultrareview <PR#>
 ```
 
 Why:
-- `/code-review --security` is fast in-session and surfaces OWASP-flavored issues across the diff.
+- `/review-deep --security` is fast in-session and surfaces OWASP-flavored issues across the diff.
 - `/ultrareview` is the deeper cloud-based pass. Worth it for any non-trivial PR that's about to merge.
 
 **Alternative:** *If the PR is small / low-risk (docs, config, copy changes, refactors with no behavior change):*
@@ -150,10 +150,12 @@ Why:
 
 **Alternative:** *If `CLAUDE.md` Next Steps already lists a specific item you want to tackle:*
 ```
-/plan-feature → implement → /code-review → /code-review --verify → /update-docs
+/plan-feature → implement → /code-review → /review-deep --verify → /update-docs
 ```
 
 Skip the audit — you already know what to work on. Go directly into the planning + implement loop.
+
+*(In both flows above, the bare `/code-review` at the implement stage = the built-in lightweight diff scan; reach for `/review-deep` instead if you want the thorough senior-engineer treatment with `--security`/`--verify`/`--fix`.)*
 
 ---
 
@@ -170,7 +172,7 @@ When two buckets match the signal pattern roughly equally:
 
 ## What none of these buckets cover (and why that's fine)
 
-- **Active debugging / incident response.** This skill assumes calm-water decision-making. If something is on fire, the user reaches for grep, debugger, and `/code-review --security` directly — not a routing advisor.
+- **Active debugging / incident response.** This skill assumes calm-water decision-making. If something is on fire, the user reaches for grep, debugger, and `/review-deep --security` directly — not a routing advisor.
 - **Greenfield / new feature work.** That's `/plan-feature` directly. The advisor will route there from Bucket E if `Next Steps` lists it, but it doesn't try to be a feature router.
 - **Doc-only sessions.** That's `/update-docs` directly. The advisor will mention it as part of every flow but never as the standalone recommendation — if the user already knows it's a doc session, they don't need routing.
 

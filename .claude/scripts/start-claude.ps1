@@ -64,7 +64,7 @@ if (Test-Path $SettingsFile) {
         $Settings = Get-Content $SettingsFile -Raw | ConvertFrom-Json
         if ($Settings.disableSkillShellExecution -eq $true) {
             Write-Host "  Warning: disableSkillShellExecution=true in ~\.claude\settings.json" -ForegroundColor Red
-            Write-Host "  Breaks /code-cleanup --fix, /code-review --verify, and /resume-work deep." -ForegroundColor Gray
+            Write-Host "  Breaks /code-cleanup --fix, /review-deep --verify, and /resume-work deep." -ForegroundColor Gray
             Write-Host "  Fix: set it to false or remove the key." -ForegroundColor Gray
         }
     } catch {

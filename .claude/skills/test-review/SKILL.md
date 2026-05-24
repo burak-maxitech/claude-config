@@ -1,6 +1,6 @@
 ---
 name: test-review
-description: Repo-wide test suite audit. Surfaces missing coverage on critical code paths AND wasteful/redundant tests in a single report. Twin headline metric ("Coverage gaps in critical code: X lines | Tests we can delete: Y lines"). Three parallel Sonnet subagents (test-coverage / test-quality / test-economics). Use when user mentions test coverage audit, test smell detection, test debt at the repo level, "are our tests any good", "what tests can we delete", or "what's untested that matters". Different from /code-review §7 (diff-scoped checkbox) and /code-cleanup's cleanup-styles-tests (artifact-level cruft only).
+description: Repo-wide test suite audit. Surfaces missing coverage on critical code paths AND wasteful/redundant tests in a single report. Twin headline metric ("Coverage gaps in critical code: X lines | Tests we can delete: Y lines"). Three parallel Sonnet subagents (test-coverage / test-quality / test-economics). Use when user mentions test coverage audit, test smell detection, test debt at the repo level, "are our tests any good", "what tests can we delete", or "what's untested that matters". Different from /review-deep §7 (diff-scoped checkbox) and /code-cleanup's cleanup-styles-tests (artifact-level cruft only).
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(python:*), Bash(python3:*), Bash(pytest:*), Bash(cargo:*), Bash(go:*), Bash(cat:*), Bash(head:*), Task
 effort: high
@@ -13,7 +13,7 @@ Audit this codebase's test suite like a staff engineer doing a quarterly test-he
 
 This skill is distinct from existing test-touching paths in this repo:
 
-- **`/code-review` §7 testing** — a 4-bullet diff-scoped checkbox during diff review
+- **`/review-deep` §7 testing** — a 4-bullet diff-scoped checkbox during diff review (or built-in `/code-review` for the lightweight pass)
 - **`/code-cleanup`'s `cleanup-styles-tests` §7** — artifact-level cruft only (orphaned files, >3mo skips, unused helpers, stale snapshots)
 - **`/architecture-review`** — code structure, not test suite
 - **`/test-review` (this)** — *repo-wide test suite health*, both directions (coverage + cost)
@@ -230,7 +230,7 @@ This dual signal makes both directions (under-tested + over-invested) equally vi
 1. Testing-Intent Summary echo + framework heatmap
 2. Findings — three subsections (Coverage / Quality / Economics) ordered by rank score
 3. Documented-Decision Conflicts (separate, "**Confirm intent before action:**")
-4. Suggested Next Actions — skill chains (`/code-cleanup` for orphans, `/code-review` for diff-scoped follow-up); copy-pasteable `/plan-feature <brief>` snippets for top 3 strategic rewrites
+4. Suggested Next Actions — skill chains (`/code-cleanup` for orphans, `/code-review` or `/review-deep` for diff-scoped follow-up); copy-pasteable `/plan-feature <brief>` snippets for top 3 strategic rewrites
 5. Footer disclosure — framework detected, coverage tool used (or "heuristic"), files scanned vs sampled vs skipped, T01-T05 hit counts, twin-headline totals
 
 ---
@@ -270,7 +270,7 @@ If running default mode, end with one line:
 
 | Want... | Use... |
 |---------|--------|
-| Per-commit / diff test check | `/code-review` |
+| Per-commit / diff test check | `/code-review` (quick) or `/review-deep` (thorough) |
 | Dead test files, stale snapshots, >3mo skipped tests | `/code-cleanup` |
 | **Repo-wide test coverage + quality audit** | **`/test-review` (this)** |
 | Plan a test-refactor effort | `/test-review --plan` |

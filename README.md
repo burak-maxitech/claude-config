@@ -47,12 +47,6 @@ claude-config/
 │       │       ├── scan-deps-config.md
 │       │       ├── scan-files-code.md
 │       │       └── scan-styles-tests.md
-│       ├── code-review/
-│       │   ├── SKILL.md
-│       │   └── references/
-│       │       ├── output-format.md
-│       │       ├── review-checklist.md
-│       │       └── security-deep-dive.md
 │       ├── plan-feature/
 │       │   ├── SKILL.md
 │       │   └── references/
@@ -65,6 +59,12 @@ claude-config/
 │       │   └── references/
 │       │       ├── summary-template.md
 │       │       └── task-hydration.md
+│       ├── review-deep/
+│       │   ├── SKILL.md
+│       │   └── references/
+│       │       ├── output-format.md
+│       │       ├── review-checklist.md
+│       │       └── security-deep-dive.md
 │       ├── seo-review/
 │       │   ├── SKILL.md
 │       │   └── references/
@@ -199,7 +199,7 @@ git pull
 |---------|---------|--------|
 | `/resume-work` | Start session - get up to speed | Skill |
 | `/plan-feature` | Interview before building features | Skill |
-| `/code-review` | Review code quality (lightweight, in-session, with `--security`/`--verify`/`--fix`) | Skill |
+| `/review-deep` | Thorough senior-engineer code review (in-session, with `--security`/`--verify`/`--fix`/`--last-commit`). Slots between built-in `/code-review` (quick) and `/ultrareview` (cloud, pre-merge). | Skill |
 | `/code-cleanup` | Find dead code & cruft (parallel subagents). Adds CVE scanning with `--vulns` (runs `npm audit` / `pip-audit` / `cargo audit` / equivalents per detected stack; report-only, never auto-fixed). | Skill |
 | `/architecture-review` | Repo-wide architecture audit — complexity hotspots, refactor opportunities, perf suspects, **and over-engineering** (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable` as a top-line metric. 4 parallel subagents, with `--plan`/`--fix`/`--map`/`--full-scan` | Skill |
 | `/test-review` | Repo-wide test suite audit — missing coverage on critical paths AND wasteful/redundant tests, in a single report. **Twin headline metric** (`Coverage gaps in critical code: X lines | Tests we can delete: Y lines`). 3 parallel subagents (`test-coverage` / `test-quality` / `test-economics`), T01-T05 smell catalog, with `--plan`/`--fix` (T01-only safe deletion)/`--coverage` (opt-in report reading)/`--full-scan`. Defers entirely to `/code-cleanup` for orphans / stale snapshots / >3mo skips. | Skill |
@@ -209,14 +209,18 @@ git pull
 
 **Skills** are directories in `.claude/skills/` that bundle reference files, use YAML frontmatter for tool permissions, and can dispatch subagents.
 
-> **When to reach for `/ultrareview` instead of `/code-review`.** Claude Code 2.1.111 ships a built-in `/ultrareview` that runs 5+ verifying subagents in the cloud (10–20 min, scales to 20 agents). Use it for high-risk pre-merge reviews — auth rewrites, payment flows, database migrations. The custom `/code-review` skill is the lighter daily-driver: in-session, fast, with `--security` (OWASP), `--verify` (run tests), and `--fix` (auto-fix simple findings) modes that `/ultrareview` doesn't have.
+> **Three review tiers — pick the right one for the risk.** As of the 2026-05-23 Claude Code update, `/simplify` was renamed to `/code-review` (built-in, lightweight diff scan). The custom code-review skill in this repo was renamed to `/review-deep` to avoid the collision and to reflect its position as the thorough middle tier. The three tiers:
+>
+> 1. **`/code-review`** (built-in, fast) — quick diff scan for correctness bugs at a chosen effort level (low/medium/high/max). Supports `--comment` to post findings as inline PR comments. **Daily driver.**
+> 2. **`/review-deep`** (this repo's custom skill, thorough) — senior-engineer review with codebase-convention scanning, severity-ranked findings, mandatory `file:line` references. Supports `--security` (OWASP Top 10), `--verify` (run tests/lint to validate), `--fix` (auto-fix simple findings), `--last-commit`. **Reach for when the diff is non-trivial or touches risky areas.**
+> 3. **`/ultrareview`** (built-in, cloud) — 5+ verifying subagents in the cloud (10–20 min, scales to 20). **High-risk pre-merge only** (auth rewrites, payment flows, database migrations).
 
-> **Picking among the review skills.** All five operate on different scopes:
+> **Picking among the review/audit skills.** All operate on different scopes:
 >
 > | Skill | Scope | When |
 > |-------|-------|------|
-> | `/code-review` | diff or commit | per-commit / per-PR quality, daily driver |
-> | `/simplify` | recent changes | post-hoc cleanup of work just done |
+> | `/code-review` | diff or commit | quick correctness scan, daily driver (built-in) |
+> | `/review-deep` | diff or commit | thorough senior-engineer review with `--security`/`--verify`/`--fix` (custom) |
 > | `/ultrareview` | PR (cloud) | high-risk pre-merge verification (auth, payments, migrations) |
 > | `/code-cleanup` | whole repo | deletion-focused — whole unused files, unused deps, stale config |
 > | `/architecture-review` | whole repo | structural audit — complexity hotspots, refactor opportunities, perf suspects, AND sub-file over-engineering (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable`. |
@@ -254,11 +258,11 @@ These skills are standalone `.claude/` configuration, which is the approach [the
 
 A few harness-level features worth knowing about when using these skills:
 
-- **Gating destructive `--fix` runs in CI.** `code-cleanup --fix` and `code-review --fix` are intentionally not self-gating (see the note in each SKILL.md). If you run them headlessly via `claude -p` and want an external approval step, configure a `PreToolUse` hook in `~/.claude/settings.json` scoped via the `if` field (added in 2.1.85) to the patterns you want to guard — e.g. `"if": "Bash(rm:*)"` or `"if": "Edit(*)"` — and return `"permissionDecision": "defer"`. The session exits with `stop_reason: "tool_deferred"`; resume via `claude -p --resume <session-id>`. Note: `defer` only works when the turn makes a single tool call — useful for a `rm` guard, not for orchestrating a multi-step `--fix` run. See [hooks docs](https://code.claude.com/docs/en/hooks) for the full decision flow and the `if` field spec.
+- **Gating destructive `--fix` runs in CI.** `code-cleanup --fix` and `review-deep --fix` are intentionally not self-gating (see the note in each SKILL.md). If you run them headlessly via `claude -p` and want an external approval step, configure a `PreToolUse` hook in `~/.claude/settings.json` scoped via the `if` field (added in 2.1.85) to the patterns you want to guard — e.g. `"if": "Bash(rm:*)"` or `"if": "Edit(*)"` — and return `"permissionDecision": "defer"`. The session exits with `stop_reason: "tool_deferred"`; resume via `claude -p --resume <session-id>`. Note: `defer` only works when the turn makes a single tool call — useful for a `rm` guard, not for orchestrating a multi-step `--fix` run. See [hooks docs](https://code.claude.com/docs/en/hooks) for the full decision flow and the `if` field spec.
 - **Auto mode compatibility** (requires 2.1.83+; Max/Team/Enterprise/API plan; Opus 4.6/4.7 or Sonnet 4.6; not available on Pro). Auto mode (`defaultMode: "auto"`) uses a classifier to auto-approve actions without prompts. On entering auto mode, broad allow rules like `Bash(*)` or `Bash(python*)` are dropped, but narrow patterns like `Bash(npm test)` carry over. The 5 skills in this repo all declare narrow `allowed-tools` (`Bash(git:*)`, `Bash(npm:*)`, `Bash(find:*)`, etc.), so `--fix`, `--verify`, and `deep` all work under auto mode. If the classifier denies something unexpectedly, configure a `PermissionDenied` hook (added 2.1.89) that returns `{"retry": true}` to tell the model it may retry. See [permission modes](https://code.claude.com/docs/en/permission-modes) for the full spec.
-- **`disableSkillShellExecution`** (added 2.1.91). Hardens the harness by blocking inline shell from skills and slash commands. **Do not enable this here** — `code-cleanup --fix`, `code-review --verify`, and `resume-work deep` all depend on shell execution and will break. Leave OFF. (The `start-claude` scripts warn if this flag is on in `~/.claude/settings.json`.)
+- **`disableSkillShellExecution`** (added 2.1.91). Hardens the harness by blocking inline shell from skills and slash commands. **Do not enable this here** — `code-cleanup --fix`, `review-deep --verify`, and `resume-work deep` all depend on shell execution and will break. Leave OFF. (The `start-claude` scripts warn if this flag is on in `~/.claude/settings.json`.)
 - **Plugin `bin/` on PATH** (added 2.1.91). If you install a marketplace plugin that ships `bin/check` or `bin/test`, `resume-work deep` picks it up automatically in the health check detection ladder.
-- **MCP `maxResultSizeChars`** (added 2.1.91). If a future `code-review` run hits an MCP-backed file reader that truncates, the MCP server can set `_meta["anthropic/maxResultSizeChars"]` up to 500K per tool to return fuller context in one call.
+- **MCP `maxResultSizeChars`** (added 2.1.91). If a future `review-deep` run hits an MCP-backed file reader that truncates, the MCP server can set `_meta["anthropic/maxResultSizeChars"]` up to 500K per tool to return fuller context in one call.
 - **MCP server setup.** Add servers via `claude mcp add --transport {http|sse|stdio} <name> <target>`. Three scopes are available: **local** (default, personal-to-this-project, stored in `~/.claude.json`), **project** (team-shared via `.mcp.json` at repo root), and **user** (all your projects, stored in `~/.claude.json`). Project scope is the one to use when a server should travel with the repo. Tool-search deferral keeps context cost low even with multiple servers, so the practical ceiling is tool-menu clarity and permission-prompt volume, not token budget. See the [MCP docs](https://code.claude.com/docs/en/mcp) for transport-specific setup.
 
 ## Documentation

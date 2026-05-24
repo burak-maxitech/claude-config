@@ -25,6 +25,5 @@ Categories to scan:
 5. **Circular dependencies** — module A imports B, B (transitively) imports A.
 
 Do NOT flag:
-- Per-commit quality issues (that's `/code-review`)
+- Per-commit quality issues (that's `/code-review` or `/review-deep` for thorough)
 - Dead code or unused files (that's `/code-cleanup`)
-- Recent-change cleanups (that's `/simplify`)

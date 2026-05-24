@@ -8,7 +8,7 @@
 - [x] `/resume-work` — Session startup with parallel doc reads, git scans, auto-memory, task hydration
 - [x] `/plan-feature` — Feature interview with greenfield/existing modes, Plan Mode, task hydration
 - [x] `/update-docs` — Session end with task drain, session archiving, auto-memory sync, CREATE/REFACTOR/UPDATE modes
-- [x] `/code-review` — Code review with auto-detect (uncommitted/staged/PR/last-commit), convention scanning, file:line refs
+- [x] `/code-review` — Code review with auto-detect (uncommitted/staged/PR/last-commit), convention scanning, file:line refs *(renamed to `/review-deep` in S32 after Anthropic renamed built-in `/simplify` → `/code-review` on 2026-05-23)*
 - [x] `/code-cleanup` — Parallel subagent scanning with summary dashboard, Quick Wins, scope filters
 - [x] `/code-cleanup` enhancements — Added `--dry-run` mode, clarified `--aggressive` behavior, added `Bash(gh:*)` permission, improved description to distinguish from `/simplify`
 - [x] `scan-deps-config` subagent — Added Python package→import name lookup table (30+ common mismatches)

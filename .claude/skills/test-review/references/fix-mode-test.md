@@ -167,7 +167,7 @@ Suggested follow-up:
 
 ## What this mode does NOT do
 
-- Run tests after edits (call `/code-review --verify` separately if you want that)
+- Run tests after edits (call `/review-deep --verify` separately if you want that)
 - Delete other smell types (T02-T05 always route to `--plan`)
 - Delete whole files (cross-skill routing to `/code-cleanup`)
 - Delete imports left orphaned by the test deletion (handled by linter / formatter / future `/code-cleanup` pass)

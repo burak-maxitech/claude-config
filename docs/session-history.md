@@ -347,3 +347,57 @@ After the 1st /update-docs sweep at `03ab5d9` closed the session, the conversati
 - **Re-dogfood `/seo-review` on burakarik6** after code change to validate all 6 fixes end-to-end. Watch points (a)-(f) above.
 - **Dogfood Part 7 on `burakarik6` CLAUDE.md** — original motivating case at 47.3k chars; still untested as of S31 cont. (claude-config dogfood didn't exercise Architecture Summary extract / In Progress collapse / Next Steps flatten paths).
 - **Other backlog unchanged:** dogfood `/test-review`, `/architecture-review`, `/code-health-advice` on real projects (Next Steps #1, #2, #3 in CLAUDE.md).
+
+### Session 32 - 2026-05-23
+**What happened:**
+- **Naming collision triage.** User flagged that today's Anthropic update renamed built-in `/simplify` → `/code-review`, colliding with this repo's custom code-review skill. The available-skills list in-session showed only the built-in description winning the lookup ("Review the current diff for correctness bugs at the given effort level..."), confirming the custom was being shadowed.
+- **Recommendation: rename custom skill to `/review-deep`.** The two skills are genuinely different (built-in: lightweight diff scan + effort levels + `--comment` PR-comment posting; custom: senior-engineer review with codebase-convention scanning + `--security` OWASP / `--verify` test-and-lint / `--fix` auto-fix / `--last-commit`). Keeping both is valuable. The custom skill's own SKILL.md already positioned it as a middle tier between built-in lightweight and `/ultrareview` — so `/review-deep` slots into a clean **3-tier ladder**: `/code-review` (built-in, fast, daily driver) → `/review-deep` (custom, thorough) → `/ultrareview` (built-in, cloud, 5+ verifying agents, high-risk pre-merge). The "deep" suffix mirrors the existing `/resume-work deep` flag convention.
+- **Refactor executed.** Directory renamed via `git mv .claude/skills/code-review .claude/skills/review-deep` (4 file paths preserved with full git history — SKILL.md + 3 reference files). Frontmatter `name:` field updated. SKILL.md self-references updated (header `# /code-review` → `# /review-deep`; fresh-session tip; description rewritten to lead with tier positioning).
+- **Scope expanded mid-refactor.** A grep for `/simplify` surfaced 46 mentions across 11 files. Doing only the custom rename would have left dead references (`/simplify` does not exist by that name anymore — Anthropic's rename is also live today). Reasonable call under auto-mode: do both renames in operational files. Historical files (`docs/session-history.md`, `docs/completed-work.md`, `docs/key-decisions.md`, plus historical sections inside CLAUDE.md — Key Decisions table rows describing past decisions, Last Session blocks describing past sessions) deliberately left untouched as records of past state.
+- **Rename rules applied:**
+  - References using `--verify`/`--security`/`--fix`/`--last-commit` flags → MUST become `/review-deep` (built-in does not have those flags).
+  - Bare `/code-review` references where context describes the thorough senior-engineer tier → became `/review-deep`.
+  - Bare `/code-review` references where context describes a lightweight diff scan → kept as `/code-review` (built-in fits — natural default post-rename).
+  - `/simplify` references → became `/code-review` (Anthropic's new name).
+- **16 operational files modified + 1 directory rename (4 file paths under it).**
+- **README "Three review tiers" blockquote** was rewritten to lead with the 2026-05-23 collision context — future readers landing on README will see *why* the rename happened, not just the resulting structure. The blockquote enumerates all three tiers with their distinguishing features, then a comparison table lists all the audit/review skills by scope.
+- **`/update-docs` invoked at session end** to capture this work. CLAUDE.md at 16.7k chars pre-update, well under all thresholds — no Part 5/6/7 rollups fire. Single new Key Decision row added. Last Session block replaced.
+
+**Files created/modified:**
+- **Renamed (4 file paths via `git mv`):**
+  - `.claude/skills/code-review/SKILL.md` → `.claude/skills/review-deep/SKILL.md` (+ frontmatter `name:` field, header, fresh-session tip, description rewritten)
+  - `.claude/skills/code-review/references/output-format.md` → `.claude/skills/review-deep/references/output-format.md`
+  - `.claude/skills/code-review/references/review-checklist.md` → `.claude/skills/review-deep/references/review-checklist.md`
+  - `.claude/skills/code-review/references/security-deep-dive.md` → `.claude/skills/review-deep/references/security-deep-dive.md`
+- **Modified (16):**
+  - `.claude/agents/arch-structure.md` — `/code-review` per-commit ref expanded to "(or `/review-deep` for thorough)"; `/simplify` "Do NOT flag" line removed (skill no longer exists by that name).
+  - `.claude/scripts/start-claude.sh` — `disableSkillShellExecution` warning updated `/code-review --verify` → `/review-deep --verify`.
+  - `.claude/scripts/start-claude.ps1` — same as above.
+  - `.claude/skills/architecture-review/SKILL.md` — frontmatter description "Different from..." list updated (dropped `/simplify`, added `/review-deep` with flag list); intro distinct-from list restructured to 3-tier ladder; quick-ref table split into quick/thorough rows.
+  - `.claude/skills/architecture-review/references/fix-mode.md` — `/code-review --verify` → `/review-deep --verify`.
+  - `.claude/skills/code-cleanup/SKILL.md` — frontmatter description "different from /simplify" → "different from /code-review".
+  - `.claude/skills/code-health-advice/SKILL.md` — routing list updated (dropped `/simplify`, added `/review-deep`); "Not a reviewer" list same update.
+  - `.claude/skills/code-health-advice/references/state-buckets.md` — Bucket A workflow chain: `/simplify → /code-review → /code-review --verify` → `/code-review → /review-deep → /review-deep --verify`; Bucket B `/code-review --security` → `/review-deep --security`; Bucket E gets new clarifier note about bare `/code-review` = built-in.
+  - `.claude/skills/review-deep/SKILL.md` — full frontmatter + header + self-reference rewrite (covered under the rename above).
+  - `.claude/skills/seo-review/SKILL.md` — distinct-from list `/code-review` row expanded to "`/code-review` / `/review-deep`"; quick-ref table same expansion.
+  - `.claude/skills/test-review/SKILL.md` — frontmatter description "Different from /code-review §7" → "/review-deep §7"; intro distinct-from list expanded with built-in mention; suggested-next-actions skill-chain mentions both; quick-ref table split.
+  - `.claude/skills/test-review/references/fix-mode-test.md` — `/code-review --verify` → `/review-deep --verify`.
+  - `.claude/skills/test-review/references/report-template.md` — sample suggested-action `/code-review --security` → `/review-deep --security`; footer "Defer to /code-review" expanded to "Defer to /code-review or /review-deep".
+  - `CLAUDE.md` — file-tree directory name; this /update-docs sweep adds Key Decisions row + Last Session block.
+  - `README.md` — file-tree directory name + reordered into alphabetical position; commands table row replaced (`/code-review` → `/review-deep` with rewritten description); "Three review tiers" positioning blockquote rewritten to lead with 2026-05-23 collision context + 3-tier enumeration; "Picking among the review skills" comparison table restructured (dropped `/simplify` row, added `/review-deep` row, updated `/code-review` row to describe built-in); interop section references `code-review --verify`/`code-review --fix` updated to `review-deep --verify`/`review-deep --fix`; MCP `maxResultSizeChars` reference updated to `review-deep` since it was always about the custom skill.
+  - `Workflow.md` — Quick Reference table row split into quick/thorough; Code Quality Checks section rewritten with 3-tier intro + new command examples; `/review-deep` command section replaces former `/code-review` section with full flag list including `--security`/`--verify`/`--fix`; `/test-review` "useful chain" reference + advisor table + loop example + troubleshooting row + file-tree all updated; in-scenario `/code-review` invocations in workflow scripts kept (built-in default is fine for routine checks) with comment-line clarifiers added.
+- **Appended this session (via /update-docs):**
+  - `docs/session-history.md` — this S32 entry.
+  - `docs/completed-work.md` — S32 entry + annotation on the original `/code-review` line.
+  - `CLAUDE.md` — Key Decisions row + Last Session block replaced.
+
+**Watch-for next session:**
+- (a) `/review-deep` actually resolves to the custom skill in a fresh `claude` session — verify by `/help` or by invoking `/review-deep --staged` on a real diff.
+- (b) Built-in `/code-review` invocation in a fresh session pulls the Anthropic version (now in available-skills list).
+- (c) Skill cross-references in scenarios where ambiguity could surface — e.g., when `/code-health-advice` routes Bucket A, does the rendered output cleanly show `/code-review → /review-deep → /review-deep --verify` or does any stale `/simplify` leak through.
+- (d) Any historical reference in CLAUDE.md historical sections (Key Decisions older rows, `docs/key-decisions.md`) that a future `/resume-work` may surface — confirm those do not confuse a fresh reader (they should not; the rename context is now in the freshest Key Decisions row).
+
+**Next session should:**
+- Commit this session's refactor + /update-docs sweep as a single commit.
+- Resume the dogfood backlog from CLAUDE.md Next Steps: `/test-review` (#1) is the highest-leverage next dogfood — built S24, never run end-to-end.
+- If a `/seo-review` re-run on `burakarik6` is desired, ensure a substantive code change ships first (S31 cont.² same-commit dedup will silently skip otherwise).

@@ -11,7 +11,7 @@
 | **Start Session** | `/resume-work` | Get up to speed, see what's next |
 | **Not Sure Where to Start** | `/code-health-advice` | 30-sec routing advisor — reads repo state, recommends a skill sequence (read-only) |
 | **Plan Feature** | `/plan-feature` | Interview before building |
-| **During Development** | `/code-review` | Review code quality |
+| **During Development** | `/code-review` (quick) or `/review-deep` (thorough) | Review code quality |
 | **During Development** | `/code-cleanup` | Find dead code & cruft |
 | **Architecture Audit** | `/architecture-review` | Repo-wide complexity + refactor + perf + over-engineering audit (4 dimensions, reports `lines_deletable`) |
 | **Test Suite Audit** | `/test-review` | Repo-wide test health — coverage gaps on critical paths + smells (T01-T05) + suite economics. Twin headline metric. |
@@ -130,18 +130,24 @@ claude
 
 #### Code Quality Checks
 
+Two review skills are available — pick the right tier for the job:
+
+- **`/code-review`** (built-in, lightweight) — quick diff scan for correctness bugs at a chosen effort level (low/medium/high/max). Supports `--comment` to post findings as inline PR comments. Use this as the daily driver.
+- **`/review-deep`** (custom, thorough) — senior-engineer review with codebase-convention scanning, severity-ranked findings, mandatory `file:line` references. Supports `--security` (OWASP), `--verify` (run tests/lint), `--fix` (auto-fix simple findings), `--last-commit`. Reach for this when the diff is non-trivial or touches risky areas.
+- **`/ultrareview`** (built-in, cloud) — 5+ verifying subagents for high-risk pre-merge (auth, payments, migrations).
+
 ```bash
-# Review uncommitted changes (default - most common)
+# Quick review of uncommitted changes (default - most common)
 /code-review
 
-# Review specific files
-/code-review src/services/gmail_service.py
+# Thorough review of specific files
+/review-deep src/services/gmail_service.py
 
-# Review staged changes before commit
-/code-review --staged
+# Thorough review of staged changes before commit
+/review-deep --staged
 
-# Review a pull request
-/code-review 123
+# Thorough review of a pull request
+/review-deep 123
 
 # Find dead code and cleanup opportunities (parallel scan)
 /code-cleanup
@@ -151,7 +157,7 @@ claude
 /code-cleanup --deps --code
 ```
 
-**What `/code-review` does:**
+**What `/review-deep` does:**
 - Auto-detects review target (uncommitted changes, staged, PR, or specified files)
 - Scans codebase conventions before reviewing (error handling, naming, imports, test patterns)
 - Checks correctness, security, performance, maintainability
@@ -267,18 +273,21 @@ cd -
 
 ---
 
-### /code-review
+### /review-deep
 
-**When:** Before committing, or to check specific code
+**When:** Before committing, or to check specific code, when you want more rigor than the built-in `/code-review` (which is fine for routine diffs but doesn't scan codebase conventions or run `--security`/`--verify`/`--fix`).
 
 **Usage:**
 ```bash
-/code-review                             # Review uncommitted changes (default)
-/code-review src/file.py                 # Review specific file
-/code-review src/services/               # Review directory
-/code-review 123                         # Review PR #123 via gh
-/code-review --staged                    # Review only staged changes
-/code-review --last-commit               # Review the last commit
+/review-deep                             # Review uncommitted changes (default)
+/review-deep src/file.py                 # Review specific file
+/review-deep src/services/               # Review directory
+/review-deep 123                         # Review PR #123 via gh
+/review-deep --staged                    # Review only staged changes
+/review-deep --last-commit               # Review the last commit
+/review-deep --security                  # Add OWASP Top 10 deep-dive
+/review-deep --verify                    # Also run tests/lint to validate findings
+/review-deep --fix                       # Auto-fix simple findings (unused imports, formatting)
 ```
 
 **Features:**
@@ -296,6 +305,8 @@ cd -
 - Test coverage gaps
 
 **Output:** Severity summary table (counts) → Critical / Important / Suggestions / Convention Violations / What's Good
+
+**Tiering:** built-in `/code-review` (quick) → `/review-deep` (this, thorough) → `/ultrareview` (cloud, pre-merge). Pick the tier that matches the risk of the diff.
 
 ---
 
@@ -372,7 +383,7 @@ cd -
 
 ### /test-review
 
-**When:** Repo-wide test suite audit — when you want to know both "what isn't tested that matters" and "what tests can we delete" in a single report. Complements diff-scoped `/code-review` §7 and artifact-level `cleanup-styles-tests` §7.
+**When:** Repo-wide test suite audit — when you want to know both "what isn't tested that matters" and "what tests can we delete" in a single report. Complements diff-scoped `/review-deep` §7 (or built-in `/code-review` for a quick pass) and artifact-level `cleanup-styles-tests` §7.
 
 **Usage:**
 ```bash
@@ -404,7 +415,7 @@ cd -
 
 **Output:** Twin headline → Testing posture summary → Findings (Coverage / Quality / Economics, ranked) → Documented-decision conflicts (separate, requires confirmation) → Suggested next actions (skill chains + copy-pasteable `/plan-feature` snippets for strategic rewrites).
 
-**Useful chain:** `/code-cleanup` (deletes orphaned test artifacts) → `/test-review` (audits what remains) → `/test-review --plan` → `/plan-feature` per phase. Or post-ship: `/test-review` → `/code-review --security` on the critical-path gaps it surfaces.
+**Useful chain:** `/code-cleanup` (deletes orphaned test artifacts) → `/test-review` (audits what remains) → `/test-review --plan` → `/plan-feature` per phase. Or post-ship: `/test-review` → `/review-deep --security` on the critical-path gaps it surfaces.
 
 ---
 
@@ -468,8 +479,8 @@ No flags. No arguments. Always read-only.
 
 | Bucket | Signal | Recommended starting skill |
 |---|---|---|
-| **A. Pre-commit cleanup** | Uncommitted changes on a feature branch | `/simplify` |
-| **B. Pre-merge verification** | Clean tree, open PR | `/code-review --security` |
+| **A. Pre-commit cleanup** | Uncommitted changes on a feature branch | `/code-review` → `/review-deep` |
+| **B. Pre-merge verification** | Clean tree, open PR | `/review-deep --security` |
 | **C. Post-ship audit** | Clean tree on main, recent ship | `/code-cleanup` |
 | **D. Orient + audit** | Long since last commit, or no `CLAUDE.md` | `/resume-work deep` |
 | **E. Ambient improvement** | Clean tree, no urgent task | `/architecture-review` |
@@ -523,7 +534,7 @@ claude
 
 # 3. Continue recommended task (or pick your own)
 
-# 4. Periodic code review
+# 4. Periodic code review (quick built-in or /review-deep for thorough)
 /code-review [files you modified]
 
 # 5. End session
@@ -549,7 +560,7 @@ claude
 
 # 4. Build it
 
-# 5. Review before committing
+# 5. Review before committing (quick built-in or /review-deep for thorough)
 /code-review [new files]
 
 # 6. End session
@@ -569,7 +580,7 @@ claude
 
 # 3. Review and fix issues
 
-# 4. Verify changes
+# 4. Verify changes (quick built-in or /review-deep for thorough)
 /code-review [modified files]
 
 # 5. End session
@@ -624,15 +635,15 @@ PR:       no open PR
 Bucket:   A — Pre-commit cleanup
 
 Recommended flow:
-  /simplify → /code-review → /code-review --verify → commit → /update-docs
+  /code-review → /review-deep → /review-deep --verify → commit → /update-docs
 
 Alternative: if this touches auth/payments/migrations
-  /simplify → /code-review --security → /code-review --verify → commit → push → /ultrareview <PR#> → merge → /update-docs
+  /code-review → /review-deep --security → /review-deep --verify → commit → push → /ultrareview <PR#> → merge → /update-docs
 ```
 
 The buckets cover: pre-commit cleanup, pre-merge verification, post-ship audit, orient + audit (unfamiliar repo), and ambient improvement. **The advisor never invokes anything** — read the flow, then run it yourself.
 
-It's useful when you'd otherwise stare at the prompt for 30 seconds wondering whether to reach for `/simplify`, `/code-review`, `/code-cleanup`, or `/architecture-review`.
+It's useful when you'd otherwise stare at the prompt for 30 seconds wondering whether to reach for `/code-review`, `/review-deep`, `/code-cleanup`, or `/architecture-review`.
 
 ---
 
@@ -674,7 +685,7 @@ Additionally, Claude Code maintains auto-memory at:
 - Always start with `/resume-work`
 - Always end with `/update-docs`
 - Plan features before building (`/plan-feature`)
-- Review code before committing (`/code-review`)
+- Review code before committing (`/code-review` quick or `/review-deep` thorough)
 - Keep CLAUDE.md updated - it's your project memory
 - Commit frequently with descriptive messages
 
@@ -693,7 +704,7 @@ Claude Code ships a built-in `/loop` skill for running a prompt or slash command
 ```bash
 /loop 5m /code-cleanup --dry-run   # dry-run cleanup every 5 minutes
 /loop 2m "check deploy status"     # poll a deploy every 2 minutes
-/loop /code-review                 # omit interval — model self-paces
+/loop /review-deep                 # omit interval — model self-paces
 ```
 
 Two important caveats: `/loop` is **session-scoped** — it dies when the Claude Code session closes — and recurring jobs **auto-expire after 3 days** even if the session lives longer. Don't use it as a replacement for a real cron job or scheduled remote agent (see `/schedule` for persistent scheduling).
@@ -737,7 +748,7 @@ Ctrl+C                           # Exit Claude
 | Starting fresh on old project | Run `/update-docs` to rebuild context |
 | Too many questions in `/plan-feature` | Say "let's skip that" or "good enough" |
 | `/code-cleanup` too aggressive | Only delete "Safe to Delete" items, or avoid `--aggressive` flag |
-| `/code-review` reviewing too much | Use `--staged` or specify files instead of running with no args |
+| `/review-deep` reviewing too much | Use `--staged` or specify files instead of running with no args |
 | Auto-memory out of date | Run `/update-docs` — it syncs stable facts automatically |
 | CLAUDE.md too long | `/update-docs` auto-archives sessions >3 to `docs/session-history.md` |
 
@@ -758,9 +769,9 @@ Commands are stored in:
 │       ├── architecture-review/
 │       ├── code-cleanup/
 │       ├── code-health-advice/
-│       ├── code-review/
 │       ├── plan-feature/
 │       ├── resume-work/
+│       ├── review-deep/
 │       ├── seo-review/
 │       ├── test-review/
 │       └── update-docs/

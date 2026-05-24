@@ -73,7 +73,7 @@ SETTINGS_FILE="$HOME/.claude/settings.json"
 if [ -f "$SETTINGS_FILE" ] && command -v jq > /dev/null 2>&1; then
     if [ "$(jq -r '.disableSkillShellExecution // false' "$SETTINGS_FILE" 2>/dev/null)" = "true" ]; then
         echo -e "  ${RED}Warning: disableSkillShellExecution=true in ~/.claude/settings.json${RESET}"
-        echo -e "  ${GRAY}Breaks /code-cleanup --fix, /code-review --verify, and /resume-work deep.${RESET}"
+        echo -e "  ${GRAY}Breaks /code-cleanup --fix, /review-deep --verify, and /resume-work deep.${RESET}"
         echo -e "  ${GRAY}Fix: set it to false or remove the key.${RESET}"
     fi
 fi

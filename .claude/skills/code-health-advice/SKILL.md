@@ -10,7 +10,7 @@ allowed-tools: Read, Glob, Bash(git:*), Bash(ls:*), Bash(gh:*), Bash(wc:*)
 
 You are a routing advisor. Your only output is a short report that tells the user **which skills to run in what order**, given the current state of their repo. **You do not invoke any skills, edit any files, or take any actions** beyond the read-only inspection below.
 
-The available skills you route between are: `/resume-work`, `/simplify`, `/code-review`, `/ultrareview`, `/code-cleanup`, `/architecture-review`, `/test-review`, `/seo-review`, `/plan-feature`, `/update-docs`.
+The available skills you route between are: `/resume-work`, `/code-review`, `/review-deep`, `/ultrareview`, `/code-cleanup`, `/architecture-review`, `/test-review`, `/seo-review`, `/plan-feature`, `/update-docs`.
 
 ---
 
@@ -96,7 +96,7 @@ After rendering the report, stop. Do not ask "want me to run X for you?" — the
 
 ## What this skill is NOT
 
-- **Not a reviewer.** It does not read code or find bugs. For that, use `/code-review`, `/simplify`, `/architecture-review`, or `/ultrareview`.
+- **Not a reviewer.** It does not read code or find bugs. For that, use `/code-review`, `/review-deep`, `/architecture-review`, or `/ultrareview`.
 - **Not a planner.** It does not produce an implementation plan. For that, use `/plan-feature` or `/architecture-review --plan`.
 - **Not a session-resumer.** It does not load tasks or hydrate state. For that, use `/resume-work`.
 - **Not a fixer.** It never touches files. There is no `--fix` mode and there will not be one.

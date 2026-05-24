@@ -80,7 +80,7 @@ Whole-pass undo: this was probably done on a branch — `git checkout main && gi
 
 ## What this mode does NOT do
 
-- Run tests after edits (call `/code-review --verify` afterward if you want that)
+- Run tests after edits (call `/review-deep --verify` afterward if you want that)
 - Update imports across the codebase (single-file restriction)
 - Rename exported symbols
 - Reorganize directory structure

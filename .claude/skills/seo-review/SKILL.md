@@ -15,7 +15,7 @@ This skill is web-projects-only. Step 0 detects web-project state and exits sile
 
 Distinct from existing review skills:
 
-- **`/code-review`** — diff/commit scope, no SEO awareness
+- **`/code-review`** / **`/review-deep`** — diff/commit scope, no SEO awareness
 - **`/architecture-review`** — code structure, not SEO
 - **`/test-review`** — test suite health, not SEO
 - **`/code-health-advice`** — routing advisor; routes to `/seo-review` when web project detected
@@ -921,7 +921,7 @@ If default mode, end with:
 
 | Want... | Use... |
 |---------|--------|
-| Per-commit / diff quality | `/code-review` |
+| Per-commit / diff quality (quick / thorough) | `/code-review` / `/review-deep` |
 | Dead code, unused deps | `/code-cleanup` |
 | Repo-wide architecture audit | `/architecture-review` |
 | Repo-wide test suite audit | `/test-review` |

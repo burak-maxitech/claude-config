@@ -143,7 +143,7 @@ If empty: render `## ⚠ Documented-Decision Conflicts\n\nNone — all findings 
 
 **Skill chains:**
 - <e.g. "Run `/code-cleanup` first — 5 orphaned-test candidates likely exist (not surfaced here; deferred to cleanup-styles-tests).">
-- <e.g. "Run `/code-review src/auth/verifySession.ts --security` before adding tests — the file is security-critical.">
+- <e.g. "Run `/review-deep src/auth/verifySession.ts --security` before adding tests — the file is security-critical.">
 - <e.g. "Run `/architecture-review` if coverage gaps cluster in one module (current run: 7 of 12 in src/billing/).">
 
 **Top strategic rewrites (copy-paste into a fresh session):**
@@ -194,7 +194,7 @@ Findings filtered:
 - Dropped 2 findings with certainty < 0.5 and impact below threshold
 
 Defer to /code-cleanup for: orphaned test files, stale snapshots, >3mo skipped tests, unused test helpers.
-Defer to /code-review for: per-commit / per-PR test quality.
+Defer to /code-review or /review-deep for: per-commit / per-PR test quality.
 ```
 
 The footer's "subtotal-check" line is intentionally surfaced — if the orchestrator's arithmetic doesn't add up, the user sees it immediately rather than the headline silently lying. If subtotals do match exactly, render the line as "Subtotal-check: <a> + <b> + <c> = <total> ✓".

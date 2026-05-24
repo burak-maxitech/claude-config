@@ -1,6 +1,6 @@
 ---
 name: architecture-review
-description: Repo-wide architecture audit. Surfaces structural debt, complexity hotspots, refactor opportunities, performance suspects, AND over-engineering/almost-dead code (single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config). Reports lines-deletable as a top-line metric. Use when user mentions architecture review, refactoring opportunities, technical debt at the repo level, "is this codebase over-engineered", "make the codebase smaller", or "where's the complexity in this codebase". Different from /code-review (diff-scoped), /simplify (recent changes only), /ultrareview (PR-scoped cloud review), and /code-cleanup (file-level deletion only).
+description: Repo-wide architecture audit. Surfaces structural debt, complexity hotspots, refactor opportunities, performance suspects, AND over-engineering/almost-dead code (single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config). Reports lines-deletable as a top-line metric. Use when user mentions architecture review, refactoring opportunities, technical debt at the repo level, "is this codebase over-engineered", "make the codebase smaller", or "where's the complexity in this codebase". Different from /code-review (diff-scoped, daily driver), /review-deep (thorough senior-engineer review), /ultrareview (PR-scoped cloud review), and /code-cleanup (file-level deletion only).
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(pip:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(cat:*), Bash(head:*), Task
 effort: high
@@ -13,13 +13,13 @@ Audit this codebase like a staff engineer doing a quarterly architecture health 
 
 This skill is distinct from the diff-scoped reviewers in this repo:
 
-- **`/code-review`** — diff or commit scope, single-pass quality review
-- **`/simplify`** — recent changes only, post-hoc cleanup
-- **`/ultrareview`** — PR-scoped cloud review with verifying subagents
+- **`/code-review`** — diff/commit scope, lightweight single-pass quality review (built-in, daily driver)
+- **`/review-deep`** — diff/commit scope, thorough senior-engineer review with `--security`/`--verify`/`--fix`
+- **`/ultrareview`** — PR-scoped cloud review with verifying subagents (high-risk pre-merge)
 - **`/code-cleanup`** — repo-wide deletion focus at *file/dependency* granularity (whole unused files, unused deps, stale config)
 - **`/architecture-review` (this)** — repo-wide *structural, complexity, and over-engineering* focus, with deletion at *symbol/abstraction* granularity
 
-The two are complementary: `/code-cleanup` deletes whole files; this skill deletes abstractions, wrappers, defensive code, and almost-dead symbols inside files that are still in use. If the user asks about per-commit quality, suggest `/code-review` instead.
+The two are complementary: `/code-cleanup` deletes whole files; this skill deletes abstractions, wrappers, defensive code, and almost-dead symbols inside files that are still in use. If the user asks about per-commit quality, suggest `/code-review` (quick) or `/review-deep` (thorough) instead.
 
 ---
 
@@ -232,8 +232,8 @@ If running default mode, end with one line:
 
 | Want... | Use... |
 |---------|--------|
-| Per-commit / diff quality review | `/code-review` |
+| Per-commit / diff quality review (quick) | `/code-review` |
+| Per-commit / diff quality review (thorough) | `/review-deep` |
 | Dead code, unused deps | `/code-cleanup` |
-| Recent-change cleanup | `/simplify` |
 | Pre-merge multi-agent verification | `/ultrareview` |
 | **Repo-wide architecture + complexity audit** | **`/architecture-review` (this)** |

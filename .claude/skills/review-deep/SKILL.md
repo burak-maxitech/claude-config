@@ -1,17 +1,17 @@
 ---
-name: code-review
-description: "Reviews code like a senior engineer. Auto-detects target (uncommitted changes, staged, PR, files), scans codebase conventions, and produces severity-ranked findings with mandatory file:line references. Supports --security (OWASP deep dive), --verify (run tests/lint to validate), and --fix (auto-fix simple issues). For high-risk pre-merge reviews of critical PRs (auth, payments, migrations), the built-in `/ultrareview` runs 5+ verifying subagents in the cloud and is the better fit; this skill is the lighter, in-session daily driver."
+name: review-deep
+description: "Senior-engineer code review (thorough tier). Auto-detects target (uncommitted, staged, PR, files), scans codebase conventions, and produces severity-ranked findings with mandatory file:line references. Supports --security (OWASP deep dive), --verify (run tests/lint to validate), and --fix (auto-fix simple issues). Slots between the built-in `/code-review` (fast diff scan, daily default) and `/ultrareview` (cloud, 5+ verifying subagents, high-risk pre-merge). Reach for this when you want more rigor than the built-in but don't need the cloud fleet."
 disable-model-invocation: true
 effort: high
 allowed-tools: Read, Edit, Grep, Glob, Bash(git:*), Bash(gh:*), Bash(npm:*), Bash(npx:*), Bash(cargo:*), Bash(python:*), Bash(pip:*)
 argument-hint: "[file/dir/PR#/--staged/--last-commit] [--security] [--verify] [--fix]"
 ---
 
-# /code-review - Comprehensive Code Review
+# /review-deep - Comprehensive Code Review
 
 Review this code like a senior engineer with 15+ years of experience. Be thorough but practical — focus on issues that matter, not pedantic style preferences.
 
-> **Fresh-session tip.** For non-trivial reviews — especially of code Claude just wrote in this same session — run `/clear` first or invoke `/code-review` from a fresh `claude` session. Per the official best-practices doc's Writer/Reviewer pattern: *"a fresh context improves code review since Claude won't be biased toward code it just wrote."* Skip this for quick passes on diffs you wrote by hand or for `--last-commit` reviews where you genuinely want session context.
+> **Fresh-session tip.** For non-trivial reviews — especially of code Claude just wrote in this same session — run `/clear` first or invoke `/review-deep` from a fresh `claude` session. Per the official best-practices doc's Writer/Reviewer pattern: *"a fresh context improves code review since Claude won't be biased toward code it just wrote."* Skip this for quick passes on diffs you wrote by hand or for `--last-commit` reviews where you genuinely want session context.
 
 ---
 
