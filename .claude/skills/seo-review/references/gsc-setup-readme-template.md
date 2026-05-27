@@ -128,7 +128,7 @@ your account can read. Empty array means no properties on this account.
 
 - API auth probe: `gcloud auth application-default print-access-token` should print a token. The skill calls `GET /webmasters/v3/sites` at start of each run to verify access; failures surface in footer with specific remediation.
 - Performance: 3 `searchanalytics.query` calls per run (queries digest, pages digest, url_impressions_map).
-- Indexing: up to 200 `urlInspection.index.inspect` calls per run (3-slice mix: 80 high-impression URLs + 20 recently-changed paths + 100 sitemap-orphan URLs that have no impressions in the lookback window — the sitemap-orphan slice catches deindex risks early, before Google emails). Well under the 2,000/day per-property quota.
+- Indexing: up to 200 `urlInspection.index.inspect` calls per run (4-slice mix: 80 high-impression URLs + 20 recently-changed paths + up to 100 user-supplied URLs from `known-bad-urls.txt` + sitemap-orphan URLs filling the rest of the shared 100-slot bucket — sitemap-orphan catches deindex risks early, before Google emails; user-supplied catches URLs no longer in your sitemap that Google still remembers). Well under the 2,000/day per-property quota.
 - Index Coverage snapshots: one `.json` written to `.seo-data/gsc/snapshots/` per run, retained 30 days. Next run diffs against the prior snapshot to surface URLs that flipped from indexed → not-indexed (sub-dim 14 `deindex_regression` — the early-warning loop catching Google's "Validation failed" emails before they hit your inbox).
 
 ## Privacy
@@ -175,10 +175,12 @@ For `urlInspection.index.inspect` to tell us "this URL is 404/redirect/etc.", we
 |---|---|---|
 | **Impressions map** (`searchanalytics.query` Q3) | up to 80 | URLs with any search traffic in the lookback window |
 | **35-day git scan** (resolves rename old_path AND new_path) | up to 20 | URLs from files renamed/touched in the last 35 days |
-| **Sitemap-orphan slice** (URLs in sitemap.xml but NOT in impressions) | up to 100 (shared) | URLs your sitemap declares but Google didn't surface as performant — e.g., "Page with redirect" cases (URL in sitemap → redirects elsewhere) and "Submitted URL not found (404)" cases |
-| **`known-bad-urls.txt`** (this file) | up to 50 (shared with sitemap-orphan) | Everything the above three miss |
+| **Sitemap-orphan slice** (URLs in sitemap.xml but NOT in impressions) | up to 100 (shared) | URLs your sitemap declares but Google didn't surface as performant — but ONLY URLs **still in your current sitemap**. URLs your codebase has already removed from sitemap (typical for properly-handled deindexed content) are NOT caught by this slice. |
+| **`known-bad-urls.txt`** (this file) | up to 100 (shared with sitemap-orphan) | URLs **not in your current sitemap** (codebase removed them) AND not in impressions AND not git-changed recently — typically deindexed URLs from GSC's "Page Indexing" reports that Google still remembers but your codebase no longer serves |
 
-The "shared 100-slot bucket" means user-supplied URLs take precedence over sitemap-orphan within their bucket — paste 50 user URLs, sitemap-orphan gets 50; paste 0 user URLs, sitemap-orphan gets 100. Dedup precedence: `impressions > git > user-supplied > sitemap-orphan`.
+The "shared 100-slot bucket" means user-supplied URLs take precedence over sitemap-orphan within their bucket — paste 30 user URLs, sitemap-orphan gets 70; paste 100 user URLs, sitemap-orphan gets 0; paste 0 user URLs, sitemap-orphan gets 100. Dedup precedence: `impressions > git > user-supplied > sitemap-orphan`.
+
+**Important nuance on sitemap-orphan's coverage of redirects.** Earlier guidance said "redirects are covered by sitemap-orphan automatically — only paste 404s into known-bad-urls.txt." That's only true if your codebase keeps deindexed/redirected URLs in `sitemap.xml`. If your codebase actively rotates them out (the cleaner approach for sitemap hygiene), sitemap-orphan can't see them either — those URLs are in NONE of the four sources except `known-bad-urls.txt`. Rule of thumb: if a GSC validation-failed email references URLs that aren't in your current sitemap, paste them here regardless of whether the reason is "404" or "Page with redirect".
 
 #### When you need `known-bad-urls.txt`
 
@@ -252,9 +254,9 @@ The `#` comments help **you** track what you pasted, what's resolved, what's sti
 
 #### Caps & behavior
 
-- First 50 entries are inspected per run (the 4th URL Inspection slice — see `references/gsc-api-queries.md`). If your file has >50 URLs, the rest are skipped this run; remove inspected URLs from the file (or wait a day) to inspect the next batch.
+- First 100 entries are inspected per run (the 4th URL Inspection slice — see `references/gsc-api-queries.md`). If your file has >100 URLs, the rest are skipped this run; remove inspected URLs from the file (or wait a day) to inspect the next batch. The skill emits a banner in the report's Suggested Next Actions section when paste size exceeds the cap — you won't miss it.
 - Daily quota (2,000 URL Inspections per property, Google-enforced) is the hard cap; the skill's per-run budget is 200.
-- URLs in this file take precedence over the sitemap-orphan slice within their shared 100-slot bucket.
+- URLs in this file take precedence over the sitemap-orphan slice within their shared 100-slot bucket. Pasting 100 URLs claims the entire shared bucket and skips sitemap-orphan for that run — appropriate when triaging a hot deindex incident; suboptimal as a steady-state because sub-dim 14 (`deindex_regression`) needs sitemap-orphan to surface NEW deindex events. Keep the file small once the incident is resolved.
 - Findings derived from these URLs will be tagged in the report so you can see which user-pasted URLs surfaced specific coverage states.
 
 #### When to delete entries

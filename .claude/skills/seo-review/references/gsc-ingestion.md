@@ -31,7 +31,7 @@ Otherwise → **heuristic-only mode**. The skill runs normally; subagents get an
 When GSC mode is enabled, ingest data from the Search Console API per `gsc-api-queries.md`:
 
 - **Performance**: 3 parallel `searchanalytics.query` calls (Q1 queries digest, Q2 pages digest, Q3 `url_impressions_map`)
-- **Indexing**: up to 200 parallel `urlInspection.index.inspect` calls (per-URL; 3-slice URL selection algorithm: top 80 by impressions + 20 git-changed + 100 sitemap-orphan URLs not in `url_impressions_map`)
+- **Indexing**: up to 200 parallel `urlInspection.index.inspect` calls (per-URL; 4-slice URL selection algorithm: top 80 by impressions + 20 git-changed + up to 100 user-supplied (`known-bad-urls.txt`) + sitemap-orphan URLs not in `url_impressions_map` filling whatever the user-supplied slice doesn't claim of the shared 100-slot bucket)
 
 ### Query execution
 
@@ -552,6 +552,6 @@ The `seo-gsc-insights` subagent is the primary consumer. The other 3 subagents u
 - **Never modify .gitignore outside the sentinel block.** Idempotency check via start-marker Grep.
 - **No silent fallback** to a different ingestion path when API fails — print the error loudly, skip the affected signal.
 - **Digest cap is 50 rows per signal** — Q1 and Q2 enforce server-side via API rowLimit + client-side top-50 sort.
-- **URL Inspection budget is 200/run hard cap** — well under the 2,000/day per-property quota. Budget split: 80 impressions-top + 20 git-changed + 100 sitemap-orphan (see `gsc-api-queries.md` "URL Inspection — selection algorithm").
+- **URL Inspection budget is 200/run hard cap** — well under the 2,000/day per-property quota. Budget split: 80 impressions-top + 20 git-changed + 100 (user-supplied + sitemap-orphan, shared bucket; user-supplied up to 100, sitemap-orphan fills remainder). See `gsc-api-queries.md` "URL Inspection — selection algorithm".
 - **Snapshot retention 30 days.** `.seo-data/gsc/snapshots/<YYYY-MM-DDTHHMMSS>-<commit_sha7>.json` files are pruned by `find -mtime +30` at Step 1.6.1's Turn 1 batch (mirrors the cache prune pattern). Snapshots are skill-auto-managed; users shouldn't touch them. Reproducible from URL Inspection cache if deleted.
 - **Score impact stays heuristic.** GSC findings carry `score_impact: 0` (see `rubric.md` for the orchestrator-side enforcement). Sub-dim 14 (`deindex_regression`) is no exception — the headline /100 score stays comparable across runs.

@@ -8,25 +8,26 @@ For curl invocation templates (request bodies, headers, post-processing), see `g
 
 ## Why cache
 
-URL Inspection has a strict **2,000-calls/day per-property quota**. A single `/seo-review` run uses up to 200 (3-slice budget: 80 impressions-top + 20 git-changed + 100 sitemap-orphan). Iterating on a fix and rerunning the audit 3-5 times in a session can chew through quota that the next run will need. Search Analytics has a more generous 1,200 QPM but still benefits from cache-hit speed (faster total wall time on rerun).
+URL Inspection has a strict **2,000-calls/day per-property quota**. A single `/seo-review` run uses up to 200 (4-slice budget: 80 impressions-top + 20 git-changed + 100 shared bucket between user-supplied `known-bad-urls.txt` and sitemap-orphan). Iterating on a fix and rerunning the audit 3-5 times in a session can chew through quota that the next run will need. Search Analytics has a more generous 1,200 QPM but still benefits from cache-hit speed (faster total wall time on rerun).
 
 GSC's own data freshness ceiling is **~2 days** (Search Analytics has a 2-day finalization lag; URL Inspection reflects Google's most recent crawl, which also moves slowly). Reruns within that window can't yield fresher data from upstream — caching for ~24h trades zero data freshness for guaranteed quota savings.
 
 ---
 
-## TTL policy
+## TTL policy (split by call-type — codified after S34 burakarik6 dogfood)
 
-**Default TTL: 24 hours** (86400 seconds).
+**Two TTL tiers — different freshness needs per endpoint:**
 
-Rationale:
-- Aligns with GSC's own data refresh cadence (no upstream change within the same calendar day).
-- Same-day reruns hit cache → zero quota cost on iteration.
-- Next-day reruns get fresh data when GSC has fresh data anyway.
-- Stale entries auto-expire on next run's TTL check; no manual eviction needed for correctness.
+| Cache prefix | TTL | Rationale |
+|---|---|---|
+| `sa-q1-*` / `sa-q2-*` / `sa-q3-*` (Search Analytics) | **24 hours** (86400 s) | Rolling-window date keys (e.g., `endDate=2026-05-27` today, `2026-05-28` tomorrow) → hash naturally invalidates day-over-day. 24h TTL aligns with GSC's own ~2-day finalization lag; cross-day reruns naturally miss because the cache key changed. Going longer would hide stale data; going shorter defeats the purpose of caching at all. |
+| `ui-*` (URL Inspection per-URL) | **7 days** (604800 s) | `coverageState` is genuinely weeks-stable — a URL's "Submitted and indexed" state doesn't flip day-over-day under normal operation. The S34 burakarik6 dogfood scored 0/197 cache hits despite 85 prior cache entries from Session 71 (3 days earlier) because the original 24h TTL had expired all of them. Raising ui-* to 7d means typical 2-7-day iteration loops (the actual user pattern) benefit from cache. URLs that *did* flip state (which is exactly the signal sub-dim 14 wants to catch) are still surfaced by the snapshot-diff path independent of cache freshness. |
 
-**Override at the run level** with `--no-cache` (Step 2 Mode Dispatch). The flag forces every call to skip the cache lookup and refetch. Fresh responses are still written to cache after the bypass run, so subsequent runs without `--no-cache` benefit from the refresh.
+**Override at the run level** with `--no-cache` (Step 2 Mode Dispatch). The flag forces every call to skip the cache lookup and refetch — applies to BOTH tiers uniformly. Fresh responses are still written to cache after the bypass run, so subsequent runs without `--no-cache` benefit from the refresh.
 
-**TTL is not user-configurable per-run.** Adding a `--cache-ttl <hours>` flag would invite footgun configurations (sub-hour TTL defeats the point; week-long TTL hides stale data); 24h is the only sensible default. If a use case for tunable TTL surfaces later, revisit.
+**TTL is not user-configurable per-run.** Adding a `--cache-ttl <hours>` flag would invite footgun configurations (sub-hour TTL defeats the point; month-long TTL hides stale data); the two-tier default is the only sensible configuration. If a use case for tunable TTL surfaces later, revisit.
+
+**Why split rather than unify at 7d for both?** Search Analytics keys shift daily anyway (rolling 90-day window) — raising sa-* TTL to 7d would produce zero additional hits (the key has already changed). It would also extend the staleness window for the rare case where GSC backfills a same-day metric correction. URL Inspection keys are stable (`site_url|url` — no date component), so longer TTL DOES help. The split matches each endpoint's actual cache-friendliness.
 
 ---
 
@@ -51,7 +52,7 @@ Already covered by the `.gitignore` sentinel block (`.seo-data/gsc/` is fully ig
 |---|---|---|
 | Purpose | Same-day quota savings (avoid refetching API responses) | Longitudinal coverage-state history (regression detection) |
 | Retention | 7 days (auto-prune) | 30 days (auto-prune) |
-| TTL on read | 24h (cache hit/miss decision) | None (every snapshot is read on demand for diff) |
+| TTL on read | 24h for `sa-*` / 7d for `ui-*` (cache hit/miss decision; see "TTL policy" above) | None (every snapshot is read on demand for diff) |
 | Files | `sa-q{1,2,3}-<hash>.json` + `ui-<hash>.json` (raw API responses) | `<YYYY-MM-DDTHHMMSS>-<commit_sha7>.json` (orchestrator-aggregated `{url: coverageState}` map + metadata) |
 | Managed by | This file's cache wrapper | `references/gsc-ingestion.md` sub-dim 14 + `SKILL.md` Step 1.6.13 |
 | Reproducible | Yes (from API on demand) | Yes (from cache files on the same run) |
@@ -91,13 +92,21 @@ filename  = "ui-<hash>.json"
 
 ---
 
-## Cache wrapper (per-call inline bash)
+## Cache wrapper (per-call inline bash — Turn 2a Search Analytics only)
 
-Each curl call uses a wrapper that checks cache, falls through on miss, and writes atomically. Single bash invocation per call so the orchestrator can fire N parallel cache-or-curl calls in one tool-use block:
+**Scope:** This wrapper is the canonical dispatch for **Search Analytics** (Q1/Q2/Q3) calls in Turn 2a. URL Inspection (Turn 2b) uses a DIFFERENT dispatch — a single Bash invocation of `gsc-parse-helper.py inspect-batch`, which parallelizes via Python's `ThreadPoolExecutor` and applies the same cache key + TTL + atomic-write contract internally. See SKILL.md Step 1.6.6 Turn 2b for the helper invocation; the helper's cache logic matches what's described here so `ui-*.json` files written by either path are mutually consumable. The boundary-violation history (S31 cont.², S34) makes the helper-driven dispatch the only sanctioned path for URL Inspection — never re-introduce per-URL Bash-curl loops.
+
+Each Q1/Q2/Q3 call uses a wrapper that checks cache, falls through on miss, and writes atomically. Single bash invocation per call so the orchestrator can fire 3 parallel cache-or-curl calls in one tool-use block:
 
 ```bash
 CACHE_FILE=".seo-data/gsc/cache/<prefix>-<hash>.json"
-TTL_MIN=1440  # 24 hours in minutes
+# TTL by prefix — sa-* is 24h (rolling date keys shift daily anyway);
+# ui-* is 7d (coverageState is weeks-stable). See "TTL policy" above.
+case "$CACHE_FILE" in
+  *.seo-data/gsc/cache/sa-*) TTL_MIN=1440   ;;  # 24h
+  *.seo-data/gsc/cache/ui-*) TTL_MIN=10080  ;;  # 7d
+  *)                         TTL_MIN=1440   ;;  # default: 24h
+esac
 
 # Cache hit check (skipped when NO_CACHE=1).
 # `find -mmin -N` matches files modified in the last N minutes — portable across
@@ -153,15 +162,22 @@ The orchestrator substitutes before invocation:
 
 ## Eviction policy
 
-At the start of Step 1.6 (after mode detection, before fetch dispatch), prune cache entries older than **7 days**:
+At the start of Step 1.6 (after mode detection, before fetch dispatch), prune cache entries:
 
 ```bash
-find .seo-data/gsc/cache -type f -mtime +7 -delete 2>/dev/null
+# Two prunes for the two TTL tiers — keep at the eviction window matching the
+# longest active TTL so we don't delete files that the per-prefix TTL check
+# would still consider fresh.
+find .seo-data/gsc/cache -type f -name 'sa-*' -mtime +7  -delete 2>/dev/null   # sa-* age cap: 7d (1d TTL + 6d slack)
+find .seo-data/gsc/cache -type f -name 'ui-*' -mtime +14 -delete 2>/dev/null   # ui-* age cap: 14d (7d TTL + 7d slack)
+find .seo-data/gsc/cache -type f ! -name 'sa-*' ! -name 'ui-*' -mtime +7 -delete 2>/dev/null   # janitorial: orphaned .tmp.$$ + future prefixes
 ```
 
 Rationale:
-- TTL is 24h, so entries older than 24h are already cache-misses by lookup time.
-- 7-day retention catches the long-tail rerun case (user reruns same audit a week later → entries auto-expire instead of accumulating forever).
+- TTL gates the cache-hit decision at lookup time (24h for sa-*, 7d for ui-*). Eviction is the secondary janitor.
+- Slack between TTL and eviction prevents thrash: if a cache entry is at TTL boundary (e.g., 23h59m old) when the run starts, eviction shouldn't delete it before the lookup check has a chance to use it.
+- `ui-*` eviction at 14d catches the long-tail rerun case (user reruns same audit two weeks later → entries auto-expire instead of accumulating).
+- `sa-*` eviction at 7d is tighter — rolling-window keys mean entries past 7d are guaranteed stale-by-key anyway; no point keeping them.
 - `find -mtime +7` is broadly portable across GNU + BSD + MSYS `find` (same family as the wrapper's `-mmin -N` TTL check).
 - `-delete` is safer than `-exec rm` (no race window) and supported on both `find` flavors.
 - `2>/dev/null` swallows the "directory not found" warning when cache dir doesn't exist yet (first run).
@@ -176,7 +192,7 @@ Prune is a single command, not per-file. If pruning fails (read-only filesystem,
 Step 1.6.12 footer gains a new line summarizing cache activity for the run:
 
 ```
-GSC API cache: 102/103 hits (24h TTL, 1 fresh call: ui-https://example.com/new-page). Use --no-cache to force refresh.
+GSC API cache: 102/103 hits (split TTL: 24h on sa-*, 7d on ui-*; 1 fresh call: ui-https://example.com/new-page). Use --no-cache to force refresh.
 ```
 
 Construction:

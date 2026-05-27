@@ -15,7 +15,7 @@ The Search Console API exposes three endpoints used by `/seo-review`:
 | Endpoint | Purpose | Queried by the skill? |
 |---|---|---|
 | `POST https://www.googleapis.com/webmasters/v3/sites/{siteUrl}/searchAnalytics/query` | Performance — queries/pages/impressions/CTR/position | **Yes** (Q1, Q2, Q3) |
-| `POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect` | Per-URL indexing diagnostics — `coverageState`, `pageFetchState`, canonicals, last crawl, mobile usability, rich results | **Yes** (one call per inspected URL, up to 200/run — 3-slice mix of impressions-top + git-changed + sitemap-orphan; see `gsc-api-queries.md` selection algorithm) |
+| `POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect` | Per-URL indexing diagnostics — `coverageState`, `pageFetchState`, canonicals, last crawl, mobile usability, rich results | **Yes** (one call per inspected URL, up to 200/run — 4-slice mix of impressions-top + git-changed + user-supplied (`known-bad-urls.txt`) + sitemap-orphan; see `gsc-api-queries.md` selection algorithm) |
 | `GET https://www.googleapis.com/webmasters/v3/sites` | List user's verified properties | **Yes** (active auth probe — Step 1.6.1 activation condition 5) |
 
 **Note two different base hosts**: `www.googleapis.com/webmasters/v3` for Search Analytics + Sites; `searchconsole.googleapis.com/v1` for URL Inspection. Same OAuth scope; same ADC token; different quota tracking (see "Quota model" below).

@@ -131,10 +131,12 @@ Steps 1.5 (git scan) and 1.6 (GSC API ingestion when configured, else heuristic-
 - `Read references/gsc-api-queries.md` (optimistic; only used when API activates — reading early avoids an extra Read in Turn 2)
 - `Read references/gsc-api-schema.md` (optimistic; reference for API response parsing)
 - `Read references/gsc-cache.md` (optimistic; cache wrapper template + TTL policy used by Turn 2 dispatch)
-- `Bash: mkdir -p .seo-data/gsc/cache .seo-data/gsc/snapshots 2>/dev/null; find .seo-data/gsc/cache -type f -mtime +7 -delete 2>/dev/null; find .seo-data/gsc/snapshots -type f -mtime +30 -delete 2>/dev/null; ls .seo-data/gsc/cache 2>/dev/null | wc -l; ls .seo-data/gsc/snapshots 2>/dev/null | wc -l` (cache + snapshot dir setup + cache 7-day prune + snapshot 30-day prune + counts of remaining entries — produces `<N>` for the footer cache stats line and `<M>` for the snapshot count. `mkdir` here is load-bearing — the Turn 2 wrapper assumes both dirs exist and does NOT recreate them per call. See `references/gsc-cache.md` "Eviction policy" for the cache prune rationale and `references/gsc-ingestion.md` "Hard rules" for the 30-day snapshot retention rationale.)
+- `Bash: mkdir -p .seo-data/gsc/cache .seo-data/gsc/snapshots 2>/dev/null; find .seo-data/gsc/cache -type f -name 'sa-*' -mtime +7 -delete 2>/dev/null; find .seo-data/gsc/cache -type f -name 'ui-*' -mtime +14 -delete 2>/dev/null; find .seo-data/gsc/cache -type f ! -name 'sa-*' ! -name 'ui-*' -mtime +7 -delete 2>/dev/null; find .seo-data/gsc/snapshots -type f -mtime +30 -delete 2>/dev/null; ls .seo-data/gsc/cache 2>/dev/null | wc -l; ls .seo-data/gsc/snapshots 2>/dev/null | wc -l` (cache + snapshot dir setup + **two-tier cache prune** (sa-* at 7d, ui-* at 14d — matches the per-prefix TTL with slack; see `references/gsc-cache.md` "Eviction policy") + janitorial prune for orphaned `.tmp.$$` files + snapshot 30-day prune + counts of remaining entries — produces `<N>` for the footer cache stats line and `<M>` for the snapshot count. `mkdir` here is load-bearing — the Turn 2 wrapper assumes both dirs exist and does NOT recreate them per call. See `references/gsc-cache.md` "TTL policy" for the per-prefix split rationale (24h for sa-*, 7d for ui-* — codified after S34 burakarik6 dogfood scored 0/197 cache hits) and `references/gsc-ingestion.md` "Hard rules" for the 30-day snapshot retention rationale.)
 - `Glob **/sitemap.xml` + `Glob **/sitemap_index.xml` (sitemap location detection — both probed in parallel so Turn 1 can begin Read'ing the right file in Turn 1.5 if found. Search paths: repo root, `public/`, `static/`, `dist/`, `out/`, `_site/`. Used by Step 1.6.6 Turn 2b URL Inspection sitemap-orphan slice AND by Step 3.2 URL probe — both consume the same parsed URL list, so a single parse is sufficient. If neither Glob finds anything, the sitemap-orphan slice in Turn 2b is skipped silently and Step 3.2 footer-notes "no sitemap.xml — URL probe skipped".)
 - `Read .seo-data/gsc/known-bad-urls.txt` (optimistic — the file is user-authored and may not exist; Read errors silently on missing file → `user_supplied_urls` stays empty. When present, parsed in Step 1.6.6's Pre-Turn-2 step into the URL Inspection user-supplied slice — see `references/gsc-api-queries.md` "URL Inspection — selection algorithm" 4-slice mix.)
 - `Bash: ls .seo-data/gsc/snapshots 2>/dev/null | sort | tail -1` (find most recent prior snapshot — used by Step 1.6.13.2 regression diff. Empty stdout means "first run for this property", in which case Step 1.6.13 emits no findings and footer-notes the activation.)
+- `Read .seo-data/gsc/finding-history.json` (optimistic — file is skill-auto-managed under Group D finding-lifecycle infra; absent on first run. When present, the orchestrator parses `{<hash>: {run_count, first_seen_date, ...}}` and passes the map to Step 7 report rendering so findings with `run_count >= 3` get an escalation hint appended to their `recommended_action`. See Step 6.8 for the write-back step.)
+- `Read .seo-data/gsc/watchpoints.json` (optimistic — same as above. When present, the orchestrator invokes `gsc-parse-helper.py watchpoint-check` AFTER Q2 cache lands in Turn 2a (since the check needs the current Q2 pages digest for metric comparison) — see **Step 1.6.14** below for the invocation block. Stash the helper output for Step 7 banner rendering.)
 - `Bash: gcloud --version 2>&1` (gcloud SDK install detection)
 - `Bash: TOKEN=$(gcloud auth application-default print-access-token 2>&1); ADC_DIR=$(gcloud info --format="value(config.paths.global_config_dir)" 2>/dev/null); QUOTA_PROJECT=$(grep -oE '"quota_project_id"[[:space:]]*:[[:space:]]*"[^"]+"' "$ADC_DIR/application_default_credentials.json" 2>/dev/null | head -1 | sed -E 's/.*"([^"]+)"$/\1/'); echo "TOKEN_LEN:${#TOKEN}"; echo "QUOTA_PROJECT:$QUOTA_PROJECT"; curl -s -w "\nHTTP_STATUS:%{http_code}\n" -H "Authorization: Bearer $TOKEN" -H "x-goog-user-project: $QUOTA_PROJECT" "https://www.googleapis.com/webmasters/v3/sites"` (combined ADC + quota-project + API auth probe in one Bash invocation; orchestrator parses `TOKEN_LEN:`, `QUOTA_PROJECT:`, and `HTTP_STATUS:` to determine ADC + quota project + API reachability. The `x-goog-user-project` header is required on every Search Console API call to bill quota to the user-controlled project; ADC stores the value in `application_default_credentials.json` after `gcloud auth application-default set-quota-project <id>`. Without it, all calls return 403 SERVICE_DISABLED. **Extraction uses `grep -oE` + `sed -E` instead of `jq`** — `jq` isn't on PATH in many bash environments (notably claude-code's Bash on Windows + minimal Linux containers); grep + sed are always available.)
 
@@ -300,7 +302,7 @@ Four reference files cover the implementation:
 - `references/gsc-ingestion.md` — digest shapes, **14 sub-dim** finding catalog (incl. sub-dim 14 `deindex_regression` for snapshot-diff early warning), `coverageState` → 9-reason lookup, setup banner, `.gitignore` auto-append rules
 - `references/gsc-api-schema.md` — Search Console API endpoint inventory, auth/scope, quota model, `coverageState`/`pageFetchState` enums
 - `references/gsc-api-queries.md` — 3 parametrized `curl` templates (Q1/Q2/Q3) + URL Inspection per-URL template + URL selection algorithm + lookup table
-- `references/gsc-cache.md` — 24h TTL response cache for `searchanalytics.query` + `urlInspection.index.inspect`. Cache wrapper bash template (atomic write, skip-cache-on-non-200, stat portability). `--no-cache` bypass behavior. 7-day eviction policy. Footer line format.
+- `references/gsc-cache.md` — split-TTL response cache for `searchanalytics.query` (24h on `sa-*`) and `urlInspection.index.inspect` (7d on `ui-*` — coverageState is weeks-stable). Cache wrapper bash template (atomic write, skip-cache-on-non-200, stat portability) for Turn 2a Search Analytics; Turn 2b URL Inspection cache is helper-resident in `gsc-parse-helper.py inspect-batch`. `--no-cache` bypass behavior. Two-tier eviction policy (sa-* at 7d, ui-* at 14d). Footer line format.
 
 ### Mode resolution (binary)
 
@@ -405,7 +407,9 @@ If no sitemap.xml or sitemap_index.xml was located: both structures stay empty. 
 - Skip lines that are blank OR start with `#` (comment lines)
 - Validate each remaining line looks like a URL (`http://` or `https://` prefix — silently drop lines that don't, with a footer note `Skipped N lines from known-bad-urls.txt that didn't look like URLs`)
 - Deduplicate (preserve first-occurrence order)
-- Take first 50 entries (cap)
+- Take first 100 entries (cap — raised from 50 after the S34 burakarik6 dogfood surfaced ~100-URL paste sizes from GSC validation-failed emails; 100 fits the shared 100-slot bucket cleanly, letting a user with a hot deindex incident paste up to 100 URLs and consume the entire user/orphan bucket without splitting across runs)
+
+**If file content exceeds the 100-entry cap**, emit a top-level banner in the report's Suggested Next Actions section (NOT just a footer note): `⚠ known-bad-urls.txt has <N> URLs; only the first 100 were inspected this run. To process the remaining <N-100>, either re-run /seo-review after removing the inspected URLs from the file, OR wait a day and re-run (URL Inspection daily quota is 2,000/property — 100/run leaves 1,900 headroom for other usage).` The banner makes the partial coverage explicitly visible — buried in the footer it's easy for the user to miss.
 
 Result: `user_supplied_urls` list, in shared context. Used by Turn 2b URL selection as the 4th URL Inspection slice — see `references/gsc-api-queries.md` "URL Inspection — selection algorithm" 4-slice mix. If the file is absent or all lines are blank/comments, `user_supplied_urls` stays empty; sitemap-orphan claims the full 100-slot bucket in Turn 2b.
 
@@ -433,20 +437,57 @@ curl -s -w '%{http_code}' -o "$TMP" -X POST \
   "https://www.googleapis.com/webmasters/v3/sites/<SITE_URL_ENCODED>/searchAnalytics/query"
 ```
 
-**Turn 2b — URL Inspection (N parallel cache-or-curl calls, N ≤ 200)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (top 80 by impressions from Q3 + 20 git-changed paths from Step 1.5 resolved via `page_type_map` + 100 sitemap-orphan URLs from the parsed sitemap.xml that don't appear in `url_impressions_map`, sorted document order; dedup precedence impressions > git > sitemap; hard cap 200). Each URL gets its own cache slot (`ui-<sha1(site_url|inspection_url)>.json`) — partial cache hits across the batch are expected (e.g., 180 cached + 20 fresh after a rerun). Fresh-path curl inside the wrapper:
+**Turn 2b — URL Inspection (single helper invocation, internally parallel)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (top 80 by impressions from Q3 + 20 git-changed paths from Step 1.5 resolved via `page_type_map` + shared 100-slot bucket of user-supplied URLs from `.seo-data/gsc/known-bad-urls.txt` (up to 100) + sitemap-orphan URLs from the parsed sitemap.xml that don't appear in `url_impressions_map` (sorted document order, filling whatever the user-supplied slice doesn't claim); dedup precedence impressions > git > user-supplied > sitemap-orphan; hard cap 200).
+
+**Canonical dispatch path: single Bash invocation of `gsc-parse-helper.py inspect-batch`.** The helper handles parallel HTTP via `ThreadPoolExecutor` (20 workers — empirically balanced against the API's per-property rate limit), per-URL cache check (7d TTL on `ui-*.json` files since `coverageState` is weeks-stable — see `gsc-cache.md` "TTL policy" for the split-TTL rationale), atomic write via `.tmp` + `os.replace`, and never-cache-non-200. Per-URL cache files match `gsc-cache.md`'s key strategy exactly (`ui-<sha1(site_url|inspection_url)>.json`) — so partial cache hits across runs interoperate cleanly.
+
+```bash
+# 1. Write the resolved URL list to system temp — NEVER under .seo-data/gsc/
+#    (disk-write boundary; see "Helper script" subsection below).
+TMPFILE_URLS=$(mktemp -t gsc-inspect-urls-XXXXXX.txt)
+printf '%s\n' "${URL_LIST[@]}" > "$TMPFILE_URLS"
+
+# 2. Dispatch — single Bash call, helper parallelizes internally.
+GCLOUD_TOKEN="$TOKEN" \
+GCLOUD_QUOTA_PROJECT="$QUOTA_PROJECT" \
+NO_CACHE="${NO_CACHE:-0}" \
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 \
+python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" inspect-batch \
+  .seo-data/gsc/cache \
+  "$CONFIG_SITE_URL" \
+  "$TMPFILE_URLS"
+
+rm -f "$TMPFILE_URLS"
+```
+
+**Helper output** (machine-parseable, parsed by the orchestrator for footer + Step 1.6.7 cluster aggregation):
 
 ```
-curl -s -w '%{http_code}' -o "$TMP" -X POST \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "x-goog-user-project: $QUOTA_PROJECT" \
-  -H "Content-Type: application/json" \
-  -d '{"inspectionUrl":"<URL>","siteUrl":"<config.site_url RAW>"}' \
-  "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect"
+total_attempted:194
+cache_hits:152
+cache_misses:42
+http_errors:0
+--- cluster_counts ---
+  submitted_indexed: 104
+  not_found_404: 48
+  discovered_not_indexed: 17
+  ...
+--- errors ---           # only when http_errors > 0
+  <url>|http=429|<error body excerpt>
+  ...
 ```
 
-Note: `siteUrl` in this request is a **body field** (raw, no URL encoding) — distinct from Search Analytics where it's a path param.
+The full per-URL cluster classification (with `pageFetchState` joint key per `gsc-api-queries.md` lookup table) happens in Step 1.6.7 via the existing `clusters` subcommand walking `ui-*.json` cache files. The helper's `cluster_counts` preview is `coverageState`-only — sufficient for the footer summary but NOT a replacement for the full classification pass.
 
-**Per-call cache stats capture.** For each call (Q1/Q2/Q3 + each URL Inspection), record `cache_status: hit | miss` and `age_seconds` (when hit) from the wrapper's first-line output. Aggregate into `{cache_hits: N, cache_misses: M, miss_call_tags: [...]}` for the Step 1.6.12 footer line. Quota tracking adjusts: cache hits don't count against the 2,000/day URL Inspection quota — only `cache_misses` consume quota.
+**Why a helper subcommand and not N parallel Bash curl calls.** S31 cont.² + S34 dogfoods both surfaced the same failure mode: orchestrators wrote ad-hoc Python scripts (`_parse_clusters.py`, `_inspect_batch.py`) into `.seo-data/gsc/` to bundle the dispatch (perceived as "more efficient than 200 parallel bash invocations" — true, but disk-write-boundary-violating). Shipping the dispatch as a canonical helper subcommand closes the spec-shaped hole that improvisation kept filling. See "Helper script" subsection below for the broader rule.
+
+**Note:** `siteUrl` in the URL Inspection request body is a **raw field** (no URL encoding) — distinct from Search Analytics where it's a path param. The helper handles this internally; orchestrator just passes `$CONFIG_SITE_URL` as the second argument.
+
+**Per-call cache stats capture (Turn 2a Search Analytics only).** For each Q1/Q2/Q3 call, record `cache_status: hit | miss` and `age_seconds` (when hit) from the cache wrapper's first-line output. Aggregate into `{cache_hits, cache_misses, miss_call_tags: [<q-tag>...]}` for the Step 1.6.12 footer line.
+
+**Aggregate cache stats capture (Turn 2b URL Inspection).** The `inspect-batch` helper emits batch-aggregate stats only — no per-URL CACHE_STATUS markers — because per-URL cache decisions happen inside the helper's `ThreadPoolExecutor` workers and aren't surfaced individually (a deliberate trade-off when the helper replaced the prior N-parallel-Bash-curl dispatch — see SKILL.md Step 1.6.6 Turn 2b for the rationale). Parse `cache_hits:N / cache_misses:M / http_errors:E / total_attempted:T` from the helper's stdout and feed those four scalars into the same Step 1.6.12 footer line. `miss_call_tags` is **N/A for URL Inspection** — the footer renders the aggregate count without per-URL tags for this signal (a `miss_call_tags` line for URL Inspection would have to list potentially hundreds of URLs and isn't useful at that scale). _code-review finding #13._
+
+Quota tracking (both tiers): cache hits don't count against the 2,000/day URL Inspection quota — only `cache_misses` consume quota.
 
 Step 1.6 total: 3 turns max (Turn 1 detection + Turn 2a Performance + Turn 2b Inspection). Heuristic-only mode finishes after Turn 1. Full-cache-hit run (all 203 calls served from cache) consumes zero API quota and shaves several seconds off wall time.
 
@@ -672,6 +713,53 @@ Index Coverage snapshots: 1 written (.seo-data/gsc/snapshots/<filename>); 7 reta
 
 If the same-commit dedup rule in Step 7 (history append) skips writing a new `docs/seo-history.md` row because the previous run was on the same commit, the snapshot is **still written** (Step 1.6.13.1 doesn't dedup by commit — every run writes its own snapshot). Regression diff in Step 1.6.13.3 compares against the prior snapshot regardless of commit. This is correct: the snapshot is a coverage-state observation at a point in time, not a score audit. Same-commit reruns can still show drift if GSC's pipeline crawled new state between the two runs.
 
+### 1.6.14 — Watchpoint check (Group D — phase-applied recheck banners)
+
+Fires when `api_active == true` AND `.seo-data/gsc/watchpoints.json` is non-empty (parsed in Turn 1's optimistic Read). Must run AFTER Turn 2a so Q2 pages digest is available for metric comparison.
+
+```bash
+RUN_DATE=$(date -u +%Y-%m-%d)
+# Q2 cache filename: deterministically derived from the Q2 cache key inputs
+# (see references/gsc-cache.md "Cache key strategy → Search Analytics").
+# DO NOT use `ls sa-q2-*.json | head -1` — multiple sa-q2 files accumulate
+# (cache key includes endDate, shifts daily; sa-* eviction at 7d) and `ls`
+# sorts by sha1 filename, picking a random old file rather than today's.
+# _code-review finding #1._
+LOOKBACK_DAYS="${LOOKBACK_DAYS:-90}"
+END_DATE=$(date -u +%Y-%m-%d)
+START_DATE=$(date -u -d "${LOOKBACK_DAYS} days ago" +%Y-%m-%d 2>/dev/null || \
+             python -c "import datetime; print((datetime.date.today() - datetime.timedelta(days=${LOOKBACK_DAYS})).isoformat())")
+Q2_KEY="${CONFIG_SITE_URL}|${END_DATE}|${START_DATE}|page|25000|web"
+Q2_HASH=$(printf '%s' "$Q2_KEY" | sha1sum | cut -d' ' -f1)
+Q2_CACHE_FILE=".seo-data/gsc/cache/sa-q2-${Q2_HASH}.json"
+
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" \
+  watchpoint-check \
+  .seo-data/gsc/watchpoints.json \
+  "$Q2_CACHE_FILE" \
+  "$RUN_DATE"
+```
+
+(The `date -u -d "N days ago"` form is GNU-find specific; the `python -c` fallback covers BSD/macOS where `-d` semantics differ. `sha1sum` is portable; on macOS use `shasum` if `sha1sum` is unavailable: `printf '%s' "$Q2_KEY" | shasum | cut -d' ' -f1`.)
+
+The helper:
+- Auto-evicts watchpoints older than 90 days (writes the trimmed file back).
+- For each remaining watchpoint past its `expected_recheck_date`, compares baseline metric (impressions/ctr/position from the apply-time finding) against current Q2 data for the same URL.
+- Emits machine-parseable `due` records with `status ∈ {improved, unchanged, regressed, no_data}` (see helper docstring).
+
+**Orchestrator behavior**:
+- Parse `watchpoints_active`, `watchpoints_due`, `watchpoints_evicted` for the footer line.
+- Stash `due` records for Step 7 banner rendering (one banner per `due` watchpoint in Suggested Next Actions — see Step 7 "Watchpoint banner format").
+- When `watchpoints_due == 0`, no banners; footer-line still emits the active count.
+
+**No-prior-watchpoints case**: file absent or empty `watchpoints` array. Helper emits `watchpoints_active:0 / watchpoints_due:0 / watchpoints_evicted:0` and exits cleanly. Orchestrator skips Step 7 banner rendering for watchpoints.
+
+**Footer line** (always rendered when api_active):
+
+```
+Watchpoints: 3 active (1 due this run, evaluated against Q2 pages digest); 0 evicted (90-day rotation).
+```
+
 ---
 
 ## Ingestion conventions (cross-cutting, applies to Step 1.6 + Step 3.2)
@@ -683,10 +771,12 @@ Three rules the orchestrator must follow when ingesting external data. Surfaced 
 `.seo-data/gsc/` is reserved for **user configuration + skill-auto-generated content only**:
 
 - `config.yaml` (user-authored)
-- `known-bad-urls.txt` (user-authored — optional; one URL per line, `#` comments allowed; up to 50 inspected per run as the 4th URL Inspection slice — see `references/gsc-api-queries.md` "URL Inspection — selection algorithm". Use this to paste specific problem URLs from GSC's "Not found (404)" / "Page with redirect" / "Validation failed" coverage exports that aren't in current sitemap/impressions/git.)
+- `known-bad-urls.txt` (user-authored — optional; one URL per line, `#` comments allowed; up to 100 inspected per run as the 4th URL Inspection slice — see `references/gsc-api-queries.md` "URL Inspection — selection algorithm". Use this to paste specific problem URLs from GSC's "Not found (404)" / "Page with redirect" / "Validation failed" coverage exports that aren't in current sitemap/impressions/git. **Critical caveat:** sitemap-orphan slice only catches deindexed URLs that are STILL in your sitemap. If your codebase actively rotates deindexed URLs out of `sitemap.xml` (the right thing to do!), sitemap-orphan misses them — those need to be pasted into `known-bad-urls.txt` explicitly. The "404-only, redirects dropped" guidance from S34 cont. assumed in-sitemap redirects; revise per workflow.)
 - `README.md` (skill-auto-written on first detection)
 - `cache/` (skill-auto-managed; **TTL'd API response cache** — see `references/gsc-cache.md`)
 - `snapshots/` (skill-auto-managed; **30-day coverage-state history** for sub-dim 14 regression detection — see `references/gsc-ingestion.md` sub-dim 14 + SKILL.md Step 1.6.13)
+- `finding-history.json` (skill-auto-managed; **per-finding run_count tracker** for Group D stale-finding escalation — written by `gsc-parse-helper.py history-update` after Step 6 score consolidation. When a finding's `run_count >= 3` and the underlying location/sub_dim hasn't changed, the orchestrator appends an escalation hint to `recommended_action` urging external action or severity reassessment. See Step 6.8 for the integration. Auto-evicted entries: none — the file grows slowly (~1 entry per persistent finding) and stable findings ARE the signal worth keeping.)
+- `watchpoints.json` (skill-auto-managed; **phase-applied watchpoints** auto-emitted when a finding has `code_changed_since_gsc_window=true` — see `gsc-parse-helper.py watchpoint-emit`. At Step 1.6 Turn 1, watchpoints past their `expected_recheck_date` (applied + 21 days, typical GSC pipeline lag) are checked via `watchpoint-check`; status delta surfaces as a top-level banner in Suggested Next Actions. Auto-evicted after 90 days to prevent unbounded growth.)
 - `.gsc-banner-shown` (sentinel — sits in `.seo-data/` not `.seo-data/gsc/`)
 
 The `cache/` subdirectory is the only sanctioned location for persisted API responses. The orchestrator owns its lifecycle (creates on Turn 1, writes via atomic mv in Turn 2, prunes entries >7d at the start of each run). Cache content is reproducible from the API on demand — safe to delete manually.
@@ -739,11 +829,25 @@ PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python <script_or_args>
 
 Same class of bug as the S30 `jq`-missing fix — the spec under-specified a platform-dependent default. Codified after S31 caught it.
 
-#### Helper script (don't inline Python heredocs)
+#### Helper script (don't inline Python heredocs, don't write orchestrator scripts into `.seo-data/gsc/`)
 
-**S31 dogfood lesson.** Across one run the orchestrator wrote 5+ different inline Python invocations (Q1 parse, Q2 parse, Q3 parse, CTR opportunities, cluster aggregation), each with different bash quoting/escaping strategies. One heredoc failed with `unexpected EOF` (single quotes inside `<<'PY'` block). The fallback was to write `_parse_clusters.py` into `.seo-data/gsc/cache/` — **violating the disk-write boundary** (cache dir is response-JSON-only).
+**S31 cont.² dogfood lesson.** Across one run the orchestrator wrote 5+ different inline Python invocations (Q1 parse, Q2 parse, Q3 parse, CTR opportunities, cluster aggregation), each with different bash quoting/escaping strategies. One heredoc failed with `unexpected EOF` (single quotes inside `<<'PY'` block). The fallback was to write `_parse_clusters.py` into `.seo-data/gsc/cache/` — **violating the disk-write boundary** (cache dir is response-JSON-only).
 
-**Rule:** GSC JSON parsing MUST go through the shipped helper at `${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py`. Invoke with subcommand args:
+**S34 burakarik6 dogfood lesson (worse instance).** Orchestrator wrote a 396-line `_inspect_batch.py` into `.seo-data/gsc/` to bundle URL Inspection's parallel-curl dispatch + cache-write + snapshot-write into one script (motivated by the perception that 180+ parallel Bash curl calls would be "more efficient than 180 parallel bash calls"). Same root cause: spec under-specified an in-orchestrator implementation, model improvised disk-write. Boundary violation was larger this time (396 lines vs prior ~50).
+
+**Rule (broader than just JSON parsing):** The orchestrator must NEVER write Python, JavaScript, shell, or any other script into `.seo-data/gsc/` for ANY purpose. This includes (non-exhaustive): JSON parsers, parallel-dispatch helpers, snapshot writers, cache eviction helpers, brand-name extractors, one-off analysis scripts. Applies regardless of script size, purpose, or whether it's auto-deleted after use. `.seo-data/gsc/` is the user's config-only workspace; we never leak skill-internal implementation there.
+
+**Canonical paths for orchestrator logic:**
+
+| Need | Canonical path | NOT this |
+|---|---|---|
+| GSC JSON parsing (Q1/Q2/Q3, clusters, CTR, brand, snapshot, regression) | `${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py` subcommands (see invocation block below) | Inline Python heredocs, `_parse_*.py` scripts in `.seo-data/gsc/` |
+| URL Inspection dispatch (Turn 2b) | N parallel `Bash: curl ...` calls in one tool-use block, each wrapped in the `gsc-cache.md` cache pattern | `_inspect_batch.py` or similar orchestrator-written dispatch script |
+| Ephemeral scratch parsing (>200KB JSON that doesn't belong in cache) | `mktemp`-style system temp (`mktemp -t gsc-XXXXXX.json`) | Any file under `.seo-data/gsc/` |
+
+**If the helper script doesn't have a subcommand you need (e.g., URL Inspection batch dispatch isn't there as of 2026-05-26):** treat that as a skill-improvement signal, not a license to inline. Surface in the report footer (`gsc-parse-helper.py missing subcommand <X> — used <fallback approach>; file follow-up to extend the helper`) and proceed with the closest approximation that respects the boundary (typically: parallel Bash curl calls). Future helper extension is preferable to repeated boundary violations.
+
+**Helper invocation:** GSC JSON parsing MUST go through the shipped helper at `${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py`. Invoke with subcommand args:
 
 ```bash
 PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" q1 .seo-data/gsc/cache/sa-q1-<hash>.json
@@ -789,11 +893,14 @@ Interpret `$ARGUMENTS`:
 | `--plan` | After report, emit phased rewrite brief (read `references/plan-mode-seo.md`) |
 | `--fix` | After report, apply strict-allowlist mechanical fixes with per-finding diff preview (read `references/fix-allowlist.md`) |
 | `--url <deployed-url>` | Live HTML fetch for SSR/SSG checks AND synthesizes sitemap URL probe bases when sitemap URLs are relative |
-| `--no-cache` | Bypass the 24h GSC API response cache. Forces fresh `searchanalytics.query` + `urlInspection.index.inspect` calls. Fresh responses are still written to cache for next run. Use when iterating on a fix and you need Google's current view, or when you suspect cached data is wrong. See `references/gsc-cache.md` for TTL policy + manual cache management. |
+| `--no-cache` | Bypass the GSC API response cache (24h TTL for sa-* / 7d TTL for ui-*). Forces fresh `searchanalytics.query` + `urlInspection.index.inspect` calls. Fresh responses are still written to cache for next run. Use when iterating on a fix and you need Google's current view, or when you suspect cached data is wrong. See `references/gsc-cache.md` for TTL policy + manual cache management. |
+| `--force-dispatch` | Always run the 3 codebase-scanning subagents even when Step 4.5's gating logic would skip them. Use when validating a refactor, taking a second-opinion run, or after updating subagent reference files. Default is "skip when zero non-doc commits since prior snapshot" — see Step 4.5. |
 
 `--plan` and `--fix` are mutually exclusive. If both supplied: "Pick one — `--plan` emits a brief, `--fix` applies edits."
 
 `--no-cache` is compatible with all other flags. No-op when `gsc_mode: disabled` (nothing to cache).
+
+`--force-dispatch` is compatible with all other flags. No-op when Step 4.5 gating would have run full dispatch anyway (the flag is harmless but the footer notes when it was a no-op so the user remembers).
 
 ---
 
@@ -843,9 +950,106 @@ If a path argument was given, scope subagents to that path (only page-template /
 
 ---
 
+## Step 4.5 — Codebase-Scan Subagent Skip Rule
+
+**Codified after the S34 burakarik6 dogfood** caught the orchestrator improvising a "skip the 3 codebase subagents because nothing changed since last run" decision. The decision was correct (zero non-doc commits since Session 71, two days prior), but the report carried Session 71's per-dim deductions forward as if freshly computed — leaving no audit trail. This section makes the rule explicit + adds the audit-trail requirements that were the actual gap.
+
+### 4.5.1 — Gating conditions (ALL must hold; any failure → full dispatch)
+
+1. **GSC mode is enabled** AND a prior snapshot exists at `.seo-data/gsc/snapshots/*` (computed in Step 1.6.13.2). Without a prior snapshot, there's no baseline to inherit per-dim deductions from — full dispatch required.
+2. **Zero code commits in window** affecting the Step 4 scope. Compute via:
+
+```bash
+# <PRIOR_SHA> is the commit_sha embedded in the most-recent prior snapshot filename
+# (parsed in Step 1.6.13.2).
+CODE_COMMITS=$(git log "${PRIOR_SHA}..HEAD" --pretty=format:"%H" -- \
+  $(printf '%s ' "${SCOPE_PATHS[@]}") \
+  ':(exclude)docs/*' ':(exclude)*.md' ':(exclude)CLAUDE.md' ':(exclude)README.md' \
+  ':(exclude)*.txt' 2>/dev/null | wc -l)
+```
+
+The `:(exclude)` pathspecs strip pure-doc / pure-config commits that don't affect any subagent's source-scan output. If `CODE_COMMITS == 0`, gating condition 2 holds.
+
+3. **`--force-dispatch` flag NOT in `$ARGUMENTS`.** The flag is the user's escape hatch — "I want a fresh codebase scan even though the gating logic says inherit." Useful for: validating a refactor didn't regress something subtle, sanity-checking after a long absence, second-opinion runs.
+4. **`--plan` and `--fix` flags NOT in `$ARGUMENTS`.** Plan + fix modes need the freshest per-finding data possible — they're action-oriented, not audit-oriented. Always full dispatch.
+
+When ALL 4 conditions hold → set `dispatch_mode = "skip_codebase_subagents"` and proceed to Step 4.5.2. Otherwise → set `dispatch_mode = "full"` and skip directly to Step 5.
+
+### 4.5.2 — What runs vs what's inherited (when `dispatch_mode == "skip_codebase_subagents"`)
+
+| Component | Status this run | Source |
+|---|---|---|
+| Subagent 1 (`seo-technical`) | **SKIPPED** | Per-dim deductions inherited from prior snapshot's run |
+| Subagent 2 (`seo-content`) | **SKIPPED** | Per-dim deductions inherited from prior snapshot's run |
+| Subagent 3 (`geo-generative`) | **SKIPPED** | Per-dim deductions inherited from prior snapshot's run |
+| Subagent 4 (`seo-gsc-insights`) | **RUNS** | GSC data is fresh every run — never inherit |
+| Sub-dim 14 (`deindex_regression`) | **RUNS** | Orchestrator-emitted (Step 1.6.13) — always |
+| Sitemap URL probe (Step 3.2) | **RUNS** | Cheap and freshness-sensitive |
+| URL Inspection (Step 1.6.6) | **RUNS** | Cache-protected; covered by Step 1.6.6 anyway |
+| Best-practices brief (Step 1) | **RUNS** | Spec drift is independent of code changes |
+
+**Inheritance source: `docs/seo-history.md`.** Read the row matching `<PRIOR_SHA>` (via the embedded `<!-- commit:abc1234 -->` comment) — it carries the score + top-3 priorities. Those two pieces drive the inherited render. Per-dimension deductions are NOT line-by-line preserved across runs; the inherited report shows totals plus the inheritance markers (see 4.5.3) without re-quoting prior breakdown text. To see prior breakdowns verbatim, the user either consults the saved prior report or re-runs with `--force-dispatch`.
+
+**Design trade-off (explicit).** We could persist per-dim breakdown JSON alongside each snapshot to enable line-by-line inheritance, but that adds new disk-write surface, a new helper subcommand, and a new failure mode (breakdown-file-missing). For the current dogfood pressure (same-commit-with-doc-changes reruns), score + top-3 priorities is enough: the score is comparable, the priorities don't change without code changes. If a future dogfood shows a need for verbatim per-dim breakdown preservation across runs, escalate to a `breakdown-write` helper subcommand then.
+
+### 4.5.3 — Audit-trail requirements (critical — closes the S34 gap)
+
+When inheritance is used, the report's Section 2 score table per-dimension rows MUST be visibly marked. Acceptable forms:
+
+```
+| Technical SEO | 21 | 25 | (inherited from 76cdef9 [2026-05-24]) <breakdown line> |
+| On-Page SEO   | 16 | 25 | (inherited from 76cdef9 [2026-05-24]) <breakdown line> |
+| ...           |    |    |                                                        |
+```
+
+Each inherited row's per-dim breakdown text begins with `(inherited from <sha7> [<date>])` followed by the breakdown — no exceptions, even when the breakdown text is identical to the prior run.
+
+**Findings list:** every finding inherited from the prior run carries `source_status: "inherited"`. Findings from `seo-gsc-insights` (Step 5) carry `source_status: "fresh"`. The report doesn't visually distinguish them in the table, but the JSON dump (when emitted) includes the field so downstream tooling can tell.
+
+**Footer line** (always when `dispatch_mode == "skip_codebase_subagents"`):
+
+```
+Subagent dispatch: skipped (zero code commits affecting scope since 76cdef9 [2026-05-24, 3 days ago]). Per-dim breakdowns + heuristic findings inherited from that run; GSC + sub-dim 14 + URL probe refreshed this run. Run /seo-review --force-dispatch to re-scan the codebase.
+```
+
+**`docs/seo-history.md` row:** append `[inherited]` suffix to the priorities column so the history is auditable:
+
+```
+| 2026-05-27 | 65 | [inherited] [gsc] smartphone CTR catastrophe; [gsc] sister-article CTR opps; [gsc] 48 NEW 404s from known-bad-urls.txt | <!-- commit:76cdef9 inherited_from:5a441d1 -->
+```
+
+The `inherited_from:<prior_sha>` HTML comment makes the inheritance chain machine-parseable for future audits. Same-commit dedup (Step 7) still applies — if `HEAD == <PRIOR_SHA>`, no row is appended (the prior row is the canonical record).
+
+### 4.5.4 — Full-dispatch escape hatch
+
+`--force-dispatch` always runs the 3 codebase subagents regardless of gating. Use cases:
+- Validating a refactor didn't regress something subtle
+- Sanity check after a long absence (>2 weeks since last run on the property)
+- Second-opinion run when methodology variance is suspected
+- After updating subagent reference files in `references/scan-*.md` (the gating measures source commits, not skill-config commits)
+
+When `--force-dispatch` is passed, the footer reads:
+
+```
+Subagent dispatch: full (--force-dispatch override; gating would have permitted skip — zero code commits since <PRIOR_SHA>).
+```
+
+This makes the override visible so the user remembers why their run took longer.
+
+---
+
 ## Step 5 — Parallel Subagent Dispatch
 
-Launch all subagents in a **single turn** (3 Task calls when `gsc_mode: disabled`; 4 Task calls when `gsc_mode: enabled` — add the `seo-gsc-insights` dispatch in the same message as the other 3). Mirror `/test-review` Step 4.
+Launch subagents in a **single turn**. The dispatch count depends on `dispatch_mode` from Step 4.5:
+
+| `dispatch_mode` | `gsc_mode` | Subagents dispatched | Count |
+|---|---|---|---|
+| `full` | `disabled` | seo-technical + seo-content + geo-generative | 3 |
+| `full` | `enabled` | seo-technical + seo-content + geo-generative + seo-gsc-insights | 4 |
+| `skip_codebase_subagents` | `enabled` | seo-gsc-insights only | 1 |
+| `skip_codebase_subagents` | `disabled` | (never reached — Step 4.5 gating requires `gsc_mode: enabled`) | — |
+
+Mirror `/test-review` Step 4 for the parallel-Task dispatch pattern. When `dispatch_mode == "skip_codebase_subagents"`, fire only the single `seo-gsc-insights` Task call — there's nothing to parallelize with.
 
 For each subagent, read its corresponding reference file (`references/scan-technical.md`, `references/scan-content.md`, `references/scan-geo.md`, and `references/gsc-ingestion.md` for the 4th when enabled) and pass the contents in the task prompt along with shared context.
 
@@ -973,6 +1177,79 @@ rank_score = effective_impact × certainty × traffic_weight / effort_weight
 
 Drop findings with `certainty < 0.5` AND `score_impact < 1` unless `is_fix_eligible: true` (fix-eligible findings surface even at lower confidence so the user can review the diff). **The drop rule applies only to `source == "heuristic"` findings.** GSC findings (`source == "gsc"`) are always retained — including those with `code_changed_since_gsc_window: true` whose certainty was lowered to 0.4 by the agent, since "may already be fixed; re-check next cycle" is exactly the annotation worth surfacing. The filter targets noisy heuristic guesses, not GSC ground-truth signal.
 
+### 6.8 — Finding lifecycle update (Group D)
+
+Fires only when `gsc_mode == "enabled"` (heuristic-only mode doesn't run the GSC infra these files live alongside). Updates `finding-history.json` (run-counter increments + stale-finding escalation source) and emits watchpoints for phase-applied findings.
+
+**Step 6.8.1 — Write findings to JSONL temp**. After Step 6.7's filter drops noise, serialize the surviving findings to a newline-delimited JSON tempfile (NOT under `.seo-data/gsc/` — disk-write boundary):
+
+```bash
+FINDINGS_JSONL=$(mktemp -t gsc-findings-XXXXXX.jsonl)
+# Orchestrator writes one finding per line:
+# {"sub_dim":"wikidata_sameAs","location":"Wikidata Q139820111","title":"...",
+#  "url":"...","source":"heuristic","impressions":...,"ctr":...,"position":...,
+#  "code_changed_since_gsc_window":false}
+```
+
+The orchestrator builds the JSONL via direct Bash redirection from the in-memory findings list — no inline Python. If the orchestrator's findings list is held in a structured form that doesn't trivially serialize to JSONL via Bash, fall back to: write each finding's minimal fields (`sub_dim`, `location`, `title`, optional `url`+`source`+`impressions`+`ctr`+`position`+`code_changed_since_gsc_window`) one per line.
+
+**Step 6.8.2 — Update finding-history** (must check exit status before proceeding to 6.8.3 — _code-review finding #10_):
+
+```bash
+RUN_DATE=$(date -u +%Y-%m-%d)
+COMMIT_SHA7=$(git rev-parse --short HEAD 2>/dev/null || echo "no-git")
+
+if ! PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" \
+    history-update \
+    "$FINDINGS_JSONL" \
+    .seo-data/gsc/finding-history.json \
+    "$COMMIT_SHA7" \
+    "$RUN_DATE"; then
+  echo "WARN: history-update failed; skipping 6.8.3 watchpoint-emit to avoid inconsistent state."
+  rm -f "$FINDINGS_JSONL"
+  # Skip 6.8.3 + 6.8.4 — return to Step 7 with no escalation hints + no new watchpoints.
+fi
+```
+
+If history-update succeeds, the helper has already printed its results to stdout BEFORE attempting the write (per the helper's print-before-write contract — _code-review finding #9_), so partial-failure observability is preserved: even if the write step fails, the orchestrator has the per-finding run_counts and can render escalation hints in Step 7 from stdout.
+
+Helper output includes per-finding `<hash>|<run_count>|<sub_dim>|<location>|<first_seen_date>[ ESCALATE]` lines. The orchestrator builds a `{finding_hash: {run_count, first_seen, escalate}}` map for Step 7 rendering. Findings tagged ` ESCALATE` (run_count ≥ 3) get an appended escalation hint in their `recommended_action`:
+
+```
+[Stale-finding escalation] This finding has appeared in 3+ consecutive runs without resolution. Three options: (a) schedule the external action this finding requires (most stale findings are external — Wikidata edits, GSC manual removals, third-party platform changes); (b) downgrade severity to acknowledge the user-side blocker (e.g., "deprioritized — waiting on upstream"); (c) if the finding is no longer relevant, document the rationale in CLAUDE.md so future runs don't re-surface it.
+```
+
+**Step 6.8.3 — Emit watchpoints for phase-applied findings** (only runs if 6.8.2 succeeded):
+
+```bash
+if ! PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" \
+    watchpoint-emit \
+    "$FINDINGS_JSONL" \
+    .seo-data/gsc/watchpoints.json \
+    "$COMMIT_SHA7" \
+    "$RUN_DATE"; then
+  echo "WARN: watchpoint-emit failed; existing watchpoints.json is unchanged."
+  # Proceed to 6.8.4 cleanup regardless — failure here just means no new watchpoints.
+fi
+```
+
+The helper auto-emits a watchpoint for each finding with `code_changed_since_gsc_window=true` — these are exactly the findings that Step 1.5 already identified as "may already be fixed; re-check next cycle." The watchpoint captures the baseline metric so Step 1.6.14 (next run's watchpoint-check) can compare current vs baseline. Dedup by finding hash prevents duplicate watchpoints on the same finding.
+
+**Step 6.8.4 — Cleanup**:
+
+```bash
+rm -f "$FINDINGS_JSONL"
+```
+
+Footer line additions (rendered in Step 7 footer alongside cache + snapshot stats):
+
+```
+Finding history: 47 tracked total; 12 fresh this run; 5 escalated (run_count ≥ 3).
+Watchpoints emitted this run: 2 (auto-watch on findings with code_changed_since_gsc_window=true).
+```
+
+When `gsc_mode == "disabled"`, all of Step 6.8 is skipped — finding-history + watchpoints both live under `.seo-data/gsc/` infra. In heuristic-only mode there's no `code_changed_since_gsc_window` signal to drive watchpoint emission anyway.
+
 ---
 
 ## Step 7 — Output
@@ -1036,6 +1313,44 @@ The `<!-- commit:abc1234 -->` HTML comment is invisible in the rendered Markdown
 - Date is `YYYY-MM-DD`.
 - This file is in-repo and git-tracked deliberately — the user can see history across machines / commits / team members.
 - One row per `last_commit_sha`. Same-commit re-runs are silently skipped per the dedup rule above.
+
+### Watchpoint banner format (Group D)
+
+When Step 1.6.14's `watchpoint-check` produced `due` records, render one banner per due watchpoint at the **top of the "Suggested Next Actions" section** (above the skill-chain suggestions). Banner format depends on `status`:
+
+**status: improved** (CTR / position moved favorably ≥10%)
+
+```
+📈 Watchpoint hit — improved. Phase applied 2026-05-24 (commit 76cdef9) targeted /en/article/smartphone-vs-mirrorless-2026 CTR.
+   Baseline: ctr=0.28% / pos=4.65 / 58k imp.   Current: ctr=1.10% / pos=4.20 / 62k imp.
+   Status: improved (CTR +293%). Consider removing the watchpoint by re-running /seo-review --force-dispatch after pushing further fixes, or accept and move on.
+```
+
+**status: regressed** (CTR / position moved unfavorably ≥10%)
+
+```
+📉 Watchpoint hit — REGRESSED. Phase applied 2026-05-24 (commit 76cdef9) targeted /en/article/smartphone-vs-mirrorless-2026 CTR.
+   Baseline: ctr=0.28% / pos=4.65 / 58k imp.   Current: ctr=0.22% / pos=5.10 / 60k imp.
+   Status: regressed (CTR -21%). The applied change may have backfired — review commit 76cdef9's diff against this URL's current rendered title/meta.
+```
+
+**status: unchanged** (within ±10% of baseline)
+
+```
+📊 Watchpoint hit — no movement yet. Phase applied 2026-05-24 (commit 76cdef9) targeted /en/article/smartphone-vs-mirrorless-2026 CTR.
+   Baseline: ctr=0.28% / pos=4.65 / 58k imp.   Current: ctr=0.30% / pos=4.55 / 59k imp.
+   Status: unchanged (within ±10% of baseline). GSC pipeline lag is typically 2-3 weeks — re-check on the next run after 2026-06-15 if movement matters.
+```
+
+**status: no_data** (URL not in Q2 pages digest this run — usually impressions dropped below Q2's threshold)
+
+```
+🔍 Watchpoint hit — no current data. Phase applied 2026-05-24 (commit 76cdef9) targeted /en/article/smartphone-vs-mirrorless-2026 CTR.
+   Baseline: ctr=0.28% / pos=4.65 / 58k imp.   Current: URL not in Q2 pages digest (impressions likely below 10/lookback floor).
+   Status: no_data. URL may be deindexed, lost ranking entirely, or below Q2's impressions threshold — check sub-dim 14 (deindex_regression) if any.
+```
+
+Banners are info-only — they don't affect the score (consistent with the `score_impact:0` invariant on all GSC-side signals).
 
 ### Mode-specific tail
 
