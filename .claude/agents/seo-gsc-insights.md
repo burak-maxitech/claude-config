@@ -44,7 +44,7 @@ The orchestrator-passed **GSC ingestion reference** (`references/gsc-ingestion.m
   - Queries digest: top 50 by impressions desc, fields: query, clicks, impressions, ctr, position
   - Pages digest: top 50 by impressions desc, fields: url, clicks, impressions, ctr, position
   - `url_impressions_map`: full url→impressions map for traffic_weight ranking (used by the orchestrator in Step 6 — you don't apply traffic_weight yourself)
-- **Indexing clusters** (from up to 100 URL Inspection API calls, mapped via `coverageState` + `pageFetchState` joint lookup table): up to 9 sub-dim clusters, each with:
+- **Indexing clusters** (from up to 200 URL Inspection API calls — 3-slice mix: 80 impressions-top + 20 git-changed + 100 sitemap-orphan; mapped via `coverageState` + `pageFetchState` joint lookup table): up to 9 sub-dim clusters, each with:
   - `total_count` (inspected-URL-count matching this cluster — NOT site-wide truth)
   - `affected_urls`: top 10 by `lastCrawlTime` descending
   - Per-URL `evidence` fields: `lastCrawlTime`, `googleCanonical`, `userCanonical`, `crawledAs`, `indexingState`, `robotsTxtState`
@@ -55,9 +55,9 @@ The orchestrator-passed **GSC ingestion reference** (`references/gsc-ingestion.m
 
 ## Scans
 
-**The per-sub-dim finding-emission spec lives in `references/gsc-ingestion.md`** section "Finding-type catalog (12 sub-dims)". The orchestrator passes that section in your task prompt (Step 5). Follow it unaltered:
+**The per-sub-dim finding-emission spec lives in `references/gsc-ingestion.md`** section "Finding-type catalog (14 sub-dims)". The orchestrator passes that section in your task prompt (Step 5). **Sub-dims 1-13 are yours to emit; sub-dim 14 (`deindex_regression`) is orchestrator-emitted from snapshot diff — you don't see transition data in your input and shouldn't emit findings for it.** Follow the catalog unaltered:
 
-- One sub-dim per indexing-cluster signal (sub-dims 2-9) or per Performance digest (sub-dims 10-12).
+- One sub-dim per indexing-cluster signal (sub-dims 2-9) or per Performance digest (sub-dims 10-13).
 - Trigger thresholds, severity/certainty defaults, effort estimates, title templates, recommended_action prose — all defined there.
 - Cluster vs per-URL emission rules (e.g., `canonical_conflict` is per-URL up to 5 then clusters).
 - The `not_found_404` **routing-rename match** procedure (cross-reference URL clusters against the git-changes digest's renames; emit `routing_rename_match: true` when matched + rename details in evidence) is in the catalog.
@@ -94,7 +94,7 @@ When the git digest reports `Shallow: true`, set `code_changed_since_gsc_window:
 ```
 {
   "dimension": "gsc_insights",
-  "sub_dimension": "<one of the 12 sub-dims>",
+  "sub_dimension": "<one of sub-dims 1-13 (sub-dim 14 deindex_regression is orchestrator-emitted, never by this subagent)>",
   "location": "<URL>" | "<URL-cluster-pattern>" | "<source-file-path-when-applicable>",
   "title": "<one-line>",
   "severity": "low" | "medium" | "high",

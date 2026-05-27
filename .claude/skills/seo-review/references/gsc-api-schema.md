@@ -2,7 +2,7 @@
 
 Loaded by the orchestrator (Step 1.6) when the Search Console API is the configured Performance + Indexing ingestion path. This file is the **source-of-truth endpoint inventory + auth contract + enum reference** that `gsc-api-queries.md` and the SKILL.md dispatcher reference.
 
-For ingestion behaviour, digest shape, and the 12 sub-dim catalog, see `gsc-ingestion.md` (the "API ingestion contract" section is the digest contract). For call templates, see `gsc-api-queries.md`. The skill's config layout is documented in `gsc-setup-readme-template.md` — `site_url` is the single required key in `config.yaml`.
+For ingestion behaviour, digest shape, and the 14 sub-dim catalog, see `gsc-ingestion.md` (the "API ingestion contract" section is the digest contract). For call templates, see `gsc-api-queries.md`. The skill's config layout is documented in `gsc-setup-readme-template.md` — `site_url` is the single required key in `config.yaml`.
 
 **Schema source:** Google's published API references — [Search Analytics: searchanalytics.query](https://developers.google.com/webmaster-tools/v1/searchanalytics/query) + [URL Inspection: urlInspection.index.inspect](https://developers.google.com/webmaster-tools/v1/urlInspection/index/inspect) + [Sites: list](https://developers.google.com/webmaster-tools/v1/sites/list). Verified against documentation as of 2026-05-15.
 
@@ -15,7 +15,7 @@ The Search Console API exposes three endpoints used by `/seo-review`:
 | Endpoint | Purpose | Queried by the skill? |
 |---|---|---|
 | `POST https://www.googleapis.com/webmasters/v3/sites/{siteUrl}/searchAnalytics/query` | Performance — queries/pages/impressions/CTR/position | **Yes** (Q1, Q2, Q3) |
-| `POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect` | Per-URL indexing diagnostics — `coverageState`, `pageFetchState`, canonicals, last crawl, mobile usability, rich results | **Yes** (one call per inspected URL, up to 100/run) |
+| `POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect` | Per-URL indexing diagnostics — `coverageState`, `pageFetchState`, canonicals, last crawl, mobile usability, rich results | **Yes** (one call per inspected URL, up to 200/run — 3-slice mix of impressions-top + git-changed + sitemap-orphan; see `gsc-api-queries.md` selection algorithm) |
 | `GET https://www.googleapis.com/webmasters/v3/sites` | List user's verified properties | **Yes** (active auth probe — Step 1.6.1 activation condition 5) |
 
 **Note two different base hosts**: `www.googleapis.com/webmasters/v3` for Search Analytics + Sites; `searchconsole.googleapis.com/v1` for URL Inspection. Same OAuth scope; same ADC token; different quota tracking (see "Quota model" below).

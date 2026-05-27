@@ -4,11 +4,11 @@ Loaded by the orchestrator (Step 1.6) when the Search Console API is the active 
 
 - 3 parametrized `curl` templates for `searchanalytics.query` (Q1 queries digest, Q2 pages digest, Q3 `url_impressions_map`)
 - 1 parametrized `curl` template for `urlInspection.index.inspect` (one URL per call)
-- URL Inspection **selection algorithm** for the 100-URL/run budget
+- URL Inspection **selection algorithm** for the 200-URL/run budget (3-slice mix: impressions-top + git-changed + sitemap-orphan)
 - `coverageState` + `pageFetchState` → 9-reason **lookup table** (full)
 - Quota degradation rules
 
-For endpoint inventory, auth, quota model, and enum reference, see `gsc-api-schema.md`. For digest field translation and integration with the 12 sub-dim catalog, see `gsc-ingestion.md` "API ingestion" subsection. **For the disk-cache wrapper that wraps every Q1/Q2/Q3/URL-Inspection call (24h TTL, atomic write, skip-on-non-200), see `gsc-cache.md` — the curl shapes in this file are the fresh-path body inside the wrapper, not standalone invocations.**
+For endpoint inventory, auth, quota model, and enum reference, see `gsc-api-schema.md`. For digest field translation and integration with the **14 sub-dim catalog**, see `gsc-ingestion.md` "API ingestion" subsection. **For the disk-cache wrapper that wraps every Q1/Q2/Q3/URL-Inspection call (24h TTL, atomic write, skip-on-non-200), see `gsc-cache.md` — the curl shapes in this file are the fresh-path body inside the wrapper, not standalone invocations.**
 
 
 ---
@@ -59,7 +59,7 @@ curl -s -w '%{http_code}' -o "$TMP" -X POST \
   "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect"
 ```
 
-Cache filename uses the `ui-<sha1(site_url|inspection_url)>` prefix — one slot per inspected URL, so partial cache hits across a 100-URL batch are common after the first run of the day.
+Cache filename uses the `ui-<sha1(site_url|inspection_url)>` prefix — one slot per inspected URL, so partial cache hits across a 200-URL batch are common after the first run of the day.
 
 **Note**: URL Inspection uses `siteUrl` as a **request body field** (raw, no encoding). Search Analytics uses it as a **path parameter** (encoded). Don't confuse them.
 
@@ -237,7 +237,7 @@ URLs not in the map → `traffic_weight = 1.0` (formula collapses to legacy `sco
 
 ## URL Inspection — per-URL call template
 
-One call per URL inspected. The orchestrator dispatches N parallel calls in a single tool-use block (N capped at 100 — see selection algorithm below).
+One call per URL inspected. The orchestrator dispatches N parallel calls in a single tool-use block (N capped at 200 — see selection algorithm below).
 
 ### Request body
 
@@ -270,44 +270,65 @@ Extract from `inspectionResult.indexStatusResult`:
 
 ## URL Inspection — selection algorithm
 
-Hard budget: **100 URLs per run**. Well under the 2,000/day per-property quota; leaves headroom for multi-run usage same day.
+Hard budget: **200 URLs per run**. Well under the 2,000/day per-property quota; same-day reruns are mostly cache hits (24h TTL).
 
-### Source allocation
+### Source allocation (4 slices)
 
 | Source | Count | Selection rule |
 |---|---|---|
 | **Top 80 from `url_impressions_map`** | up to 80 | Take the **literal top 80 URLs by impressions desc** from Q3's full uncapped map. Apply **no additional minimum impression threshold** — even URLs with 1 impression count. If fewer than 80 URLs have any impressions, take all available. **Do not add subjective filters** ("only high-quality URLs", "skip thin pages", etc.). The point is depth-of-diagnostic on the URLs that drive traffic at any level. |
-| **Recent git changes resolved to URLs** | up to 20 | File paths from Step 1.5's 35-day git scan, resolved to URLs via `page_type_map` heuristics OR direct match in `url_impressions_map`. Git emits file paths, not URLs — only candidates that resolve cleanly are included. Take all that resolve, capped at 20. |
+| **Recent git changes resolved to URLs** | up to 20 | File paths from Step 1.5's 35-day git scan, resolved to URLs via `page_type_map` heuristics OR direct match in `url_impressions_map`. Git emits file paths, not URLs — only candidates that resolve cleanly are included. **Resolves BOTH `old_path` AND `new_path` from rename commits** (Step 1.5's `renames` aggregate) — the old_path resolution is what links a 404 URL to the rename that orphaned it. Without this, sub-dim 4 (`not_found_404`) misses the routing-rename signal for URLs that exist as 404s precisely because their source file moved. Take all that resolve, capped at 20. |
+| **User-supplied URLs** (`.seo-data/gsc/known-bad-urls.txt`) | up to 50 | **One URL per line; `#`-prefixed lines and blank lines skipped; whitespace trimmed; duplicates removed; cap 50.** User pastes URLs they want inspected — typically from GSC's "All known pages" coverage report export or from validation-failure emails. **Always inspected when present** — explicit user signal. Targets URLs that are NOT in current sitemap, NOT in impressions, AND NOT git-changed in the 35-day window — e.g., 404'd URLs from older renames (>35d ago), URLs orphaned via CMS edits not visible in git history, or specific URLs flagged in a GSC "Validation failed" email. **Why this slice exists (S34 burakarik6 dogfood):** the second screenshot showed 663 URLs with `coverageState: "Not found (404)"` — URLs Google still remembers from past indexing but that no longer exist in sitemap, codebase, or impressions. **Root-cause is a Search Console API limitation:** the API does NOT expose the GSC "Page indexing" report's URL lists (no `pageIndexing.list` endpoint, despite long-standing community feature requests). `urlInspection.index.inspect` requires you to already know the URL. Without algorithmic discovery (impressions/git/sitemap) or user input (this file), these URLs are invisible to the skill. This slice closes that gap. **Use as fallback, not primary workflow:** the three algorithmic slices cover most cases; only paste URLs into this file that demonstrably didn't appear in the inspected set on a prior run. See `gsc-setup-readme-template.md` "When you need / DON'T need it" + "Recommended workflow: try without the file first" for the consumer-facing guidance. |
+| **Sitemap orphans (URLs not in `url_impressions_map`)** | up to (100 − user-supplied count) | URLs from parsed sitemap.xml (parsed in Step 1.6.1's Turn 1 batch — see SKILL.md) that do NOT appear in Q3's `url_impressions_map`. **Sort: document order.** Tiebreak: `<priority>` desc when present. **Do NOT use `<lastmod>` desc** — the burakarik6 dogfood (838 URLs flipped to "Page with redirect" over 5 weeks) shows the failure pattern is *stable pages suddenly broken*, not *new pages*. Document order is also **deterministic** across runs — required for sub-dim 14 (`deindex_regression`) snapshot diff to compare the same URLs run-over-run. **Why this slice exists:** URLs that Google has deindexed fall out of `url_impressions_map` (no impressions → not in Q3) → never get inspected without this slice → user only learns about the deindex when Google emails. **Bucket-sharing with user-supplied:** sitemap-orphan and user-supplied share a 100-slot bucket. User-supplied takes precedence (explicit user intent); sitemap-orphan fills the remainder. So if user pastes 50 URLs, sitemap-orphan slot count drops from 100 → 50. If user pastes 0, sitemap-orphan stays at 100. |
 
-Both sources are available within Step 1.6 (Q3 from Turn 2a + Step 1.5's digest from Turn 1). Sitemap probe failures (Step 3.2) are intentionally NOT used as a source — Step 3.2 runs after Step 1.6, and waiting for it would push GSC ingestion into 60+ seconds wall time. The probe's URL-health findings already cover broken-sitemap-URL signals; URL Inspection adds Google's view on the URLs that matter most by traffic.
+All four sources are available within Step 1.6: Q3 from Turn 2a + Step 1.5's digest from Turn 1 + sitemap.xml parsed in Step 1.6.1's Turn 1 batch + `.seo-data/gsc/known-bad-urls.txt` read optimistically in Step 1.6.1's Turn 1 batch (file may not exist — `Read` errors silently → user_supplied_urls stays empty).
 
 ### Deduplication
 
-A URL appearing in both sources counts **once**. Dedup precedence: `url_impressions_map` source wins.
+A URL appearing in multiple sources counts **once**. Dedup precedence: `url_impressions_map` (impressions-top) > `git-changed` > `user-supplied` > `sitemap-orphan`.
 
-After dedup, hard cap at 100. If fewer than 100 candidates after dedup, the budget shrinks accordingly (no padding with arbitrary URLs).
+Rationale for the order:
+- **impressions-top** wins because the traffic data is the highest-value diagnostic context (`traffic_weight` for ranking).
+- **git-changed** wins over user-supplied because Google's recrawl behavior tracks code changes — these URLs are the most likely to have changed state recently.
+- **user-supplied** wins over sitemap-orphan because the user pasted them deliberately — they're high-signal even when they don't appear in any algorithmic source.
+- **sitemap-orphan** is last because it's the broad sweep — URLs there are inspected when no higher-priority source claims them.
 
-**The 100-URL cap is the ceiling, not the target.** Per the `SKILL.md` "Ingestion conventions → Budget utilization" contract, the orchestrator MUST attempt to fill the budget when candidates are available. Cutting to 40 URLs when 1,300+ URLs are in the impressions map (S30 dogfood failure mode) violates the spec. The URLs that don't drive massive traffic still provide diagnostic value for indexing/canonical decisions.
+After dedup, hard cap at 200. If fewer than 200 candidates after dedup, the budget shrinks accordingly (no padding with arbitrary URLs).
+
+**The 200-URL cap is the ceiling, not the target.** Per the `SKILL.md` "Ingestion conventions → Budget utilization" contract, the orchestrator MUST attempt to fill the budget when candidates are available. Cutting to 40 URLs when 1,300+ URLs are in the impressions map AND 2,800+ URLs are sitemap-orphan candidates (S30 dogfood failure mode) violates the spec. The URLs that don't drive massive traffic still provide diagnostic value for indexing/canonical decisions — and the sitemap-orphan slice specifically catches URLs that ARE the deindex risk.
 
 ### Source unavailable
 
-- `url_impressions_map` empty (Q3 failed or no traffic): skip the 80-URL bucket; budget falls to whatever git resolves (typically 0-20)
-- Step 1.5 git-history shallow or scan failed: skip the 20-URL bucket
-
-When both sources are empty: skip URL Inspection batch entirely. Footer notes "0 URLs to inspect — no high-priority candidates this run." No indexing findings emitted this run.
+- `url_impressions_map` empty (Q3 failed or no traffic): skip the 80-URL impressions slice
+- Step 1.5 git-history shallow or scan failed: skip the 20-URL git-changed slice
+- `.seo-data/gsc/known-bad-urls.txt` absent or empty (after stripping comments/blanks): skip the user-supplied slice; sitemap-orphan claims the full 100-slot bucket
+- Sitemap missing OR all sitemap URLs already in `url_impressions_map`: skip the sitemap-orphan portion of the 100-slot bucket; user-supplied fills only its own portion
+- All four empty (rare — usually sitemap-orphan has candidates): skip URL Inspection batch entirely. Footer notes "0 URLs to inspect — no high-priority candidates this run." No indexing findings emitted this run.
 
 ### Pre-flight budget log
 
 Before dispatching the batch, log to footer. Include the source breakdown so under-utilization is auditable:
 
 ```
-URL Inspection budget: 80 by impressions (from 1,304 URLs in url_impressions_map) + 17 git-resolved (resolved 17/22 git-changed paths via page_type_map); dedup removed 0 → 97/100 attempted. Quota remaining: ~1903/2000 today.
+URL Inspection budget: 80 by impressions (from 1,304 URLs in url_impressions_map) + 17 git-resolved (resolved 17/22 git-changed paths via page_type_map; includes 8 rename old_paths) + 0 user-supplied (no known-bad-urls.txt) + 100 sitemap-orphan (from 2,795 sitemap URLs not in url_impressions_map); dedup removed 3 → 194/200 attempted. Quota remaining: ~1806/2000 today.
 ```
 
-If under-utilizing the 100-URL cap (because candidate pool is smaller), surface the reason explicitly:
+When user supplied known-bad-urls.txt:
 
 ```
-URL Inspection budget: 30 by impressions (only 30 URLs have any impressions in lookback window) + 8 git-resolved → 38/100 attempted. Reason: low-traffic property. Quota remaining: ~1962/2000.
+URL Inspection budget: 80 by impressions + 17 git-resolved + 50 user-supplied (from .seo-data/gsc/known-bad-urls.txt — 50 of 663 URLs pasted by user from GSC "Not found (404)" export; first 50 by file order) + 50 sitemap-orphan (slot count reduced from 100 → 50 by user-supplied bucket share); dedup removed 5 → 192/200 attempted. Quota remaining: ~1808/2000 today.
+```
+
+If under-utilizing the 200-URL cap (because candidate pool is smaller across all 4 slices), surface the reason explicitly:
+
+```
+URL Inspection budget: 30 by impressions + 8 git-resolved + 0 user-supplied + 47 sitemap-orphan (small sitemap, few orphans) → 85/200 attempted. Reason: low-traffic property with compact sitemap. Quota remaining: ~1915/2000.
+```
+
+If user pasted more URLs than the 50-slot cap can take, surface as a hint to spread across runs:
+
+```
+URL Inspection budget: ... + 50 user-supplied (of 663 in known-bad-urls.txt — first 50 by file order this run; consider removing inspected URLs from the file or re-running over multiple days to inspect the remainder under daily quota limits) + ...
 ```
 
 Remaining-quota figure is approximate — the API doesn't expose a precise counter; back-of-envelope from "2000/day total minus inspections this run."
@@ -369,7 +390,7 @@ finding = {
 }
 ```
 
-**Important `total_count` semantics**: `total_count` is the **inspected-URL-count**, not site-wide truth. If 100 URLs were inspected and 12 matched `crawled_not_indexed`, the finding says "12 of 100 inspected pages...". The finding title surfaces this explicitly:
+**Important `total_count` semantics**: `total_count` is the **inspected-URL-count**, not site-wide truth. If 194 URLs were inspected and 12 matched `crawled_not_indexed`, the finding says "12 of 194 inspected pages...". The finding title surfaces this explicitly:
 
 > "12 of 100 inspected pages crawled-not-indexed (content quality signal — sampled from highest-impression + sitemap-failure + recent-change URLs)"
 

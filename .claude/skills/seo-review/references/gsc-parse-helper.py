@@ -21,6 +21,15 @@ Subcommands:
     q3 <path>         Parse Q3 (full url_impressions_map, no client-side cap)
     clusters <dir>    Parse all ui-*.json in cache dir into coverageState clusters
     ctr <path>        Compute median CTR + ctr_opportunity findings from Q2
+    brand <q1_path> <brand_name>
+                      Sub-dim 13 brand-query anomaly detection
+    snapshot-write <cache_dir> <run_ts> <commit_sha> <site_url> <output_path>
+                      Sub-dim 14 — write a snapshot of {url: coverageState} from
+                      ui-*.json files in cache_dir, wrapped with metadata.
+                      Atomic write via .tmp + os.replace.
+    regression <current_snapshot> <previous_snapshot>
+                      Sub-dim 14 — diff two snapshots, emit transitions +
+                      path_clusters + count_deltas (machine-parseable lines).
 
 All subcommands print:
     <metric>:<value>          # one per line, machine-parseable
@@ -40,6 +49,7 @@ import sys
 import glob
 import hashlib
 from collections import defaultdict
+from urllib.parse import urlparse
 
 
 def load_json(path):
@@ -292,6 +302,244 @@ def detect_brand_anomaly(q1_path, brand_name):
               f"ctr={r['ctr']:.4f} imps={r['impressions']}")
 
 
+def snapshot_write(cache_dir, run_timestamp, commit_sha, site_url, output_path):
+    """sub-dim 14 step 1.6.13.1 — write current run's snapshot.
+
+    Walks all ui-*.json in cache_dir, extracts {inspectionUrl: coverageState},
+    wraps with metadata, writes atomically (tmp + os.replace).
+
+    Output schema:
+        {
+          "run_timestamp": "2026-05-26T143200",
+          "commit_sha": "5a441d1",
+          "site_url": "sc-domain:burakarik.com",
+          "inspection_count": 194,
+          "inspections": {
+            "<url>": "<coverageState>",
+            ...
+          }
+        }
+
+    Atomic via os.replace — partial-write interrupts can't leave half-written
+    snapshot files that would corrupt the next run's regression diff."""
+    pattern = os.path.join(cache_dir, 'ui-*.json')
+    files = sorted(glob.glob(pattern))
+
+    inspections = {}
+    for fp in files:
+        try:
+            with open(fp, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            continue
+
+        result = data.get('inspectionResult', {}).get('indexStatusResult', {})
+        url = data.get('inspectionUrl') or ''
+        coverage = result.get('coverageState', '')
+        if url:
+            inspections[url] = coverage
+
+    snapshot = {
+        'run_timestamp': run_timestamp,
+        'commit_sha': commit_sha,
+        'site_url': site_url,
+        'inspection_count': len(inspections),
+        'inspections': inspections,
+    }
+
+    # Ensure parent dir exists (orchestrator creates it in Turn 1, but be defensive)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    # Atomic write: .tmp then os.replace
+    tmp_path = output_path + '.tmp'
+    try:
+        with open(tmp_path, 'w', encoding='utf-8') as f:
+            json.dump(snapshot, f, indent=2, ensure_ascii=False)
+        os.replace(tmp_path, output_path)
+    except OSError as e:
+        # Clean up tmp on failure
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        print(f"ERROR: snapshot write failed: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"snapshot_written:{output_path}")
+    print(f"inspection_count:{len(inspections)}")
+
+
+def classify_transition(cur_state_lower):
+    """Map current coverageState (lowercased) to transition class for severity calc.
+
+    Class priority for sort (lower number = higher priority in report ordering):
+        0  server_error    — availability regression (always critical)
+        1  broken_url      — 404
+        2  redirect        — Page with redirect (burakarik6 pattern)
+        3  canonical       — Google chose different canonical
+        4  quality         — Crawled - not indexed (E-E-A-T signal)
+        5  crawl_budget    — Discovered - not indexed
+        6  rendering       — Soft 404
+        7  access          — 403 / blocked (often intentional)
+        8  other           — unmapped state
+    """
+    if 'server error' in cur_state_lower or '5xx' in cur_state_lower:
+        return 'server_error'
+    if 'not found' in cur_state_lower or '404' in cur_state_lower and 'soft' not in cur_state_lower:
+        return 'broken_url'
+    if 'redirect' in cur_state_lower:
+        return 'redirect'
+    if 'duplicate' in cur_state_lower or 'canonical' in cur_state_lower:
+        return 'canonical'
+    if 'crawled' in cur_state_lower and 'not indexed' in cur_state_lower:
+        return 'quality'
+    if 'discovered' in cur_state_lower and 'not indexed' in cur_state_lower:
+        return 'crawl_budget'
+    if 'soft 404' in cur_state_lower:
+        return 'rendering'
+    if 'blocked' in cur_state_lower or '403' in cur_state_lower or 'noindex' in cur_state_lower:
+        return 'access'
+    return 'other'
+
+
+def compute_path_clusters(urls):
+    """Group URLs by path prefix (1-3 leading segments).
+
+    Returns up to 3 (prefix, count) tuples where count >= 3, sorted desc by count.
+
+    Path prefix construction: for each URL, generate 1, 2, and 3-segment prefixes,
+    increment a counter per prefix. Top 3 clusters by count, filtered to count >= 3.
+
+    Example: /en/photo/foo, /en/photo/bar, /en/photo/baz, /en/gallery/qux yield:
+        /en/* → 4
+        /en/photo/* → 3
+        /en/gallery/* → 1 (filtered out, < 3)
+    Result: [(/en/*, 4), (/en/photo/*, 3)]"""
+    prefix_counts = defaultdict(int)
+    for url in urls:
+        try:
+            path = urlparse(url).path
+        except Exception:
+            continue
+        if not path or path == '/':
+            continue
+        segs = [s for s in path.split('/') if s]
+        for n in (1, 2, 3):
+            if len(segs) >= n:
+                prefix = '/' + '/'.join(segs[:n]) + '/*'
+                prefix_counts[prefix] += 1
+
+    # Filter count >= 3 and take top 3
+    sorted_clusters = sorted(prefix_counts.items(), key=lambda x: -x[1])
+    return [(p, c) for p, c in sorted_clusters if c >= 3][:3]
+
+
+def regression(current_path, previous_path):
+    """sub-dim 14 step 1.6.13.3 — diff two snapshots, emit transitions + clusters.
+
+    Compares {url: coverageState} maps between current and previous snapshots.
+    Emits:
+      - transitions: URLs whose state flipped (positive or negative)
+      - path_clusters: top 3 path-prefix groupings of transition URLs
+      - count_deltas: per-coverageState count changes across the full inspection set
+      - recoveries: count of any-non-indexed → indexed transitions (info-only)
+
+    Negative transitions (indexed → anything-non-indexed) are the primary signal —
+    these are what trigger the sub-dim 14 finding."""
+    cur = load_json(current_path)
+    prev = load_json(previous_path)
+
+    cur_inspections = cur.get('inspections', {})
+    prev_inspections = prev.get('inspections', {})
+
+    transitions = []
+    no_change_count = 0
+    recoveries = 0
+
+    for url, current_state in cur_inspections.items():
+        if url not in prev_inspections:
+            continue  # new URL this run; no transition data
+        previous_state = prev_inspections[url]
+        if previous_state == current_state:
+            no_change_count += 1
+            continue
+
+        prev_lower = (previous_state or '').strip().lower()
+        cur_lower = (current_state or '').strip().lower()
+
+        prev_was_indexed = 'submitted and indexed' in prev_lower
+        cur_is_indexed = 'submitted and indexed' in cur_lower
+
+        # Recovery: was non-indexed, now indexed
+        if cur_is_indexed and not prev_was_indexed:
+            recoveries += 1
+            continue
+
+        # Negative transition: was indexed, now not
+        if prev_was_indexed and not cur_is_indexed:
+            transition_class = classify_transition(cur_lower)
+            transitions.append({
+                'url': url,
+                'previous_state': previous_state,
+                'current_state': current_state,
+                'transition_class': transition_class,
+            })
+            continue
+
+        # Other state-to-state transitions (e.g., crawled-not-indexed → 404) — not
+        # currently surfaced as findings. Future enhancement: a 'lateral' bucket.
+
+    critical_count = sum(1 for t in transitions if t['transition_class'] == 'server_error')
+    high_count = len(transitions) - critical_count
+
+    print(f"transitions_total:{len(transitions)}")
+    print(f"critical_transitions:{critical_count}")
+    print(f"high_transitions:{high_count}")
+    print(f"recoveries:{recoveries}")
+    print(f"no_change_count:{no_change_count}")
+    print(f"previous_run_date:{prev.get('run_timestamp', '')[:10]}")
+    print(f"previous_commit:{prev.get('commit_sha', '')}")
+    print(f"current_commit:{cur.get('commit_sha', '')}")
+
+    # Transitions detail — sorted by class priority then URL
+    class_priority = {
+        'server_error': 0, 'broken_url': 1, 'redirect': 2, 'canonical': 3,
+        'quality': 4, 'crawl_budget': 5, 'rendering': 6, 'access': 7, 'other': 8,
+    }
+    transitions.sort(key=lambda t: (class_priority.get(t['transition_class'], 9), t['url']))
+    print("--- transitions ---")
+    for t in transitions:
+        print(f"  {t['url']}|{t['previous_state']}|{t['current_state']}|{t['transition_class']}")
+
+    # Path clusters from transition URLs
+    clusters = compute_path_clusters([t['url'] for t in transitions])
+    print("--- path_clusters ---")
+    for prefix, count in clusters:
+        print(f"  {prefix}|{count}")
+
+    # Count deltas across the full inspection set (not just transitions)
+    prev_counts = defaultdict(int)
+    for url, state in prev_inspections.items():
+        prev_counts[state] += 1
+    cur_counts = defaultdict(int)
+    for url, state in cur_inspections.items():
+        cur_counts[state] += 1
+
+    all_states = set(prev_counts.keys()) | set(cur_counts.keys())
+    deltas = []
+    for state in all_states:
+        p = prev_counts[state]
+        c = cur_counts[state]
+        delta = c - p
+        deltas.append((state, p, c, delta))
+    deltas.sort(key=lambda d: -abs(d[3]))
+
+    print("--- count_deltas ---")
+    for state, p, c, d in deltas[:10]:
+        sign = '+' if d >= 0 else ''
+        print(f"  {state}|{p}|{c}|{sign}{d}")
+
+
 def main():
     if len(sys.argv) < 3:
         print(__doc__, file=sys.stderr)
@@ -315,6 +563,19 @@ def main():
             print("ERROR: brand subcommand needs <q1_path> <brand_name>", file=sys.stderr)
             sys.exit(3)
         detect_brand_anomaly(arg, sys.argv[3])
+    elif cmd == 'snapshot-write':
+        if len(sys.argv) < 7:
+            print("ERROR: snapshot-write subcommand needs "
+                  "<cache_dir> <run_timestamp> <commit_sha> <site_url> <output_path>",
+                  file=sys.stderr)
+            sys.exit(3)
+        snapshot_write(arg, sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
+    elif cmd == 'regression':
+        if len(sys.argv) < 4:
+            print("ERROR: regression subcommand needs "
+                  "<current_snapshot> <previous_snapshot>", file=sys.stderr)
+            sys.exit(3)
+        regression(arg, sys.argv[3])
     else:
         print(f"ERROR: unknown subcommand '{cmd}'. Run with no args for usage.",
               file=sys.stderr)

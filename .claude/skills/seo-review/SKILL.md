@@ -53,7 +53,7 @@ and stop the skill cleanly.
 
 **Otherwise, print the detected stack in one line.** The line includes the GSC-mode summary computed in Step 1.6 (one of two outcomes: API enabled, or heuristic-only). Examples:
 
-> Detected: Next.js 14 app-router project, TypeScript, with sitemap.xml at /public/sitemap.xml and i18n via next-i18next. Mode: heuristic + GSC (Search Console API — 95 URLs inspected, 3 perf queries). Use `--url <base>` for live HTML diff and sitemap URL probe.
+> Detected: Next.js 14 app-router project, TypeScript, with sitemap.xml at /public/sitemap.xml and i18n via next-i18next. Mode: heuristic + GSC (Search Console API — 194 URLs inspected, 3 perf queries). Use `--url <base>` for live HTML diff and sitemap URL probe.
 
 > Detected: Hugo static site, no i18n. Mode: heuristic (no GSC data — see one-time setup banner above to enable GSC API).
 
@@ -126,12 +126,15 @@ Steps 1.5 (git scan) and 1.6 (GSC API ingestion when configured, else heuristic-
 - `Glob .seo-data/gsc/README.md` (Step 1.6.5 idempotency)
 - `Read .gitignore` (Step 1.6.5 idempotency)
 - `Read references/gsc-setup-readme-template.md` (fire optimistically; discard if README already exists)
-- `Read references/gsc-ingestion.md` (always needed when API is configured — covers API ingestion contract + 13 sub-dim catalog)
+- `Read references/gsc-ingestion.md` (always needed when API is configured — covers API ingestion contract + 14 sub-dim catalog including sub-dim 14 `deindex_regression`)
 - `Read .seo-data/gsc/config.yaml` (optimistic; if file doesn't exist the tool errors silently — interpret as `api_configured = false`)
 - `Read references/gsc-api-queries.md` (optimistic; only used when API activates — reading early avoids an extra Read in Turn 2)
 - `Read references/gsc-api-schema.md` (optimistic; reference for API response parsing)
 - `Read references/gsc-cache.md` (optimistic; cache wrapper template + TTL policy used by Turn 2 dispatch)
-- `Bash: mkdir -p .seo-data/gsc/cache 2>/dev/null; find .seo-data/gsc/cache -type f -mtime +7 -delete 2>/dev/null; ls .seo-data/gsc/cache 2>/dev/null | wc -l` (cache dir setup + 7-day prune + count of remaining entries — produces `<N>` for the footer cache stats line. `mkdir` here is load-bearing — the Turn 2 wrapper assumes the dir exists and does NOT recreate it per call. See `references/gsc-cache.md` "Eviction policy".)
+- `Bash: mkdir -p .seo-data/gsc/cache .seo-data/gsc/snapshots 2>/dev/null; find .seo-data/gsc/cache -type f -mtime +7 -delete 2>/dev/null; find .seo-data/gsc/snapshots -type f -mtime +30 -delete 2>/dev/null; ls .seo-data/gsc/cache 2>/dev/null | wc -l; ls .seo-data/gsc/snapshots 2>/dev/null | wc -l` (cache + snapshot dir setup + cache 7-day prune + snapshot 30-day prune + counts of remaining entries — produces `<N>` for the footer cache stats line and `<M>` for the snapshot count. `mkdir` here is load-bearing — the Turn 2 wrapper assumes both dirs exist and does NOT recreate them per call. See `references/gsc-cache.md` "Eviction policy" for the cache prune rationale and `references/gsc-ingestion.md` "Hard rules" for the 30-day snapshot retention rationale.)
+- `Glob **/sitemap.xml` + `Glob **/sitemap_index.xml` (sitemap location detection — both probed in parallel so Turn 1 can begin Read'ing the right file in Turn 1.5 if found. Search paths: repo root, `public/`, `static/`, `dist/`, `out/`, `_site/`. Used by Step 1.6.6 Turn 2b URL Inspection sitemap-orphan slice AND by Step 3.2 URL probe — both consume the same parsed URL list, so a single parse is sufficient. If neither Glob finds anything, the sitemap-orphan slice in Turn 2b is skipped silently and Step 3.2 footer-notes "no sitemap.xml — URL probe skipped".)
+- `Read .seo-data/gsc/known-bad-urls.txt` (optimistic — the file is user-authored and may not exist; Read errors silently on missing file → `user_supplied_urls` stays empty. When present, parsed in Step 1.6.6's Pre-Turn-2 step into the URL Inspection user-supplied slice — see `references/gsc-api-queries.md` "URL Inspection — selection algorithm" 4-slice mix.)
+- `Bash: ls .seo-data/gsc/snapshots 2>/dev/null | sort | tail -1` (find most recent prior snapshot — used by Step 1.6.13.2 regression diff. Empty stdout means "first run for this property", in which case Step 1.6.13 emits no findings and footer-notes the activation.)
 - `Bash: gcloud --version 2>&1` (gcloud SDK install detection)
 - `Bash: TOKEN=$(gcloud auth application-default print-access-token 2>&1); ADC_DIR=$(gcloud info --format="value(config.paths.global_config_dir)" 2>/dev/null); QUOTA_PROJECT=$(grep -oE '"quota_project_id"[[:space:]]*:[[:space:]]*"[^"]+"' "$ADC_DIR/application_default_credentials.json" 2>/dev/null | head -1 | sed -E 's/.*"([^"]+)"$/\1/'); echo "TOKEN_LEN:${#TOKEN}"; echo "QUOTA_PROJECT:$QUOTA_PROJECT"; curl -s -w "\nHTTP_STATUS:%{http_code}\n" -H "Authorization: Bearer $TOKEN" -H "x-goog-user-project: $QUOTA_PROJECT" "https://www.googleapis.com/webmasters/v3/sites"` (combined ADC + quota-project + API auth probe in one Bash invocation; orchestrator parses `TOKEN_LEN:`, `QUOTA_PROJECT:`, and `HTTP_STATUS:` to determine ADC + quota project + API reachability. The `x-goog-user-project` header is required on every Search Console API call to bill quota to the user-controlled project; ADC stores the value in `application_default_credentials.json` after `gcloud auth application-default set-quota-project <id>`. Without it, all calls return 403 SERVICE_DISABLED. **Extraction uses `grep -oE` + `sed -E` instead of `jq`** — `jq` isn't on PATH in many bash environments (notably claude-code's Bash on Windows + minimal Linux containers); grep + sed are always available.)
 
@@ -139,7 +142,7 @@ Only the **post-tool aggregation** (parsing git log, parsing config.yaml, resolv
 
 **Turn 2 — Data ingestion** (only fires when API is active; skipped in heuristic-only mode):
 - **Turn 2a — Performance**: 3 parallel `Bash: curl ...` calls for Q1+Q2+Q3 from `gsc-api-queries.md`
-- **Turn 2b — Indexing**: up to 100 parallel `Bash: curl ...` calls for URL Inspection (URL selection from Q3 output + sitemap-probe failures + git-changed paths). Turn 2b runs after Turn 2a since URL selection depends on Q3's `url_impressions_map`.
+- **Turn 2b — Indexing**: up to 200 parallel `Bash: curl ...` calls for URL Inspection. URL selection algorithm (per `gsc-api-queries.md`): top 80 by impressions from Q3's `url_impressions_map` + 20 git-changed paths from Step 1.5 + 100 sitemap-orphan URLs (sitemap entries NOT in `url_impressions_map`, sorted document order; deterministic for snapshot regression diff). Dedup precedence: impressions > git > sitemap. Turn 2b runs after Turn 2a since URL selection depends on Q3's `url_impressions_map`.
 
 Without explicit batching, the orchestrator would run ~15+ sequential tool turns for Steps 1.5+1.6. With batching: 3 turns total (Turn 1 detection + Turn 2a Performance + Turn 2b Inspection).
 
@@ -294,7 +297,7 @@ When shallow: `Git history scan: skipped (shallow clone — change-awareness ann
 GSC data is ingested via the **Search Console API**: `searchanalytics.query` for Performance signal, `urlInspection.index.inspect` per-URL for Indexing signal. Configuration is a single key (`site_url`) in `.seo-data/gsc/config.yaml`. When not configured or unreachable, the skill runs heuristic-only.
 
 Four reference files cover the implementation:
-- `references/gsc-ingestion.md` — digest shapes, 12 sub-dim finding catalog, `coverageState` → 9-reason lookup, setup banner, `.gitignore` auto-append rules
+- `references/gsc-ingestion.md` — digest shapes, **14 sub-dim** finding catalog (incl. sub-dim 14 `deindex_regression` for snapshot-diff early warning), `coverageState` → 9-reason lookup, setup banner, `.gitignore` auto-append rules
 - `references/gsc-api-schema.md` — Search Console API endpoint inventory, auth/scope, quota model, `coverageState`/`pageFetchState` enums
 - `references/gsc-api-queries.md` — 3 parametrized `curl` templates (Q1/Q2/Q3) + URL Inspection per-URL template + URL selection algorithm + lookup table
 - `references/gsc-cache.md` — 24h TTL response cache for `searchanalytics.query` + `urlInspection.index.inspect`. Cache wrapper bash template (atomic write, skip-cache-on-non-200, stat portability). `--no-cache` bypass behavior. 7-day eviction policy. Footer line format.
@@ -386,6 +389,26 @@ The block covers `config.yaml` (which contains `site_url` — non-secret but pro
 
 Only fires when `api_active == true`. Skipped in heuristic-only mode.
 
+**Pre-Turn-2 sitemap parse.** Before dispatching Turn 2a/2b, parse the sitemap XML located in Turn 1's `Glob` results. If `Glob **/sitemap.xml` returned a path, issue a single `Read <path>` call (sequential, between Turn 1 aggregation and Turn 2 dispatch — adds one tool turn, cheap). If `Glob **/sitemap_index.xml` returned a path AND `sitemap.xml` did not, Read the index file and follow `<sitemap><loc>` entries to fetch child sitemaps (cap at 5 child sitemaps to avoid runaway). Parse `<url><loc>` entries in document order, build:
+
+- `sitemap_url_list`: ordered list of `<loc>` URLs (preserving document order — required for the deterministic sitemap-orphan slice in Turn 2b URL selection)
+- `sitemap_url_set`: a set for O(1) lookup when computing the orphan slice (`url in sitemap_url_set AND url NOT in url_impressions_map`)
+
+Both data structures live in shared context across the rest of Step 1.6 and are also passed to Step 3.2 (URL probe consumes the same parsed list — no re-parse needed).
+
+If no sitemap.xml or sitemap_index.xml was located: both structures stay empty. Turn 2b URL selection skips the sitemap-orphan slice and footer-notes the absence. Step 3.2 URL probe also notes the absent sitemap.
+
+**Pre-Turn-2 known-bad-urls parse.** If Turn 1's optimistic `Read .seo-data/gsc/known-bad-urls.txt` returned content (file exists, non-empty after stripping), parse it line-by-line:
+
+- Split on newlines
+- Trim leading/trailing whitespace per line
+- Skip lines that are blank OR start with `#` (comment lines)
+- Validate each remaining line looks like a URL (`http://` or `https://` prefix — silently drop lines that don't, with a footer note `Skipped N lines from known-bad-urls.txt that didn't look like URLs`)
+- Deduplicate (preserve first-occurrence order)
+- Take first 50 entries (cap)
+
+Result: `user_supplied_urls` list, in shared context. Used by Turn 2b URL selection as the 4th URL Inspection slice — see `references/gsc-api-queries.md` "URL Inspection — selection algorithm" 4-slice mix. If the file is absent or all lines are blank/comments, `user_supplied_urls` stays empty; sitemap-orphan claims the full 100-slot bucket in Turn 2b.
+
 **Token + quota-project cache**: Turn 1's probe already produced both. Reuse from shared context across all curl invocations — no new gcloud calls needed in Turn 2:
 
 ```
@@ -410,7 +433,7 @@ curl -s -w '%{http_code}' -o "$TMP" -X POST \
   "https://www.googleapis.com/webmasters/v3/sites/<SITE_URL_ENCODED>/searchAnalytics/query"
 ```
 
-**Turn 2b — URL Inspection (N parallel cache-or-curl calls, N ≤ 100)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (top 80 by impressions from Q3 + 20 git-changed paths from Step 1.5 resolved via `page_type_map`, dedup, hard cap 100). Each URL gets its own cache slot (`ui-<sha1(site_url|inspection_url)>.json`) — partial cache hits across the batch are expected (e.g., 80 cached + 20 fresh after a rerun). Fresh-path curl inside the wrapper:
+**Turn 2b — URL Inspection (N parallel cache-or-curl calls, N ≤ 200)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (top 80 by impressions from Q3 + 20 git-changed paths from Step 1.5 resolved via `page_type_map` + 100 sitemap-orphan URLs from the parsed sitemap.xml that don't appear in `url_impressions_map`, sorted document order; dedup precedence impressions > git > sitemap; hard cap 200). Each URL gets its own cache slot (`ui-<sha1(site_url|inspection_url)>.json`) — partial cache hits across the batch are expected (e.g., 180 cached + 20 fresh after a rerun). Fresh-path curl inside the wrapper:
 
 ```
 curl -s -w '%{http_code}' -o "$TMP" -X POST \
@@ -425,7 +448,7 @@ Note: `siteUrl` in this request is a **body field** (raw, no URL encoding) — d
 
 **Per-call cache stats capture.** For each call (Q1/Q2/Q3 + each URL Inspection), record `cache_status: hit | miss` and `age_seconds` (when hit) from the wrapper's first-line output. Aggregate into `{cache_hits: N, cache_misses: M, miss_call_tags: [...]}` for the Step 1.6.12 footer line. Quota tracking adjusts: cache hits don't count against the 2,000/day URL Inspection quota — only `cache_misses` consume quota.
 
-Step 1.6 total: 3 turns max (Turn 1 detection + Turn 2a Performance + Turn 2b Inspection). Heuristic-only mode finishes after Turn 1. Full-cache-hit run (all 103 calls served from cache) consumes zero API quota and shaves several seconds off wall time.
+Step 1.6 total: 3 turns max (Turn 1 detection + Turn 2a Performance + Turn 2b Inspection). Heuristic-only mode finishes after Turn 1. Full-cache-hit run (all 203 calls served from cache) consumes zero API quota and shaves several seconds off wall time.
 
 ### 1.6.7 — Parse outputs into digests
 
@@ -474,7 +497,7 @@ No per-source freshness check needed — the API returns the live state of GSC.
 
 | `gsc_mode` | Step 0 fragment example |
 |---|---|
-| `enabled` | `Mode: heuristic + GSC (Search Console API — 95 URLs inspected, 3 perf queries)` |
+| `enabled` | `Mode: heuristic + GSC (Search Console API — 194 URLs inspected, 3 perf queries)` |
 | `disabled` | `Mode: heuristic (no GSC data — see one-time setup banner above)` |
 
 ### 1.6.11 — Pass to all dispatched subagents (Step 5 shared context)
@@ -540,6 +563,115 @@ In heuristic-only mode, render only: `GSC mode: disabled. Reason: <blocker from 
 
 Quota tracking is approximate (the API doesn't expose a precise counter — back-of-envelope: `2000/day per property minus cache_misses this run`). Cache hits do NOT consume quota and should not be counted toward the daily total.
 
+### 1.6.13 — Snapshot write + regression diff (sub-dim 14 emission)
+
+Only fires when `api_active == true` AND Turn 2b URL Inspection produced ≥1 result. The early-warning loop that catches deindex events before Google emails the user. See `references/gsc-ingestion.md` sub-dim 14 (`deindex_regression`) for the finding shape and transition table.
+
+#### 1.6.13.1 — Write current run's snapshot
+
+After Turn 2b parsing completes (Step 1.6.7's URL Inspection output walk), the orchestrator has the cache directory full of `ui-<hash>.json` files for this run. Write a snapshot via the helper:
+
+```bash
+RUN_TIMESTAMP=$(date -u +%Y-%m-%dT%H%M%S)
+COMMIT_SHA7=$(git rev-parse --short HEAD 2>/dev/null || echo "no-git")
+SNAPSHOT_PATH=".seo-data/gsc/snapshots/${RUN_TIMESTAMP}-${COMMIT_SHA7}.json"
+
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" \
+  snapshot-write \
+  .seo-data/gsc/cache \
+  "$RUN_TIMESTAMP" \
+  "$COMMIT_SHA7" \
+  "$CONFIG_SITE_URL" \
+  "$SNAPSHOT_PATH"
+```
+
+The helper walks all `ui-*.json` in the cache dir, extracts `{inspectionUrl: coverageState}` pairs, wraps with metadata (`run_timestamp`, `commit_sha`, `site_url`, `lookback_days`), and writes atomically. Schema documented in `references/gsc-parse-helper.py` `snapshot-write` subcommand.
+
+Failure handling: if the helper exits non-zero (e.g., empty cache dir, write permission failure), footer-note `Snapshot write failed: <reason>. Regression detection skipped this run; subsequent runs will compare against the prior snapshot.` and continue. Never block.
+
+#### 1.6.13.2 — Find previous snapshot
+
+Turn 1's batch already produced the most-recent prior snapshot filename (via `ls .seo-data/gsc/snapshots | sort | tail -1`). After Step 1.6.13.1 wrote the new snapshot, the orchestrator now picks the **second-most-recent** entry to use as the prior snapshot for diffing. From shared context:
+
+```
+PREV_SNAPSHOT_FILE = <output of: ls .seo-data/gsc/snapshots | sort | tail -2 | head -1>
+```
+
+When `PREV_SNAPSHOT_FILE` is empty (this is the first snapshot ever written for the property): set `regression_mode = "first_run"`, skip Step 1.6.13.3, emit footer line `Index Coverage snapshots: first run for this property. Regression detection activates on next /seo-review run.` and proceed to Step 2.
+
+When `PREV_SNAPSHOT_FILE` equals current snapshot's filename (orchestrator just wrote a new snapshot AND it's the only file): same first-run handling — Turn 1's `ls | sort | tail -1` ran BEFORE the new snapshot was written, so a second-most-recent file genuinely doesn't exist.
+
+#### 1.6.13.3 — Run regression diff
+
+```bash
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" \
+  regression \
+  "$SNAPSHOT_PATH" \
+  ".seo-data/gsc/snapshots/$PREV_SNAPSHOT_FILE"
+```
+
+The helper emits machine-parseable output:
+
+```
+transitions_total:<N>
+critical_transitions:<count of Submitted-indexed → 5xx>
+high_transitions:<count of other negative transitions>
+recoveries:<count of any → Submitted-indexed>
+no_change_count:<count of URLs unchanged>
+previous_run_date:<YYYY-MM-DD>
+previous_commit:<sha7>
+current_commit:<sha7>
+--- transitions ---
+<url>|<prev_state>|<current_state>|<transition_class>
+...
+--- path_clusters ---
+<prefix>|<count>
+...
+--- count_deltas ---
+<coverage_state>|<previous_count>|<current_count>|<delta>
+...
+```
+
+#### 1.6.13.4 — Emit sub-dim 14 finding (when transitions detected)
+
+When `transitions_total > 0`, the orchestrator constructs a sub-dim 14 finding per `references/gsc-ingestion.md` sub-dim 14 entry (severity, certainty, evidence schema, recommended_action tiers). Cross-link to related findings in this run's pool:
+
+- When `Page with redirect` transitions present → cross-link to sub-dim 5 (`redirect_hygiene`) finding (the locale-prefix-cluster diagnosis is in sub-dim 5)
+- When `Not found (404)` transitions present → cross-link to sub-dim 4 (`not_found_404`) finding
+- When `Server error (5xx)` transitions present → cross-link to sub-dim 9 (`server_errors`) finding
+
+Path-cluster evidence: when `path_clusters` output has ≥1 entry, include in evidence + run git-correlation against Step 1.5's digest (for each cluster prefix, scan touched-files list for paths matching the prefix when resolved via `page_type_map`; attach matching commits as `git_correlation` evidence, max 3 commits per cluster).
+
+The finding is added directly to the findings pool used by Step 6 ranking. Source: `"gsc"`. `score_impact: 0` (Step 6.0a enforcement applies as for all GSC findings).
+
+#### 1.6.13.5 — Inflection-point footer lines (independent of finding emission)
+
+When prior snapshot exists, render footer lines for the top-3 reason-category count deltas. Walk `count_deltas` from helper output, take top 3 by absolute delta:
+
+```
+Page-with-redirect count: 838 (delta +47 since previous run on 2026-05-13 [commit 5a441d1]). ⚠ Climbing fast — consider running /seo-review with --plan to triage.
+Crawled-not-indexed count: 142 (delta -8 since previous run). Improving.
+Not-found-404 count: 23 (delta 0 since previous run). Stable.
+```
+
+Warning threshold (⚠): absolute delta ≥ 20 URLs OR relative delta ≥ 10% of prior count. Below threshold: render without warning.
+
+Recovery footer line (when `recoveries > 0`):
+
+```
+Index Coverage recoveries: <N> URLs returned to "Submitted and indexed" since previous run. ✓
+```
+
+Snapshot stats footer line (always rendered when prior snapshot exists):
+
+```
+Index Coverage snapshots: 1 written (.seo-data/gsc/snapshots/<filename>); 7 retained (30-day rotation); compared against <previous filename>.
+```
+
+#### 1.6.13.6 — Same-commit dedup interaction
+
+If the same-commit dedup rule in Step 7 (history append) skips writing a new `docs/seo-history.md` row because the previous run was on the same commit, the snapshot is **still written** (Step 1.6.13.1 doesn't dedup by commit — every run writes its own snapshot). Regression diff in Step 1.6.13.3 compares against the prior snapshot regardless of commit. This is correct: the snapshot is a coverage-state observation at a point in time, not a score audit. Same-commit reruns can still show drift if GSC's pipeline crawled new state between the two runs.
+
 ---
 
 ## Ingestion conventions (cross-cutting, applies to Step 1.6 + Step 3.2)
@@ -551,8 +683,10 @@ Three rules the orchestrator must follow when ingesting external data. Surfaced 
 `.seo-data/gsc/` is reserved for **user configuration + skill-auto-generated content only**:
 
 - `config.yaml` (user-authored)
+- `known-bad-urls.txt` (user-authored — optional; one URL per line, `#` comments allowed; up to 50 inspected per run as the 4th URL Inspection slice — see `references/gsc-api-queries.md` "URL Inspection — selection algorithm". Use this to paste specific problem URLs from GSC's "Not found (404)" / "Page with redirect" / "Validation failed" coverage exports that aren't in current sitemap/impressions/git.)
 - `README.md` (skill-auto-written on first detection)
 - `cache/` (skill-auto-managed; **TTL'd API response cache** — see `references/gsc-cache.md`)
+- `snapshots/` (skill-auto-managed; **30-day coverage-state history** for sub-dim 14 regression detection — see `references/gsc-ingestion.md` sub-dim 14 + SKILL.md Step 1.6.13)
 - `.gsc-banner-shown` (sentinel — sits in `.seo-data/` not `.seo-data/gsc/`)
 
 The `cache/` subdirectory is the only sanctioned location for persisted API responses. The orchestrator owns its lifecycle (creates on Turn 1, writes via atomic mv in Turn 2, prunes entries >7d at the start of each run). Cache content is reproducible from the API on demand — safe to delete manually.
@@ -675,8 +809,8 @@ Interpret `$ARGUMENTS`:
 
 Runs **always when sitemap.xml exists locally** AND (sitemap URLs are absolute OR `--url <base>` provides a domain to synthesize bases from).
 
-1. **Locate sitemap.xml locally** — try in order: repo root, `public/sitemap.xml`, `static/sitemap.xml`, `dist/sitemap.xml`, `out/sitemap.xml`, `_site/sitemap.xml`. Also check for `sitemap_index.xml` — if found, parse it and follow `<sitemap><loc>` entries to find child sitemaps (cap at 5 child sitemaps to avoid runaway).
-2. **Parse with Read tool** (not network) — extract `<url><loc>` entries.
+1. **Locate sitemap.xml locally** — **reuse Step 1.6.6's pre-parsed `sitemap_url_list` when GSC mode is enabled** (the parse already happened in Step 1.6 for the sitemap-orphan URL Inspection slice). When GSC mode is disabled OR Step 1.6 didn't run, fall back to the standalone parse here: try in order: repo root, `public/sitemap.xml`, `static/sitemap.xml`, `dist/sitemap.xml`, `out/sitemap.xml`, `_site/sitemap.xml`. Also check for `sitemap_index.xml` — if found, parse it and follow `<sitemap><loc>` entries to find child sitemaps (cap at 5 child sitemaps to avoid runaway).
+2. **Parse with Read tool** (not network) — extract `<url><loc>` entries. **Skip when `sitemap_url_list` is already populated from Step 1.6.6** — single-parse contract.
 3. **URL list resolution:**
    - If URLs are absolute (start with `http://` / `https://`) → use them as-is.
    - If URLs are relative AND `--url <base>` provided → synthesize: `<base>` + relative path.
@@ -763,7 +897,7 @@ Read `references/scan-content.md`, dispatch `seo-content` with the file + shared
 Read `references/scan-geo.md`, dispatch `geo-generative` with the file + shared context. Owns Structured Data (20) + Generative Engine (20) = 40 points. Source-only (no rendered HTML).
 
 ### Agent 4: seo-gsc-insights (only when `gsc_mode: enabled`)
-Read `references/gsc-ingestion.md` (the same reference used by the orchestrator in Step 1.6 — the "Finding-type catalog" section is the agent's spec) and dispatch `seo-gsc-insights` with the reference content + shared context + sitemap URL list. Owns `gsc_insights` dimension with 13 sub-dims and **0 score allocation** (informational only). All findings emit `source: "gsc"` and `score_impact: 0`.
+Read `references/gsc-ingestion.md` (the same reference used by the orchestrator in Step 1.6 — the "Finding-type catalog" section is the agent's spec) and dispatch `seo-gsc-insights` with the reference content + shared context + sitemap URL list. Owns `gsc_insights` dimension with **14 sub-dims** and **0 score allocation** (informational only). All findings emit `source: "gsc"` and `score_impact: 0`. **Note:** the subagent only emits sub-dims 1-13 from API output; sub-dim 14 (`deindex_regression`) is orchestrator-emitted in Step 1.6.13 from snapshot diff and added directly to the findings pool — the subagent never sees regression transitions in its input.
 
 When `gsc_mode: disabled`, do not dispatch the 4th agent — only dispatch 3.
 

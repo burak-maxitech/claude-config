@@ -69,7 +69,7 @@ When `gsc_mode == "enabled"`, DO NOT render this banner — the GSC mode line in
 **Sitemap:** public/sitemap.xml (47 URLs, probed)
 **Best practices fetched:** 2026-05-14 from 5 sources (see footer for URLs)
 **Coverage mode:** static + sitemap URL probe (use `--url <base>` for live HTML diff)
-**GSC mode:** enabled (Search Console API — 95 URLs inspected, 3 perf queries)
+**GSC mode:** enabled (Search Console API — 194 URLs inspected, 3 perf queries)
 
 ### Score breakdown by dimension
 
@@ -130,7 +130,7 @@ Repeat per dimension. Don't render detail blocks for every finding — only #1 p
 
 ## Section 3 — GSC Insights (only when `gsc_mode: enabled`)
 
-Render this section between Findings (Section 2) and Score History (Section 4) **only when GSC API ingestion produced findings in Step 1.6**. Skip entirely otherwise — no banner, no placeholder. The section has 6 sub-blocks (Indexing coverage / Top-impact GSC findings / CTR opportunities / Position-band query opportunities / Traffic orphans / Code-already-fixed annotations); render only those that have data.
+Render this section between Findings (Section 2) and Score History (Section 4) **only when GSC API ingestion produced findings in Step 1.6**. Skip entirely otherwise — no banner, no placeholder. The section has 7 sub-blocks (Indexing coverage / **Index Coverage regression** / Top-impact GSC findings / CTR opportunities / Position-band query opportunities / Traffic orphans / Code-already-fixed annotations); render only those that have data.
 
 ```
 ## GSC Insights
@@ -151,7 +151,59 @@ Of 95 inspected URLs, 67 (71%) are not indexed cleanly. Per-reason breakdown fro
 | Duplicate, Google chose different canonical     |  2 | ✓ canonical investigation |
 | Soft 404                                        |  2 | ✓ rendering fix |
 
-(Counts reflect the inspected-URL sample, not site-wide truth. URL Inspection samples high-impression + recently-changed URLs — see `gsc-api-queries.md` "URL Inspection — selection algorithm".)
+(Counts reflect the inspected-URL sample, not site-wide truth. URL Inspection samples high-impression + git-changed + sitemap-orphan URLs — see `gsc-api-queries.md` "URL Inspection — selection algorithm".)
+
+### Index Coverage regression (snapshot diff)
+
+Render this sub-block **only when a prior snapshot exists** (i.e., this is not the first run for the property). Pulls from sub-dim 14 (`deindex_regression`) finding + Step 1.6.13.5 inflection-point footer lines.
+
+When transitions detected (one finding emitted from Step 1.6.13.4):
+
+```
+⚠ 47 URLs deindexed since previous run on 2026-05-13 (commit 5a441d1)
+
+Likely caused by recent changes:
+- commit 7109213 (2026-05-15): "feat(seo-review): 6 fixes from burakarik6 dogfood"
+- (cross-reference Step 1.5's git digest for the routing change)
+
+Transition breakdown:
+| Transition class             | Count | Severity |
+|------------------------------|-------|----------|
+| Page with redirect (i18n)    | 38    | high     |
+| Crawled - not indexed        | 7     | high     |
+| Not found (404)              | 2     | high     |
+
+Path clusters (≥3 URLs each):
+- /en/photo/* (24 URLs)
+- /tr/photo/* (12 URLs)
+- /photo/* (8 URLs)
+
+Sample transitions (top 5):
+- https://burakarik.com/en/photo/granada-sokakları | Submitted and indexed → Page with redirect
+- https://burakarik.com/tr/gallery/slovenia | Submitted and indexed → Page with redirect
+- ... (full list in snapshot diff at .seo-data/gsc/snapshots/2026-05-26T143200-5a441d1.json)
+
+**This may correspond to a Google Search Console "Validation failed" or "New reason preventing your pages from being indexed" email.** Cross-reference sub-dim 5 (redirect_hygiene) in this run's findings for the locale-prefix-cluster diagnosis. Recovery path: see the sub-dim 14 finding's recommended_action.
+
+Count deltas since previous run:
+- Page-with-redirect: 838 (delta +47). ⚠ Climbing fast.
+- Crawled-not-indexed: 142 (delta -8). Improving.
+- Submitted-and-indexed: 1,247 (delta -39). Net loss.
+```
+
+When no transitions detected but prior snapshot exists, render only the count deltas + recovery line:
+
+```
+Index Coverage regression: no negative transitions detected since previous run (2026-05-13). ✓
+
+Count deltas since previous run:
+- Submitted-and-indexed: 1,286 (delta +12). Improving.
+- Crawled-not-indexed: 130 (delta -8). Improving.
+
+Recoveries: 5 URLs returned to "Submitted and indexed" since previous run.
+```
+
+When this is the first run for the property (no prior snapshot), omit this sub-block entirely. Footer-only line from Step 1.6.13.2 covers the activation: `Index Coverage snapshots: first run for this property. Regression detection activates on next /seo-review run.`
 
 ### Top-impact GSC findings
 
@@ -271,7 +323,7 @@ Probe cap: 100 URLs (47 in this sitemap; no cap hit)
 
 Git history scan: 35d, 23 SEO-relevant commits across 14 files. Shallow: no.
 
-GSC API: Q1+Q2+Q3 succeeded; URL Inspection 95/100 (5 skipped — 4 unknown to Google, 1 transient 5xx).
+GSC API: Q1+Q2+Q3 succeeded; URL Inspection 194/200 (6 skipped — 5 unknown to Google, 1 transient 5xx).
 Page-type map: 84 URLs classified (54 article / 18 product / 12 other).
 URL impressions map: 312 URLs with traffic data.
 API call failures: 0.

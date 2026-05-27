@@ -5,7 +5,7 @@ Loaded by the orchestrator in **Step 1.6** of `SKILL.md`. This file is the sourc
 - API ingestion contract — digest shape consumed by subagents
 - Setup banner (one-time, sentinel-gated)
 - `.gitignore` auto-append rules
-- Finding-type catalog (13 sub-dims) populated from Search Console API output
+- Finding-type catalog (14 sub-dims) — sub-dims 1-13 populated from Search Console API output; sub-dim 14 (`deindex_regression`) is orchestrator-emitted in Step 1.6.13 from snapshot diff (not produced by the seo-gsc-insights subagent)
 
 For the **finding output shape**, ranking formulas, and `score_impact: 0` invariant, see `rubric.md` — that file is the contract; this file is the implementation reference. For endpoint inventory + auth setup, see `gsc-api-schema.md`. For SQL-equivalent call templates + URL Inspection selection + `coverageState` → 9-reason lookup table, see `gsc-api-queries.md`.
 
@@ -31,7 +31,7 @@ Otherwise → **heuristic-only mode**. The skill runs normally; subagents get an
 When GSC mode is enabled, ingest data from the Search Console API per `gsc-api-queries.md`:
 
 - **Performance**: 3 parallel `searchanalytics.query` calls (Q1 queries digest, Q2 pages digest, Q3 `url_impressions_map`)
-- **Indexing**: up to 100 parallel `urlInspection.index.inspect` calls (per-URL; URL selection algorithm picks high-leverage candidates)
+- **Indexing**: up to 200 parallel `urlInspection.index.inspect` calls (per-URL; 3-slice URL selection algorithm: top 80 by impressions + 20 git-changed + 100 sitemap-orphan URLs not in `url_impressions_map`)
 
 ### Query execution
 
@@ -269,7 +269,7 @@ The orchestrator prints a one-line notice on first append: `Added .seo-data/gsc/
 
 ---
 
-## Finding-type catalog (13 sub-dims)
+## Finding-type catalog (14 sub-dims)
 
 Each ingestion call (Search Analytics + URL Inspection) produces 0+ findings. All findings have `source: "gsc"`, `score_impact: 0` (enforced orchestrator-side in Step 6.0a).
 
@@ -311,19 +311,25 @@ No score-headline finding emitted (the site-wide rate isn't reliably computable 
 
 **Trigger:** ≥1 matched.
 
-**Cluster + routing-rename match** (the bulk-redirect detection):
+**Cluster + routing-rename match + locale-prefix cluster** (S34 burakarik6 dogfood: a 404 GSC email surfaced 663 affected URLs, sibling to the 838-URL sub-dim 5 redirect case — same i18n migration, two states):
 
 1. Parse all matched URLs, derive path patterns (e.g., `/blog/2023/post-1`, `/blog/2023/post-2` → cluster `/blog/2023/*`).
-2. Cross-reference with Step 1.5's git-changes digest: any commits in the 35-day window touching source paths that *generated* these URLs?
-3. If routing-rename match found: emit single bulk-cluster finding with the routing-rename signal in evidence.
+2. Cross-reference with Step 1.5's git-changes digest, **including rename old_paths** — when `renames: [(old_path, new_path, ...)]` is present in the digest, resolve BOTH `old_path` and `new_path` to URLs via `page_type_map`. The old_path resolution is what links a 404 URL to the rename commit that orphaned it. Without resolving old_paths, sub-dim 4 misses the routing-rename signal for URLs that exist as 404s precisely because the source file moved.
+3. **Locale-prefix cluster detection** (mirrors sub-dim 5 pattern): split each affected URL's path on `/`, take the first segment. When ≥2 distinct locale prefixes each account for ≥30% of the affected count (or one locale prefix accounts for ≥60% AND bare-prefix accounts for ≥20%), surface as `locale_prefix_clusters: {en: 287, tr: 198, bare: 178}` in evidence. Strong signal for the same i18n-migration root cause that drives sub-dim 5 in parallel.
+4. **Cross-link with sub-dim 5** when both fire on overlapping path patterns: compute path-prefix overlap between sub-dim 4's affected URLs and sub-dim 5's affected URLs. When ≥3 path prefixes appear in BOTH findings' clusters, attach `co_occurrence_with_sub_dim_5: {<prefix>: {404_count: N, redirect_count: M}, ...}` evidence. Points to a single root cause (incomplete migration: some old URLs got proper redirects, others got dropped without).
+5. If routing-rename match found: emit single bulk-cluster finding with the routing-rename signal in evidence.
 
 - `severity`: `high` (broken URLs at Google's view dilute crawl budget)
 - `certainty`: `1.0`
-- `effort_estimate`: `small` (bulk 301 redirect or sitemap cleanup)
+- `effort_estimate`: `small` (bulk 301 redirect or sitemap cleanup) or `medium` (when locale-prefix-cluster + sub-dim 5 co-occurrence detected — incomplete migration requires reasoning about which old URLs deserve redirects vs. removal)
 - `affected_urls`: top 10
-- `title`: `"<N> of <total_inspected> inspected URLs return 404 at Google's view"`
-- `evidence`: includes `"Routing rename in window: <commit-msg> on YYYY-MM-DD touching <paths>"` when detected
-- `recommended_action`: when routing-rename detected: `"Bulk 301 redirects mapping <old-pattern> → <new-pattern> in <framework-config-file>. Plus remove 404 entries from sitemap.xml. Confirm the mapping is 1:1 before bulk-applying."` Otherwise: `"Either restore the affected pages or remove these entries from sitemap.xml."`
+- `title`: `"<N> of <total_inspected> inspected URLs return 404 at Google's view"`. Append `" — likely i18n migration regression"` when locale-prefix clustering detected AND co_occurrence_with_sub_dim_5 has ≥3 shared prefixes.
+- `evidence`: includes `"Routing rename in window: <commit-msg> on YYYY-MM-DD touching <paths>"` when detected. Also `locale_prefix_clusters` and `co_occurrence_with_sub_dim_5` per detection rules above.
+- `recommended_action`:
+  - **When routing-rename detected:** `"Bulk 301 redirects mapping <old-pattern> → <new-pattern> in <framework-config-file>. Plus remove 404 entries from sitemap.xml. Confirm the mapping is 1:1 before bulk-applying."`
+  - **When sub-dim 5 co-occurrence detected (likely incomplete i18n migration):** `"This finding pairs with sub-dim 5 (redirect_hygiene) — same path patterns appear in both. Likely incomplete i18n migration where some old URLs got proper redirects (sub-dim 5) and others got dropped without (sub-dim 4 — this finding). If you've received a GSC 'Not found (404)' or 'Validation failed' email recently, this is the corresponding signal. Fix path: (1) audit the affected 404 URLs against the redirect rules in sub-dim 5's recommendation — add the missing 301 redirects (old-pattern → new canonical locale-prefixed URL); (2) verify no URL is BOTH redirected AND 404'd (would indicate a routing config conflict); (3) request validation in GSC after pushing the redirect rules. Affected URLs sample: <list>. Locale clusters: <locale_prefix_clusters>. Shared prefixes with redirect finding: <co_occurrence_with_sub_dim_5>."`
+  - **When user supplied a known-bad-urls.txt file (Step 1.6 4th URL Inspection source):** Append to either branch: `"User-supplied URLs from .seo-data/gsc/known-bad-urls.txt contributed N of the affected URLs — confirming the user-pasted GSC export was inspected this run."`
+  - **Default (no rename, no co-occurrence):** `"Either restore the affected pages or remove these entries from sitemap.xml. If these URLs are old content that's been deprecated, add 301 redirects to the appropriate new locations (canonical URL or category index page) — Google will continue crawling them for months otherwise, wasting crawl budget."`
 
 ### 5. `redirect_hygiene` (URL Inspection: `coverageState == "Page with redirect"`)
 
@@ -331,11 +337,14 @@ No score-headline finding emitted (the site-wide rate isn't reliably computable 
 
 **Cluster:**
 
-- `severity`: `medium`
+- `severity`: `medium` if count < 50; **`high`** if count ≥ 50 (matches sub-dim 2/3 tiering pattern). **Calibration evidence:** burakarik6 dogfood (2026-05-26) surfaced 838 affected URLs in this sub-dim, with Google sending a "New reason preventing your pages from being indexed: Page with redirect" email + a validation-failed notice. The original fixed-`medium` severity under-called that scale. When the user gets Google emails on this reason, count is almost always ≥50.
 - `certainty`: `1.0`
-- `effort_estimate`: `small`
-- `title`: `"<N> sitemap URLs point to redirect destinations (sitemap hygiene)"`
-- `recommended_action`: `"Replace these sitemap entries with their final destinations. Redirect-chain URLs in sitemap waste crawl budget. Sample: <list>."`
+- `effort_estimate`: `small` (pure sitemap regeneration) or `medium` (when canonical/hreflang config also needs fixing — see locale-prefix-cluster detection below)
+- `title`: `"<N> sitemap URLs point to redirect destinations (sitemap hygiene)"`. Append `" — likely i18n canonical mismatch"` when locale-prefix clustering detected.
+- `evidence`: in addition to standard per-URL diagnostics, when affected URLs cluster by locale prefix include `locale_prefix_clusters` map. Detect by splitting each affected URL's path on `/`, taking the first segment if it matches a 2-3-char locale code (`en`, `tr`, `fr`, `de`, `es`, `it`, `pt`, `ja`, `zh`, `ko`, `ar`, etc.) or empty (bare path). When **≥2 distinct locale prefixes each account for ≥30% of the affected count**, surface as `locale_prefix_clusters: {en: 312, tr: 287, bare: 239}` — strong signal for i18n canonical/redirect collision (same content reachable at multiple URL patterns; sitemap declares non-canonical variants).
+- `recommended_action`:
+  - **Default (no locale clustering):** `"Replace these sitemap entries with their final destinations. Redirect-chain URLs in sitemap waste crawl budget. Sample: <list>."`
+  - **When locale-prefix clustering detected:** `"Affected URLs cluster by locale prefix — this is a classic i18n canonical/redirect collision. Same content is reachable at multiple URL patterns (e.g., /photo/foo, /en/photo/foo, /tr/photo/foo) and the server redirects between them, but sitemap.xml declares the non-canonical variants. If you recently received a GSC 'New reason preventing your pages from being indexed: Page with redirect' or 'Validation failed' email, this is the corresponding signal. Fix path: (1) pick ONE canonical URL pattern (usually locale-prefixed: /en/* + /tr/*, not bare /*); (2) drop non-canonical variants from sitemap.xml; (3) verify <link rel='canonical'> matches sitemap-declared URLs on every page; (4) verify <link rel='alternate' hreflang='...'> tags align with the canonical pattern; (5) resubmit sitemap.xml + request validation in GSC. Affected URLs sample: <list>. Locale-cluster breakdown: <locale_prefix_clusters>."`
 
 ### 6. `canonical_conflict` (URL Inspection: `coverageState` matches "Duplicate, Google chose different canonical" / "Duplicate without user-selected canonical")
 
@@ -462,6 +471,71 @@ Pass the brand name + 1-2 aliases (e.g., `"Burak Arık"` + `"burakarik"` + `"bur
 
 **No false-positive risk** when the brand name resolution is wrong. If the orchestrator picks the wrong brand name (e.g., resolves to "Photography" because it's the first proper noun in CLAUDE.md), Q1 queries matching "photography" would be common search-intent queries, NOT brand queries — they wouldn't trigger the anomaly threshold (CTR would be normal-low across the position band). Defensive design: the trigger only fires when both name-match AND ranking-anomaly conditions hold.
 
+### 14. `deindex_regression` (snapshot diff — orchestrator-emitted)
+
+**Codified after burakarik6 dogfood (Session 34, 2026-05-26):** the trigger that surfaces "URLs deindexed since last run" — the early-warning loop catching Google's "New reason preventing your pages from being indexed" / "Validation failed" emails BEFORE they hit the user's inbox. Distinct from sub-dims 2-9 which surface the *current* state per inspected URL; sub-dim 14 surfaces *state transitions* across runs.
+
+**Source:** orchestrator-emitted in SKILL.md Step 1.6.13 (NOT the seo-gsc-insights subagent — the snapshot diff lives in the orchestrator since it spans runs, and the finding is emitted directly into the findings pool). The subagent's catalog stays at sub-dims 1-13; the catalog total of 14 reflects sub-dim 14 as the orchestrator-emitted addition.
+
+**Mechanism:** every run writes a snapshot of `{url → coverageState}` for all inspected URLs to `.seo-data/gsc/snapshots/<YYYY-MM-DDTHHMMSS>-<commit_sha7>.json` (Step 1.6.13.1). On the next run, the orchestrator finds the most-recent prior snapshot (Step 1.6.13.2), diffs it against the current run's inspections (Step 1.6.13.3 via `gsc-parse-helper.py regression`), and emits sub-dim 14 findings for URLs whose coverageState flipped from indexed to non-indexed.
+
+**Trigger transitions** (each emits as evidence in the sub-dim 14 finding):
+
+| Previous state | Current state | Transition class | Default severity |
+|---|---|---|---|
+| `Submitted and indexed` | `Crawled - currently not indexed` | quality regression | high |
+| `Submitted and indexed` | `Discovered - currently not indexed` | crawl-budget regression | high |
+| `Submitted and indexed` | `Page with redirect` | canonical/i18n regression (burakarik6 pattern) | high |
+| `Submitted and indexed` | `Soft 404` | rendering regression | high |
+| `Submitted and indexed` | `Not found (404)` | broken-URL regression | high |
+| `Submitted and indexed` | `Server error (5xx)` | availability regression | **critical (always)** |
+| `Submitted and indexed` | `Duplicate, Google chose different canonical` | canonical regression | high |
+| `Submitted and indexed` | `Blocked due to access forbidden (403)` | access regression (often intentional) | medium |
+| (any non-indexed) | `Submitted and indexed` | RECOVERY | — (info footer line, NOT a finding) |
+| (identical) | (identical) | no change | — |
+
+**No-prior-snapshot case:** first run for this property has no previous snapshot. Emit no findings; footer line: `Index Coverage snapshots: first run for this property. Regression detection activates on next /seo-review run.`
+
+**Finding shape** (when ≥1 negative transition detected — one finding per run, all transitions clustered):
+
+- `severity`: starts from the highest-severity transition class. **Escalate to `critical`** if (a) any `Server error (5xx)` transition present, OR (b) transition count ≥ 20 URLs, OR (c) transition count ≥ 10% of inspected URLs.
+- `certainty`: `0.95` (Google's own state — hard signal)
+- `effort_estimate`: `medium` by default; `large` when path_clusters span ≥3 distinct prefix groups (suggests broader routing change requiring multi-area audit)
+- `affected_urls`: top 10 by transition class priority (server errors first, then quality regressions, then redirect/canonical)
+- `title`: `"⚠ <N> URLs deindexed since <previous-run-date> (<previous_commit_sha7>) — possible Google validation failure or quality-signal regression"`
+- `evidence`:
+  - `previous_snapshot`: `{date: "YYYY-MM-DD", commit_sha: "abc1234", url_count: N}`
+  - `current_snapshot`: `{date: "YYYY-MM-DD", commit_sha: "def5678", url_count: M}`
+  - `transitions`: array of `{url, previous_state, current_state, transition_class}` records (cap 20 inline; full set lives in the snapshot files)
+  - `path_clusters`: when ≥3 transitions share a path prefix (split on `/` after domain; group by 1-3 leading segments), surface as `{prefix: count}` map — high-signal for routing-change root cause (S30 lesson: when transitions cluster, the cause is usually one commit)
+  - `git_correlation`: when `path_clusters` prefixes match touched paths in Step 1.5's 35-day git digest, append the matching commits (max 3) with short subjects + dates. Bridges the regression to the likely-causal code change.
+  - `recovery_count`: count of URLs that improved (any non-indexed → `Submitted and indexed`) since previous run — surfaces in the footer info line, not in the finding's main evidence
+- `cross_link_findings`: array of related finding IDs from this run — populate with sub-dim 5 (`redirect_hygiene`) when `Page with redirect` transitions present, sub-dim 4 (`not_found_404`) when `Not found (404)` transitions present, sub-dim 9 (`server_errors`) when `Server error (5xx)` transitions present
+- `recommended_action`: tiered by transition class (orchestrator picks the most severe applicable tier; multiple tiers can chain):
+  - **Always include the framing line:** `"If you've seen a Google Search Console 'New reason preventing your pages from being indexed' or 'Validation failed' email recently, this is the corresponding signal. The snapshot diff shows what flipped state since <previous-run-date>."`
+  - **Server error transitions (critical):** `"<N> URLs that were indexed are now returning 5xx — immediate investigation needed. Check server uptime + deploy logs around <previous-run-date>. Cross-reference: sub-dim 9 server_errors finding this run."`
+  - **Page with redirect transitions:** `"Likely canonical/i18n config change. Cross-reference with sub-dim 5 (redirect_hygiene) finding in this run for locale-prefix-cluster diagnosis. Fix path: (1) identify routing/canonical change in git history around <previous-run-date> (cross-link: git_correlation evidence); (2) update sitemap.xml entries to canonical URLs; (3) verify <link rel='canonical'> and hreflang tags."`
+  - **404 transitions:** `"<N> URLs that were indexed are now 404. Bulk redirect or restore. Cross-link: git_correlation evidence often points to the rename commit."`
+  - **Quality regressions (crawled/discovered not indexed):** `"Recent content changes may have triggered Google's content-quality reassessment. Audit the affected URLs against top-ranking competitors — common causes: thin content additions, removed citations, removed author bylines, truncated articles."`
+  - **Canonical regressions (Google chose different canonical):** `"Declared canonical no longer matches Google's pick. Verify <link rel='canonical'> attribute on affected pages — common causes: duplicate content variants, hreflang misconfig, params/trailing-slash variations."`
+
+**Path-cluster detection algorithm:** group transitions by path prefix. Split each URL on `/` after domain, take prefixes of length 1, 2, and 3 segments. For each prefix length, count how many transitions share that prefix. Surface the **largest 3 clusters where count ≥ 3** as `path_clusters`. Cross-reference with Step 1.5's git digest: for each cluster prefix, check if any commit in the 35-day window touched source paths that map to URLs matching the prefix (via `page_type_map` reverse-lookup). When matched, append the commits to `git_correlation` (max 3 commits, short subjects + dates).
+
+**Inflection-point footer line** (independent of sub-dim 14 finding emission, surfaces even when no transitions detected):
+
+When prior snapshot exists, compute `coverageState` count deltas for the top-3 reason categories (e.g., crawled_not_indexed, redirect_hygiene, not_found_404). For each category, render a footer line:
+
+```
+Page-with-redirect count: 838 (delta +47 since previous run on 2026-05-13 [commit 5a441d1]). ⚠ Climbing fast — consider running /seo-review with --plan to triage.
+Crawled-not-indexed count: 142 (delta -8 since previous run). Improving.
+```
+
+Threshold for ⚠ warning: absolute delta ≥ 20 URLs OR relative delta ≥ 10% of prior count. Otherwise render without warning.
+
+When previous run was on the same commit (rare — usually means user ran `/seo-review` twice without code change), suppress the delta line entirely and surface a footer note: `Snapshot delta suppressed: previous run on same commit (<sha>).`
+
+**Why this sub-dim matters more than the per-URL sub-dims 2-9.** Sub-dims 2-9 surface the *current* state; sub-dim 14 surfaces *what just changed*. The change is the actionable signal — pages stable in `Submitted and indexed` for months suddenly flipping is what triggers Google's validation-failure emails. Without sub-dim 14, the user only learns about the regression from Google's email; with it, `/seo-review` catches the regression at the next run after the breaking commit (typically 24-72 hours before Google emails).
+
 ---
 
 ## Output to shared context
@@ -478,5 +552,6 @@ The `seo-gsc-insights` subagent is the primary consumer. The other 3 subagents u
 - **Never modify .gitignore outside the sentinel block.** Idempotency check via start-marker Grep.
 - **No silent fallback** to a different ingestion path when API fails — print the error loudly, skip the affected signal.
 - **Digest cap is 50 rows per signal** — Q1 and Q2 enforce server-side via API rowLimit + client-side top-50 sort.
-- **URL Inspection budget is 100/run hard cap** — well under the 2,000/day per-property quota.
-- **Score impact stays heuristic.** GSC findings carry `score_impact: 0` (see `rubric.md` for the orchestrator-side enforcement).
+- **URL Inspection budget is 200/run hard cap** — well under the 2,000/day per-property quota. Budget split: 80 impressions-top + 20 git-changed + 100 sitemap-orphan (see `gsc-api-queries.md` "URL Inspection — selection algorithm").
+- **Snapshot retention 30 days.** `.seo-data/gsc/snapshots/<YYYY-MM-DDTHHMMSS>-<commit_sha7>.json` files are pruned by `find -mtime +30` at Step 1.6.1's Turn 1 batch (mirrors the cache prune pattern). Snapshots are skill-auto-managed; users shouldn't touch them. Reproducible from URL Inspection cache if deleted.
+- **Score impact stays heuristic.** GSC findings carry `score_impact: 0` (see `rubric.md` for the orchestrator-side enforcement). Sub-dim 14 (`deindex_regression`) is no exception — the headline /100 score stays comparable across runs.

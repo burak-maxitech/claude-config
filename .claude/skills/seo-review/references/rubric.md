@@ -116,7 +116,7 @@ This is **the single point of enforcement**. Subagent files don't need to track 
 
 ### gsc_insights dimension + sub-dim enum
 
-GSC findings use their own `dimension: "gsc_insights"` with 13 sub-dimensions for structural organization. No score allocation — these are routing labels, not score buckets:
+GSC findings use their own `dimension: "gsc_insights"` with **14 sub-dimensions** for structural organization. No score allocation — these are routing labels, not score buckets:
 
 | Sub-dim | Source | Notes |
 |---|---|---|
@@ -124,7 +124,7 @@ GSC findings use their own `dimension: "gsc_insights"` with 13 sub-dimensions fo
 | `crawled_not_indexed` | URL Inspection — `coverageState` matches | Content quality / E-E-A-T cluster |
 | `discovered_not_indexed` | URL Inspection — `coverageState` matches | Crawl-budget / internal-linking cluster |
 | `not_found_404` | URL Inspection — `coverageState` matches | Sitemap-vs-actual 404 cluster (dedupes with sitemap probe — see below) |
-| `redirect_hygiene` | URL Inspection — `coverageState` matches | Sitemap entries pointing to redirected URLs |
+| `redirect_hygiene` | URL Inspection — `coverageState` matches | Sitemap entries pointing to redirected URLs. **Severity tiered medium/<50/high** (S34 burakarik6 dogfood — 838 affected URLs called for `high` severity that the original fixed-`medium` under-rated). Locale-prefix-cluster detection in recommendation. |
 | `canonical_conflict` | URL Inspection — `coverageState` matches (with `googleCanonical` + `userCanonical` evidence) | Declared canonical disagrees with Google's chosen canonical |
 | `blocked_access` | URL Inspection — `coverageState` matches | Usually intentional; low-severity info |
 | `soft_404` | URL Inspection — `coverageState` matches | 200-but-empty pages |
@@ -133,6 +133,7 @@ GSC findings use their own `dimension: "gsc_insights"` with 13 sub-dimensions fo
 | `position_band_opportunity` | Q1 queries digest | Position 5-20 queries with ≥100 impressions |
 | `traffic_orphan` | Q3 `url_impressions_map` + sitemap | Sitemap URLs with 0 impressions in the data window |
 | `brand_query_anomaly` | Q1 queries digest ∩ Schema/CLAUDE.md brand-name | Brand queries (Person.name / Organization.name / CLAUDE.md first proper noun) ranking >pos 3 OR CTR <10% → entity-recognition deficit. Cross-links to Schema `Person.@id` split + `Person.sameAs` Wikidata findings. **S31 dogfood codification of emergent capability.** |
+| `deindex_regression` | Snapshot diff (`.seo-data/gsc/snapshots/*.json`) — **orchestrator-emitted in SKILL.md Step 1.6.13** | URLs that flipped from `Submitted and indexed` → any non-indexed state since the previous run. The early-warning loop catching Google's "New reason preventing your pages from being indexed" / "Validation failed" emails before they hit the user's inbox. **S34 burakarik6 dogfood codification** — 838-URL `Page with redirect` regression was invisible to the impressions-only sampling pre-S34. Severity escalates to `critical` on Server error (5xx) transitions OR ≥20 URLs OR ≥10% of inspected URLs. Carries `path_clusters` + `git_correlation` evidence to bridge the regression to its likely-causal commit. NOT produced by the seo-gsc-insights subagent — emitted directly by the orchestrator after snapshot diff. |
 
 ### Per-finding output shape — GSC additions
 

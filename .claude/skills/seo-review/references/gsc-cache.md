@@ -8,7 +8,7 @@ For curl invocation templates (request bodies, headers, post-processing), see `g
 
 ## Why cache
 
-URL Inspection has a strict **2,000-calls/day per-property quota**. A single `/seo-review` run uses up to 100. Iterating on a fix and rerunning the audit 3-5 times in a session can chew through quota that the next run will need. Search Analytics has a more generous 1,200 QPM but still benefits from cache-hit speed (faster total wall time on rerun).
+URL Inspection has a strict **2,000-calls/day per-property quota**. A single `/seo-review` run uses up to 200 (3-slice budget: 80 impressions-top + 20 git-changed + 100 sitemap-orphan). Iterating on a fix and rerunning the audit 3-5 times in a session can chew through quota that the next run will need. Search Analytics has a more generous 1,200 QPM but still benefits from cache-hit speed (faster total wall time on rerun).
 
 GSC's own data freshness ceiling is **~2 days** (Search Analytics has a 2-day finalization lag; URL Inspection reflects Google's most recent crawl, which also moves slowly). Reruns within that window can't yield fresher data from upstream — caching for ~24h trades zero data freshness for guaranteed quota savings.
 
@@ -45,6 +45,19 @@ Already covered by the `.gitignore` sentinel block (`.seo-data/gsc/` is fully ig
 
 **Disk-write boundary entry.** The Ingestion conventions section in `SKILL.md` reserves `.seo-data/gsc/` for user config + skill-auto-generated content. The `cache/` subdirectory is one of the allowed entries under that rule (skill-auto-managed; orchestrator owns its lifecycle). Raw curl responses written elsewhere in `.seo-data/gsc/` still violate the boundary — use system temp (`mktemp`) for ephemeral parsing buffers.
 
+**Distinction from `snapshots/`.** `.seo-data/gsc/snapshots/` is a SIBLING directory with a different purpose and retention policy — do not confuse the two:
+
+| | `cache/` | `snapshots/` |
+|---|---|---|
+| Purpose | Same-day quota savings (avoid refetching API responses) | Longitudinal coverage-state history (regression detection) |
+| Retention | 7 days (auto-prune) | 30 days (auto-prune) |
+| TTL on read | 24h (cache hit/miss decision) | None (every snapshot is read on demand for diff) |
+| Files | `sa-q{1,2,3}-<hash>.json` + `ui-<hash>.json` (raw API responses) | `<YYYY-MM-DDTHHMMSS>-<commit_sha7>.json` (orchestrator-aggregated `{url: coverageState}` map + metadata) |
+| Managed by | This file's cache wrapper | `references/gsc-ingestion.md` sub-dim 14 + `SKILL.md` Step 1.6.13 |
+| Reproducible | Yes (from API on demand) | Yes (from cache files on the same run) |
+
+Both subdirectories live under `.seo-data/gsc/` and are covered by the same `.gitignore` sentinel block. The orchestrator pre-creates both in Turn 1's batch.
+
 ---
 
 ## Cache key strategy
@@ -74,7 +87,7 @@ filename  = "ui-<hash>.json"
 ```
 
 - `site_url` + `inspection_url` are the only inputs to the API call. `languageCode` is fixed at `en` per the template.
-- Per-URL caching means partial cache hits across a 100-URL batch are common (e.g., 80 URLs cached from yesterday's run + 20 new URLs from today's git-changed paths → 80 cache hits, 20 fresh calls).
+- Per-URL caching means partial cache hits across a 200-URL batch are common (e.g., 180 URLs cached from yesterday's run + 20 new URLs from today's git-changed paths or newly-listed sitemap entries → 180 cache hits, 20 fresh calls).
 
 ---
 
@@ -184,7 +197,7 @@ The cache stats line sits between the "URL Inspection: N/M attempted" line and t
 
 ## Concurrency
 
-The orchestrator fires Turn 2a (3 Search Analytics calls) and Turn 2b (up to 100 URL Inspection calls) as parallel batches. Each call's wrapper writes to its own `$CACHE_FILE.tmp.$$` and renames atomically — there's no shared-file contention. PID-suffixed tempfiles handle the (unlikely) case where two parallel invocations produce identical hashes.
+The orchestrator fires Turn 2a (3 Search Analytics calls) and Turn 2b (up to 200 URL Inspection calls) as parallel batches. Each call's wrapper writes to its own `$CACHE_FILE.tmp.$$` and renames atomically — there's no shared-file contention. PID-suffixed tempfiles handle the (unlikely) case where two parallel invocations produce identical hashes.
 
 ---
 
