@@ -1,7 +1,7 @@
 ---
 name: bx-review
 description: "Senior-engineer code review (thorough tier). Auto-detects target (uncommitted, staged, PR, files), scans codebase conventions, and produces severity-ranked findings with mandatory file:line references. Supports `--security` (OWASP deep dive), `--verify` (run tests/lint to validate), and `--fix` (auto-fix simple issues)."
-when_to_use: "When user wants more rigor than the lightweight built-in `/code-review` but doesn't need `/ultrareview`'s cloud fleet. Slots between the built-in `/code-review` (fast diff scan, daily default) and `/ultrareview` (cloud, 5+ verifying subagents, high-risk pre-merge). Trigger phrases: 'review this carefully', 'security review', 'thorough review', 'check this PR for bugs', or passing `--security`/`--verify`/`--fix` flags."
+when_to_use: "When user wants more rigor than the lightweight built-in `/code-review` but doesn't need `/code-review ultra`'s cloud fleet. Slots between the built-in `/code-review` (fast diff scan, daily default) and `/code-review ultra` (cloud, 5+ verifying subagents, high-risk pre-merge). Trigger phrases: 'review this carefully', 'security review', 'thorough review', 'check this PR for bugs', or passing `--security`/`--verify`/`--fix` flags."
 disable-model-invocation: true
 effort: high
 allowed-tools: Read, Edit, Grep, Glob, Bash(git:*), Bash(gh:*), Bash(npm:*), Bash(npx:*), Bash(cargo:*), Bash(python:*), Bash(pip:*)

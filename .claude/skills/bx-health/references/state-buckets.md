@@ -15,21 +15,22 @@ Each bucket maps an observable repo state to a recommended skill flow. The orche
 
 **Recommended flow:**
 ```
-/code-review → /bx-review → /bx-review --verify → commit → /bx-docs
+/simplify → /code-review → /bx-review → /bx-review --verify → commit → /bx-docs
 ```
 
 Why this order:
-- `/code-review` (built-in, lightweight) first because it works on *what you just wrote* — best signal closest to the change. Fix obvious quality issues before a structured review sees them.
+- `/simplify` (built-in, quality-only) first — auto-applies cheap clarity/altitude/dedup fixes to *what you just wrote*, so the bug-focused passes downstream read cleaner code. It does NOT hunt for bugs.
+- `/code-review` (built-in, lightweight) next — scans the diff for correctness bugs at a chosen effort level. Best signal closest to the change.
 - `/bx-review` next for diff-scoped correctness/security — same diff scope but more rigorous (custom skill with codebase-convention scan + git-blame context).
 - `/bx-review --verify` runs your test/lint suite (parallel-backgrounded since S19) — catches regressions before commit.
 - Commit, then `/bx-docs` at session end so the work is captured in `CLAUDE.md`.
 
 **Alternative:** *If the change touches auth, payments, data migrations, or anything that pages someone at 3 AM:*
 ```
-/code-review → /bx-review --security → /bx-review --verify → commit → push → /ultrareview <PR#> → merge → /bx-docs
+/code-review → /bx-review --security → /bx-review --verify → commit → push → /code-review ultra <PR#> → merge → /bx-docs
 ```
 
-`/ultrareview` adds 5–20 cloud subagents (10–20 min) and is overkill for routine work but the right call for high-risk code.
+`/code-review ultra` adds 5–20 cloud subagents (10–20 min) and is overkill for routine work but the right call for high-risk code.
 
 ---
 
@@ -44,19 +45,19 @@ Why this order:
 
 **Recommended flow:**
 ```
-/bx-review --security → /ultrareview <PR#>
+/bx-review --security → /code-review ultra <PR#>
 ```
 
 Why:
 - `/bx-review --security` is fast in-session and surfaces OWASP-flavored issues across the diff.
-- `/ultrareview` is the deeper cloud-based pass. Worth it for any non-trivial PR that's about to merge.
+- `/code-review ultra` is the deeper cloud-based pass. Worth it for any non-trivial PR that's about to merge.
 
 **Alternative:** *If the PR is small / low-risk (docs, config, copy changes, refactors with no behavior change):*
 ```
 /code-review (no flags)
 ```
 
-Skip `/ultrareview` for trivial PRs — the cloud cost and 10–20 min wait isn't justified.
+Skip `/code-review ultra` for trivial PRs — the cloud cost and 10–20 min wait isn't justified.
 
 ---
 

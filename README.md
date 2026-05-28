@@ -199,7 +199,7 @@ git pull
 |---------|---------|--------|
 | `/bx-resume` | Start session - get up to speed | Skill |
 | `/bx-plan` | Interview before building features | Skill |
-| `/bx-review` | Thorough senior-engineer code review (in-session, with `--security`/`--verify`/`--fix`/`--last-commit`). Slots between built-in `/code-review` (quick) and `/ultrareview` (cloud, pre-merge). | Skill |
+| `/bx-review` | Thorough senior-engineer code review (in-session, with `--security`/`--verify`/`--fix`/`--last-commit`). Slots between built-in `/code-review` (quick) and `/code-review ultra` (cloud, pre-merge). | Skill |
 | `/bx-clean` | Find dead code & cruft (parallel subagents). Adds CVE scanning with `--vulns` (runs `npm audit` / `pip-audit` / `cargo audit` / equivalents per detected stack; report-only, never auto-fixed). | Skill |
 | `/bx-arch` | Repo-wide architecture audit — complexity hotspots, refactor opportunities, perf suspects, **and over-engineering** (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable` as a top-line metric. 4 parallel subagents, with `--plan`/`--fix`/`--map`/`--full-scan` | Skill |
 | `/bx-tests` | Repo-wide test suite audit — missing coverage on critical paths AND wasteful/redundant tests, in a single report. **Twin headline metric** (`Coverage gaps in critical code: X lines | Tests we can delete: Y lines`). 3 parallel subagents (`test-coverage` / `test-quality` / `test-economics`), T01-T05 smell catalog, with `--plan`/`--fix` (T01-only safe deletion)/`--coverage` (opt-in report reading)/`--full-scan`. Defers entirely to `/bx-clean` for orphans / stale snapshots / >3mo skips. | Skill |
@@ -209,19 +209,21 @@ git pull
 
 **Skills** are directories in `.claude/skills/` that bundle reference files, use YAML frontmatter for tool permissions, and can dispatch subagents.
 
-> **Three review tiers — pick the right one for the risk.** As of the 2026-05-23 Claude Code update, `/simplify` was renamed to `/code-review` (built-in, lightweight diff scan). The custom code-review skill in this repo was renamed to `/bx-review` to avoid the collision and to reflect its position as the thorough middle tier. The three tiers:
+> **The review ladder — pick the rung that matches the risk.** Naming churned twice: on 2026-05-23 Anthropic renamed built-in `/simplify` → `/code-review` (so this repo's custom `code-review` was renamed to `/bx-review` to dodge the collision); since then Anthropic **reinstated `/simplify`** as a separate built-in and folded the old `/ultrareview` cloud pass into `/code-review ultra`. Current ladder, lightest → heaviest:
 >
-> 1. **`/code-review`** (built-in, fast) — quick diff scan for correctness bugs at a chosen effort level (low/medium/high/max). Supports `--comment` to post findings as inline PR comments. **Daily driver.**
-> 2. **`/bx-review`** (this repo's custom skill, thorough) — senior-engineer review with codebase-convention scanning, severity-ranked findings, mandatory `file:line` references. Supports `--security` (OWASP Top 10), `--verify` (run tests/lint to validate), `--fix` (auto-fix simple findings), `--last-commit`. **Reach for when the diff is non-trivial or touches risky areas.**
-> 3. **`/ultrareview`** (built-in, cloud) — 5+ verifying subagents in the cloud (10–20 min, scales to 20). **High-risk pre-merge only** (auth rewrites, payment flows, database migrations).
+> 1. **`/simplify`** (built-in) — quality-only pass on changed code (reuse, simplification, altitude); **applies fixes**. Does *not* hunt for bugs. Cheapest cleanup of what you just wrote.
+> 2. **`/code-review [effort]`** (built-in, fast) — correctness bugs **+** cleanups at a chosen effort (`low`/`medium`/`high`/`max`). `--comment` posts inline PR comments; `--fix` applies findings. **Daily driver.**
+> 3. **`/bx-review`** (this repo's custom skill, thorough) — senior-engineer review with codebase-convention scanning, severity-ranked findings, mandatory `file:line` references. Supports `--security` (OWASP Top 10), `--verify` (run tests/lint to validate), `--fix` (auto-fix simple findings), `--last-commit`. **Reach for when the diff is non-trivial or touches risky areas.**
+> 4. **`/code-review ultra`** (built-in, cloud) — the `ultra` effort spins up 5+ verifying subagents in the cloud (10–20 min, scales to 20). **High-risk pre-merge only** (auth rewrites, payment flows, database migrations). *(Was `/ultrareview`, now a deprecated alias.)*
 
 > **Picking among the review/audit skills.** All operate on different scopes:
 >
 > | Skill | Scope | When |
 > |-------|-------|------|
+> | `/simplify` | changed code | quality-only cleanup, applies fixes — no bug-hunting (built-in) |
 > | `/code-review` | diff or commit | quick correctness scan, daily driver (built-in) |
 > | `/bx-review` | diff or commit | thorough senior-engineer review with `--security`/`--verify`/`--fix` (custom) |
-> | `/ultrareview` | PR (cloud) | high-risk pre-merge verification (auth, payments, migrations) |
+> | `/code-review ultra` | PR (cloud) | high-risk pre-merge verification (auth, payments, migrations) |
 > | `/bx-clean` | whole repo | deletion-focused — whole unused files, unused deps, stale config |
 > | `/bx-arch` | whole repo | structural audit — complexity hotspots, refactor opportunities, perf suspects, AND sub-file over-engineering (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable`. |
 > | `/bx-tests` | whole repo, test suite focus | test suite audit — coverage gaps on critical paths + test smells (T01-T05) + suite economics (snapshot bloat, flakiness, LOC ratio extremes). Reports twin headline (coverage gap LOC + deletable LOC). |

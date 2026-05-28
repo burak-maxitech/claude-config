@@ -1,7 +1,7 @@
 ---
 name: bx-arch
 description: Repo-wide architecture audit. Surfaces structural debt, complexity hotspots, refactor opportunities, performance suspects, AND over-engineering/almost-dead code (single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config). Reports `lines_deletable` as a top-line metric.
-when_to_use: When user mentions architecture review, refactoring opportunities, technical debt at the repo level, "is this codebase over-engineered", "make the codebase smaller", or "where's the complexity in this codebase". Different from `/code-review` (diff-scoped, daily driver), `/bx-review` (thorough senior-engineer review), `/ultrareview` (PR-scoped cloud review), and `/bx-clean` (file-level deletion only).
+when_to_use: When user mentions architecture review, refactoring opportunities, technical debt at the repo level, "is this codebase over-engineered", "make the codebase smaller", or "where's the complexity in this codebase". Different from `/code-review` (diff-scoped, daily driver), `/bx-review` (thorough senior-engineer review), `/code-review ultra` (PR-scoped cloud review), and `/bx-clean` (file-level deletion only).
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(pip:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(cat:*), Bash(head:*), Task
 effort: high
@@ -16,7 +16,7 @@ This skill is distinct from the diff-scoped reviewers in this repo:
 
 - **`/code-review`** — diff/commit scope, lightweight single-pass quality review (built-in, daily driver)
 - **`/bx-review`** — diff/commit scope, thorough senior-engineer review with `--security`/`--verify`/`--fix`
-- **`/ultrareview`** — PR-scoped cloud review with verifying subagents (high-risk pre-merge)
+- **`/code-review ultra`** — PR-scoped cloud review with verifying subagents (high-risk pre-merge)
 - **`/bx-clean`** — repo-wide deletion focus at *file/dependency* granularity (whole unused files, unused deps, stale config)
 - **`/bx-arch` (this)** — repo-wide *structural, complexity, and over-engineering* focus, with deletion at *symbol/abstraction* granularity
 
@@ -236,5 +236,5 @@ If running default mode, end with one line:
 | Per-commit / diff quality review (quick) | `/code-review` |
 | Per-commit / diff quality review (thorough) | `/bx-review` |
 | Dead code, unused deps | `/bx-clean` |
-| Pre-merge multi-agent verification | `/ultrareview` |
+| Pre-merge multi-agent verification | `/code-review ultra` |
 | **Repo-wide architecture + complexity audit** | **`/bx-arch` (this)** |

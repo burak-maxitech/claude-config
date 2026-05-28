@@ -10,7 +10,7 @@ allowed-tools: Read, Glob, Bash(git:*), Bash(ls:*), Bash(gh:*), Bash(wc:*)
 
 You are a routing advisor. Your only output is a short report that tells the user **which skills to run in what order**, given the current state of their repo. **You do not invoke any skills, edit any files, or take any actions** beyond the read-only inspection below.
 
-The available skills you route between are: `/bx-resume`, `/code-review`, `/bx-review`, `/ultrareview`, `/bx-clean`, `/bx-arch`, `/bx-tests`, `/bx-seo`, `/bx-plan`, `/bx-docs`.
+The available skills you route between are: `/bx-resume`, `/simplify`, `/code-review`, `/bx-review`, `/code-review ultra`, `/bx-clean`, `/bx-arch`, `/bx-tests`, `/bx-seo`, `/bx-plan`, `/bx-docs`. (`/simplify`, `/code-review`, and `/code-review ultra` are Anthropic built-ins; the `/bx-*` skills are this repo's. `/code-review ultra` is the cloud pass formerly called `/ultrareview`.)
 
 ---
 
@@ -129,7 +129,7 @@ After rendering the report, stop. Do not ask "want me to run X for you?" — the
 
 ## What this skill is NOT
 
-- **Not a reviewer.** It does not read code or find bugs. For that, use `/code-review`, `/bx-review`, `/bx-arch`, or `/ultrareview`.
+- **Not a reviewer.** It does not read code or find bugs. For that, use `/code-review`, `/bx-review`, `/bx-arch`, or `/code-review ultra`.
 - **Not a planner.** It does not produce an implementation plan. For that, use `/bx-plan` or `/bx-arch --plan`.
 - **Not a session-resumer.** It does not load tasks or hydrate state. For that, use `/bx-resume`.
 - **Not a fixer.** It never touches files. There is no `--fix` mode and there will not be one.

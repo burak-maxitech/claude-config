@@ -134,7 +134,7 @@ Two review skills are available — pick the right tier for the job:
 
 - **`/code-review`** (built-in, lightweight) — quick diff scan for correctness bugs at a chosen effort level (low/medium/high/max). Supports `--comment` to post findings as inline PR comments. Use this as the daily driver.
 - **`/bx-review`** (custom, thorough) — senior-engineer review with codebase-convention scanning, severity-ranked findings, mandatory `file:line` references. Supports `--security` (OWASP), `--verify` (run tests/lint), `--fix` (auto-fix simple findings), `--last-commit`. Reach for this when the diff is non-trivial or touches risky areas.
-- **`/ultrareview`** (built-in, cloud) — 5+ verifying subagents for high-risk pre-merge (auth, payments, migrations).
+- **`/code-review ultra`** (built-in, cloud) — 5+ verifying subagents for high-risk pre-merge (auth, payments, migrations).
 
 ```bash
 # Quick review of uncommitted changes (default - most common)
@@ -306,7 +306,7 @@ cd -
 
 **Output:** Severity summary table (counts) → Critical / Important / Suggestions / Convention Violations / What's Good
 
-**Tiering:** built-in `/code-review` (quick) → `/bx-review` (this, thorough) → `/ultrareview` (cloud, pre-merge). Pick the tier that matches the risk of the diff.
+**Tiering:** built-in `/simplify` (quality cleanup) → built-in `/code-review` (quick bug scan) → `/bx-review` (this, thorough) → `/code-review ultra` (cloud, pre-merge). Pick the rung that matches the risk of the diff.
 
 ---
 
@@ -638,7 +638,7 @@ Recommended flow:
   /code-review → /bx-review → /bx-review --verify → commit → /bx-docs
 
 Alternative: if this touches auth/payments/migrations
-  /code-review → /bx-review --security → /bx-review --verify → commit → push → /ultrareview <PR#> → merge → /bx-docs
+  /code-review → /bx-review --security → /bx-review --verify → commit → push → /code-review ultra <PR#> → merge → /bx-docs
 ```
 
 The buckets cover: pre-commit cleanup, pre-merge verification, post-ship audit, orient + audit (unfamiliar repo), and ambient improvement. **The advisor never invokes anything** — read the flow, then run it yourself.
@@ -807,7 +807,7 @@ Symlinked to: `~/.claude/skills`, `~/.claude/agents` (individual subdirectories)
 | Mar 2026 | Added startup scripts (`start-claude.sh`, `start-claude.ps1`) to automate session startup |
 | | Replaced manual 8-step startup with single-command script (5 automated steps); shows tip to run `/bx-resume` |
 | Apr 2026 | Aligned with Opus 4.7 release (CC 2.1.111): added `effort: high` frontmatter to `/code-review` and `/bx-plan` for stronger reasoning on review/synthesis work |
-| | Documented when to reach for built-in `/ultrareview` (high-risk pre-merge) vs custom `/code-review` (daily driver) in README |
+| | Documented when to reach for built-in `/code-review ultra` (high-risk pre-merge) vs custom `/code-review` (daily driver) in README |
 | May 2026 | New `/bx-arch` skill — repo-wide complexity + refactor + perf + over-engineering audit, distinct from diff-scoped reviewers. Three guardrails: catalog-driven complexity-reducing refactors (not GoF pattern-mongering), reads intended architecture from CLAUDE.md/ADRs first, CCN delta sanity gate. **Four parallel subagents** (`arch-structure`, `arch-refactors`, `arch-performance`, `arch-simplification`). 4th dimension added mid-session after honest audit against user's three real goals (optimized / maintainable / least-code-possible) found `least-code-possible` was under-served — refactor catalog *trades* complexity, doesn't delete it. `arch-simplification` targets sub-file over-engineering: single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config, near-duplicates. Reports `lines_deletable` as top-line metric. |
 | | New `/bx-health` skill — read-only routing advisor. Reads `git status`, branch, recent commits, `CLAUDE.md` `In Progress`/`Next Steps`, open PR; classifies repo state into one of five buckets (pre-commit cleanup / pre-merge verification / post-ship audit / orient + audit / ambient improvement); prints a ~10-line report with one recommended skill flow + one alternative. Never invokes anything, never edits files. Solves "I have time but I'm not sure which skill to reach for next." |
 | | New `/bx-tests` skill — repo-wide test suite audit. Closes the biggest code-health gap surfaced in Session 23's audit (existing skills only covered diff-scoped or artifact-level test concerns). Three parallel Sonnet subagents (`test-coverage` / `test-quality` / `test-economics`). T01-T05 smell catalog. **Twin headline metric** so both directions (missing coverage on critical paths + wasteful/redundant tests) are equally visible. `--fix` restricted to T01 (assertion-free — provably safe deletion); everything else routes to `--plan`. `--coverage` opt-in for reading existing coverage reports (jest/vitest/pytest-cov/cargo-tarpaulin/go cover); never auto-invokes the tool. Defers entirely to `cleanup-styles-tests` §7 for orphans / >3mo skips / unused helpers / stale snapshots — non-overlap is deliberate. |
