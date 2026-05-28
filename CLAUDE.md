@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-05-26 (Session 35)
+Last Updated: 2026-05-28 (Session 36)
 
 ## Project Overview
 
@@ -32,19 +32,18 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 ## In Progress
 
-None — S35 work is complete and uncommitted. Next session should pick up Next Steps #1 (commit S35 changes) and #2 (validate on a real burakarik.com run).
+None — S35 is committed (`548bdee`) and the working tree is clean. Next session picks up the validation/dogfood backlog from Next Steps (now #1: validate S35 `/seo-review` on a real burakarik.com run).
 
 ## Next Steps
 
-1. **Commit S35 changes.** Suggested message: `feat(seo-review): S35 — Groups A-D from burakarik6 dogfood + 15 code-review fixes`. 7 files uncommitted (+1105/-71). Helper script syntax-checks; all 4 groups + 15 fixes end-to-end smoke-tested.
-2. **Validate S35 on a real burakarik.com run.** Infrastructure now backs the S34 validation step: 100 user-supplied URL cap (was 50), helper-driven Turn 2b dispatch, split TTL (S34 cache entries from 3 days ago now hit), finding-history infrastructure ready to track all current findings as run_count=1. Sub-dim 14 will fire on this run since S34 wrote the baseline snapshot. Skip-mode (`dispatch_mode == "skip_codebase_subagents"`) likely fires on subsequent same-property reruns if no code commits intervene.
-3. **Dogfood `/test-review` on a real Node/Jest or Python/pytest project** — built S24 but never invoked end-to-end. Watch for: T01 false-positive rate (project-defined assertion-helper scan should be the gate), twin-headline math correctness on real subagent output, `--coverage` opt-in path against an actual jest `coverage-summary.json` / pytest `coverage.json`, scan-economics ratio thresholds (>3.0 over, <0.1 under), non-overlap with `/code-cleanup`. S30 + S34 + S35 dogfood patterns validate value here.
-4. **Dogfood `/architecture-review` on a non-trivial real project** — never run end-to-end yet. Watch for linter-detection accuracy, intended-architecture summary quality, CCN-delta filter behavior, simplification false-positive rate. **S30/S34/S35 lesson:** look for similar under-specifications in budget utilization, disk-cache boundaries, parser tool assumptions, blind-spot sampling — the patterns that surfaced in `/seo-review` likely have analogs in any data-ingestion-heavy skill.
-5. **Dogfood `/code-health-advice`** — built S22 but never invoked end-to-end. Watch for: bucket misclassification rate, freshness-mismatch detection accuracy, cases where a 6th bucket would help.
-6. **Address /seo-review deferred refactors** (captured in /simplify passes S25 + S27 + S29; S34/S35 didn't add new ones — all dogfood-surfaced concerns shipped same-session): batched-Grep alternation across scan-technical/content/geo (biggest runtime win — 30 Greps → 3-6 per scan on real projects); fix-mode harness extraction from architecture-review/references/fix-mode.md; plan-mode scaffolding extraction across the 3 plan-mode-*.md files; cross-file boilerplate consolidation into a shared-rules ref file (~25-40 lines saveable). Best done after further dogfood surfaces which refactor is most needed.
-7. Improve existing skill reference files based on usage patterns.
-8. Consider adding hooks for automated pre-commit workflows.
-9. Explore MCP server integration for external tool access.
+1. **Validate S35 on a real burakarik.com run.** Infrastructure now backs the S34 validation step: 100 user-supplied URL cap (was 50), helper-driven Turn 2b dispatch, split TTL (ui-* 7d means S34 cache entries now hit), finding-history infrastructure ready to track all current findings as run_count=1. Sub-dim 14 will fire since S34 wrote the baseline snapshot. Skip-mode (`dispatch_mode == "skip_codebase_subagents"`) likely fires on subsequent same-property reruns if no code commits intervene.
+2. **Dogfood `/test-review` on a real Node/Jest or Python/pytest project** — built S24 but never invoked end-to-end. Watch for: T01 false-positive rate (project-defined assertion-helper scan should be the gate), twin-headline math correctness on real subagent output, `--coverage` opt-in path against an actual jest `coverage-summary.json` / pytest `coverage.json`, scan-economics ratio thresholds (>3.0 over, <0.1 under), non-overlap with `/code-cleanup`. S30 + S34 + S35 dogfood patterns validate value here.
+3. **Dogfood `/architecture-review` on a non-trivial real project** — never run end-to-end yet. Watch for linter-detection accuracy, intended-architecture summary quality, CCN-delta filter behavior, simplification false-positive rate. **S30/S34/S35 lesson:** look for similar under-specifications in budget utilization, disk-cache boundaries, parser tool assumptions, blind-spot sampling — the patterns that surfaced in `/seo-review` likely have analogs in any data-ingestion-heavy skill.
+4. **Dogfood `/code-health-advice`** — built S22 but never invoked end-to-end. Watch for: bucket misclassification rate, freshness-mismatch detection accuracy, cases where a 6th bucket would help.
+5. **Address /seo-review deferred refactors** (captured in /simplify passes S25 + S27 + S29; S34/S35 didn't add new ones — all dogfood-surfaced concerns shipped same-session): batched-Grep alternation across scan-technical/content/geo (biggest runtime win — 30 Greps → 3-6 per scan on real projects); fix-mode harness extraction from architecture-review/references/fix-mode.md; plan-mode scaffolding extraction across the 3 plan-mode-*.md files; cross-file boilerplate consolidation into a shared-rules ref file (~25-40 lines saveable). Best done after further dogfood surfaces which refactor is most needed.
+6. Improve existing skill reference files based on usage patterns.
+7. Consider adding hooks for automated pre-commit workflows.
+8. Explore MCP server integration for external tool access.
 
 ## Key Decisions
 
@@ -129,11 +128,11 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 35) - 2026-05-26
-- **`/seo-review` hardened across 4 improvement groups + 15 code-review fixes.** Same-day continuation of S34 burakarik.com dogfood; user ran the skill with the new `known-bad-urls.txt` populated. Two issues surfaced mid-run: orchestrator wrote a 396-line `_inspect_batch.py` into `.seo-data/gsc/` (3rd disk-write boundary violation in the trilogy S31 cont.² + S34 + S35), and only 50 of 100 pasted URLs were inspected due to the per-run cap.
-- **4 improvement groups shipped (7 files modified, uncommitted; +1105/-71 LOC):** **(A)** `inspect-batch` helper subcommand replaces the spec-prose-only "N parallel Bash curl calls" path (`ThreadPoolExecutor` + per-URL cache + atomic write + 6 workers + 429/5xx retries); broader disk-write boundary rule forbidding ALL orchestrator-written scripts under `.seo-data/gsc/`. **(B)** subagent-skip rule codified as new Step 4.5 with 4 gating conditions + audit-trail marking + `--force-dispatch` escape hatch. **(C)** cache TTL split (sa-* 24h, ui-* 7d) — coverageState is weeks-stable; fixes the S34 0/197 cache-hit problem. **(D)** finding lifecycle infrastructure: `finding-history.json` (run_count + ESCALATE at >=3 + same-commit guard) + `watchpoints.json` (auto-emit on `code_changed_since_gsc_window=true`, 21-day recheck, 90-day evict). Three new helper subcommands: `history-update`, `watchpoint-emit`, `watchpoint-check`. End-to-end smoke-tested.
-- **`/code-review` extra-high effort pass surfaced 15 findings; all 15 fixed same-session.** Top correctness bugs: `head -1` on sa-q2-*.json picked random old Q2 file (now deterministic hash recomputation); `time.mktime`/`localtime` had DST off-by-one on UTC dates (now `datetime.date + timedelta`); `_watchpoint_status` crashed on None metrics (filter upstream); 5-file "3-slice" docs-spec drift bulk-updated to "4-slice"; operator precedence in `classify_transition`; bare `.tmp` race → PID-suffixed; 20-worker rate-limit burst → 6 + retries; `sys.exit(1)` before stdout flush → return bool + print-before-write; missing error trap between Step 6.8 sub-steps; null-title TypeError; dangling section reference; per-call CACHE_STATUS spec drift split into Turn 2a vs 2b; 24h-TTL back-references; `snapshot_write` refactored to use `_atomic_write_json`.
-- **`/update-docs` Full Path run as session close** — this entry. Drift probes triggered Part 5 session-history rollup (deferred from S34): compressed S28, S29, S30, S31, S31 cont., S31 cont.² from full-prose blocks to one-liners with commit hashes; `session-history.md` 125k → 64k chars. Part 6 not needed (Key Decisions table at 6 rows, under 20 cap).
-- **Key altitude lesson:** every dispatch shape that lives only in spec-prose ("N parallel bash curl calls") gets improvised into `.seo-data/gsc/` until shipped as a canonical helper subcommand. Same pattern as S30 `jq`-missing + S31 cont.² UTF-8-on-Windows. The S35 fix is "ship the canonical primitive," not "tell the orchestrator harder."
+### Last Session (Session 36) - 2026-05-28
+- **Doc-housekeeping session — no code work.** Ran `/resume-work` then `/update-docs`. The resume scan caught that CLAUDE.md was stale on its own post-commit state.
+- **Reconciled S35 commit state.** CLAUDE.md claimed S35 was "complete and uncommitted" with Next Step #1 = "commit S35" — but S35 *was* committed as `548bdee` (the S35 close-out doc run ran just before the commit). Corrected `## In Progress` → None, dropped the done Next Step #1, renumbered the rest (now 8 items).
+- **Auto-memory drift fixed (Part 4).** `MEMORY.md` listed 7 skills / 7 subagents (naming the pre-rename `code-review`, missing the SEO/test skills + agents). Resynced to 9 skills / 13 subagents + added the SessionStart scripts.
+- **Part 5 rollup fired:** adding this S36 entry pushed S32 (the `/review-deep` rename) out of the 5-most-recent window → compressed to a one-liner with commit `e38951a`. No new Key Decision; CLAUDE.md at ~21k (Parts 6/7 skip).
+- **Context:** 4 marketplace plugins installed locally this session (superpowers, code-simplifier, playwright, claude-code-setup) — local `~/.claude` only, not committed to this repo.
 
-> Full session detail: [docs/session-history.md](docs/session-history.md) S35
+> Full session detail: [docs/session-history.md](docs/session-history.md) S36
