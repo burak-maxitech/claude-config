@@ -131,10 +131,10 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
 ### Last Session (Session 36) - 2026-05-28
-- **Doc-housekeeping session — no code work.** Ran `/resume-work` then `/update-docs`. The resume scan caught that CLAUDE.md was stale on its own post-commit state.
-- **Reconciled S35 commit state.** CLAUDE.md claimed S35 was "complete and uncommitted" with Next Step #1 = "commit S35" — but S35 *was* committed as `548bdee` (the S35 close-out doc run ran just before the commit). Corrected `## In Progress` → None, dropped the done Next Step #1, renumbered the rest (now 8 items).
-- **Auto-memory drift fixed (Part 4).** `MEMORY.md` listed 7 skills / 7 subagents (naming the pre-rename `code-review`, missing the SEO/test skills + agents). Resynced to 9 skills / 13 subagents + added the SessionStart scripts.
-- **Part 5 rollup fired:** adding this S36 entry pushed S32 (the `/review-deep` rename) out of the 5-most-recent window → compressed to a one-liner with commit `e38951a`. No new Key Decision; CLAUDE.md at ~21k (Parts 6/7 skip).
-- **Context:** 4 marketplace plugins installed locally this session (superpowers, code-simplifier, playwright, claude-code-setup) — local `~/.claude` only, not committed to this repo.
+- **Renamed all 9 custom skills under the `bx-` prefix** — `bx-review`, `bx-arch`, `bx-tests`, `bx-seo`, `bx-clean`, `bx-health`, `bx-plan`, `bx-resume`, `bx-docs`. Root-cause fix for recurring name collisions/confusion with built-ins. `git mv` + token-sweep across 76 files via `find -exec perl` (the system `grep` is **ugrep** where `-Z`≠null-delimit, which silently broke two `xargs -0` attempts first). Commit `c5e654a`.
+- **Plugin overlap analysis** of 4 newly-installed plugins (superpowers, code-simplifier, playwright, claude-code-setup). **Uninstalled `code-simplifier`** (redundant with built-in `/simplify` + the `arch-simplification` subagent; JS/React-tuned, irrelevant here).
+- **Review-tooling freshness fixes** (commit `385c248`): `/ultrareview` → `/code-review ultra` (deprecated alias) everywhere; reinstated built-in `/simplify` re-added to the review ladder + Bucket A routing — corrects S32's now-stale "/simplify gone" premise.
+- **Phase-0 doc reconcile** (commit `a60c006`): S35 was already committed (`548bdee`); fixed the stale "uncommitted" note, resynced MEMORY.md to 9 skills / 13 subagents, rolled up S32 in session-history.
+- **Heads-up:** `superpowers` ships an aggressive every-session skill-mandate SessionStart hook — flagged, left enabled (it defers to CLAUDE.md). Disable if it fights quick edits.
 
 > Full session detail: [docs/session-history.md](docs/session-history.md) S36

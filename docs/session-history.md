@@ -251,19 +251,22 @@ Same-day continuation of S34 burakarik.com dogfood. User ran `/seo-review` on bu
 - **Dogfood backlog unchanged:** /test-review, /architecture-review, /code-health-advice — still built but not end-to-end invoked.
 
 ### Session 36 - 2026-05-28
-**What happened:**
-- **Doc-housekeeping session — no code work.** Ran `/resume-work` then `/update-docs`. The resume scan surfaced that CLAUDE.md was stale on its own post-commit state.
-- **Reconciled S35 commit state.** CLAUDE.md `## In Progress` claimed "S35 work is complete and uncommitted" and Next Step #1 was "Commit S35 changes" — but S35 *was* committed as `548bdee` (the S35 update-docs run at session close documented it as uncommitted, then the commit happened immediately after without a doc refresh). Working tree confirmed clean. Corrected `## In Progress` → None, dropped the now-done Next Step #1, renumbered the remaining 8 → 8 items.
-- **Auto-memory drift fixed (Part 4).** `MEMORY.md` listed "7 skills" (naming the pre-rename `code-review`, missing `review-deep`/`seo-review`/`test-review`) and "7 subagents" (missing the 6 SEO/test agents). Resynced to 9 skills / 13 subagents + added `session-start-context.{sh,ps1}` to the scripts list. These are stable facts, exactly what auto-memory is for.
-- **Part 5 rollup fired.** Adding this S36 full-prose entry pushed S32 out of the 5-most-recent window; compressed S32 (the `/review-deep` rename session) to a one-liner with commit `e38951a`. session-history.md stays bounded.
-- **No new Key Decision** (no architectural choice made), no README/docs-spec changes (README already current — 9 skills / 13 agents / review-deep rename / SessionStart hook all present). CLAUDE.md at 21k chars — under all caps, Parts 6/7 skip.
-- **Context note:** 4 marketplace plugins were installed locally this session (superpowers, code-simplifier, playwright, claude-code-setup) — these live in the user's local `~/.claude`, not in this repo, so they are not committed here.
+**What happened:** Started as routine doc housekeeping, expanded into a full skill-namespace overhaul after the user flagged plugin-induced confusion. Three phases, three commits.
 
-**Files created/modified:**
-- `CLAUDE.md` — timestamp → S36; `## In Progress` → None; Next Steps #1 dropped + renumbered; Session History block → S36.
-- `docs/session-history.md` — S32 compressed to one-liner; this S36 entry appended.
-- `MEMORY.md` (auto-memory) — skill count 7→9, subagent count 7→13, scripts list updated.
+- **Phase 1 — doc reconcile (commit `a60c006`).** Ran `/resume-work` + `/update-docs`. CLAUDE.md `## In Progress` claimed "S35 complete and uncommitted" with Next Step #1 = "commit S35" — but S35 was already committed as `548bdee` (the S35 close-out doc run preceded the commit). Corrected In Progress → None, dropped the done step, renumbered. Auto-memory `MEMORY.md` resynced (7→9 skills, 7→13 subagents + SessionStart scripts). Part 5 rollup compressed S32 to a one-liner (`e38951a`).
+- **Phase 2 — plugin overlap analysis.** User installed 4 marketplace plugins (superpowers, code-simplifier, playwright, claude-code-setup) and worried about overlap + stale routing advice. Findings: (a) **no** namespace collision with the 9 custom skills, but (b) the review/simplify/cleanup namespace was crowded — "review" alone mapped to 5 things; (c) `/code-health-advice` + docs gave **stale** advice — `/ultrareview` is now a deprecated alias for `/code-review ultra`, and `/simplify` was **reinstated** as a separate built-in (invalidating S32's "/simplify no longer exists" premise); (d) `superpowers` ships an aggressive every-session "must-invoke-a-skill" SessionStart hook (flagged, left enabled — it defers to CLAUDE.md); (e) `code-simplifier` plugin is redundant with built-in `/simplify` + the `arch-simplification` subagent and is JS/React-tuned. **Uninstalled `code-simplifier`** (settings.json `enabledPlugins` + `installed_plugins.json` + cache; both JSONs validated).
+- **Phase 3a — renamed all 9 skills under `bx-` prefix + shortened (commit `c5e654a`).** Root-cause fix for the recurring collision/confusion. User picked "prefix + shorten all 9" with prefix `bx`. `git mv` 9 dirs + literal token-replace across **76 operational files** via `find -exec perl`. **Gotcha worth remembering:** the system `grep` is **ugrep**, where `-Z` means fuzzy-match (NOT null-delimit) — it silently no-op'd two `grep -Z | xargs -0` attempts before switching to `find -exec perl`. Built-in refs (`/code-review`, `/simplify`, `/ultrareview`) deliberately preserved. Historical archives (`docs/*.md`, CLAUDE.md history rows) left untouched per S32 convention. **Mapping:** review-deep→bx-review, architecture-review→bx-arch, test-review→bx-tests, seo-review→bx-seo, code-cleanup→bx-clean, code-health-advice→bx-health, plan-feature→bx-plan, resume-work→bx-resume, update-docs→bx-docs. New Key Decision row added as the old→new Rosetta stone.
+- **Phase 3b — review-tooling freshness fixes (commit `385c248`).** `/ultrareview` → `/code-review ultra` across all operational files (deprecated alias → live command); reinstated built-in `/simplify` re-introduced into the bx-health routing list, Bucket A flow, README review-ladder (now 4 rungs: /simplify → /code-review → /bx-review → /code-review ultra), and workflow.md tiering.
+- **Verified end-to-end:** `/reload-plugins` → 3 plugins / 20 agents (code-simplifier gone); `/bx-docs` loads and runs (this close-out). All 9 `bx-*` resolve.
+
+**Files created/modified (across commits a60c006, c5e654a, 385c248):**
+- 9 skill directories renamed via `git mv` (+ each SKILL.md `name:` frontmatter, headers, self-refs).
+- ~76 operational files token-swept (skills + agents + scripts + `settings.local.json` + README.md + workflow.md).
+- `CLAUDE.md` — file-tree (bx-* + old→new comments), In Progress, Next Steps, 2 new Key Decision rows (bx- rename + freshness folded in), Last Session block.
+- `MEMORY.md` (auto-memory) — skill list → bx-* names + collision-fix rationale + `/bx-resume`/`/bx-docs` convention.
+- `~/.claude/settings.json` + `~/.claude/plugins/*` — `code-simplifier` uninstalled (NOT part of this repo).
 
 **Next session should:**
-- Pick up the validation/dogfood backlog (now Next Step #1): validate S35 `/seo-review` on a real burakarik.com run, then dogfood `/test-review`, `/architecture-review`, `/code-health-advice`.
-- Nothing is blocked; tree is clean and all S35 work is committed.
+- Pick up the validation/dogfood backlog (Next Step #1): validate `/bx-seo` on a real burakarik.com run, then dogfood `/bx-tests`, `/bx-arch`, `/bx-health`.
+- Use the **new command names** — old `/seo-review`/`/review-deep`/etc. no longer exist. Type `/bx` + Tab for the full toolkit.
+- Decide whether to keep the `superpowers` skill-mandate hook (disable if it fights quick-edit work). Tree is clean; everything committed + pushed.
