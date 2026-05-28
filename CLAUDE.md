@@ -16,7 +16,8 @@ Last Updated: 2026-05-28 (Session 36)
 | Area | Status |
 |------|--------|
 | Skills (9) | Complete |
-| Subagents (13) | Complete |
+| Subagents (14) | Complete |
+| Plugin packaging (`bx`) | Core complete (S37) — pending install smoke-test + symlink retirement |
 | Startup scripts | Complete |
 | Cross-platform setup | Complete |
 | GitHub sync | Complete |
@@ -32,7 +33,7 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 ## In Progress
 
-None — working tree clean at the start of this rename work. Next session picks up the validation/dogfood backlog from Next Steps (now #1: validate the SEO skill, now `/bx-seo`, on a real burakarik.com run).
+**S37 modernization (branch `feat/bx-plugin`).** Roadmap in [docs/modernization-roadmap.md](docs/modernization-roadmap.md) sequences 4 items: #1 GSC MCP server (retire `gsc-parse-helper.py`), #2 Playwright rendered audit in `bx:seo`, #4 plugin packaging, #6 orchestration-as-code. **#4 core shipped on this branch** (9 skills + 14 agents → `bx` plugin, validates clean). **Remaining for #4:** install smoke-test (`/plugin install bx@burak-tools`), verify agent-dispatch naming (`bx:seo-technical` vs bare), retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, SessionEnd→`/bx:docs` nudge, launcher-script symlink-check retirement. **#1/#2 not started** (both need user input: GSC auth + `npx playwright install`).
 
 ## Next Steps
 
@@ -69,54 +70,37 @@ None — working tree clean at the start of this rename work. Next session picks
 ## Architecture Summary
 
 ```
-claude-config/
+claude-config/                         # marketplace repo
+├── .claude-plugin/
+│   └── marketplace.json               # "burak-tools" marketplace catalog
+├── bx/                                # the installable `bx` plugin (S37, see Key Decisions)
+│   ├── .claude-plugin/plugin.json     # manifest (commit-SHA versioned; skills → /bx:<name>)
+│   ├── agents/                        # 14 subagents (Sonnet-routed) → bx:<agent>
+│   ├── hooks/hooks.json               # SessionStart project-orientation injection
+│   ├── scripts/                       # session-start-context.{sh,ps1}
+│   └── skills/                        # 9 skills (SKILL.md + references/) → /bx:<name>
+│       ├── arch/    clean/   docs/
+│       ├── health/  plan/    resume/
+│       └── review/  seo/     tests/
 ├── .claude/
-│   ├── agents/              # Subagent definitions (Sonnet-routed)
-│   │   ├── arch-performance.md
-│   │   ├── arch-refactors.md
-│   │   ├── arch-simplification.md
-│   │   ├── arch-structure.md
-│   │   ├── cleanup-deps-config.md
-│   │   ├── cleanup-files-code.md
-│   │   ├── cleanup-styles-tests.md
-│   │   ├── geo-generative.md
-│   │   ├── seo-content.md
-│   │   ├── seo-gsc-insights.md
-│   │   ├── seo-technical.md
-│   │   ├── test-coverage.md
-│   │   ├── test-economics.md
-│   │   └── test-quality.md
-│   ├── scripts/             # Session startup scripts
-│   │   ├── session-start-context.sh    # SessionStart hook (Bash/Mac/Linux)
-│   │   ├── session-start-context.ps1   # SessionStart hook (Windows)
-│   │   ├── start-claude.sh             # Mac/Linux launcher
-│   │   └── start-claude.ps1            # Windows (PowerShell) launcher
-│   ├── settings.local.json  # Shared Claude Code settings
-│   └── skills/              # Skills (SKILL.md + references/) — all under `bx-` prefix (S36, see Key Decisions)
-│       ├── bx-arch/         # was architecture-review
-│       ├── bx-clean/        # was code-cleanup
-│       ├── bx-docs/         # was update-docs
-│       ├── bx-health/       # was code-health-advice
-│       ├── bx-plan/         # was plan-feature
-│       ├── bx-resume/       # was resume-work
-│       ├── bx-review/       # was review-deep
-│       ├── bx-seo/          # was seo-review
-│       └── bx-tests/        # was test-review
+│   ├── scripts/             # start-claude.{sh,ps1} launchers (not plugin components)
+│   └── settings.local.json  # Local Claude Code settings
 ├── docs/                    # Reference files (overflow from CLAUDE.md)
 │   ├── completed-work.md
 │   ├── key-decisions.md
+│   ├── modernization-roadmap.md
 │   └── session-history.md
 ├── .gitignore
 ├── CLAUDE.md                # This file — AI session context
 ├── README.md                # Public overview
-└── Workflow.md              # Personal workflow guide
+└── workflow.md              # Personal workflow guide
 ```
 
-**Symlink approach:** Only `.claude/skills/` and `.claude/agents/` are symlinked into `~/.claude/` on each machine. This preserves local credentials and settings while sharing skills and agents across machines via Git.
+**Plugin approach (S37):** the toolkit installs as the `bx` plugin from the local `burak-tools` marketplace (`/plugin install bx@burak-tools`) — no symlinks. Skills are namespaced `/bx:<name>` and agents `bx:<agent>` by the plugin, which is the principled collision-proof fix that the S36 `bx-` prefix only worked around. `version` is omitted so each commit is a new version. (Old `~/.claude/skills`+`agents` symlinks are retired on adoption — see README "Migrating from the old symlink setup".)
 
-**Skills** are directories containing `SKILL.md` (main logic with YAML frontmatter) and a `references/` folder with supporting documents. They are user-invocable via `/skill-name`.
+**Skills** are directories under `bx/skills/` containing `SKILL.md` (YAML frontmatter) + a `references/` folder. Invocable as `/bx:<name>`.
 
-**Subagents** are markdown files in `.claude/agents/` dispatched by skills (not user-invocable). They run on Sonnet for cost efficiency and have scoped tool permissions.
+**Subagents** are the 14 markdown files under `bx/agents/`, dispatched by skills. They run on Sonnet for cost efficiency and have scoped tool permissions.
 
 ## Known Issues / Blockers
 
