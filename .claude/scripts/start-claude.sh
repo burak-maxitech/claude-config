@@ -52,20 +52,14 @@ else
 fi
 popd > /dev/null
 
-# --- Step 2: Verify symlinks ---
-echo -e "${YELLOW}[2/5] Checking config symlinks...${RESET}"
-FOUND_SYMLINKS=false
-for item in "$HOME/.claude"/*; do
-    if [ -L "$item" ]; then
-        target=$(readlink "$item")
-        echo -e "  ${GREEN}$(basename "$item") -> $target${RESET}"
-        FOUND_SYMLINKS=true
-    fi
-done
-if [ "$FOUND_SYMLINKS" = false ]; then
-    echo -e "  ${DIM}Warning: No symlinks found in ~/.claude. Skills may not load.${RESET}"
-    echo -e "  ${GRAY}Fix: ln -s $CONFIG_REPO/.claude/skills ~/.claude/skills${RESET}"
-    echo -e "  ${GRAY}Fix: ln -s $CONFIG_REPO/.claude/agents ~/.claude/agents${RESET}"
+# --- Step 2: Verify the bx plugin is installed ---
+echo -e "${YELLOW}[2/5] Checking the bx plugin...${RESET}"
+if command -v claude > /dev/null 2>&1 && claude plugin list 2>/dev/null | grep -q "bx@burak-tools"; then
+    echo -e "  ${GREEN}bx plugin installed${RESET}"
+else
+    echo -e "  ${DIM}Warning: bx plugin not detected. Skills (/bx:*) may not load.${RESET}"
+    echo -e "  ${GRAY}Fix (in Claude Code): /plugin marketplace add burak-maxitech/claude-config${RESET}"
+    echo -e "  ${GRAY}                      /plugin install bx@burak-tools${RESET}"
 fi
 
 # Check user settings for skill-breaking flags
@@ -73,7 +67,7 @@ SETTINGS_FILE="$HOME/.claude/settings.json"
 if [ -f "$SETTINGS_FILE" ] && command -v jq > /dev/null 2>&1; then
     if [ "$(jq -r '.disableSkillShellExecution // false' "$SETTINGS_FILE" 2>/dev/null)" = "true" ]; then
         echo -e "  ${RED}Warning: disableSkillShellExecution=true in ~/.claude/settings.json${RESET}"
-        echo -e "  ${GRAY}Breaks /bx-clean --fix, /bx-review --verify, and /bx-resume deep.${RESET}"
+        echo -e "  ${GRAY}Breaks /bx:clean --fix, /bx:review --verify, and /bx:resume deep.${RESET}"
         echo -e "  ${GRAY}Fix: set it to false or remove the key.${RESET}"
     fi
 fi

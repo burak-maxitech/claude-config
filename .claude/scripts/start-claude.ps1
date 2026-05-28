@@ -43,18 +43,15 @@ try {
 }
 Pop-Location
 
-# --- Step 2: Verify symlinks ---
-Write-Host "[2/5] Checking config symlinks..." -ForegroundColor Yellow
-$symlinks = Get-ChildItem ~\.claude -ErrorAction SilentlyContinue |
-    Where-Object { $_.LinkType -eq "SymbolicLink" }
-if ($symlinks) {
-    $symlinks | ForEach-Object {
-        Write-Host "  $($_.Name) -> $($_.Target)" -ForegroundColor Green
-    }
+# --- Step 2: Verify the bx plugin is installed ---
+Write-Host "[2/5] Checking the bx plugin..." -ForegroundColor Yellow
+$pluginList = (claude plugin list 2>$null | Out-String)
+if ($pluginList -match "bx@burak-tools") {
+    Write-Host "  bx plugin installed" -ForegroundColor Green
 } else {
-    Write-Host "  Warning: No symlinks found in ~/.claude. Skills may not load." -ForegroundColor DarkYellow
-    Write-Host "  Fix: ln -s $ConfigRepo\commands ~\.claude\commands" -ForegroundColor Gray
-    Write-Host "  Fix: ln -s $ConfigRepo\skills ~\.claude\skills" -ForegroundColor Gray
+    Write-Host "  Warning: bx plugin not detected. Skills (/bx:*) may not load." -ForegroundColor DarkYellow
+    Write-Host "  Fix (in Claude Code): /plugin marketplace add burak-maxitech/claude-config" -ForegroundColor Gray
+    Write-Host "                        /plugin install bx@burak-tools" -ForegroundColor Gray
 }
 
 # Check user settings for skill-breaking flags
@@ -64,7 +61,7 @@ if (Test-Path $SettingsFile) {
         $Settings = Get-Content $SettingsFile -Raw | ConvertFrom-Json
         if ($Settings.disableSkillShellExecution -eq $true) {
             Write-Host "  Warning: disableSkillShellExecution=true in ~\.claude\settings.json" -ForegroundColor Red
-            Write-Host "  Breaks /bx-clean --fix, /bx-review --verify, and /bx-resume deep." -ForegroundColor Gray
+            Write-Host "  Breaks /bx:clean --fix, /bx:review --verify, and /bx:resume deep." -ForegroundColor Gray
             Write-Host "  Fix: set it to false or remove the key." -ForegroundColor Gray
         }
     } catch {
