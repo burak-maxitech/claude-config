@@ -141,7 +141,7 @@ cd ~/Development/projects/claude-config && git pull
 cd C:\Development\projects\claude-config; git pull
 ```
 
-If `git pull` refuses or conflicts on `.claude/settings.local.json` (it's machine-local), stash first and keep your version: `git stash` → `git pull` → `git stash pop` (resolve in favor of your local entries if it conflicts).
+`.claude/settings.local.json` is machine-local and **no longer tracked** (it's now gitignored — each machine keeps its own). On the *first* pull after this change, git removes the old tracked copy; to keep your machine's permission grants, stash first: `git stash` → `git pull` → `git stash pop` (it returns as an ignored local file and never conflicts again). Don't care about the old grants? Just let it go — Claude Code rebuilds the file as you approve permissions.
 
 **3. Remove the now-dangling old symlinks** (`git pull` deleted their target `.claude/skills`):
 
