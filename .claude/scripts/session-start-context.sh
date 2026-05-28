@@ -9,7 +9,7 @@
 #   - Read-only: no writes anywhere
 #   - Silent on non-repo dirs: emit nothing rather than errors
 #   - Bounded: never emit more than ~50 lines (Claude reads this on every start)
-#   - Manual /resume-work still works for deep orientation (deliberate dual-path)
+#   - Manual /bx-resume still works for deep orientation (deliberate dual-path)
 
 set -e
 
@@ -53,7 +53,7 @@ if [ -f "$repo_root/CLAUDE.md" ]; then
     age_days=$(( (head_commit_mtime - claude_md_mtime) / 86400 ))
     if [ "$age_days" -gt 2 ]; then
       echo ""
-      echo "_(CLAUDE.md last updated $age_days days before the latest commit — may be stale. Run \`/resume-work\` to verify.)_"
+      echo "_(CLAUDE.md last updated $age_days days before the latest commit — may be stale. Run \`/bx-resume\` to verify.)_"
     fi
   fi
 fi
@@ -70,4 +70,4 @@ if command -v gh >/dev/null 2>&1; then
 fi
 
 echo ""
-echo "_(Orientation auto-injected by \`session-start-context.sh\`. For full task hydration + docs scan, run \`/resume-work\` explicitly.)_"
+echo "_(Orientation auto-injected by \`session-start-context.sh\`. For full task hydration + docs scan, run \`/bx-resume\` explicitly.)_"

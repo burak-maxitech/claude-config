@@ -5,11 +5,11 @@
       "Bash(git:*)",
       "Bash(xargs grep:*)",
       "Bash(rm:*)",
-      "Bash(find \"C:/Development/projects/claude-config/.claude/skills/update-docs\" -type f -exec ls -lh {})",
-      "Bash(find \"C:/Development/projects/claude-config/.claude/skills/resume-work\" -type f -exec ls -lh {})",
+      "Bash(find \"C:/Development/projects/claude-config/.claude/skills/bx-docs\" -type f -exec ls -lh {})",
+      "Bash(find \"C:/Development/projects/claude-config/.claude/skills/bx-resume\" -type f -exec ls -lh {})",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:docs.anthropic.com)",
-      "Skill(update-docs)",
+      "Skill(bx-docs)",
       "Bash(xargs -I {} ls -la {})",
       "WebFetch(domain:docs.claude.com)",
       "WebSearch",
@@ -18,9 +18,19 @@
       "Bash(where claude:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
-      "Skill(plan-feature)",
+      "Skill(bx-plan)",
       "Bash(python3)",
-      "Bash(awk *)"
+      "Bash(awk *)",
+      "Read(//Users/burakarik/.claude/plugins/**)",
+      "Bash(rm -rf ~/.claude/plugins/cache/claude-plugins-official/code-simplifier)",
+      "Bash(python3 -c \"import json; json.load\\(open\\('/Users/burakarik/.claude/plugins/installed_plugins.json'\\)\\); print\\('installed_plugins.json OK'\\)\")",
+      "Bash(python3 -c \"import json; d=json.load\\(open\\('/Users/burakarik/Development/projects/claude-config/.claude/settings.local.json'\\)\\) if False else None; import json; json.load\\(open\\('/Users/burakarik/.claude/settings.json'\\)\\); print\\('settings.json OK'\\)\")",
+      "Bash(python3 -c \"import json; print\\(list\\(json.load\\(open\\('/Users/burakarik/.claude/settings.json'\\)\\)['enabledPlugins'].keys\\(\\)\\)\\)\")",
+      "Bash(xargs -0 perl -i -pe ' *)",
+      "Bash(echo \"=== EXIT: $? ===\")",
+      "Bash(grep -nE \"^\\\\| \\\\`/bx-\" README.md)",
+      "Bash(python3 -m py_compile .claude/skills/bx-seo/references/gsc-parse-helper.py)",
+      "Bash(python3 -c \"import json; json.load\\(open\\('.claude/settings.local.json'\\)\\); print\\('✓ valid JSON'\\)\")"
     ]
   }
 }

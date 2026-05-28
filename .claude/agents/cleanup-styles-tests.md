@@ -1,6 +1,6 @@
 ---
 name: cleanup-styles-tests
-description: Scans for unused CSS and stale test artifacts. Used by the code-cleanup skill for parallel scanning. Do not invoke independently.
+description: Scans for unused CSS and stale test artifacts. Used by the bx-clean skill for parallel scanning. Do not invoke independently.
 model: sonnet
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(cat:*), Bash(git:*)
 user-invocable: false

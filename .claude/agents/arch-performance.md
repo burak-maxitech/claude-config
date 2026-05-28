@@ -1,6 +1,6 @@
 ---
 name: arch-performance
-description: Scans for high-precision performance issues that static analysis can detect reliably (N+1 queries, sync I/O in async paths, accidental O(n²), missing memoization, hot-loop invariants). Frames lower-confidence findings as "suspects to measure" rather than fixes. Used by the architecture-review skill. Do not invoke independently.
+description: Scans for high-precision performance issues that static analysis can detect reliably (N+1 queries, sync I/O in async paths, accidental O(n²), missing memoization, hot-loop invariants). Frames lower-confidence findings as "suspects to measure" rather than fixes. Used by the bx-arch skill. Do not invoke independently.
 model: sonnet
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(jq:*), Bash(cat:*), Bash(head:*)
 user-invocable: false

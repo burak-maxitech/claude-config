@@ -8,7 +8,7 @@
 #   - Read-only: no writes anywhere
 #   - Silent on non-repo dirs: emit nothing rather than errors
 #   - Bounded: never emit more than ~50 lines (Claude reads this on every start)
-#   - Manual /resume-work still works for deep orientation (deliberate dual-path)
+#   - Manual /bx-resume still works for deep orientation (deliberate dual-path)
 
 $ErrorActionPreference = 'SilentlyContinue'
 
@@ -66,7 +66,7 @@ if (Test-Path $claudeMd) {
             $ageDays = [int](([int]$headCommit - [int]$claudeMdCommit) / 86400)
             if ($ageDays -gt 2) {
                 Write-Output ""
-                Write-Output "_(CLAUDE.md last updated $ageDays days before the latest commit — may be stale. Run ``/resume-work`` to verify.)_"
+                Write-Output "_(CLAUDE.md last updated $ageDays days before the latest commit — may be stale. Run ``/bx-resume`` to verify.)_"
             }
         }
     }
@@ -85,4 +85,4 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
 }
 
 Write-Output ""
-Write-Output "_(Orientation auto-injected by ``session-start-context.ps1``. For full task hydration + docs scan, run ``/resume-work`` explicitly.)_"
+Write-Output "_(Orientation auto-injected by ``session-start-context.ps1``. For full task hydration + docs scan, run ``/bx-resume`` explicitly.)_"

@@ -73,7 +73,7 @@ SETTINGS_FILE="$HOME/.claude/settings.json"
 if [ -f "$SETTINGS_FILE" ] && command -v jq > /dev/null 2>&1; then
     if [ "$(jq -r '.disableSkillShellExecution // false' "$SETTINGS_FILE" 2>/dev/null)" = "true" ]; then
         echo -e "  ${RED}Warning: disableSkillShellExecution=true in ~/.claude/settings.json${RESET}"
-        echo -e "  ${GRAY}Breaks /code-cleanup --fix, /review-deep --verify, and /resume-work deep.${RESET}"
+        echo -e "  ${GRAY}Breaks /bx-clean --fix, /bx-review --verify, and /bx-resume deep.${RESET}"
         echo -e "  ${GRAY}Fix: set it to false or remove the key.${RESET}"
     fi
 fi
@@ -101,8 +101,8 @@ else
     echo -e "  ${DIM}Warning: Could not check for updates.${RESET}"
 fi
 
-# --- Step 5: Launch Claude Code with /resume-work ---
+# --- Step 5: Launch Claude Code with /bx-resume ---
 echo -e "${YELLOW}[5/5] Launching Claude Code...${RESET}"
-echo -e "  ${GRAY}Tip: Run /resume-work to get up to speed.${RESET}"
+echo -e "  ${GRAY}Tip: Run /bx-resume to get up to speed.${RESET}"
 echo ""
 claude

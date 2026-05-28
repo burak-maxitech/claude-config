@@ -64,7 +64,7 @@ if (Test-Path $SettingsFile) {
         $Settings = Get-Content $SettingsFile -Raw | ConvertFrom-Json
         if ($Settings.disableSkillShellExecution -eq $true) {
             Write-Host "  Warning: disableSkillShellExecution=true in ~\.claude\settings.json" -ForegroundColor Red
-            Write-Host "  Breaks /code-cleanup --fix, /review-deep --verify, and /resume-work deep." -ForegroundColor Gray
+            Write-Host "  Breaks /bx-clean --fix, /bx-review --verify, and /bx-resume deep." -ForegroundColor Gray
             Write-Host "  Fix: set it to false or remove the key." -ForegroundColor Gray
         }
     } catch {
@@ -96,8 +96,8 @@ try {
     Write-Host "  Warning: Could not check for updates." -ForegroundColor DarkYellow
 }
 
-# --- Step 5: Launch Claude Code with /resume-work ---
+# --- Step 5: Launch Claude Code with /bx-resume ---
 Write-Host "[5/5] Launching Claude Code..." -ForegroundColor Yellow
-Write-Host "  Tip: Run /resume-work to get up to speed." -ForegroundColor Gray
+Write-Host "  Tip: Run /bx-resume to get up to speed." -ForegroundColor Gray
 Write-Host ""
 claude

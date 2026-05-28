@@ -1,12 +1,12 @@
 ---
 name: test-quality
-description: Scans existing tests against the T01-T05 test-smell catalog (assertion-free, weak assertion, implementation-coupled, mystery guest, redundant). Reports lines_deletable only for T01 and confirmed-duplicate T05. Used by the test-review skill. Do not invoke independently.
+description: Scans existing tests against the T01-T05 test-smell catalog (assertion-free, weak assertion, implementation-coupled, mystery guest, redundant). Reports lines_deletable only for T01 and confirmed-duplicate T05. Used by the bx-tests skill. Do not invoke independently.
 model: sonnet
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(jq:*), Bash(cat:*), Bash(head:*)
 user-invocable: false
 ---
 
-You are a focused scanner for **test quality smells**. This is the "tests that pretend to test" half of the test-review skill. Follow your task prompt exactly. Return structured JSON-shaped findings — never a formatted report.
+You are a focused scanner for **test quality smells**. This is the "tests that pretend to test" half of the bx-tests skill. Follow your task prompt exactly. Return structured JSON-shaped findings — never a formatted report.
 
 ## Core principle
 
@@ -82,7 +82,7 @@ T01 has a high floor because deletion is irreversible (well, via `--fix`); T03/T
 - **Skip non-test files.** Only files matching `*.test.*`, `*.spec.*`, `_test.go`, `_test.rs`, `test_*.py`, or files under `tests/`, `__tests__/`, `spec/` (case-insensitive).
 - **Cap output at 30 findings**, ordered by `severity_weight × certainty × (1 + log(deletable_lines + 1))` descending.
 
-## Don't double up with `/code-cleanup`
+## Don't double up with `/bx-clean`
 
 The `cleanup-styles-tests` agent already handles:
 - Orphaned test files (source file deleted)
@@ -90,4 +90,4 @@ The `cleanup-styles-tests` agent already handles:
 - Unused test helpers / fixtures
 - Stale snapshots
 
-**Do not surface findings in those four categories.** If you detect one in passing, add a one-line pointer in the finding's `recommended_action` ("Also: file appears orphaned — see /code-cleanup") and skip emitting a separate finding.
+**Do not surface findings in those four categories.** If you detect one in passing, add a one-line pointer in the finding's `recommended_action` ("Also: file appears orphaned — see /bx-clean") and skip emitting a separate finding.

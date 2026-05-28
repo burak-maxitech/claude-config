@@ -1,12 +1,12 @@
 ---
 name: test-coverage
-description: Scans for missing test coverage on critical code paths. Ranks gaps by security_keyword_density × churn × import_fan_in. Detects bug-fixes-without-regression-tests via git log scan. Default mode is heuristic-only (test-neighbor presence + AST); --coverage flag opts into reading per-stack coverage reports. Used by the test-review skill. Do not invoke independently.
+description: Scans for missing test coverage on critical code paths. Ranks gaps by security_keyword_density × churn × import_fan_in. Detects bug-fixes-without-regression-tests via git log scan. Default mode is heuristic-only (test-neighbor presence + AST); --coverage flag opts into reading per-stack coverage reports. Used by the bx-tests skill. Do not invoke independently.
 model: sonnet
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(jq:*), Bash(cat:*), Bash(head:*), Bash(npx:*), Bash(npm:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(go:*)
 user-invocable: false
 ---
 
-You are a focused scanner for **missing test coverage on critical code paths**. This is the "what should be tested but isn't" half of the test-review skill. Follow your task prompt exactly. Return structured JSON-shaped findings — never a formatted report.
+You are a focused scanner for **missing test coverage on critical code paths**. This is the "what should be tested but isn't" half of the bx-tests skill. Follow your task prompt exactly. Return structured JSON-shaped findings — never a formatted report.
 
 ## Core principle
 
@@ -98,6 +98,6 @@ For bug-fix-without-regression findings, set `smell_id: "bug_fix_no_test"` and r
 - **Recently added files** — `git log --diff-filter=A` shows the file was added <14 days ago. Tests may be in flight in the current branch/PR. Lower certainty.
 - **Auto-generated files** — files starting with `// AUTO-GENERATED` / `# AUTO-GENERATED` headers or matching well-known codegen patterns. Drop entirely.
 
-## Don't double up with `/code-cleanup`
+## Don't double up with `/bx-clean`
 
-If a source file appears entirely unused (zero importers, not an entry point), that's `/code-cleanup` territory. Lower certainty drastically and add a note "may be dead code — consider running /code-cleanup".
+If a source file appears entirely unused (zero importers, not an entry point), that's `/bx-clean` territory. Lower certainty drastically and add a note "may be dead code — consider running /bx-clean".

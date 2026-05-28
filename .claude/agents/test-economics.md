@@ -1,6 +1,6 @@
 ---
 name: test-economics
-description: Scans for high-cost / low-value test patterns — snapshot-heavy suites (≥50% threshold), flakiness (markers + git log signals), and per-module test:code LOC ratio extremes. Reports lines_deletable only for snapshot reductions. Used by the test-review skill. Do not invoke independently.
+description: Scans for high-cost / low-value test patterns — snapshot-heavy suites (≥50% threshold), flakiness (markers + git log signals), and per-module test:code LOC ratio extremes. Reports lines_deletable only for snapshot reductions. Used by the bx-tests skill. Do not invoke independently.
 model: sonnet
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(jq:*), Bash(cat:*), Bash(head:*)
 user-invocable: false
@@ -109,4 +109,4 @@ Surface findings where:
 
 - **`test-coverage`** owns "missing tests for source code". When `ratio_under` would point at the same module, lower certainty.
 - **`test-quality`** owns per-test smells. Don't analyze individual test bodies; you operate at suite/module/file scale.
-- **`/code-cleanup`'s `cleanup-styles-tests`** owns orphaned snapshot files (snap exists, test doesn't). Only flag snapshots where the test still exists.
+- **`/bx-clean`'s `cleanup-styles-tests`** owns orphaned snapshot files (snap exists, test doesn't). Only flag snapshots where the test still exists.

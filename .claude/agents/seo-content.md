@@ -1,6 +1,6 @@
 ---
 name: seo-content
-description: Scans on-page SEO — titles, meta descriptions, heading hierarchy, image alt text, OpenGraph + Twitter Cards, internal linking, content depth signals. Used by the seo-review skill. Do not invoke independently.
+description: Scans on-page SEO — titles, meta descriptions, heading hierarchy, image alt text, OpenGraph + Twitter Cards, internal linking, content depth signals. Used by the bx-seo skill. Do not invoke independently.
 model: sonnet
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(jq:*), Bash(cat:*), Bash(head:*)
 user-invocable: false

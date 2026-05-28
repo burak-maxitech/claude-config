@@ -1,6 +1,6 @@
 ---
 name: arch-structure
-description: Scans for cyclomatic/cognitive complexity hotspots, coupling, cohesion, layering violations, and circular dependencies. Used by the architecture-review skill for parallel scanning. Do not invoke independently.
+description: Scans for cyclomatic/cognitive complexity hotspots, coupling, cohesion, layering violations, and circular dependencies. Used by the bx-arch skill for parallel scanning. Do not invoke independently.
 model: sonnet
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(npx:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(jq:*), Bash(cat:*), Bash(head:*)
 user-invocable: false
@@ -25,5 +25,5 @@ Categories to scan:
 5. **Circular dependencies** — module A imports B, B (transitively) imports A.
 
 Do NOT flag:
-- Per-commit quality issues (that's `/code-review` or `/review-deep` for thorough)
-- Dead code or unused files (that's `/code-cleanup`)
+- Per-commit quality issues (that's `/code-review` or `/bx-review` for thorough)
+- Dead code or unused files (that's `/bx-clean`)

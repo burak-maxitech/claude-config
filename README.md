@@ -25,7 +25,7 @@ claude-config/
 │   │   └── start-claude.ps1           # Windows startup (PowerShell)
 │   ├── settings.local.json            # Shared Claude Code settings
 │   └── skills/                        # Skills (commands + bundled references)
-│       ├── architecture-review/
+│       ├── bx-arch/
 │       │   ├── SKILL.md
 │       │   └── references/
 │       │       ├── fix-mode.md
@@ -37,35 +37,35 @@ claude-config/
 │       │       ├── scan-refactors.md
 │       │       ├── scan-simplification.md
 │       │       └── scan-structure.md
-│       ├── code-health-advice/
+│       ├── bx-health/
 │       │   ├── SKILL.md
 │       │   └── references/
 │       │       └── state-buckets.md
-│       ├── code-cleanup/
+│       ├── bx-clean/
 │       │   ├── SKILL.md
 │       │   └── references/
 │       │       ├── scan-deps-config.md
 │       │       ├── scan-files-code.md
 │       │       └── scan-styles-tests.md
-│       ├── plan-feature/
+│       ├── bx-plan/
 │       │   ├── SKILL.md
 │       │   └── references/
 │       │       ├── interview-rules.md
 │       │       ├── mode-greenfield.md
 │       │       ├── mode-existing.md
 │       │       └── plan-and-tasks.md
-│       ├── resume-work/
+│       ├── bx-resume/
 │       │   ├── SKILL.md
 │       │   └── references/
 │       │       ├── summary-template.md
 │       │       └── task-hydration.md
-│       ├── review-deep/
+│       ├── bx-review/
 │       │   ├── SKILL.md
 │       │   └── references/
 │       │       ├── output-format.md
 │       │       ├── review-checklist.md
 │       │       └── security-deep-dive.md
-│       ├── seo-review/
+│       ├── bx-seo/
 │       │   ├── SKILL.md
 │       │   └── references/
 │       │       ├── best-practices-sources.md
@@ -76,7 +76,7 @@ claude-config/
 │       │       ├── scan-content.md
 │       │       ├── scan-geo.md
 │       │       └── scan-technical.md
-│       ├── test-review/
+│       ├── bx-tests/
 │       │   ├── SKILL.md
 │       │   └── references/
 │       │       ├── fix-mode-test.md
@@ -86,7 +86,7 @@ claude-config/
 │       │       ├── scan-economics.md
 │       │       ├── scan-quality.md
 │       │       └── test-smell-catalog.md
-│       └── update-docs/
+│       └── bx-docs/
 │           ├── SKILL.md
 │           └── references/
 │               ├── claude-md-sections.md
@@ -197,22 +197,22 @@ git pull
 
 | Command | Purpose | Format |
 |---------|---------|--------|
-| `/resume-work` | Start session - get up to speed | Skill |
-| `/plan-feature` | Interview before building features | Skill |
-| `/review-deep` | Thorough senior-engineer code review (in-session, with `--security`/`--verify`/`--fix`/`--last-commit`). Slots between built-in `/code-review` (quick) and `/ultrareview` (cloud, pre-merge). | Skill |
-| `/code-cleanup` | Find dead code & cruft (parallel subagents). Adds CVE scanning with `--vulns` (runs `npm audit` / `pip-audit` / `cargo audit` / equivalents per detected stack; report-only, never auto-fixed). | Skill |
-| `/architecture-review` | Repo-wide architecture audit — complexity hotspots, refactor opportunities, perf suspects, **and over-engineering** (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable` as a top-line metric. 4 parallel subagents, with `--plan`/`--fix`/`--map`/`--full-scan` | Skill |
-| `/test-review` | Repo-wide test suite audit — missing coverage on critical paths AND wasteful/redundant tests, in a single report. **Twin headline metric** (`Coverage gaps in critical code: X lines | Tests we can delete: Y lines`). 3 parallel subagents (`test-coverage` / `test-quality` / `test-economics`), T01-T05 smell catalog, with `--plan`/`--fix` (T01-only safe deletion)/`--coverage` (opt-in report reading)/`--full-scan`. Defers entirely to `/code-cleanup` for orphans / stale snapshots / >3mo skips. | Skill |
-| `/seo-review` | Repo-wide SEO + Generative Engine Optimization audit for **web projects only** (rejects non-web repos silently). **Fetches current best practices fresh every run** via WebSearch + WebFetch (4 source categories: Google Search Central+web.dev, Schema.org+JSON-LD, GEO sources, third-party authority blogs). **Probes sitemap URLs** for 4xx/5xx/redirect-chains/slow-responses (cap 100 URLs; score-impact capped at 8 points). **Optional GSC integration via Search Console API** — single auth (gcloud ADC with `webmasters.readonly` scope) + single config key (`site_url:` in `.seo-data/gsc/config.yaml`) + two endpoints (`searchanalytics.query` for Performance + `urlInspection.index.inspect` for per-URL Indexing). Binary mode: API-enabled or heuristic-only fallback. 35-day git-history overlap flags "may already be fixed" findings against the GSC reporting lag. **Score stays /100** (purely heuristic) so `docs/seo-history.md` is comparable across runs regardless of GSC availability. 3 parallel subagents (4 when GSC API enabled: `seo-technical` / `seo-content` / `geo-generative` / `seo-gsc-insights`). Single headline: **score /100 (Δ since last run) + top-3 highest-impact opportunities**. Score tracked over time in `docs/seo-history.md`. Flags: `--plan` / `--fix` (strict allowlist, never fabricates content — only inserts TODO placeholders) / `--url <deployed-url>` (live HTML diff). | Skill |
-| `/code-health-advice` | Routing advisor — looks at `git status`, branch, recent commits, `CLAUDE.md`, open PR, then suggests which skills to run in what order. **Read-only, never invokes anything.** Use when unsure where to start. | Skill |
-| `/update-docs` | End session - save progress | Skill |
+| `/bx-resume` | Start session - get up to speed | Skill |
+| `/bx-plan` | Interview before building features | Skill |
+| `/bx-review` | Thorough senior-engineer code review (in-session, with `--security`/`--verify`/`--fix`/`--last-commit`). Slots between built-in `/code-review` (quick) and `/ultrareview` (cloud, pre-merge). | Skill |
+| `/bx-clean` | Find dead code & cruft (parallel subagents). Adds CVE scanning with `--vulns` (runs `npm audit` / `pip-audit` / `cargo audit` / equivalents per detected stack; report-only, never auto-fixed). | Skill |
+| `/bx-arch` | Repo-wide architecture audit — complexity hotspots, refactor opportunities, perf suspects, **and over-engineering** (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable` as a top-line metric. 4 parallel subagents, with `--plan`/`--fix`/`--map`/`--full-scan` | Skill |
+| `/bx-tests` | Repo-wide test suite audit — missing coverage on critical paths AND wasteful/redundant tests, in a single report. **Twin headline metric** (`Coverage gaps in critical code: X lines | Tests we can delete: Y lines`). 3 parallel subagents (`test-coverage` / `test-quality` / `test-economics`), T01-T05 smell catalog, with `--plan`/`--fix` (T01-only safe deletion)/`--coverage` (opt-in report reading)/`--full-scan`. Defers entirely to `/bx-clean` for orphans / stale snapshots / >3mo skips. | Skill |
+| `/bx-seo` | Repo-wide SEO + Generative Engine Optimization audit for **web projects only** (rejects non-web repos silently). **Fetches current best practices fresh every run** via WebSearch + WebFetch (4 source categories: Google Search Central+web.dev, Schema.org+JSON-LD, GEO sources, third-party authority blogs). **Probes sitemap URLs** for 4xx/5xx/redirect-chains/slow-responses (cap 100 URLs; score-impact capped at 8 points). **Optional GSC integration via Search Console API** — single auth (gcloud ADC with `webmasters.readonly` scope) + single config key (`site_url:` in `.seo-data/gsc/config.yaml`) + two endpoints (`searchanalytics.query` for Performance + `urlInspection.index.inspect` for per-URL Indexing). Binary mode: API-enabled or heuristic-only fallback. 35-day git-history overlap flags "may already be fixed" findings against the GSC reporting lag. **Score stays /100** (purely heuristic) so `docs/seo-history.md` is comparable across runs regardless of GSC availability. 3 parallel subagents (4 when GSC API enabled: `seo-technical` / `seo-content` / `geo-generative` / `seo-gsc-insights`). Single headline: **score /100 (Δ since last run) + top-3 highest-impact opportunities**. Score tracked over time in `docs/seo-history.md`. Flags: `--plan` / `--fix` (strict allowlist, never fabricates content — only inserts TODO placeholders) / `--url <deployed-url>` (live HTML diff). | Skill |
+| `/bx-health` | Routing advisor — looks at `git status`, branch, recent commits, `CLAUDE.md`, open PR, then suggests which skills to run in what order. **Read-only, never invokes anything.** Use when unsure where to start. | Skill |
+| `/bx-docs` | End session - save progress | Skill |
 
 **Skills** are directories in `.claude/skills/` that bundle reference files, use YAML frontmatter for tool permissions, and can dispatch subagents.
 
-> **Three review tiers — pick the right one for the risk.** As of the 2026-05-23 Claude Code update, `/simplify` was renamed to `/code-review` (built-in, lightweight diff scan). The custom code-review skill in this repo was renamed to `/review-deep` to avoid the collision and to reflect its position as the thorough middle tier. The three tiers:
+> **Three review tiers — pick the right one for the risk.** As of the 2026-05-23 Claude Code update, `/simplify` was renamed to `/code-review` (built-in, lightweight diff scan). The custom code-review skill in this repo was renamed to `/bx-review` to avoid the collision and to reflect its position as the thorough middle tier. The three tiers:
 >
 > 1. **`/code-review`** (built-in, fast) — quick diff scan for correctness bugs at a chosen effort level (low/medium/high/max). Supports `--comment` to post findings as inline PR comments. **Daily driver.**
-> 2. **`/review-deep`** (this repo's custom skill, thorough) — senior-engineer review with codebase-convention scanning, severity-ranked findings, mandatory `file:line` references. Supports `--security` (OWASP Top 10), `--verify` (run tests/lint to validate), `--fix` (auto-fix simple findings), `--last-commit`. **Reach for when the diff is non-trivial or touches risky areas.**
+> 2. **`/bx-review`** (this repo's custom skill, thorough) — senior-engineer review with codebase-convention scanning, severity-ranked findings, mandatory `file:line` references. Supports `--security` (OWASP Top 10), `--verify` (run tests/lint to validate), `--fix` (auto-fix simple findings), `--last-commit`. **Reach for when the diff is non-trivial or touches risky areas.**
 > 3. **`/ultrareview`** (built-in, cloud) — 5+ verifying subagents in the cloud (10–20 min, scales to 20). **High-risk pre-merge only** (auth rewrites, payment flows, database migrations).
 
 > **Picking among the review/audit skills.** All operate on different scopes:
@@ -220,16 +220,16 @@ git pull
 > | Skill | Scope | When |
 > |-------|-------|------|
 > | `/code-review` | diff or commit | quick correctness scan, daily driver (built-in) |
-> | `/review-deep` | diff or commit | thorough senior-engineer review with `--security`/`--verify`/`--fix` (custom) |
+> | `/bx-review` | diff or commit | thorough senior-engineer review with `--security`/`--verify`/`--fix` (custom) |
 > | `/ultrareview` | PR (cloud) | high-risk pre-merge verification (auth, payments, migrations) |
-> | `/code-cleanup` | whole repo | deletion-focused — whole unused files, unused deps, stale config |
-> | `/architecture-review` | whole repo | structural audit — complexity hotspots, refactor opportunities, perf suspects, AND sub-file over-engineering (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable`. |
-> | `/test-review` | whole repo, test suite focus | test suite audit — coverage gaps on critical paths + test smells (T01-T05) + suite economics (snapshot bloat, flakiness, LOC ratio extremes). Reports twin headline (coverage gap LOC + deletable LOC). |
-> | `/seo-review` | whole web repo, SEO + GEO focus | SEO + Generative Engine Optimization audit. Fetches current best practices each run. Probes sitemap URL health (404/5xx/redirect-chain/slow). **Optional GSC integration via Search Console API** — install gcloud SDK, authenticate with ADC, drop a one-line `site_url:` in `.seo-data/gsc/config.yaml`. Two endpoints (`searchanalytics.query` for Performance + `urlInspection.index.inspect` for per-URL Indexing) cover both signals. Binary mode: API-enabled or heuristic-only. 35-day git-history overlap to flag "may already be fixed" findings against the GSC reporting lag. Single score `/100` headline + top-3 priorities. Tracked over time in `docs/seo-history.md` (comparable across runs whether GSC API is configured or not — score stays purely heuristic). Web projects only — rejects others silently. |
+> | `/bx-clean` | whole repo | deletion-focused — whole unused files, unused deps, stale config |
+> | `/bx-arch` | whole repo | structural audit — complexity hotspots, refactor opportunities, perf suspects, AND sub-file over-engineering (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable`. |
+> | `/bx-tests` | whole repo, test suite focus | test suite audit — coverage gaps on critical paths + test smells (T01-T05) + suite economics (snapshot bloat, flakiness, LOC ratio extremes). Reports twin headline (coverage gap LOC + deletable LOC). |
+> | `/bx-seo` | whole web repo, SEO + GEO focus | SEO + Generative Engine Optimization audit. Fetches current best practices each run. Probes sitemap URL health (404/5xx/redirect-chain/slow). **Optional GSC integration via Search Console API** — install gcloud SDK, authenticate with ADC, drop a one-line `site_url:` in `.seo-data/gsc/config.yaml`. Two endpoints (`searchanalytics.query` for Performance + `urlInspection.index.inspect` for per-URL Indexing) cover both signals. Binary mode: API-enabled or heuristic-only. 35-day git-history overlap to flag "may already be fixed" findings against the GSC reporting lag. Single score `/100` headline + top-3 priorities. Tracked over time in `docs/seo-history.md` (comparable across runs whether GSC API is configured or not — score stays purely heuristic). Web projects only — rejects others silently. |
 >
-> Useful chain on an unfamiliar repo: `/code-cleanup` → `/architecture-review` → `/test-review` → (if web) `/seo-review` → `/architecture-review --plan` → `/plan-feature` per phase.
+> Useful chain on an unfamiliar repo: `/bx-clean` → `/bx-arch` → `/bx-tests` → (if web) `/bx-seo` → `/bx-arch --plan` → `/bx-plan` per phase.
 >
-> Not sure where to start? `/code-health-advice` reads your repo state and suggests which of these skills to run in what order. It's a 30-second routing call, not a review.
+> Not sure where to start? `/bx-health` reads your repo state and suggests which of these skills to run in what order. It's a 30-second routing call, not a review.
 
 ## Subagents
 
@@ -237,24 +237,24 @@ The `.claude/agents/` folder contains subagent definitions used by skills. These
 
 | Agent | Used By | Purpose |
 |-------|---------|---------|
-| `cleanup-files-code` | `/code-cleanup` | Scans for unused files and dead code |
-| `cleanup-deps-config` | `/code-cleanup` | Scans for unused deps and config cruft |
-| `cleanup-styles-tests` | `/code-cleanup` | Scans for unused CSS and stale tests |
-| `arch-structure` | `/architecture-review` | Cyclomatic + cognitive complexity hotspots, coupling, layering violations, circular deps |
-| `arch-refactors` | `/architecture-review` | Catalog-driven complexity-reducing refactor opportunities (cites entry IDs) |
-| `arch-performance` | `/architecture-review` | High-precision performance findings (N+1, sync I/O in async, accidental O(n²), hot-loop invariants) |
-| `arch-simplification` | `/architecture-review` | Over-engineering / almost-dead code at sub-file granularity — single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config, near-duplicates. Reports `lines_deletable`. |
-| `test-coverage` | `/test-review` | Ranks coverage gaps by `security_keyword_density × churn × import_fan_in`. Heuristic mode (test-neighbor + public-symbol enum) by default; reads coverage reports when `--coverage` opted in. Also scans bug-fixes-without-regression-tests in last 50 commits. |
-| `test-quality` | `/test-review` | Scans tests against T01-T05 smell catalog (assertion-free / weak / mock-heavy / mystery guest / redundant). Runs project-defined-assertion-helper allowlist scan FIRST as the critical T01 false-positive guard. |
-| `test-economics` | `/test-review` | Suite-level cost vs value: snapshot-heavy (≥50% ratio), flakiness (markers + git-log signals), test:code LOC ratio extremes per module. Reports `deletable_lines` only for snapshot reductions — keeps twin-headline math honest. |
-| `seo-technical` | `/seo-review` | Technical SEO (25 pts) + Performance signals (10 pts): crawlability (robots.txt + sitemap.xml), canonicals, mobile viewport, hreflang, indexability, redirect config, image/font/script perf. Consumes orchestrator-passed sitemap URL probe results (4xx/5xx/redirect-chains/slow); score impact capped at 8 points so a fully broken sitemap can't zero out the dimension. No network access — orchestrator owns all HTTP. |
-| `seo-content` | `/seo-review` | On-Page SEO (25 pts): titles, meta descriptions, headings hierarchy, image alt text, OpenGraph + Twitter Cards, internal linking, content depth signals. Strict no-fabrication rule on `--fix` — only inserts TODO placeholders. |
-| `geo-generative` | `/seo-review` | Structured Data (20 pts) + Generative Engine readiness (20 pts): Schema.org JSON-LD coverage + rich-result eligibility, llms.txt presence + format, E-E-A-T signals (author bios, dates, citations), semantic content patterns (topic sentences, list/table structure, question-headings), AI-bot crawl access (GPTBot/ClaudeBot/PerplexityBot/etc.). Fetched best-practices brief is primary source of truth (GEO evolves fast); `brief_divergence` field surfaces when heuristic disagrees. |
-| `seo-gsc-insights` | `/seo-review` (only when `.seo-data/gsc/` present) | Ingests orchestrator-parsed Google Search Console CSV digests (queries, pages, 9 page-indexing per-reason CSVs) + 35-day git-history change digest. Emits 12 sub-dim info-only findings (`indexing_coverage`, `crawled_not_indexed`, `discovered_not_indexed`, `not_found_404` with routing-rename match for bulk-redirect detection, `redirect_hygiene`, `canonical_conflict`, `blocked_access`, `soft_404`, `server_errors`, `ctr_opportunity`, `position_band_opportunity`, `traffic_orphan`). `score_impact: 0` enforced agent-side AND orchestrator-side — GSC enriches recommendations, never the /100 score. Annotates each finding with `code_changed_since_gsc_window` (lowers certainty to 0.4 + rewrites recommendation when matched commit detected). |
+| `cleanup-files-code` | `/bx-clean` | Scans for unused files and dead code |
+| `cleanup-deps-config` | `/bx-clean` | Scans for unused deps and config cruft |
+| `cleanup-styles-tests` | `/bx-clean` | Scans for unused CSS and stale tests |
+| `arch-structure` | `/bx-arch` | Cyclomatic + cognitive complexity hotspots, coupling, layering violations, circular deps |
+| `arch-refactors` | `/bx-arch` | Catalog-driven complexity-reducing refactor opportunities (cites entry IDs) |
+| `arch-performance` | `/bx-arch` | High-precision performance findings (N+1, sync I/O in async, accidental O(n²), hot-loop invariants) |
+| `arch-simplification` | `/bx-arch` | Over-engineering / almost-dead code at sub-file granularity — single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config, near-duplicates. Reports `lines_deletable`. |
+| `test-coverage` | `/bx-tests` | Ranks coverage gaps by `security_keyword_density × churn × import_fan_in`. Heuristic mode (test-neighbor + public-symbol enum) by default; reads coverage reports when `--coverage` opted in. Also scans bug-fixes-without-regression-tests in last 50 commits. |
+| `test-quality` | `/bx-tests` | Scans tests against T01-T05 smell catalog (assertion-free / weak / mock-heavy / mystery guest / redundant). Runs project-defined-assertion-helper allowlist scan FIRST as the critical T01 false-positive guard. |
+| `test-economics` | `/bx-tests` | Suite-level cost vs value: snapshot-heavy (≥50% ratio), flakiness (markers + git-log signals), test:code LOC ratio extremes per module. Reports `deletable_lines` only for snapshot reductions — keeps twin-headline math honest. |
+| `seo-technical` | `/bx-seo` | Technical SEO (25 pts) + Performance signals (10 pts): crawlability (robots.txt + sitemap.xml), canonicals, mobile viewport, hreflang, indexability, redirect config, image/font/script perf. Consumes orchestrator-passed sitemap URL probe results (4xx/5xx/redirect-chains/slow); score impact capped at 8 points so a fully broken sitemap can't zero out the dimension. No network access — orchestrator owns all HTTP. |
+| `seo-content` | `/bx-seo` | On-Page SEO (25 pts): titles, meta descriptions, headings hierarchy, image alt text, OpenGraph + Twitter Cards, internal linking, content depth signals. Strict no-fabrication rule on `--fix` — only inserts TODO placeholders. |
+| `geo-generative` | `/bx-seo` | Structured Data (20 pts) + Generative Engine readiness (20 pts): Schema.org JSON-LD coverage + rich-result eligibility, llms.txt presence + format, E-E-A-T signals (author bios, dates, citations), semantic content patterns (topic sentences, list/table structure, question-headings), AI-bot crawl access (GPTBot/ClaudeBot/PerplexityBot/etc.). Fetched best-practices brief is primary source of truth (GEO evolves fast); `brief_divergence` field surfaces when heuristic disagrees. |
+| `seo-gsc-insights` | `/bx-seo` (only when `.seo-data/gsc/` present) | Ingests orchestrator-parsed Google Search Console CSV digests (queries, pages, 9 page-indexing per-reason CSVs) + 35-day git-history change digest. Emits 12 sub-dim info-only findings (`indexing_coverage`, `crawled_not_indexed`, `discovered_not_indexed`, `not_found_404` with routing-rename match for bulk-redirect detection, `redirect_hygiene`, `canonical_conflict`, `blocked_access`, `soft_404`, `server_errors`, `ctr_opportunity`, `position_band_opportunity`, `traffic_orphan`). `score_impact: 0` enforced agent-side AND orchestrator-side — GSC enriches recommendations, never the /100 score. Annotates each finding with `code_changed_since_gsc_window` (lowers certainty to 0.4 + rewrites recommendation when matched commit detected). |
 
 ## Optional: SessionStart hook for auto-orientation
 
-The repo ships `.claude/scripts/session-start-context.{sh,ps1}` — a cheap (<1s) read-only script that emits project orientation as system context at the start of every Claude Code session, before the user's first prompt. It eliminates the need to type `/resume-work` for routine starts (deep orientation still works via the explicit slash command).
+The repo ships `.claude/scripts/session-start-context.{sh,ps1}` — a cheap (<1s) read-only script that emits project orientation as system context at the start of every Claude Code session, before the user's first prompt. It eliminates the need to type `/bx-resume` for routine starts (deep orientation still works via the explicit slash command).
 
 **What it emits:**
 - Branch + uncommitted-file count + age of last commit
@@ -294,11 +294,11 @@ On Windows, swap to `.ps1` and prefix with `pwsh -NoProfile -File `.
 
 Add the same block to `~/.claude/settings.json`. The script is silent on non-repo dirs, so it stays out of the way for one-off chats.
 
-### Why a hook *and* `/resume-work`
+### Why a hook *and* `/bx-resume`
 
-The hook gets you oriented for *free* on every session start. `/resume-work` does the deeper work the hook deliberately skips: reads all docs in parallel, runs the health-check ladder, hydrates the task tracker via `TaskCreate`. Use the hook for routine starts; reach for `/resume-work` when returning to a project after a long absence or when you want the live task list.
+The hook gets you oriented for *free* on every session start. `/bx-resume` does the deeper work the hook deliberately skips: reads all docs in parallel, runs the health-check ladder, hydrates the task tracker via `TaskCreate`. Use the hook for routine starts; reach for `/bx-resume` when returning to a project after a long absence or when you want the live task list.
 
-If `disableSkillShellExecution: true` is set, the hook still runs (it's a hook, not a skill's shell injection) — but skill-internal `` !`<cmd>` `` blocks (e.g., in `/code-health-advice`) won't. That setting is independently warned about by the `start-claude` scripts.
+If `disableSkillShellExecution: true` is set, the hook still runs (it's a hook, not a skill's shell injection) — but skill-internal `` !`<cmd>` `` blocks (e.g., in `/bx-health`) won't. That setting is independently warned about by the `start-claude` scripts.
 
 ## Interop with Claude Code 2.1 features
 
@@ -306,11 +306,11 @@ These skills are standalone `.claude/` configuration, which is the approach [the
 
 A few harness-level features worth knowing about when using these skills:
 
-- **Gating destructive `--fix` runs in CI.** `code-cleanup --fix` and `review-deep --fix` are intentionally not self-gating (see the note in each SKILL.md). If you run them headlessly via `claude -p` and want an external approval step, configure a `PreToolUse` hook in `~/.claude/settings.json` scoped via the `if` field (added in 2.1.85) to the patterns you want to guard — e.g. `"if": "Bash(rm:*)"` or `"if": "Edit(*)"` — and return `"permissionDecision": "defer"`. The session exits with `stop_reason: "tool_deferred"`; resume via `claude -p --resume <session-id>`. Note: `defer` only works when the turn makes a single tool call — useful for a `rm` guard, not for orchestrating a multi-step `--fix` run. See [hooks docs](https://code.claude.com/docs/en/hooks) for the full decision flow and the `if` field spec.
+- **Gating destructive `--fix` runs in CI.** `bx-clean --fix` and `bx-review --fix` are intentionally not self-gating (see the note in each SKILL.md). If you run them headlessly via `claude -p` and want an external approval step, configure a `PreToolUse` hook in `~/.claude/settings.json` scoped via the `if` field (added in 2.1.85) to the patterns you want to guard — e.g. `"if": "Bash(rm:*)"` or `"if": "Edit(*)"` — and return `"permissionDecision": "defer"`. The session exits with `stop_reason: "tool_deferred"`; resume via `claude -p --resume <session-id>`. Note: `defer` only works when the turn makes a single tool call — useful for a `rm` guard, not for orchestrating a multi-step `--fix` run. See [hooks docs](https://code.claude.com/docs/en/hooks) for the full decision flow and the `if` field spec.
 - **Auto mode compatibility** (requires 2.1.83+; Max/Team/Enterprise/API plan; Opus 4.6/4.7 or Sonnet 4.6; not available on Pro). Auto mode (`defaultMode: "auto"`) uses a classifier to auto-approve actions without prompts. On entering auto mode, broad allow rules like `Bash(*)` or `Bash(python*)` are dropped, but narrow patterns like `Bash(npm test)` carry over. The 5 skills in this repo all declare narrow `allowed-tools` (`Bash(git:*)`, `Bash(npm:*)`, `Bash(find:*)`, etc.), so `--fix`, `--verify`, and `deep` all work under auto mode. If the classifier denies something unexpectedly, configure a `PermissionDenied` hook (added 2.1.89) that returns `{"retry": true}` to tell the model it may retry. See [permission modes](https://code.claude.com/docs/en/permission-modes) for the full spec.
-- **`disableSkillShellExecution`** (added 2.1.91). Hardens the harness by blocking inline shell from skills and slash commands. **Do not enable this here** — `code-cleanup --fix`, `review-deep --verify`, and `resume-work deep` all depend on shell execution and will break. Leave OFF. (The `start-claude` scripts warn if this flag is on in `~/.claude/settings.json`.)
-- **Plugin `bin/` on PATH** (added 2.1.91). If you install a marketplace plugin that ships `bin/check` or `bin/test`, `resume-work deep` picks it up automatically in the health check detection ladder.
-- **MCP `maxResultSizeChars`** (added 2.1.91). If a future `review-deep` run hits an MCP-backed file reader that truncates, the MCP server can set `_meta["anthropic/maxResultSizeChars"]` up to 500K per tool to return fuller context in one call.
+- **`disableSkillShellExecution`** (added 2.1.91). Hardens the harness by blocking inline shell from skills and slash commands. **Do not enable this here** — `bx-clean --fix`, `bx-review --verify`, and `bx-resume deep` all depend on shell execution and will break. Leave OFF. (The `start-claude` scripts warn if this flag is on in `~/.claude/settings.json`.)
+- **Plugin `bin/` on PATH** (added 2.1.91). If you install a marketplace plugin that ships `bin/check` or `bin/test`, `bx-resume deep` picks it up automatically in the health check detection ladder.
+- **MCP `maxResultSizeChars`** (added 2.1.91). If a future `bx-review` run hits an MCP-backed file reader that truncates, the MCP server can set `_meta["anthropic/maxResultSizeChars"]` up to 500K per tool to return fuller context in one call.
 - **MCP server setup.** Add servers via `claude mcp add --transport {http|sse|stdio} <name> <target>`. Three scopes are available: **local** (default, personal-to-this-project, stored in `~/.claude.json`), **project** (team-shared via `.mcp.json` at repo root), and **user** (all your projects, stored in `~/.claude.json`). Project scope is the one to use when a server should travel with the repo. Tool-search deferral keeps context cost low even with multiple servers, so the practical ceiling is tool-menu clarity and permission-prompt volume, not token budget. See the [MCP docs](https://code.claude.com/docs/en/mcp) for transport-specific setup.
 
 ## Documentation
