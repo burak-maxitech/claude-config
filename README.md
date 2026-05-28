@@ -81,7 +81,7 @@ git clone https://github.com/burak-maxitech/claude-config.git ~/Development/proj
 
 ```powershell
 # Windows
-git clone https://github.com/burak-maxitech/claude-config.git $env:USERPROFILE\Development\projects\claude-config
+git clone https://github.com/burak-maxitech/claude-config.git C:\Development\projects\claude-config
 ```
 
 ### 3. Add the `cc` launcher alias
@@ -94,8 +94,8 @@ echo 'alias cc="~/Development/projects/claude-config/.claude/scripts/start-claud
 
 ```powershell
 # Windows — run once, then restart PowerShell
-Unblock-File "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1"
-Add-Content $PROFILE 'function cc { & "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1" @args }'
+Unblock-File "C:\Development\projects\claude-config\.claude\scripts\start-claude.ps1"
+Add-Content $PROFILE 'function cc { & "C:\Development\projects\claude-config\.claude\scripts\start-claude.ps1" @args }'
 ```
 
 Then start any session with:
@@ -118,21 +118,48 @@ Edit skills in your clone → `git commit` → `git push`, then refresh your ins
 
 `cc` runs this refresh automatically on every launch. Otherwise updates are on-demand; because the plugin omits an explicit `version`, every pushed commit counts as a new version.
 
-### Migrating from the old symlink setup
+### Migrating an existing machine (from the old symlink setup)
 
-Earlier versions symlinked `~/.claude/skills` and `~/.claude/agents` into this repo. After installing the plugin, retire those symlinks so the old `bx-*` skills don't shadow the namespaced `/bx:*` ones:
+If a machine already has the old symlinked skills (`~/.claude/skills` + `~/.claude/agents` pointing into this repo) **and** an existing clone, migrate **in this order** — not the fresh-machine steps above:
+
+**1. Install the plugin** (Claude Code) — gives you `/bx:*` immediately, independent of the symlinks:
+
+```
+/plugin marketplace add burak-maxitech/claude-config
+/plugin install bx@burak-tools
+```
+
+**2. Update the existing clone** (don't re-clone — `git clone` fails on a non-empty dir):
 
 ```bash
-# Mac/Linux — only remove if they are symlinks pointing at this repo
+# Mac/Linux
+cd ~/Development/projects/claude-config && git pull
+```
+
+```powershell
+# Windows
+cd C:\Development\projects\claude-config; git pull
+```
+
+If `git pull` refuses or conflicts on `.claude/settings.local.json` (it's machine-local), stash first and keep your version: `git stash` → `git pull` → `git stash pop` (resolve in favor of your local entries if it conflicts).
+
+**3. Remove the now-dangling old symlinks** (`git pull` deleted their target `.claude/skills`):
+
+```bash
+# Mac/Linux — only removes if it's a symlink
 [ -L ~/.claude/skills ] && rm ~/.claude/skills
 [ -L ~/.claude/agents ] && rm ~/.claude/agents
 ```
 
 ```powershell
-# Windows
-(Get-Item "$env:USERPROFILE\.claude\skills").LinkType -eq "SymbolicLink" -and (Remove-Item "$env:USERPROFILE\.claude\skills")
-(Get-Item "$env:USERPROFILE\.claude\agents").LinkType -eq "SymbolicLink" -and (Remove-Item "$env:USERPROFILE\.claude\agents")
+# Windows — robust: tolerates dangling links + removes directory symlinks cleanly
+foreach ($p in "$env:USERPROFILE\.claude\skills","$env:USERPROFILE\.claude\agents") {
+  $i = Get-Item $p -Force -ErrorAction SilentlyContinue
+  if ($i -and $i.LinkType -eq 'SymbolicLink') { cmd /c rmdir "$p"; Write-Host "removed symlink: $p" }
+}
 ```
+
+**4. Restart Claude Code.** Verify with `/bx:health`; the old `/bx-*` names should be gone, leaving only the namespaced `/bx:*` skills.
 
 ## Syncing Changes
 
