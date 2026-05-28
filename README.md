@@ -58,28 +58,65 @@ claude-config/                         # marketplace repo
 
 ## Setup on a New Machine
 
-The toolkit installs as a Claude Code **plugin** (`bx`) sourced from this repo's GitHub marketplace — no symlinks, cross-platform, and skills are namespaced `/bx:<name>` so they never collide with built-ins.
+The toolkit is a Claude Code **plugin** (`bx`) installed from this repo's GitHub marketplace — no symlinks, cross-platform, skills namespaced `/bx:<name>`. The optional `cc` launcher (numbered project picker → plugin refresh → launch) lives *inside* the repo, so **clone the repo if you want `cc`** (steps 2–3).
+
+### 1. Install the plugin (required)
 
 Inside Claude Code:
 
 ```
-# 1. Register the marketplace (fetched from GitHub) + install the plugin
 /plugin marketplace add burak-maxitech/claude-config
 /plugin install bx@burak-tools
-
-# 2. Verify — skills register under the bx: namespace
 /bx:health
 ```
 
-The repo is private; the marketplace clones with your existing GitHub auth (same as `git push`). You do **not** need a local clone for the skills to work — the install fetches the plugin from GitHub directly.
+The repo is private; the marketplace clones with your existing GitHub auth (same as `git push`). This alone gives you every `/bx:*` skill in all sessions — no local clone needed.
 
-**For development** (editing the skills themselves), also clone the repo:
+### 2. Clone the repo (only if you want the `cc` launcher or to edit skills)
 
 ```bash
+# Mac/Linux
 git clone https://github.com/burak-maxitech/claude-config.git ~/Development/projects/claude-config
 ```
 
-Then the loop is: edit in your clone → `git commit` → `git push` → pull the changes into your install with `/plugin marketplace update burak-tools && /plugin update bx`. Updates are **on-demand**; because the plugin omits an explicit `version`, every pushed commit counts as a new version.
+```powershell
+# Windows
+git clone https://github.com/burak-maxitech/claude-config.git $env:USERPROFILE\Development\projects\claude-config
+```
+
+### 3. Add the `cc` launcher alias
+
+```bash
+# Mac/Linux — run once, then: source ~/.zshrc
+chmod +x ~/Development/projects/claude-config/.claude/scripts/start-claude.sh
+echo 'alias cc="~/Development/projects/claude-config/.claude/scripts/start-claude.sh"' >> ~/.zshrc
+```
+
+```powershell
+# Windows — run once, then restart PowerShell
+Unblock-File "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1"
+Add-Content $PROFILE 'function cc { & "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1" @args }'
+```
+
+Then start any session with:
+
+```bash
+cc               # numbered picker — "Which project do you want to work on today?"
+cc my-project    # launch a project directly
+```
+
+`cc` refreshes the `bx` plugin from the marketplace, opens (and pulls) your chosen project, checks for Claude Code updates, and launches Claude Code.
+
+### Updating
+
+Edit skills in your clone → `git commit` → `git push`, then refresh your install:
+
+```
+/plugin marketplace update burak-tools
+/plugin update bx
+```
+
+`cc` runs this refresh automatically on every launch. Otherwise updates are on-demand; because the plugin omits an explicit `version`, every pushed commit counts as a new version.
 
 ### Migrating from the old symlink setup
 
@@ -96,33 +133,6 @@ Earlier versions symlinked `~/.claude/skills` and `~/.claude/agents` into this r
 (Get-Item "$env:USERPROFILE\.claude\skills").LinkType -eq "SymbolicLink" -and (Remove-Item "$env:USERPROFILE\.claude\skills")
 (Get-Item "$env:USERPROFILE\.claude\agents").LinkType -eq "SymbolicLink" -and (Remove-Item "$env:USERPROFILE\.claude\agents")
 ```
-
-## Quick Start
-
-After setup, create a shell alias for quick access:
-
-```bash
-# Mac/Linux — run once, then restart terminal (or run: source ~/.zshrc)
-echo 'alias cc="~/Development/projects/claude-config/.claude/scripts/start-claude.sh"' >> ~/.zshrc
-```
-```powershell
-# Windows — run once, then restart PowerShell
-Add-Content $PROFILE 'function cc { & "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1" @args }'
-```
-
-> **Mac/Linux first run:** Make the script executable first:
-> `chmod +x ~/Development/projects/claude-config/.claude/scripts/start-claude.sh`
-
-> **Windows first run:** You may need to unblock the script first:
-> `Unblock-File "$env:USERPROFILE\Development\projects\claude-config\.claude\scripts\start-claude.ps1"`
-
-Then start any session with:
-```bash
-cc my-project    # launch directly
-cc               # interactive project picker
-```
-
-The script pulls project changes, checks for Claude updates, and launches Claude Code. (Note: the launcher's legacy symlink check is being retired alongside the move to the `bx` plugin.)
 
 ## Syncing Changes
 
