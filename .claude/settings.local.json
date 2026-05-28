@@ -30,7 +30,19 @@
       "Bash(echo \"=== EXIT: $? ===\")",
       "Bash(grep -nE \"^\\\\| \\\\`/bx-\" README.md)",
       "Bash(python3 -m py_compile .claude/skills/bx-seo/references/gsc-parse-helper.py)",
-      "Bash(python3 -c \"import json; json.load\\(open\\('.claude/settings.local.json'\\)\\); print\\('✓ valid JSON'\\)\")"
+      "Bash(python3 -c \"import json; json.load\\(open\\('.claude/settings.local.json'\\)\\); print\\('✓ valid JSON'\\)\")",
+      "Bash(claude mcp *)",
+      "Bash(claude plugin *)",
+      "Read(//Users/burakarik/**)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(set -e)",
+      "Bash(perl -i -pe 's{/bx-\\(__TRACKED_VAR__\\)\\\\b}{/bx:$1}g' README.md workflow.md)",
+      "Bash(grep -cE '/bx-\\(__TRACKED_VAR__\\)\\\\b' README.md workflow.md)",
+      "Bash(perl -i -pe 's/\\\\bbx-\\(__TRACKED_VAR__\\)\\\\b/bx:$1/g' README.md workflow.md)",
+      "Bash(grep -cE '\\\\bbx-\\(__TRACKED_VAR__\\)\\\\b' README.md workflow.md)",
+      "Bash(perl -i -pe 's/\"Skill\\\\\\(bx-\\(docs|plan|arch|clean|health|resume|review|seo|tests\\)\\\\\\)\"/\"Skill\\(bx:$1\\)\"/g' .claude/settings.local.json)",
+      "Bash(grep -iA1 \"plugin\")",
+      "Bash(grep -rnE 'marketplace add \\(~|/Users|\\\\$CONFIG|\\\\$ConfigRepo|\\\\.\\\\/|/Users/burakarik\\)' README.md workflow.md CLAUDE.md .claude/scripts/)"
     ]
   }
 }
