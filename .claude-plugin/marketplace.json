@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "burak-tools",
+  "owner": {
+    "name": "Burak Arık",
+    "email": "burak.arik@gmail.com"
+  },
+  "description": "Burak's personal Claude Code toolkit marketplace.",
+  "plugins": [
+    {
+      "name": "bx",
+      "source": "./bx",
+      "description": "Engineering toolkit: review, architecture, tests, SEO/GEO, cleanup, health, planning, resume, docs. Skills invoke as /bx:<name>.",
+      "category": "development",
+      "tags": ["code-review", "architecture", "testing", "seo", "cleanup", "documentation"]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "bx",
+  "description": "Burak's personal engineering toolkit — code review, architecture audit, test audit, SEO/GEO audit, cleanup, health routing, planning, session resume, and docs management. Skills invoke as /bx:<name>.",
+  "author": {
+    "name": "Burak Arık"
+  },
+  "homepage": "https://github.com/burak-maxitech/claude-config",
+  "repository": "https://github.com/burak-maxitech/claude-config",
+  "license": "MIT",
+  "keywords": [
+    "code-review",
+    "architecture",
+    "testing",
+    "seo",
+    "geo",
+    "cleanup",
+    "documentation",
+    "planning",
+    "workflow"
+  ]
+}
