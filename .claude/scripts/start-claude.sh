@@ -19,15 +19,36 @@ GRAY='\033[0;37m'; DIM='\033[2m'; CYAN='\033[0;36m'; RESET='\033[0m'
 
 PROJECT_NAME="${1:-}"
 
-# --- Project picker (scan PROJECTS_ROOT if no name given) ---
+# --- Project picker (numbered selection if no name given) ---
 if [ -z "$PROJECT_NAME" ]; then
-    echo -e "\n${CYAN}Available projects:${RESET}"
-    find "$PROJECTS_ROOT" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | while read -r dir; do
-        echo -e "  ${GRAY}$dir${RESET}"
+    # Build a sorted array of project directory names (bash 3.2-safe — no mapfile)
+    projects=()
+    while IFS= read -r dir; do
+        projects+=("$dir")
+    done < <(find "$PROJECTS_ROOT" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
+
+    if [ "${#projects[@]}" -eq 0 ]; then
+        echo -e "${RED}No projects found in $PROJECTS_ROOT. Exiting.${RESET}"
+        exit 1
+    fi
+
+    echo -e "\n${CYAN}Which project do you want to work on today?${RESET}"
+    i=1
+    for p in "${projects[@]}"; do
+        echo -e "  ${GRAY}${i}-${p}${RESET}"
+        i=$((i + 1))
     done
     echo ""
-    read -rp "Project name: " PROJECT_NAME
-    [ -z "$PROJECT_NAME" ] && { echo -e "${RED}No project name provided. Exiting.${RESET}"; exit 1; }
+    read -rp "Enter number: " sel
+
+    if [[ "$sel" =~ ^[0-9]+$ ]] && [ "$sel" -ge 1 ] && [ "$sel" -le "${#projects[@]}" ]; then
+        PROJECT_NAME="${projects[$((sel - 1))]}"
+    elif [ -n "$sel" ] && [ -d "$PROJECTS_ROOT/$sel" ]; then
+        PROJECT_NAME="$sel"   # typed a name instead of a number — accept it
+    else
+        echo -e "${RED}Invalid selection: '$sel'. Exiting.${RESET}"
+        exit 1
+    fi
 fi
 
 PROJECT_PATH="$PROJECTS_ROOT/$PROJECT_NAME"

@@ -14,16 +14,25 @@ param(
 $ProjectsRoot = "C:\Development\projects"
 $ConfigRepo = "$ProjectsRoot\claude-config"
 
-# --- Project picker (scan ProjectsRoot if no name given) ---
+# --- Project picker (numbered selection if no name given) ---
 if (-not $ProjectName) {
-    Write-Host "`nAvailable projects:" -ForegroundColor Cyan
-    Get-ChildItem -Path $ProjectsRoot -Directory |
-        Sort-Object Name |
-        ForEach-Object { Write-Host "  $($_.Name)" -ForegroundColor Gray }
+    $projects = @(Get-ChildItem -Path $ProjectsRoot -Directory | Sort-Object Name)
+    if ($projects.Count -eq 0) {
+        Write-Host "No projects found in $ProjectsRoot. Exiting." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "`nWhich project do you want to work on today?" -ForegroundColor Cyan
+    for ($i = 0; $i -lt $projects.Count; $i++) {
+        Write-Host ("  {0}-{1}" -f ($i + 1), $projects[$i].Name) -ForegroundColor Gray
+    }
     Write-Host ""
-    $ProjectName = Read-Host "Project name"
-    if (-not $ProjectName) {
-        Write-Host "No project name provided. Exiting." -ForegroundColor Red
+    $sel = Read-Host "Enter number"
+    if ($sel -match '^\d+$' -and [int]$sel -ge 1 -and [int]$sel -le $projects.Count) {
+        $ProjectName = $projects[[int]$sel - 1].Name
+    } elseif ($sel -and (Test-Path "$ProjectsRoot\$sel")) {
+        $ProjectName = $sel   # typed a name instead of a number — accept it
+    } else {
+        Write-Host "Invalid selection: '$sel'. Exiting." -ForegroundColor Red
         exit 1
     }
 }
