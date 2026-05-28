@@ -58,25 +58,28 @@ claude-config/                         # marketplace repo
 
 ## Setup on a New Machine
 
-The toolkit installs as a Claude Code **plugin** (`bx`) from a local marketplace — no symlinks, cross-platform, and skills are namespaced `/bx:<name>` so they never collide with built-ins.
+The toolkit installs as a Claude Code **plugin** (`bx`) sourced from this repo's GitHub marketplace — no symlinks, cross-platform, and skills are namespaced `/bx:<name>` so they never collide with built-ins.
 
-```bash
-# 1. Clone this repo (any platform)
-git clone https://github.com/burak-maxitech/claude-config.git ~/Development/projects/claude-config
-```
-
-Then, inside Claude Code:
+Inside Claude Code:
 
 ```
-# 2. Register the marketplace + install the plugin
-/plugin marketplace add ~/Development/projects/claude-config
+# 1. Register the marketplace (fetched from GitHub) + install the plugin
+/plugin marketplace add burak-maxitech/claude-config
 /plugin install bx@burak-tools
 
-# 3. Verify — skills register under the bx: namespace
+# 2. Verify — skills register under the bx: namespace
 /bx:health
 ```
 
-Updates: `git pull` in the repo, then `/plugin marketplace update burak-tools` and `/plugin update bx`. Because the plugin omits an explicit `version`, every commit is treated as a new version.
+The repo is private; the marketplace clones with your existing GitHub auth (same as `git push`). You do **not** need a local clone for the skills to work — the install fetches the plugin from GitHub directly.
+
+**For development** (editing the skills themselves), also clone the repo:
+
+```bash
+git clone https://github.com/burak-maxitech/claude-config.git ~/Development/projects/claude-config
+```
+
+Then the loop is: edit in your clone → `git commit` → `git push` → pull the changes into your install with `/plugin marketplace update burak-tools && /plugin update bx`. Updates are **on-demand**; because the plugin omits an explicit `version`, every pushed commit counts as a new version.
 
 ### Migrating from the old symlink setup
 

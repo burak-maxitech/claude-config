@@ -50,7 +50,7 @@ if ($pluginList -match "bx@burak-tools") {
     Write-Host "  bx plugin installed" -ForegroundColor Green
 } else {
     Write-Host "  Warning: bx plugin not detected. Skills (/bx:*) may not load." -ForegroundColor DarkYellow
-    Write-Host "  Fix (in Claude Code): /plugin marketplace add $ConfigRepo" -ForegroundColor Gray
+    Write-Host "  Fix (in Claude Code): /plugin marketplace add burak-maxitech/claude-config" -ForegroundColor Gray
     Write-Host "                        /plugin install bx@burak-tools" -ForegroundColor Gray
 }
 

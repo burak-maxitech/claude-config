@@ -58,7 +58,7 @@ if command -v claude > /dev/null 2>&1 && claude plugin list 2>/dev/null | grep -
     echo -e "  ${GREEN}bx plugin installed${RESET}"
 else
     echo -e "  ${DIM}Warning: bx plugin not detected. Skills (/bx:*) may not load.${RESET}"
-    echo -e "  ${GRAY}Fix (in Claude Code): /plugin marketplace add $CONFIG_REPO${RESET}"
+    echo -e "  ${GRAY}Fix (in Claude Code): /plugin marketplace add burak-maxitech/claude-config${RESET}"
     echo -e "  ${GRAY}                      /plugin install bx@burak-tools${RESET}"
 fi
 
