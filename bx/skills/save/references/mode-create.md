@@ -68,7 +68,7 @@ When no documentation exists, generate all files from codebase analysis.
 # Claude Code Context
 
 > **Purpose:** Maintains context across AI coding sessions.
-> **Update:** Run `/bx:docs` at the end of each coding session.
+> **Update:** Run `/bx:save` at the end of each coding session.
 > **Resume:** Run `/bx:resume` at the start of each coding session.
 
 **Last Updated:** [DATE AND TIME]
@@ -126,7 +126,7 @@ Initial setup completed — documentation generated from codebase analysis.
 | [Detected pattern/choice] | [Inferred or documented reason] |
 | [Another decision] | [Reason] |
 
-<!-- Reference files (docs/completed-work.md, docs/key-decisions.md, docs/session-history.md) will be created by /bx:docs as content accumulates -->
+<!-- Reference files (docs/completed-work.md, docs/key-decisions.md, docs/session-history.md) will be created by /bx:save as content accumulates -->
 
 ---
 
@@ -162,7 +162,7 @@ Initial setup completed — documentation generated from codebase analysis.
 - Created CLAUDE.md, README.md, docs/PRD.md
 - Next: review generated docs, add missing context, begin development
 
-<!-- docs/session-history.md will be created by /bx:docs on subsequent sessions -->
+<!-- docs/session-history.md will be created by /bx:save on subsequent sessions -->
 ```
 
 ## Create: docs/PRD.md Template

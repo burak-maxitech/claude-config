@@ -190,7 +190,7 @@ After draining, verify completeness:
    ```markdown
    # Session History Archive
 
-   > Auto-managed by `/bx:docs`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
+   > Auto-managed by `/bx:save`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
 
    ---
    ```
@@ -297,7 +297,7 @@ Session history is split between CLAUDE.md (brief) and docs/session-history.md (
      ```markdown
      # Session History Archive
 
-     > Auto-managed by `/bx:docs`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
+     > Auto-managed by `/bx:save`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
 
      ---
      ```
@@ -490,7 +490,7 @@ The presence of the rollup-format note (see Step 5.4) acts as a "this project ha
 
 For each session needing compression:
 
-1. **Extract a one-line summary** from the existing entry — pull the most architecturally significant 1-3 bullets from "What happened" and condense. Keep skill names, flag names, and concrete artifacts (file names, decision names) since those are what future-readers grep for. Drop process narration ("ran /bx:docs", "committed and pushed", "user asked").
+1. **Extract a one-line summary** from the existing entry — pull the most architecturally significant 1-3 bullets from "What happened" and condense. Keep skill names, flag names, and concrete artifacts (file names, decision names) since those are what future-readers grep for. Drop process narration ("ran /bx:save", "committed and pushed", "user asked").
 2. **Find associated commit hashes** using a single pre-fetched git log. Before the per-session compression loop, run ONCE:
    ```
    git log --since="<earliest-compressible-session-date>" --until="<latest-compressible-session-date +1d>" --pretty=format:'%h %ad %s' --date=short
@@ -508,7 +508,7 @@ For each session needing compression:
 
 ### 5.4 Add Rollup Note (First Run Only)
 
-If `session-history.md` does not already contain the rollup note (i.e., this is the first run and the user said yes in Step 5.2), insert it after the existing `> Auto-managed by /bx:docs...` line:
+If `session-history.md` does not already contain the rollup note (i.e., this is the first run and the user said yes in Step 5.2), insert it after the existing `> Auto-managed by /bx:save...` line:
 
 ```markdown
 > **Note:** Sessions older than the 5 most recent are compressed to one-liners with commit hashes. Full prose for compressed sessions lives in git history (`git show <hash>`).

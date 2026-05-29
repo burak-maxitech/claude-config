@@ -81,7 +81,7 @@ For UPDATE mode the change report is assembled from the `save-writer` subagent's
 - [ ] Environment variables documented
 - [ ] CLAUDE.md has ALL required sections in lean format
 - [ ] CLAUDE.md has "Last Updated" timestamp
-- [ ] CLAUDE.md does NOT reference files that don't exist yet (reference files created on demand by /bx:docs)
+- [ ] CLAUDE.md does NOT reference files that don't exist yet (reference files created on demand by /bx:save)
 - [ ] Templates ready for future updates
 - [ ] Didn't overwrite existing docs/ files
 
@@ -116,5 +116,5 @@ For UPDATE mode the change report is assembled from the `save-writer` subagent's
 
 ## Post-Verification Note
 
-If the user plans to continue working after `/bx:docs`, suggest:
+If the user plans to continue working after `/bx:save`, suggest:
 > "To free up context consumed by the docs update, consider running `/compact` before continuing work."

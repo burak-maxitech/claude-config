@@ -16,7 +16,7 @@
 | **Architecture Audit** | `/bx:arch` | Repo-wide complexity + refactor + perf + over-engineering audit (4 dimensions, reports `lines_deletable`) |
 | **Test Suite Audit** | `/bx:tests` | Repo-wide test health — coverage gaps on critical paths + smells (T01-T05) + suite economics. Twin headline metric. |
 | **SEO + GEO Audit** | `/bx:seo` | Repo-wide SEO + Generative Engine Optimization audit for web projects. Fetches current best practices every run. Probes sitemap URL health. **Optional GSC integration via Search Console API** (Performance via `searchanalytics.query` + per-URL Indexing via `urlInspection.index.inspect`). Configure `.seo-data/gsc/config.yaml` `site_url:` after `gcloud auth application-default login`. Score `/100` tracked over time. |
-| **End Session** | `/bx:docs` | Save progress & context |
+| **End Session** | `/bx:save` | Save progress & context |
 
 ---
 
@@ -179,7 +179,7 @@ Long sessions bloat the context window with tool results, scan outputs, and earl
 
 **Run `/compact` proactively — earlier rather than later.** Once the context bar is visibly consumed and the main task ahead is well-defined, compacting immediately is cheaper than waiting until the context is full. A useful form is `/compact focus on <next task>` — Claude keeps the carry-forward summary pointed at what's about to happen next.
 
-This generalizes the compact hints already emitted by `/bx:resume` and `/bx:docs`. Those two skills suggest compacting after their own substantial work; the same habit applies mid-session whenever a chunk of context (failed approach, large file read, long grep) is no longer needed.
+This generalizes the compact hints already emitted by `/bx:resume` and `/bx:save`. Those two skills suggest compacting after their own substantial work; the same habit applies mid-session whenever a chunk of context (failed approach, large file read, long grep) is no longer needed.
 
 Project-root `CLAUDE.md` survives compaction — Claude re-reads it from disk after `/compact` — so project-wide context is not lost. Nested CLAUDE.md files in subdirectories reload lazily the next time Claude reads a file there. Instructions given only in conversation (not in any CLAUDE.md) may not survive: put anything you want to persist into CLAUDE.md or a `.claude/rules/` file.
 
@@ -189,7 +189,7 @@ Project-root `CLAUDE.md` survives compaction — Claude re-reads it from disk af
 
 ```bash
 # Save your progress
-/bx:docs
+/bx:save
 
 # Commit your project work
 git add .
@@ -206,7 +206,7 @@ git push
 cd -
 ```
 
-**What `/bx:docs` does:**
+**What `/bx:save` does:**
 - Drains live task list — syncs completed/in-progress/pending tasks back to CLAUDE.md
 - Updates CLAUDE.md with session history, status, and next steps
 - Archives old sessions (>3) to `docs/session-history.md` to keep CLAUDE.md lean
@@ -254,7 +254,7 @@ cd -
 
 ---
 
-### /bx:docs
+### /bx:save
 
 **When:** End of every session (or after major milestones)
 
@@ -508,7 +508,7 @@ git init
 claude
 
 # 4. Generate full documentation
-/bx:docs
+/bx:save
 
 # 5. Plan the first feature
 /bx:plan
@@ -516,7 +516,7 @@ claude
 # 6. Build it!
 
 # 7. End session
-/bx:docs
+/bx:save
 ```
 
 ---
@@ -538,7 +538,7 @@ claude
 /code-review [files you modified]
 
 # 5. End session
-/bx:docs
+/bx:save
 ```
 
 ---
@@ -564,7 +564,7 @@ claude
 /code-review [new files]
 
 # 6. End session
-/bx:docs
+/bx:save
 ```
 
 ---
@@ -584,7 +584,7 @@ claude
 /code-review [modified files]
 
 # 5. End session
-/bx:docs
+/bx:save
 ```
 
 ---
@@ -611,7 +611,7 @@ claude
 #    (the brief is self-contained — paste and go)
 
 # 7. End session
-/bx:docs
+/bx:save
 ```
 
 For mechanical refactors only (single-file, non-API-breaking) you can skip step 5 and run `/bx:arch --fix` directly — it gates per finding with a diff preview. Anything cross-file or API-touching gets auto-routed to `--plan` regardless. Similarly, `/bx:tests --fix` walks T01 (assertion-free) deletions with per-finding diff preview.
@@ -635,10 +635,10 @@ PR:       no open PR
 Bucket:   A — Pre-commit cleanup
 
 Recommended flow:
-  /code-review → /bx:review → /bx:review --verify → commit → /bx:docs
+  /code-review → /bx:review → /bx:review --verify → commit → /bx:save
 
 Alternative: if this touches auth/payments/migrations
-  /code-review → /bx:review --security → /bx:review --verify → commit → push → /code-review ultra <PR#> → merge → /bx:docs
+  /code-review → /bx:review --security → /bx:review --verify → commit → push → /code-review ultra <PR#> → merge → /bx:save
 ```
 
 The buckets cover: pre-commit cleanup, pre-merge verification, post-ship audit, orient + audit (unfamiliar repo), and ambient improvement. **The advisor never invokes anything** — read the flow, then run it yourself.
@@ -657,14 +657,14 @@ project/
 ├── CLAUDE.md                  # Session context (AI reads this first)
 └── docs/
     ├── [project]-prd.md       # Full specifications
-    ├── session-history.md     # Archived sessions (auto-managed by /bx:docs)
+    ├── session-history.md     # Archived sessions (auto-managed by /bx:save)
     └── [other docs].md        # Supporting documentation
 ```
 
 Additionally, Claude Code maintains auto-memory at:
 ```
 ~/.claude/projects/<project-path>/memory/
-├── MEMORY.md                  # Stable project facts (auto-synced by /bx:docs)
+├── MEMORY.md                  # Stable project facts (auto-synced by /bx:save)
 └── [topic].md                 # Detailed topic notes (optional)
 ```
 
@@ -673,7 +673,7 @@ Additionally, Claude Code maintains auto-memory at:
 | **README.md** | Quick start, public docs | When features ship |
 | **CLAUDE.md** | AI context, session tracking | Every session |
 | **docs/*.md** | Detailed specs, PRD | When requirements change |
-| **docs/session-history.md** | Archived session logs (>3 sessions) | Automatically by `/bx:docs` |
+| **docs/session-history.md** | Archived session logs (>3 sessions) | Automatically by `/bx:save` |
 | **auto-memory MEMORY.md** | Stable facts (tech stack, commands, paths) | When project fundamentals change |
 
 ---
@@ -683,7 +683,7 @@ Additionally, Claude Code maintains auto-memory at:
 ### Do's
 
 - Always start with `/bx:resume`
-- Always end with `/bx:docs`
+- Always end with `/bx:save`
 - Plan features before building (`/bx:plan`)
 - Review code before committing (`/code-review` quick or `/bx:review` thorough)
 - Keep CLAUDE.md updated - it's your project memory
@@ -692,7 +692,7 @@ Additionally, Claude Code maintains auto-memory at:
 ### Don'ts
 
 - Don't skip `/bx:resume` - context matters
-- Don't forget `/bx:docs` - you'll lose session context
+- Don't forget `/bx:save` - you'll lose session context
 - Don't start coding without planning complex features
 - Don't let CLAUDE.md get stale
 - Don't ignore code review suggestions
@@ -745,12 +745,12 @@ Ctrl+C                           # Exit Claude
 |-------|----------|
 | Claude doesn't know project context | Run `/bx:resume` first |
 | Lost track of what was done | Check CLAUDE.md Session History or `docs/session-history.md` for older sessions |
-| Starting fresh on old project | Run `/bx:docs` to rebuild context |
+| Starting fresh on old project | Run `/bx:save` to rebuild context |
 | Too many questions in `/bx:plan` | Say "let's skip that" or "good enough" |
 | `/bx:clean` too aggressive | Only delete "Safe to Delete" items, or avoid `--aggressive` flag |
 | `/bx:review` reviewing too much | Use `--staged` or specify files instead of running with no args |
-| Auto-memory out of date | Run `/bx:docs` — it syncs stable facts automatically |
-| CLAUDE.md too long | `/bx:docs` auto-archives sessions >3 to `docs/session-history.md` |
+| Auto-memory out of date | Run `/bx:save` — it syncs stable facts automatically |
+| CLAUDE.md too long | `/bx:save` auto-archives sessions >3 to `docs/session-history.md` |
 
 ---
 
@@ -774,7 +774,7 @@ Commands are stored in:
 │       ├── bx:review/
 │       ├── bx:seo/
 │       ├── bx:tests/
-│       └── bx:docs/
+│       └── bx:save/
 ├── .gitignore
 ├── Workflow.md              # This file
 └── README.md
@@ -797,7 +797,7 @@ Installed as the `bx` plugin via the `burak-tools` marketplace (`/plugin install
 | | Set up GitHub sync across machines |
 | Feb 2026 | Optimized all commands for Claude Opus 4.6 capabilities |
 | | `/bx:resume` — parallel doc reads, parallel git scans, auto-memory awareness, task hydration |
-| | `/bx:docs` — task list drain, session history archiving, auto-memory sync |
+| | `/bx:save` — task list drain, session history archiving, auto-memory sync |
 | | `/bx:plan` — parallel context loading, Plan Mode integration, task hydration from plan |
 | | `/code-review` — git-aware diffing (uncommitted/staged/PR/last-commit), convention detection, enforced file:line refs |
 | | `/bx:clean` — parallel subagent scanning, summary dashboard, Quick Wins, scope filters (--code/--deps/--css/--aggressive) |

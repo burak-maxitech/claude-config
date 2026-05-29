@@ -13,7 +13,7 @@ Interview me exhaustively about a feature before any implementation begins.
 
 **Companion skills:**
 - `/bx:resume` - Start of session context
-- `/bx:docs` - End of session documentation
+- `/bx:save` - End of session documentation
 
 ---
 

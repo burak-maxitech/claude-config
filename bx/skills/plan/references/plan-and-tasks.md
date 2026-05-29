@@ -42,7 +42,7 @@ For each implementation phase/step in the approved plan:
 - **One task per logical unit of work** — don't create a task per file, create a task per deliverable
 - **Limit to ~10 tasks max** — group small steps if there are many phases
 - **Include testing tasks** — add a task for writing tests after each major phase
-- **Skip documentation tasks** — `/bx:docs` handles that at end of session
+- **Skip documentation tasks** — `/bx:save` handles that at end of session
 
 ### Phase Gating — Verify Before Proceeding
 Each phase is **gated**: do NOT start the next phase until the current phase passes its gate check.

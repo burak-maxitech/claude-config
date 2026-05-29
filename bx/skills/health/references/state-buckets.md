@@ -15,7 +15,7 @@ Each bucket maps an observable repo state to a recommended skill flow. The orche
 
 **Recommended flow:**
 ```
-/simplify → /code-review → /bx:review → /bx:review --verify → commit → /bx:docs
+/simplify → /code-review → /bx:review → /bx:review --verify → commit → /bx:save
 ```
 
 Why this order:
@@ -23,11 +23,11 @@ Why this order:
 - `/code-review` (built-in, lightweight) next — scans the diff for correctness bugs at a chosen effort level. Best signal closest to the change.
 - `/bx:review` next for diff-scoped correctness/security — same diff scope but more rigorous (custom skill with codebase-convention scan + git-blame context).
 - `/bx:review --verify` runs your test/lint suite (parallel-backgrounded since S19) — catches regressions before commit.
-- Commit, then `/bx:docs` at session end so the work is captured in `CLAUDE.md`.
+- Commit, then `/bx:save` at session end so the work is captured in `CLAUDE.md`.
 
 **Alternative:** *If the change touches auth, payments, data migrations, or anything that pages someone at 3 AM:*
 ```
-/code-review → /bx:review --security → /bx:review --verify → commit → push → /code-review ultra <PR#> → merge → /bx:docs
+/code-review → /bx:review --security → /bx:review --verify → commit → push → /code-review ultra <PR#> → merge → /bx:save
 ```
 
 `/code-review ultra` adds 5–20 cloud subagents (10–20 min) and is overkill for routine work but the right call for high-risk code.
@@ -109,19 +109,19 @@ The default `/bx:arch` report includes a "Code we can delete: N lines" top-line 
 
 **Recommended flow:**
 ```
-/bx:resume deep → /bx:clean → /bx:arch → /bx:tests → /bx:docs
+/bx:resume deep → /bx:clean → /bx:arch → /bx:tests → /bx:save
 ```
 
 Why:
-- `/bx:resume deep` reads the full reference set (`docs/session-history.md`, `docs/completed-work.md`, `docs/key-decisions.md`) and runs the health-check ladder. If `CLAUDE.md` is missing, it surfaces the gap and recommends `/bx:docs` first.
+- `/bx:resume deep` reads the full reference set (`docs/session-history.md`, `docs/completed-work.md`, `docs/key-decisions.md`) and runs the health-check ladder. If `CLAUDE.md` is missing, it surfaces the gap and recommends `/bx:save` first.
 - `/bx:clean` next because it works without `CLAUDE.md` context — pure structural deletion signal.
 - `/bx:arch` for the structural picture once dead code is gone.
 - `/bx:tests` for the test suite picture — both coverage gaps and waste. Surfaces what to write next and what to delete. Skip if `git ls-files` shows no test files.
-- `/bx:docs` at the end populates `CLAUDE.md` and auto-memory so the next session starts oriented.
+- `/bx:save` at the end populates `CLAUDE.md` and auto-memory so the next session starts oriented.
 
 **Alternative:** *If `CLAUDE.md` is completely missing and the repo isn't yours:*
 ```
-/bx:docs (CREATE mode, scaffolds CLAUDE.md from the codebase) → /bx:resume → /bx:arch
+/bx:save (CREATE mode, scaffolds CLAUDE.md from the codebase) → /bx:resume → /bx:arch
 ```
 
 Build the doc surface first; everything downstream is easier with it.
@@ -140,7 +140,7 @@ Build the doc surface first; everything downstream is easier with it.
 
 **Recommended flow:**
 ```
-/bx:arch (or /bx:tests for test suite focus, or /bx:seo when is_web: true) → pick one finding → /bx:plan → implement → /code-review → /bx:docs
+/bx:arch (or /bx:tests for test suite focus, or /bx:seo when is_web: true) → pick one finding → /bx:plan → implement → /code-review → /bx:save
 ```
 
 Why:
@@ -151,7 +151,7 @@ Why:
 
 **Alternative:** *If `CLAUDE.md` Next Steps already lists a specific item you want to tackle:*
 ```
-/bx:plan → implement → /code-review → /bx:review --verify → /bx:docs
+/bx:plan → implement → /code-review → /bx:review --verify → /bx:save
 ```
 
 Skip the audit — you already know what to work on. Go directly into the planning + implement loop.
@@ -175,6 +175,6 @@ When two buckets match the signal pattern roughly equally:
 
 - **Active debugging / incident response.** This skill assumes calm-water decision-making. If something is on fire, the user reaches for grep, debugger, and `/bx:review --security` directly — not a routing advisor.
 - **Greenfield / new feature work.** That's `/bx:plan` directly. The advisor will route there from Bucket E if `Next Steps` lists it, but it doesn't try to be a feature router.
-- **Doc-only sessions.** That's `/bx:docs` directly. The advisor will mention it as part of every flow but never as the standalone recommendation — if the user already knows it's a doc session, they don't need routing.
+- **Doc-only sessions.** That's `/bx:save` directly. The advisor will mention it as part of every flow but never as the standalone recommendation — if the user already knows it's a doc session, they don't need routing.
 
 The advisor's job is the *gray zone*: "I have time, the repo is in some state, what's the best use of my next hour?" That's it.

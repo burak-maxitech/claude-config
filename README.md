@@ -33,7 +33,7 @@ claude-config/                         # marketplace repo
 │   └── skills/                        # 9 skills → /bx:<name> (each: SKILL.md + references/)
 │       ├── arch/                      # /bx:arch  — repo-wide architecture audit
 │       ├── clean/                     # /bx:clean — codebase cleanup audit
-│       ├── docs/                      # /bx:docs  — documentation management
+│       ├── docs/                      # /bx:save  — documentation management
 │       ├── health/                    # /bx:health — skill-routing advisor
 │       ├── plan/                      # /bx:plan  — feature planning interview
 │       ├── resume/                    # /bx:resume — resume a dev session
@@ -189,7 +189,7 @@ git pull
 | `/bx:tests` | Repo-wide test suite audit — missing coverage on critical paths AND wasteful/redundant tests, in a single report. **Twin headline metric** (`Coverage gaps in critical code: X lines | Tests we can delete: Y lines`). 3 parallel subagents (`test-coverage` / `test-quality` / `test-economics`), T01-T05 smell catalog, with `--plan`/`--fix` (T01-only safe deletion)/`--coverage` (opt-in report reading)/`--full-scan`. Defers entirely to `/bx:clean` for orphans / stale snapshots / >3mo skips. | Skill |
 | `/bx:seo` | Repo-wide SEO + Generative Engine Optimization audit for **web projects only** (rejects non-web repos silently). **Fetches current best practices fresh every run** via WebSearch + WebFetch (4 source categories: Google Search Central+web.dev, Schema.org+JSON-LD, GEO sources, third-party authority blogs). **Probes sitemap URLs** for 4xx/5xx/redirect-chains/slow-responses (cap 100 URLs; score-impact capped at 8 points). **Optional GSC integration via Search Console API** — single auth (gcloud ADC with `webmasters.readonly` scope) + single config key (`site_url:` in `.seo-data/gsc/config.yaml`) + two endpoints (`searchanalytics.query` for Performance + `urlInspection.index.inspect` for per-URL Indexing). Binary mode: API-enabled or heuristic-only fallback. 35-day git-history overlap flags "may already be fixed" findings against the GSC reporting lag. **Score stays /100** (purely heuristic) so `docs/seo-history.md` is comparable across runs regardless of GSC availability. 3 parallel subagents (4 when GSC API enabled: `seo-technical` / `seo-content` / `geo-generative` / `seo-gsc-insights`). Single headline: **score /100 (Δ since last run) + top-3 highest-impact opportunities**. Score tracked over time in `docs/seo-history.md`. Flags: `--plan` / `--fix` (strict allowlist, never fabricates content — only inserts TODO placeholders) / `--url <deployed-url>` (live HTML diff). | Skill |
 | `/bx:health` | Routing advisor — looks at `git status`, branch, recent commits, `CLAUDE.md`, open PR, then suggests which skills to run in what order. **Read-only, never invokes anything.** Use when unsure where to start. | Skill |
-| `/bx:docs` | End session - save progress | Skill |
+| `/bx:save` | End session - save progress | Skill |
 
 **Skills** are directories in `bx/skills/` (each `SKILL.md` + a `references/` folder) that use YAML frontmatter for tool permissions and can dispatch subagents. Installed via the plugin, they invoke as `/bx:<name>`.
 

@@ -11,7 +11,7 @@ argument-hint: "[deep]"
 
 Get up to speed on this project and continue development from where we left off.
 
-**Companion command:** `/bx:docs` - Use at the end of sessions to save progress.
+**Companion command:** `/bx:save` - Use at the end of sessions to save progress.
 
 ---
 
@@ -29,9 +29,9 @@ You are resuming work on this project after a break (hours, days, or weeks). You
 
 Claude Code's auto-memory (`~/.claude/projects/<project-path>/memory/MEMORY.md`) is **automatically loaded** into your context at session start. Before reading project docs:
 
-1. **Check if auto-memory already has project context** -- it may contain tech stack, key paths, common commands, and architecture patterns synced by `/bx:docs`
+1. **Check if auto-memory already has project context** -- it may contain tech stack, key paths, common commands, and architecture patterns synced by `/bx:save`
 2. **If auto-memory has good coverage**, you can skim README.md rather than deep-reading it -- focus your attention on CLAUDE.md for evolving state
-3. **If auto-memory is empty or missing**, proceed normally and note that `/bx:docs` should be run at end of session to populate it
+3. **If auto-memory is empty or missing**, proceed normally and note that `/bx:save` should be run at end of session to populate it
 
 ---
 
@@ -123,7 +123,7 @@ Compare CLAUDE.md's "Last Updated" date with the latest git commit:
 - Parse the "Last Updated" date from CLAUDE.md
 - **If commits are newer than the "Last Updated" date**, flag a warning:
   > "CLAUDE.md was last updated [date], but there are [N] commits since then. Documentation may be stale."
-- Suggest: "Consider running `/bx:docs` after reviewing to refresh documentation."
+- Suggest: "Consider running `/bx:save` after reviewing to refresh documentation."
 - **If dates match or CLAUDE.md is newer**, no warning needed
 
 ### 3.1 What Was Last Worked On
@@ -159,7 +159,7 @@ Read `references/task-hydration.md` and follow its rules to load CLAUDE.md tasks
 
 ## Step 6: Validate CLAUDE.md Structure
 
-Cross-reference CLAUDE.md against the section contract at `../docs/references/claude-md-sections.md`. If sections are missing or malformed, note this in the summary and suggest running `/bx:docs` to fix it.
+Cross-reference CLAUDE.md against the section contract at `../docs/references/claude-md-sections.md`. If sections are missing or malformed, note this in the summary and suggest running `/bx:save` to fix it.
 
 ---
 
@@ -187,7 +187,7 @@ If CLAUDE.md or other docs are missing/incomplete:
 
 **Missing:** CLAUDE.md (session context file)
 
-**Recommendation:** Run `/bx:docs` first to establish documentation structure, then `/bx:resume` again.
+**Recommendation:** Run `/bx:save` first to establish documentation structure, then `/bx:resume` again.
 
 **Or:** I can analyze the codebase directly and create a status summary. Would you like me to proceed?
 ```
@@ -227,7 +227,7 @@ Once you've presented the summary and user confirms direction:
 
 1. **Start working** on the agreed task
 2. **Reference docs** as needed during development
-3. **At end of session**, remind user: "Run `/bx:docs` to save progress"
+3. **At end of session**, remind user: "Run `/bx:save` to save progress"
 
 ---
 
@@ -236,7 +236,7 @@ Once you've presented the summary and user confirms direction:
 | If... | Then... |
 |-------|---------|
 | CLAUDE.md exists | Read it first, it has everything you need |
-| CLAUDE.md missing | Suggest running `/bx:docs` first |
+| CLAUDE.md missing | Suggest running `/bx:save` first |
 | Last session was recent | Focus on "In Progress" and "Next Steps" |
 | Last session was weeks ago | Read more thoroughly, verify code state |
 | User specifies task | Skip recommendation, focus on their request |

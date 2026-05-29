@@ -13,7 +13,7 @@ Present this summary after completing Steps 0-3. Fill in all bracketed placehold
 - [ ] Uncommitted changes? [Yes: N files / No]
 
 ### Staleness Warning (if applicable)
-> ⚠ CLAUDE.md was last updated [date], but there are [N] commits since then. Documentation may be stale. Consider running `/bx:docs` after reviewing.
+> ⚠ CLAUDE.md was last updated [date], but there are [N] commits since then. Documentation may be stale. Consider running `/bx:save` after reviewing.
 
 *(Only show this section if commits are newer than CLAUDE.md's "Last Updated" date. Remove entirely if docs are fresh.)*
 
