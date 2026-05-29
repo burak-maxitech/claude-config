@@ -14,8 +14,8 @@ Four items, in recommended execution order:
 
 | # | Item | Effort | Risk | Blocks on user |
 |---|------|--------|------|----------------|
-| **#1** | Retire `gsc-parse-helper.py` → **GSC MCP server** | M | Low | GSC auth (service account / OAuth) |
-| **#2** | **Playwright rendered audit** in `bx-seo` | S | Low | `npx playwright install` (browser binaries) |
+| ~~**#1**~~ | ~~Retire `gsc-parse-helper.py` → **GSC MCP server**~~ — **DECLINED (S37)**, quota regression | M | Low | — |
+| **#2** | **Playwright rendered audit** in `bx-seo` — *deferred, no current dependency* | S | Low | `npx playwright install` (browser binaries) |
 | **#4** | Package toolkit as a **versioned `bx` plugin** | L | Med | Naming decision (`bx-arch` → `bx:arch`) |
 | **#6** | **Orchestration-as-code** for `bx-seo` | M | Low | none (mostly subsumed by #1) |
 
@@ -39,6 +39,8 @@ These corrected my initial assumptions and shape the plan:
 ---
 
 ## #1 — Retire `gsc-parse-helper.py` for a GSC MCP server
+
+> **STATUS: EVALUATED AND DECLINED (S37, 2026-05-28).** The candidate server (`mcp-search-console`) has **no response caching** and **caps `batch_url_inspection` at 10 URLs/call** — adopting it would regress the quota economics the S31/S35 cache layer protects (the helper inspects up to 200 URLs in parallel with a 7-day cache). `/bx:seo` stays on gcloud ADC + the helper. The `gsc` MCP server stays configured machine-local for *ad-hoc interactive* GSC queries only. Reopen only if the server gains caching + a higher batch cap. See [key-decisions.md](key-decisions.md). The goal below is preserved as the original plan-of-record.
 
 **Goal.** Replace the 1279-line `gsc-parse-helper.py` + the hand-built cache (atomic writes, TTL split, PID-suffixed temp files), 429/5xx retry/backoff, `inspect-batch` ThreadPoolExecutor, and the `gcloud`/`curl` shelling with **typed MCP tool calls**.
 
