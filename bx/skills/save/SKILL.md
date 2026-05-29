@@ -1,5 +1,5 @@
 ---
-name: docs
+name: save
 description: "Manages project documentation (README.md, CLAUDE.md, docs/*.md). Detects state and runs REFACTOR, CREATE, or UPDATE mode. Use when user wants to update docs, save session progress, create documentation, or refactor a monolithic README."
 disable-model-invocation: false
 effort: low
