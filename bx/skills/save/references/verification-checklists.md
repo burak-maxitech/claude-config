@@ -40,9 +40,22 @@
 - [ ] CLAUDE.md has all required sections for /bx:resume
 ```
 
-### 2. Full File Contents
+### 2. Change Report (NOT file contents)
 
-Provide complete content for each file created or significantly modified.
+**Never echo modified file contents back into the response** — that regenerates tens of thousands of characters the user does not read and is a dominant cost of this skill. Instead report only what changed, in this compact form:
+
+```
+Saved session [N] ([mode], [path]):
+  CLAUDE.md            — session block + [N] section updates ([old]k → [new]k)
+  session-history.md   — appended S[N] (+[X] lines)
+  completed-work.md    — +[M] items          (omit if none)
+  key-decisions.md     — +1 row               (omit if none)
+[--full only] README.md / docs/*.md — [summary of edits]
+[--full only] rollups  — [Part 5/6/7 results, or "none triggered"]
+Drift: [drift warnings, or "none"]
+```
+
+For UPDATE mode the change report is assembled from the `save-writer` subagent's returned report plus any orchestrator-side `--full` actions. The user reviews the actual diff at the commit checkpoint (Part 8) — that is the review surface, not an inline dump.
 
 ---
 
@@ -86,6 +99,9 @@ Provide complete content for each file created or significantly modified.
 - [ ] CLAUDE.md is under 35k chars (warn if exceeded, target ~17k)
 - [ ] Cap enforcement (Part 1.10) ran — Current Status ≤10, Next Steps ≤10, In Progress ≤5 (or warnings issued)
 - [ ] Size-pressure rollup (Part 7) ran when CLAUDE.md exceeded 35k post-Parts 5/6, or skipped silently when under threshold
+- [ ] (Fast path) `save-writer` subagent was dispatched with the update packet and returned a change report — no full-file contents echoed in the response
+- [ ] (Fast path) README.md / docs/*.md / rollups were NOT touched (those are `--full` only) — drift warnings surfaced instead
+- [ ] (`--full` only) README sync, docs/*.md sync, and rollups ran on the orchestrator after the writer returned
 - [ ] README.md matches current features
 - [ ] README.md links to actual docs/ files
 - [ ] Relevant docs/*.md files updated
