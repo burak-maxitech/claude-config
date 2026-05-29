@@ -2,83 +2,103 @@
 
 When documentation structure exists, update to reflect current state.
 
-## Step 0: Upfront Parallel Batch
+## Step 0: Scoped Context Gather
 
-Before any Part runs, gather all read-only inputs in **one parallel turn**. This drives every downstream decision and replaces the per-part reads scattered through Parts 0.5, 2, 3, 4, 5, 6.
+Gather only what the orchestrator needs to *route* and *compose the packet*. The big append-only archives (`docs/key-decisions.md`, `docs/completed-work.md`, `docs/session-history.md`) are NOT read here on the default (fast) path — the `save-writer` subagent reads `session-history.md` off the main thread, and the other two are append-only (the orchestrator never reads *from* them to write the packet). Reading all archives up front was the single biggest cost of the old flow (~60k tokens/run).
 
-### 0.1 Single parallel turn — issue these calls together
+### 0.1 Single parallel turn — issue these together
 
 **Reads (parallel):**
-- `CLAUDE.md`
-- `README.md`
-- All `docs/*.md` files (`Glob docs/**/*.md` first if list unknown, then one Read per file in the same turn)
-- Auto-memory `MEMORY.md` — usually already in conversation context (Claude Code auto-loads it at session start); read explicitly only if absent
+- `CLAUDE.md` — the only doc the orchestrator reads in full.
+- Auto-memory `MEMORY.md` — usually already in conversation context; read explicitly only if absent.
 
 **Bash (parallel):**
-- `git log -20 --pretty=format:'%h %ad %s' --date=short` — recent commits with dates for filtering
-- `git diff --stat HEAD~5` — what files changed recently
-- `git status` — uncommitted state
+- `git log -20 --pretty=format:'%h %ad %s' --date=short`
+- `git diff --stat HEAD~5`
+- `git status`
 
 **Other:**
-- `TaskList` — current task tracker
+- `TaskList`
 
-### 0.2 Cache results
+**Deferred to `--full` only:** `README.md`, `docs/*.md` archive reads. If routing lands on `--full`, read those at the top of the Full Path (Step 0.3), not here.
 
-Hold all results in working memory for the rest of this run. Derive:
+### 0.2 Derive
 
-- **Last Updated date** from CLAUDE.md → cutoff for filtering git log output
-- **Filtered commit list** (commits since Last Updated) → drives Parts 1.8, 5
-- **Diff file list** → drives Parts 2, 3, 4 (which docs/code actually changed)
-- **TaskList state** → drives Part 0
-- **Row counts**: Key Decisions in CLAUDE.md, `^### Session` in `docs/session-history.md` → drive Parts 5, 6 probes and Part 1.10 caps
-- **Sentinel presence**: rollup notes in `session-history.md` and `key-decisions.md` → drive Parts 5.2, 6.2 first-run gates
-- **CLAUDE.md total size + per-section sizes**: total via `wc -c`; per-section via the `awk` one-liner in Part 7.2 → drives Part 1.9 advisory, Part 7 size-pressure rollup, and Fast Path drift warning. Cache as `{total, sections: [{name, chars, over_threshold}]}` so Parts 1.9 / 7 / drift-warning all read the same snapshot.
-
-After Step 0, do not re-read these files unless a Part has just modified one and needs to verify post-write state.
+From the gathered context:
+- **Last Updated date** from CLAUDE.md → cutoff for filtering git log.
+- **Filtered commit list** (commits since Last Updated) → feeds the session entry + drift probes.
+- **Diff file list** → tells you whether README/`docs/` changed (drift signal; drives the `--full` recommendation).
+- **TaskList state** → drives the task drain (Part 0) and the In Progress / Next Steps deltas.
+- **CLAUDE.md size + Key Decisions row count + session count** — cheap: `wc -c CLAUDE.md`, count `^| ` rows in the Key Decisions table, and (for the drift probe only) `grep -c '^### Session' docs/session-history.md` (one cheap grep, not a full read). These drive the drift warnings and the `--full` rollup gates.
 
 ## Step 0.1: Path Routing
 
-After Step 0 completes:
+After Step 0:
 
-- **If `--fast` is in `$ARGUMENTS`** → run the **Fast Path** below
-- **Otherwise** → run the **Full Path** (existing Parts 0–7, with the plan-then-batch preamble in Part 1)
+- **Default (no path flag), or `--fast`** → run the **Save Path** below. (`--fast` is a no-op alias kept for muscle memory; it now matches the default.)
+- **`--full`** → run the **Full Path**: the Save Path first, then the heavy sweep (README + `docs/*.md` sync + rollups), all described after the Save Path.
 
-## Fast Path (`--fast`)
+The old behavior (full sweep by default) is inverted: the daily save is fast; the heavy sweep is opt-in. Drift warnings (emitted at the end of the Save Path) tell the user when a `--full` is due.
 
-Targeted at the daily-cycle case: a session produced commits and task progress but didn't touch README, `docs/`, or architecture. Runs a focused subset of the Full Path, keeping CLAUDE.md and `docs/session-history.md` current.
+## Prose Caps (apply when composing any new entry)
+
+New entries are capped — this keeps writing fast and keeps `/bx:resume` lean. Existing entries are never rewritten to fit.
+
+- **Session-history entry:** ≤5 "What happened" bullets. Detail that doesn't fit becomes a commit-hash reference (`see commit abc1234`), not prose.
+- **CLAUDE.md last-session block:** ≤5 bullets, the most architecturally significant.
+- **Key Decision rationale:** ≤2–3 sentences. Longer context goes only into `docs/key-decisions.md`, referenced by commit hash.
+- **In Progress / Next Steps items:** one line each + file paths; no multi-paragraph narration.
+
+## Save Path (default)
+
+The orchestrator owns everything that needs conversation context or user input; the `save-writer` subagent owns the file reads/writes. The orchestrator does NOT edit `CLAUDE.md`, `session-history.md`, `completed-work.md`, or `key-decisions.md` itself — it composes the packet and dispatches.
 
 **Sequence:**
 
-1. **Part 0** — drain `TaskList` into CLAUDE.md (full logic, unchanged; respects `--skip-tasks`)
-2. **Part 1 subset** — only the sub-sections with evidence from Step 0:
-   - **1.0** — update timestamp (always)
-   - **1.4 / 1.5** — In Progress / Next Steps (if `TaskList` showed changes)
-   - **1.6** — Key Decisions (only if user explicitly named one this session, or commit messages flag a decision)
-   - **1.8** — append last-session block to CLAUDE.md **and** write the detailed entry to `docs/session-history.md`
-3. **Drift probes** — run cheap counts on already-loaded files (no new reads), surface warnings, **do not enforce**
-4. **Plan-then-batch** — gather every CLAUDE.md change from step 2 above into a single Write of the full file, or non-overlapping parallel Edits in one turn
-5. **Part 8** — commit checkpoint (full logic, unchanged; respects `--skip-commit`)
+1. **Drain the task list (Part 0 logic).** Run the Part 0 / Drain Validation rules below to reconcile `TaskList` against CLAUDE.md. Respect `--skip-tasks`. The result (completed → completed-work items; in-progress → In Progress; new pending → Next Steps) becomes part of the packet, NOT inline edits.
+2. **Compose the update packet** (see "Update Packet" below) from: the conversation (what happened this session — only the orchestrator knows this), the filtered commit list, the diff file list, and the drained task state. Apply the Prose Caps.
+3. **Dispatch the `save-writer` subagent** (see "Dispatch" below) and await its change report.
+4. **Drift probes** (cheap, on already-gathered data — no new reads): emit the drift warning block if anything fired. Do NOT enforce.
+5. **Commit checkpoint (Part 8).** Run Part 8 as written; respects `--skip-commit`. The git diff is the user's review surface.
+6. **Report** using the Change Report format from `verification-checklists.md` — assembled from the subagent's report + drift warnings. Never echo file contents.
 
-**Skipped in Fast Path:**
-- Part 0.5 (migration) — handled by Full Path if it ever fires
-- Part 2 (README sync)
-- Part 3 (`docs/*.md` sync)
-- Part 4 (auto-memory sync)
-- Part 5 (session rollup)
-- Part 6 (Key Decisions rollup)
-- Part 7 (size-pressure rollup) — replaced by drift warning when CLAUDE.md > 35k
-- Part 1.10 (caps enforcement) — replaced by drift warning
+**Skipped on the Save Path** (these are `--full` only): Part 0.5 (migration), Part 2 (README), Part 3 (`docs/*.md`), Part 4 (auto-memory), Parts 5/6/7 (rollups), Part 1.10 cap enforcement (replaced by drift warnings).
 
-**Drift warning format** (show only lines whose probe fires):
+### Update Packet
 
-> "Drift detected — run `/bx:docs` (no flag) when convenient:
+Compose this structure and pass it to `save-writer` as the task prompt (fill every field; use the section references in Part 1 to decide *what* each field contains):
+
+- `project_root` — absolute repo path.
+- `today` — current date (e.g. `2026-05-29`).
+- `claude_md_deltas` — exact `old → new` string pairs (or "replace block under `## Section` with: …") for: the `Last Updated:` line, any Current Status row changes (Part 1.2), In Progress (Part 1.4), Next Steps (Part 1.5). Source the *old* strings from the CLAUDE.md you read in Step 0.
+- `claude_md_session_block` — the full replacement text for the `## Session History` last-session block (Part 1.8 format, ≤5 bullets).
+- `session_history_entry` — the detailed entry for `docs/session-history.md` (Part 1.8 format, capped).
+- `completed_items` — `- [x] …` lines from the task drain (may be empty).
+- `decision_row` — a single `| decision | rationale |` row IF a genuinely architectural decision was made this session (Part 1.6 criteria), else `null`.
+
+### Dispatch
+
+Dispatch one `save-writer` subagent via the Task tool with `subagent_type: "bx:save-writer"`, passing the packet as the prompt (serialize as labeled sections). Await its change report. If it returns a `warnings:` line about exceeded density caps, tighten the offending field and note it in your report — do not re-dispatch unless a file write failed.
+
+### Drift warning format (show only lines whose probe fires)
+
+> "Drift detected — run `/bx:save --full` when convenient:
 >  - [N] sessions in `docs/session-history.md` ready for rollup (count > 5)
 >  - Key Decisions table in CLAUDE.md at [M] rows (cap 20)
 >  - README.md or `docs/*.md` touched in [K] commits since last full sweep
->  - CLAUDE.md at [X]k chars (target 17k, soft cap 35k) — Part 7 size-pressure rollup will fire on Full Path
->  - Sections over Part 7 threshold: [section1] ([Y]k), [section2] ([Z]k) (run Full Path to actively shrink)"
+>  - CLAUDE.md at [X]k chars (target 17k, soft cap 35k) — Part 7 size-pressure rollup will fire on `--full`"
 
-Drift warnings are the safety valve: `--fast` runs daily without losing visibility into accumulated debt. If a probe shows nothing has drifted, omit the warning entirely.
+If no probe fires, omit the warning entirely.
+
+## Full Path (`--full`)
+
+Runs the **Save Path** above first (so the fast result is identical), then the heavy sweep below. Because the Save Path deferred the archive reads, do them now:
+
+### Step 0.3 Full-sweep reads (parallel)
+
+Read `README.md` and all `docs/*.md` (`Glob docs/**/*.md`, then one Read per file in the same turn). These feed Parts 2, 3, 5, 6, 7.
+
+The remaining Parts (0.5, 2, 3, 4, 5, 6, 7) run on the **orchestrator**, not the subagent, because Parts 5/6/7 can require an `AskUserQuestion` consent prompt and a subagent cannot prompt the user. The commit checkpoint (Part 8) already ran as the final Save-Path step — on `--full`, defer the commit to after the rollups instead (so rollup changes land in the same commit), exactly as the current Part 8 note specifies.
 
 ## Step 1: Scan docs/ Folder
 
@@ -170,7 +190,7 @@ After draining, verify completeness:
    ```markdown
    # Session History Archive
 
-   > Auto-managed by `/bx:docs`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
+   > Auto-managed by `/bx:save`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
 
    ---
    ```
@@ -277,7 +297,7 @@ Session history is split between CLAUDE.md (brief) and docs/session-history.md (
      ```markdown
      # Session History Archive
 
-     > Auto-managed by `/bx:docs`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
+     > Auto-managed by `/bx:save`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
 
      ---
      ```
@@ -470,7 +490,7 @@ The presence of the rollup-format note (see Step 5.4) acts as a "this project ha
 
 For each session needing compression:
 
-1. **Extract a one-line summary** from the existing entry — pull the most architecturally significant 1-3 bullets from "What happened" and condense. Keep skill names, flag names, and concrete artifacts (file names, decision names) since those are what future-readers grep for. Drop process narration ("ran /bx:docs", "committed and pushed", "user asked").
+1. **Extract a one-line summary** from the existing entry — pull the most architecturally significant 1-3 bullets from "What happened" and condense. Keep skill names, flag names, and concrete artifacts (file names, decision names) since those are what future-readers grep for. Drop process narration ("ran /bx:save", "committed and pushed", "user asked").
 2. **Find associated commit hashes** using a single pre-fetched git log. Before the per-session compression loop, run ONCE:
    ```
    git log --since="<earliest-compressible-session-date>" --until="<latest-compressible-session-date +1d>" --pretty=format:'%h %ad %s' --date=short
@@ -488,7 +508,7 @@ For each session needing compression:
 
 ### 5.4 Add Rollup Note (First Run Only)
 
-If `session-history.md` does not already contain the rollup note (i.e., this is the first run and the user said yes in Step 5.2), insert it after the existing `> Auto-managed by /bx:docs...` line:
+If `session-history.md` does not already contain the rollup note (i.e., this is the first run and the user said yes in Step 5.2), insert it after the existing `> Auto-managed by /bx:save...` line:
 
 ```markdown
 > **Note:** Sessions older than the 5 most recent are compressed to one-liners with commit hashes. Full prose for compressed sessions lives in git history (`git show <hash>`).

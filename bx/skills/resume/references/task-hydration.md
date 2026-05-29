@@ -10,12 +10,12 @@ Before creating any new tasks, check for stale tasks from a previous session:
 
 1. **Run `TaskList`** to check for existing tasks
 2. **If tasks exist:**
-   - These are leftover from a previous session (task state does not persist across sessions unless drained by `/bx:docs`)
+   - These are leftover from a previous session (task state does not persist across sessions unless drained by `/bx:save`)
    - **Warn the user:**
      > "Found [N] stale tasks from a previous session. These may contain progress not yet saved to CLAUDE.md."
    - **Show the stale tasks** with their statuses (completed, in-progress, pending)
    - **Ask the user:** "Should I drain these into CLAUDE.md first, or discard them?"
-     - **Drain:** Follow the drain logic from `/bx:docs` Part 0 — completed tasks → `docs/completed-work.md`, in-progress → `## In Progress`, pending → `## Next Steps`
+     - **Drain:** Follow the drain logic from `/bx:save` Part 0 — completed tasks → `docs/completed-work.md`, in-progress → `## In Progress`, pending → `## Next Steps`
      - **Discard:** Proceed without saving (tasks will be overwritten by fresh hydration)
 3. **If no tasks exist**, proceed directly to hydration below
 
