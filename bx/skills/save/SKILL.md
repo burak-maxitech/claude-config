@@ -1,15 +1,15 @@
 ---
 name: save
-description: "Manages project documentation (README.md, CLAUDE.md, docs/*.md). Detects state and runs REFACTOR, CREATE, or UPDATE mode. Use when user wants to update docs, save session progress, create documentation, or refactor a monolithic README."
+description: "Saves session state for the next /bx:resume — drains the task tracker, updates CLAUDE.md + docs/session-history.md, and commits. Fast by default (UPDATE mode via a save-writer subagent); --full adds README/docs sync + rollups. Also runs CREATE/REFACTOR for first-time or monolithic docs. Use at end of a session to save progress, or to create/refactor docs."
 disable-model-invocation: false
 effort: low
 allowed-tools: Read, Edit, Write, Grep, Glob, Bash(git:*), Bash(ls:*), Bash(find:*), TaskList, TaskGet, AskUserQuestion
-argument-hint: "[scope] [--fast] [--skip-memory] [--skip-tasks] [--skip-commit] [--skip-rollup] [--skip-decisions-rollup] [--skip-caps]"
+argument-hint: "[scope] [--full] [--fast] [--skip-memory] [--skip-tasks] [--skip-commit] [--skip-rollup] [--skip-decisions-rollup] [--skip-caps]"
 ---
 
-# /bx:docs - Documentation Management Skill
+# /bx:save - Session Save & Documentation Skill
 
-Analyze this codebase and manage documentation. Act as a senior engineer who values clear, maintainable documentation.
+Save the current session's state so the next `/bx:resume` picks up cleanly, and keep project documentation current. Act as a senior engineer who values clear, maintainable documentation. The common case (UPDATE mode, no flags) is **fast by default**: it drains the task tracker, updates CLAUDE.md + `docs/session-history.md` via the `save-writer` subagent, and commits — without the heavy README/docs sweep. Use `--full` for the periodic deep sweep (README + `docs/*.md` sync + rollups).
 
 **Companion command:** `/bx:resume` - Use at the start of sessions to get up to speed.
 
@@ -57,6 +57,8 @@ Based on the detected mode, read **only** the relevant reference file and follow
 | **REFACTOR** | `references/mode-refactor.md` |
 | **CREATE** | `references/mode-create.md` |
 | **UPDATE** | `references/mode-update.md` |
+
+**UPDATE mode dispatches the `save-writer` subagent** (Sonnet) to apply the file edits off the main thread — see `references/mode-update.md` (Save Path / Dispatch). CREATE and REFACTOR run inline on the orchestrator.
 
 Execute the instructions in the loaded reference file.
 
