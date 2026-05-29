@@ -241,3 +241,22 @@ Same-day continuation of S34 burakarik.com dogfood. User ran `/seo-review` on bu
 - Treat roadmap #1 (GSC→MCP) as **closed/declined** unless the MCP server gains response caching + a higher batch-inspection cap. Don't re-suggest the service account (blocked by a Google bug).
 - If GSC auth breaks on a ~7-day cadence, the cause is the GCP consent screen stuck in "Testing" — publish the app.
 - Resume the dogfood backlog (Next Steps #3-5): `/bx:tests`, `/bx:arch`, `/bx:health` have never been run end-to-end.
+
+### Session 38 - 2026-05-29
+**What happened:** The user reported `/bx:docs` (the end-of-session save paired with `/bx:resume`) routinely takes >10 min and they'd stopped using it; asked for an analysis of where to save time + whether an out-of-box skill could replace it. Diagnosed the cost, then reworked the skill end-to-end and renamed it `/bx:save`.
+- **Diagnosis (measured on this repo):** UPDATE mode ran an 8-part inline pipeline on Opus. Top costs: (1) Step 0 read ALL docs (~60k tokens) every run — incl. the 70k `key-decisions.md` + 53k `completed-work.md` append-only archives the update never reads *from* — and `--fast` didn't skip it (Step 0 ran before routing); (2) `verification-checklists.md §2` mandated echoing full file contents back; (3) verbose 300-600-word session/decision prose. Confirmed no out-of-box replacement (auto-memory = stable facts only; compaction = intra-session; `/init` = one-shot).
+- **Design (brainstorming skill):** locked 3 decisions — fast-by-default (`--full` opt-in), tight prose caps on new entries, surgical fixes + Sonnet subagent offload. Renamed `/bx:docs` → `/bx:save` ("save"/"resume" is a clean collision-proof pair). Spec at `docs/superpowers/specs/2026-05-29-bx-save-rework-design.md`.
+- **Architecture:** Opus orchestrator owns conversation-context + user-prompt work (composes a small "update packet": `claude_md_deltas`, `claude_md_session_block`, `session_history_entry`, `completed_items`, `decision_row`; runs the commit checkpoint). New `save-writer` Sonnet subagent (dispatched `bx:save-writer`) reads the big `session-history.md` + applies all file edits off the main thread. Scoped Step 0 reads only CLAUDE.md + git + TaskList on the fast path; `--full` defers README/docs reads to Step 0.3 and keeps rollups on the orchestrator (subagents can't `AskUserQuestion`).
+- **Execution (subagent-driven-development):** 7 tasks (rename dir → save-writer agent → change-report output → mode-update control-flow rewrite → SKILL.md body → cross-ref sweep → verify), implementer + review per substantive task. Final holistic review caught a **runtime blocker** — the skill dispatches via the Task tool but `Task` was missing from `allowed-tools` (every other dispatching skill has it) — plus a stale README tree dir name + a broken `../docs/references/` path in resume's SKILL.md; all fixed. Merged to `main` with `--no-ff` (8 commits); feature branch deleted.
+- **Note:** ran this very `/bx:docs` save on the OLD cached (slow) version — the new `/bx:save` activates only after push + `/plugin update bx`.
+
+**Files created/modified:**
+- `bx/agents/save-writer.md` (new) — Sonnet doc-writer subagent
+- `bx/skills/save/` (renamed from `bx/skills/docs/`) — `SKILL.md` (name/description/title/argument-hint/dispatch note + `Task` in allowed-tools); `references/mode-update.md` (scoped reads, fast-default routing, packet + dispatch, prose caps, Full Path); `references/verification-checklists.md` (change-report, no full-file dump)
+- `bx/skills/{resume,plan,health}/**`, `README.md`, `workflow.md`, `CLAUDE.md` — `/bx:docs` → `/bx:save` sweep; resume `SKILL.md` ref path `../docs/` → `../save/`; README tree `docs/` → `save/`
+- `docs/superpowers/specs/2026-05-29-bx-save-rework-design.md` + `docs/superpowers/plans/2026-05-29-bx-save-rework.md` (new)
+
+**Next session should:**
+- **Push `main` + `/plugin update bx` (or `cc`) to activate `/bx:save`**, then dogfood it as the real session-save (first end-to-end test of the speedup, the packet round-trip to `save-writer`, and the `bx:save-writer` dispatch naming).
+- Resume the flagged priority: **fix `/bx:seo`** (user flagged "messed up" — diagnose concrete symptom first).
+- Watch on first `/bx:save` run: packet field round-trip, the key-decisions anchor rule (insert before trailing non-table content), drift-warning accuracy, and that `--full` rollups still fire on the orchestrator.

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-05-28 (Session 37)
+Last Updated: 2026-05-29 (Session 38)
 
 ## Project Overview
 
@@ -16,7 +16,7 @@ Last Updated: 2026-05-28 (Session 37)
 | Area | Status |
 |------|--------|
 | Skills (9) | Complete |
-| Subagents (14) | Complete |
+| Subagents (15) | Complete |
 | Plugin packaging (`bx`) | Core complete (S37) — pending install smoke-test + symlink retirement |
 | Startup scripts | Complete |
 | Cross-platform setup | Complete |
@@ -33,19 +33,20 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 ## In Progress
 
-**S37 modernization (branch `feat/bx-plugin`).** Roadmap in [docs/modernization-roadmap.md](docs/modernization-roadmap.md) sequences 4 items: #1 GSC MCP server (retire `gsc-parse-helper.py`), #2 Playwright rendered audit in `bx:seo`, #4 plugin packaging, #6 orchestration-as-code. **#4 core shipped on this branch** (9 skills + 14 agents → `bx` plugin, validates clean). **Remaining for #4:** install smoke-test (`/plugin install bx@burak-tools`), verify agent-dispatch naming (`bx:seo-technical` vs bare), retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, SessionEnd→`/bx:save` nudge, launcher-script symlink-check retirement. **#1 (GSC MCP) evaluated and declined (S37)** — would regress GSC quota (the `mcp-search-console` server has no response caching + caps `batch_url_inspection` at 10 URLs/call); `/bx:seo` stays on gcloud ADC + `gsc-parse-helper.py`, with the machine-local `gsc` MCP server kept for *ad-hoc interactive* GSC queries only, intentionally NOT wired into the skill. See Key Decisions. **#2 (Playwright) deferred** — confirmed no current dependency; aspirational rendered-audit feature only.
+**`/bx:save` rework shipped (S38) — merged to `main`, pending push + plugin refresh to activate.** `/bx:docs` was reworked into the faster, renamed `/bx:save` (fast-by-default UPDATE + `save-writer` Sonnet offload; see Key Decisions). Merged to `main` with `--no-ff` (8 commits), **not yet pushed**. Until `main` is pushed and `/plugin update bx` runs, the installed plugin still serves the old slow `/bx:docs`.
+
+**S37 plugin packaging (#4) — remaining:** install smoke-test (`/plugin install bx@burak-tools`), verify agent-dispatch naming (`bx:seo-technical` vs bare), retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, SessionEnd→`/bx:save` nudge, launcher-script symlink-check retirement. (GSC MCP migration #1 declined; Playwright #2 deferred — see Key Decisions.)
 
 ## Next Steps
 
-1. **⚠️ Revisit + fix `/bx:seo` — user flagged the skill as messed up (S37).** First diagnose *what* is actually wrong before touching code: the repo skill is at its committed state (git confirms `bx/skills/seo/` untouched in S37, working tree clean), so the issue is either an expectation-vs-reality gap, the GSC auth/MCP confusion (gcloud+helper vs the separate interactive MCP server), or uncommitted/unpushed changes on a Windows PC. Pin down the concrete symptom (run it, or check the PC's `git status`) first. Do NOT reopen the GSC→MCP migration (declined — see Key Decisions). See Known Issues / Blockers.
-2. **Validate S35 on a real burakarik.com run.** Infrastructure now backs the S34 validation step: 100 user-supplied URL cap (was 50), helper-driven Turn 2b dispatch, split TTL (ui-* 7d means S34 cache entries now hit), finding-history infrastructure ready to track all current findings as run_count=1. Sub-dim 14 will fire since S34 wrote the baseline snapshot. Skip-mode (`dispatch_mode == "skip_codebase_subagents"`) likely fires on subsequent same-property reruns if no code commits intervene.
-3. **Dogfood `/bx-tests` on a real Node/Jest or Python/pytest project** — built S24 but never invoked end-to-end. Watch for: T01 false-positive rate (project-defined assertion-helper scan should be the gate), twin-headline math correctness on real subagent output, `--coverage` opt-in path against an actual jest `coverage-summary.json` / pytest `coverage.json`, scan-economics ratio thresholds (>3.0 over, <0.1 under), non-overlap with `/bx-clean`. S30 + S34 + S35 dogfood patterns validate value here.
-4. **Dogfood `/bx-arch` on a non-trivial real project** — never run end-to-end yet. Watch for linter-detection accuracy, intended-architecture summary quality, CCN-delta filter behavior, simplification false-positive rate. **S30/S34/S35 lesson:** look for similar under-specifications in budget utilization, disk-cache boundaries, parser tool assumptions, blind-spot sampling — the patterns that surfaced in `/bx-seo` likely have analogs in any data-ingestion-heavy skill.
-5. **Dogfood `/bx-health`** — built S22 but never invoked end-to-end. Watch for: bucket misclassification rate, freshness-mismatch detection accuracy, cases where a 6th bucket would help.
-6. **Address `/bx-seo` deferred refactors** (captured in `/simplify` passes S25 + S27 + S29; S34/S35 didn't add new ones — all dogfood-surfaced concerns shipped same-session): batched-Grep alternation across scan-technical/content/geo (biggest runtime win — 30 Greps → 3-6 per scan on real projects); fix-mode harness extraction from bx-arch/references/fix-mode.md; plan-mode scaffolding extraction across the 3 plan-mode-*.md files; cross-file boilerplate consolidation into a shared-rules ref file (~25-40 lines saveable). Best done after further dogfood surfaces which refactor is most needed.
-7. Improve existing skill reference files based on usage patterns.
-8. Consider adding hooks for automated pre-commit workflows.
-9. Explore MCP server integration for external tool access.
+1. **Activate `/bx:save`:** push `main` to origin, then `/plugin marketplace update burak-tools` → `/plugin update bx` (or run `cc`). Then **dogfood `/bx:save`** as the real session-save — first end-to-end test of the speedup, the packet round-trip to `save-writer`, the `bx:save-writer` dispatch naming, and the key-decisions anchor rule. (This session's save ran on the old slow `/bx:docs`.)
+2. **⚠️ Revisit + fix `/bx:seo` — user flagged the skill as messed up (S37).** First diagnose *what* is actually wrong before touching code: the repo skill is at its committed state (git confirms `bx/skills/seo/` untouched, working tree clean), so the issue is either an expectation-vs-reality gap, the GSC auth/MCP confusion (gcloud+helper vs the separate interactive MCP server), or uncommitted/unpushed changes on a Windows PC. Pin down the concrete symptom (run it, or check the PC's `git status`) first. Do NOT reopen the GSC→MCP migration (declined — see Key Decisions). See Known Issues / Blockers.
+3. **Validate S35 on a real burakarik.com run.** Infrastructure now backs the S34 validation step: 100 user-supplied URL cap (was 50), helper-driven Turn 2b dispatch, split TTL (ui-* 7d means S34 cache entries now hit), finding-history infrastructure ready. Sub-dim 14 will fire since S34 wrote the baseline snapshot.
+4. **Dogfood `/bx:tests` on a real Node/Jest or Python/pytest project** — built S24 but never invoked end-to-end. Watch for: T01 false-positive rate, twin-headline math correctness, `--coverage` opt-in path, scan-economics ratio thresholds (>3.0 over, <0.1 under), non-overlap with `/bx:clean`.
+5. **Dogfood `/bx:arch` on a non-trivial real project** — never run end-to-end. Watch for linter-detection accuracy, intended-architecture summary quality, CCN-delta filter behavior, simplification false-positive rate.
+6. **Dogfood `/bx:health`** — built S22 but never invoked end-to-end. Watch for bucket misclassification + freshness-mismatch detection accuracy.
+7. **Address `/bx:seo` deferred refactors** (captured in `/simplify` passes S25 + S27 + S29): batched-Grep alternation across scan-technical/content/geo (biggest runtime win); fix-mode harness extraction; plan-mode scaffolding extraction; cross-file boilerplate consolidation. Best done after further dogfood surfaces which is most needed.
+8. Improve existing skill reference files based on usage patterns; consider pre-commit hooks.
 
 ## Key Decisions
 
@@ -66,6 +67,7 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 | All 9 custom skills renamed under `bx-` prefix + shortened (S36, 2026-05-28) | Root-cause fix for recurring namespace collisions/confusion with built-ins. S32 was the first symptom (built-in `/code-review` shadowed the custom one → renamed custom → `/review-deep`); then two more shifts landed: Anthropic **reinstated `/simplify`** as a separate built-in (quality-only, applies fixes — invalidating S32's "/simplify no longer exists" premise), and **`/ultrareview` was deprecated → `/code-review ultra`**. The word "review" alone now maps to 5 built-ins/skills. Flat-namespace sharing is the root cause, so the fix is a personal prefix that can never collide with any present/future built-in + groups the whole toolkit under one tab-complete. **Mapping:** review-deep→`bx-review`, architecture-review→`bx-arch`, test-review→`bx-tests`, seo-review→`bx-seo`, code-cleanup→`bx-clean`, code-health-advice→`bx-health`, plan-feature→`bx-plan`, resume-work→`bx-resume`, update-docs→`bx-docs`. **Sweep:** 9 `git mv` + literal token-replace across 76 operational files (skills/agents/scripts/settings.local.json/README/workflow.md) via `find -exec perl` (the system `grep` is **ugrep** — `-Z` means fuzzy-match, not null-delimit, which silently no-op'd two earlier `xargs -0` attempts). Built-in refs (`/code-review`, `/simplify`, `/ultrareview`) deliberately preserved. Historical archives (`docs/*.md`, CLAUDE.md Key Decisions/Session History/Completed narrative) left untouched per the S32 records-of-past-state convention — this row + the file-tree comments are the old→new map. **Also this session:** uninstalled the `code-simplifier` plugin (redundant with built-in `/simplify` + the `arch-simplification` subagent; its baked-in standards are JS/React-specific, irrelevant to this markdown/Python repo). Review-tooling doc-freshness fixes also applied same session (separate commit): `/ultrareview`→`/code-review ultra` everywhere (deprecated alias → live command), and the reinstated built-in `/simplify` re-introduced into the review ladder + Bucket A routing. |
 | GSC MCP migration (roadmap #1) evaluated and declined (S37, 2026-05-28) | `mcp-search-console` (the `gsc` MCP server) has **no response caching** + caps `batch_url_inspection` at **10 URLs/call** — a full migration would regress the quota economics the S31/S35 cache layer protects (the skill inspects up to 200 URLs in parallel with a 7-day `ui-*` cache via `gsc-parse-helper.py`). **`/bx:seo` stays on gcloud ADC + the helper.** The `gsc` MCP server stays configured machine-local (`~/.config/bx-seo/`, portable OAuth `token.json`) for *ad-hoc interactive* GSC queries only — NOT wired into the skill. Git history across all branches/remotes/reflog confirms the skill was **never** on MCP; only the roadmap doc mentions it. `get_advanced_search_analytics` (clean JSON, 25k-row pagination) is the one tool worth revisiting if ever rebuilt — Performance queries only, never URL Inspection. Full: [docs/key-decisions.md](docs/key-decisions.md). |
+| `/bx:docs` → `/bx:save` rework — fast-by-default + Sonnet offload (S38, 2026-05-29) | The end-of-session save (paired with `/bx:resume`) routinely took >10 min so the user abandoned it. Root causes: Step 0 read all docs every run (~60k tokens incl. the 70k+53k append-only archives the update never reads *from*) even on `--fast`; the verification step echoed full file contents back; verbose prose. Fix: the lean session-save is now the **default** (drain tasks → CLAUDE.md session block → session-history append → commit), with README/docs sync + rollups moved to `--full`; a new `save-writer` Sonnet subagent does the big reads + all file writes off the main thread while the Opus orchestrator composes a small "update packet" + dispatches; full-file output dump → compact change report; prose caps on new entries; scoped Step-0 reads. Skill renamed `/bx:docs` → `/bx:save` (collision-proof pair-name with `/bx:resume`). Subagents 14 → 15. Built via superpowers brainstorm→spec→writing-plans→subagent-driven flow; specs in [docs/superpowers/](docs/superpowers/). Full: [docs/key-decisions.md](docs/key-decisions.md). |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -77,13 +79,13 @@ claude-config/                         # marketplace repo
 │   └── marketplace.json               # "burak-tools" marketplace catalog
 ├── bx/                                # the installable `bx` plugin (S37, see Key Decisions)
 │   ├── .claude-plugin/plugin.json     # manifest (commit-SHA versioned; skills → /bx:<name>)
-│   ├── agents/                        # 14 subagents (Sonnet-routed) → bx:<agent>
+│   ├── agents/                        # 15 subagents (Sonnet-routed) → bx:<agent>
 │   ├── hooks/hooks.json               # SessionStart project-orientation injection
 │   ├── scripts/                       # session-start-context.{sh,ps1}
 │   └── skills/                        # 9 skills (SKILL.md + references/) → /bx:<name>
-│       ├── arch/    clean/   docs/
-│       ├── health/  plan/    resume/
-│       └── review/  seo/     tests/
+│       ├── arch/    clean/   health/
+│       ├── plan/    resume/  review/
+│       ├── save/    seo/     tests/   # save = /bx:save (was docs)
 ├── .claude/
 │   ├── scripts/             # start-claude.{sh,ps1} launchers (not plugin components)
 │   └── settings.local.json  # Local Claude Code settings
@@ -102,7 +104,7 @@ claude-config/                         # marketplace repo
 
 **Skills** are directories under `bx/skills/` containing `SKILL.md` (YAML frontmatter) + a `references/` folder. Invocable as `/bx:<name>`.
 
-**Subagents** are the 14 markdown files under `bx/agents/`, dispatched by skills. They run on Sonnet for cost efficiency and have scoped tool permissions.
+**Subagents** are the 15 markdown files under `bx/agents/`, dispatched by skills. They run on Sonnet for cost efficiency and have scoped tool permissions. (`save-writer` is dispatched by `/bx:save` to apply doc edits off the main thread.)
 
 ## Known Issues / Blockers
 
@@ -116,11 +118,11 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 37) - 2026-05-28
-- **GSC auth clarified + roadmap #1 (GSC→MCP migration) evaluated and declined.** `/bx:seo` uses gcloud ADC + `gsc-parse-helper.py` and was **never** migrated to MCP (git history across all branches/remotes/reflog confirms — only the roadmap *doc* mentions MCP). The `mcp-search-console` server set up in a prior session is **machine-local**, for *ad-hoc interactive* GSC queries only (it answered "list my Search Console sites" this session), and is intentionally NOT wired into the skill.
-- **Why declined:** the MCP server has no response caching (reruns re-spend GSC quota) and caps `batch_url_inspection` at 10 URLs/call — a full migration would regress the quota economics the S31/S35 cache layer protects. See Key Decisions.
-- **GSC OAuth made multi-machine-ready** (machine-local, not a repo change): `token.json` holds a portable refresh token; consolidated creds under `~/.config/bx-seo/` via `GSC_CONFIG_DIR`. **Caveat:** the GCP OAuth consent screen must be "In production" or installed-app refresh tokens expire every 7 days.
-- **Playwright (roadmap #2) confirmed not required** — no skill depends on it; aspirational rendered-audit feature only.
-- **Net repo change: zero.** A README GSC-setup section was added then reverted once it was clear it described the MCP server (which the skill doesn't use). The SEO skill was never modified. New memory: `gsc-auth-model.md`.
+### Last Session (Session 38) - 2026-05-29
+- **Reworked `/bx:docs` → `/bx:save`** (pairs with `/bx:resume`): the end-of-session save was taking >10 min and the user had stopped using it.
+- **Fast by default**: bare `/bx:save` does the lean session-save (drain tasks → CLAUDE.md session block → session-history append → commit); the heavy README/docs sweep + rollups are now opt-in via `--full`. `--fast` kept as a no-op alias.
+- **Sonnet offload**: new `save-writer` subagent (15th) absorbs the big `session-history.md` read + all file writes off the main thread; the Opus orchestrator only composes a small "update packet" + dispatches. Scoped Step-0 reads (~−30k tokens/run); full-file output dump removed; prose caps added.
+- **Built via superpowers** brainstorm → spec → writing-plans → subagent-driven execution; final holistic review caught a runtime blocker (missing `Task` in `allowed-tools`) — fixed. 8 commits merged to `main` (not yet pushed). Spec/plan in `docs/superpowers/`.
+- **To activate**: push `main` + `/plugin update bx` (the cache still runs the old slow `/bx:docs` — this very save ran on it).
 
-> Full session detail: [docs/session-history.md](docs/session-history.md) S37
+> Full session detail: [docs/session-history.md](docs/session-history.md) S38

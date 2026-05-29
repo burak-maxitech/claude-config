@@ -177,3 +177,9 @@
 - [x] **Review-tooling freshness fixes** (commit `385c248`) — `/ultrareview` → `/code-review ultra` (deprecated alias → live command) across all operational files; reinstated built-in `/simplify` re-introduced into bx-health routing list + Bucket A flow + README review-ladder (4 rungs) + workflow.md tiering.
 - [x] **Phase-0 doc reconcile** (commit `a60c006`) — corrected CLAUDE.md stale "S35 uncommitted" note (S35 was committed as `548bdee`), resynced MEMORY.md (7→9 skills / 7→13 subagents), Part 5 rollup compressed S32 to a one-liner.
 - [x] **End-to-end verified**: `/reload-plugins` → 3 plugins / 20 agents (code-simplifier gone); all 9 `bx-*` resolve; `/bx-docs` runs.
+
+## Session 38 (2026-05-29) — /bx:docs → /bx:save rework (fast-default + Sonnet offload)
+- [x] **Reworked the session-save skill** `/bx:docs` → `/bx:save`: fast UPDATE path is now the default (drain tasks → CLAUDE.md session block → session-history append → commit); `--full` opt-in for README/docs sync + rollups; scoped Step-0 reads (no big-archive reads on the fast path); full-file output dump → compact change report; tight prose caps. Target: ~10 min → ~1-2 min.
+- [x] **New `save-writer` Sonnet subagent** (`bx/agents/save-writer.md`, 15th agent) — absorbs the big `session-history.md` read + all doc file writes off the Opus main thread via an orchestrator-composed "update packet".
+- [x] **Skill renamed** `bx/skills/docs/` → `bx/skills/save/` + `/bx:docs` → `/bx:save` swept across all active files; historical archives left per S32 convention. Added `Task` to the skill's allowed-tools (final-review-caught runtime blocker); fixed README tree dir name + a broken `../docs/references/` path in resume's SKILL.md.
+- [x] **Process**: superpowers brainstorm → spec → writing-plans → subagent-driven-development (7 tasks, per-task review + final holistic review). Specs/plan in `docs/superpowers/`. 8 commits merged to `main` (not yet pushed).
