@@ -159,7 +159,7 @@ Read `references/task-hydration.md` and follow its rules to load CLAUDE.md tasks
 
 ## Step 6: Validate CLAUDE.md Structure
 
-Cross-reference CLAUDE.md against the section contract at `../docs/references/claude-md-sections.md`. If sections are missing or malformed, note this in the summary and suggest running `/bx:save` to fix it.
+Cross-reference CLAUDE.md against the section contract at `../save/references/claude-md-sections.md`. If sections are missing or malformed, note this in the summary and suggest running `/bx:save` to fix it.
 
 ---
 

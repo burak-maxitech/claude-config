@@ -33,11 +33,11 @@ claude-config/                         # marketplace repo
 │   └── skills/                        # 9 skills → /bx:<name> (each: SKILL.md + references/)
 │       ├── arch/                      # /bx:arch  — repo-wide architecture audit
 │       ├── clean/                     # /bx:clean — codebase cleanup audit
-│       ├── docs/                      # /bx:save  — documentation management
 │       ├── health/                    # /bx:health — skill-routing advisor
 │       ├── plan/                      # /bx:plan  — feature planning interview
 │       ├── resume/                    # /bx:resume — resume a dev session
 │       ├── review/                    # /bx:review — senior-engineer code review
+│       ├── save/                      # /bx:save  — session save + docs management
 │       ├── seo/                       # /bx:seo   — SEO + GEO audit
 │       └── tests/                     # /bx:tests — test-suite audit
 ├── .claude/
