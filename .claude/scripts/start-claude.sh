@@ -57,8 +57,10 @@ PROJECT_PATH="$PROJECTS_ROOT/$PROJECT_NAME"
 # --- Step 1: Sync the bx toolkit (dev clone + installed plugin) ---
 echo -e "\n${YELLOW}[1/5] Syncing bx toolkit...${RESET}"
 # 1a. Refresh the local dev clone if present (only matters when you edit skills)
+# Show the diffstat (drop --quiet) and let errors through (drop 2>/dev/null) so a
+# failed pull is visible instead of silently reported as "synced".
 if [ -d "$CONFIG_REPO/.git" ]; then
-    if git -C "$CONFIG_REPO" pull --quiet 2>/dev/null; then
+    if git -C "$CONFIG_REPO" pull --stat; then
         echo -e "  ${GREEN}claude-config clone synced.${RESET}"
     else
         echo -e "  ${DIM}Could not pull claude-config clone (continuing).${RESET}"
@@ -96,7 +98,7 @@ echo -e "${YELLOW}[3/5] Opening project: $PROJECT_NAME${RESET}"
 cd "$PROJECT_PATH"
 if [ -d ".git" ]; then
     echo -e "  ${GRAY}Pulling latest changes...${RESET}"
-    if git pull --quiet 2>/dev/null; then
+    if git pull --stat; then
         echo -e "  ${GREEN}Project synced.${RESET}"
     else
         echo -e "  ${DIM}Could not pull (continuing with local state).${RESET}"

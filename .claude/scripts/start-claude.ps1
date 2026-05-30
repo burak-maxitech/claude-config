@@ -47,12 +47,14 @@ if (-not (Test-Path $ProjectPath)) {
 # --- Step 1: Sync the bx toolkit (dev clone + installed plugin) ---
 Write-Host "`n[1/5] Syncing bx toolkit..." -ForegroundColor Yellow
 # 1a. Refresh the local dev clone if present (only matters when you edit skills)
+# NOTE: git is a native exe — failures surface via $LASTEXITCODE, NOT exceptions,
+# so try/catch can't catch them. Gate the success message on $LASTEXITCODE instead.
 if (Test-Path "$ConfigRepo\.git") {
-    try {
-        git -C $ConfigRepo pull --quiet
+    git -C $ConfigRepo pull --stat
+    if ($LASTEXITCODE -eq 0) {
         Write-Host "  claude-config clone synced." -ForegroundColor Green
-    } catch {
-        Write-Host "  Could not pull claude-config clone (continuing)." -ForegroundColor DarkGray
+    } else {
+        Write-Host "  Could not pull claude-config clone (exit $LASTEXITCODE) — continuing." -ForegroundColor DarkGray
     }
 }
 # 1b. Refresh the installed plugin from the GitHub marketplace (this is the live skills)
@@ -95,11 +97,11 @@ Set-Location $ProjectPath
 
 if (Test-Path "$ProjectPath\.git") {
     Write-Host "  Pulling latest changes..." -ForegroundColor Gray
-    try {
-        git pull --quiet
+    git pull --stat
+    if ($LASTEXITCODE -eq 0) {
         Write-Host "  Project synced." -ForegroundColor Green
-    } catch {
-        Write-Host "  Could not pull (continuing with local state)." -ForegroundColor DarkYellow
+    } else {
+        Write-Host "  Could not pull (exit $LASTEXITCODE) — continuing with local state." -ForegroundColor DarkYellow
     }
 } else {
     Write-Host "  Not a git repo — skipping pull." -ForegroundColor Gray
@@ -107,10 +109,9 @@ if (Test-Path "$ProjectPath\.git") {
 
 # --- Step 4: Update Claude Code ---
 Write-Host "[4/5] Checking for Claude Code updates..." -ForegroundColor Yellow
-try {
-    claude update 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
-} catch {
-    Write-Host "  Could not check for updates." -ForegroundColor DarkYellow
+claude update 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  Could not check for updates (exit $LASTEXITCODE)." -ForegroundColor DarkYellow
 }
 
 # --- Step 5: Launch Claude Code ---

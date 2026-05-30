@@ -188,3 +188,7 @@
 - [x] Diagnose + fix /bx:seo GSC path resolution + authentication (S39) — bx/bin/gsc-parse-helper (new), .gitattributes (new), bx/skills/seo/references/gsc-parse-helper.py, SKILL.md + gsc-cache/api-queries/api-schema/ingestion/setup-readme reference docs
 - [x] Close /bx:seo sitemap-discovery gap with live fetch (S39) — sitemaps-list + sitemap-urls helper subcommands; validated on burakarik.com's 2,892-URL sitemap
 - [x] Dogfood /bx:save end-to-end (S39) — first real run of the S38 fast-default UPDATE path + save-writer dispatch
+
+## Session 40 (2026-05-30) — cc launcher git-pull fix + stale activation-gap correction
+- [x] Verified S38 + S39 already active on this machine (main == origin/main 0/0, plugin cache at HEAD e12c52c) — corrected stale "3 commits ahead" note - CLAUDE.md (S40)
+- [x] Fixed `cc` launcher unreliable git-pull ($LASTEXITCODE gating + --stat, dropped --quiet/2>/dev/null) - .claude/scripts/start-claude.ps1, start-claude.sh (S40)

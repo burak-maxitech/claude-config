@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-05-29 (Session 39)
+Last Updated: 2026-05-30 (Session 40)
 
 ## Project Overview
 
@@ -25,7 +25,7 @@ Last Updated: 2026-05-29 (Session 39)
 
 ## Completed
 
-All 9 skills, 13 subagents, cross-platform setup, and documentation system are complete.
+All 9 skills, 15 subagents, cross-platform setup, and documentation system are complete.
 
 See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
@@ -33,18 +33,17 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 ## In Progress
 
-**`main` is 3 commits ahead of `origin/main` — not pushed.** Both the S38 `/bx:save` rework AND the S39 `/bx:seo` GSC repair are merged to `main` but unpushed. Until `main` is pushed and `/plugin update bx` runs, the installed plugin (cache `77c860147e81`) still serves the old code — the slow `/bx:docs` behavior AND the broken `/bx:seo` GSC path. Activation is the top Next Step.
+**S38 + S39 are active on this machine.** Verified S40: `main` == `origin/main` (0 ahead / 0 behind) and the installed plugin cache is `e12c52c` (= HEAD) — the S39 "3 commits ahead / not pushed" note was stale (the push had already landed). Other machines still pick up S38+S39 on their next `/plugin update bx` (or `cc` launch).
 
 **S37 plugin packaging (#4) — remaining:** install smoke-test, verify agent-dispatch naming, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, SessionEnd→`/bx:save` nudge, launcher-script symlink-check retirement. (GSC MCP migration #1 declined; Playwright #2 deferred.)
 
 ## Next Steps
 
-1. **Activate S38 + S39:** push `main` to origin, then `/plugin marketplace update burak-tools` → `/plugin update bx` (or run `cc`). The installed plugin still runs the old slow `/bx:docs` AND the broken `/bx:seo` GSC path.
-2. **Real `/bx:seo` run against burakarik.com** — first genuinely-working end-to-end (auth fixed, live sitemap discovery, sub-dim 14 deindex detection now fed). Confirmed live this session: GSC auth returns HTTP 200, the 2,892-URL sitemap yields 100 orphans. (Was the S34/S35 validation step — now unblocked.)
-3. **Remaining `/bx:seo` code-review items (non-blocking, from S39 review):** #5 redundant per-call token mints (mint once → mode-600 temp file, vs 4-5 OAuth round-trips/run); #6 `_read_skill_config` CWD assumption; #7 token-to-stdout structural hardening (a `fetch-sa` subcommand so Search Analytics never exposes a token to the orchestrator).
-4. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — built but never run end-to-end.
-5. **Address `/bx:seo` deferred refactors** (S25/S27/S29 `/simplify` passes): batched-Grep alternation across scan-technical/content/geo; fix-mode + plan-mode scaffolding extraction.
-6. Improve skill reference files based on usage; consider pre-commit hooks.
+1. **Real `/bx:seo` run against burakarik.com** — first genuinely-working end-to-end (auth fixed, live sitemap discovery, sub-dim 14 deindex detection now fed). Confirmed live in S39: GSC auth HTTP 200, the 2,892-URL sitemap yields 100 orphans. Now fully unblocked — activation confirmed.
+2. **Remaining `/bx:seo` code-review items (non-blocking, from S39 review):** #5 redundant per-call token mints (mint once → mode-600 temp file); #6 `_read_skill_config` CWD assumption; #7 token-to-stdout structural hardening (a `fetch-sa` subcommand so Search Analytics never exposes a token to the orchestrator).
+3. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — built but never run end-to-end.
+4. **Address `/bx:seo` deferred refactors** (S25/S27/S29 `/simplify` passes): batched-Grep alternation across scan-technical/content/geo; fix-mode + plan-mode scaffolding extraction.
+5. Improve skill reference files based on usage; consider pre-commit hooks.
 
 ## Key Decisions
 
@@ -67,6 +66,7 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 | GSC MCP migration (roadmap #1) evaluated and declined (S37, 2026-05-28) | `mcp-search-console` (the `gsc` MCP server) has **no response caching** + caps `batch_url_inspection` at **10 URLs/call** — a full migration would regress the quota economics the S31/S35 cache layer protects (the skill inspects up to 200 URLs in parallel with a 7-day `ui-*` cache via `gsc-parse-helper.py`). **`/bx:seo` stays on gcloud ADC + the helper.** The `gsc` MCP server stays configured machine-local (`~/.config/bx-seo/`, portable OAuth `token.json`) for *ad-hoc interactive* GSC queries only — NOT wired into the skill. Git history across all branches/remotes/reflog confirms the skill was **never** on MCP; only the roadmap doc mentions it. `get_advanced_search_analytics` (clean JSON, 25k-row pagination) is the one tool worth revisiting if ever rebuilt — Performance queries only, never URL Inspection. Full: [docs/key-decisions.md](docs/key-decisions.md). |
 | `/bx:docs` → `/bx:save` rework — fast-by-default + Sonnet offload (S38, 2026-05-29) | The end-of-session save (paired with `/bx:resume`) routinely took >10 min so the user abandoned it. Root causes: Step 0 read all docs every run (~60k tokens incl. the 70k+53k append-only archives the update never reads *from*) even on `--fast`; the verification step echoed full file contents back; verbose prose. Fix: the lean session-save is now the **default** (drain tasks → CLAUDE.md session block → session-history append → commit), with README/docs sync + rollups moved to `--full`; a new `save-writer` Sonnet subagent does the big reads + all file writes off the main thread while the Opus orchestrator composes a small "update packet" + dispatches; full-file output dump → compact change report; prose caps on new entries; scoped Step-0 reads. Skill renamed `/bx:docs` → `/bx:save` (collision-proof pair-name with `/bx:resume`). Subagents 14 → 15. Built via superpowers brainstorm→spec→writing-plans→subagent-driven flow; specs in [docs/superpowers/](docs/superpowers/). Full: [docs/key-decisions.md](docs/key-decisions.md). |
 | `/bx:seo` GSC path+auth+sitemap repair (S39, 2026-05-29) | The skill's entire GSC path was dead since plugin packaging: `${CLAUDE_SKILL_DIR}` isn't a real Claude Code variable (→ helper file-not-found, silent heuristic-only), and the token-passing assumed shell state persists across Bash calls (it doesn't). Fixed with a `bin/` launcher on PATH + in-call stdlib refresh-token minting — ADC **as the user, NOT a service account** (open Google bug blocks adding SAs to GSC; multi-machine via `adc_credentials_path` in config.yaml). Also closed the sitemap-discovery gap: fetch the LIVE sitemap (GSC `sitemaps.list` → robots.txt → conventional) instead of globbing a repo-local file that's empty for generated sitemaps — which had silently starved sub-dim 14 deindex detection. Verified against live GSC (sites.list 200) + burakarik.com (2,892-URL sitemap). Full: [docs/key-decisions.md](docs/key-decisions.md). |
+| PowerShell `try/catch` can't gate native-exe failures — `cc` launcher git-pull fix (S40) | `start-claude.ps1` printed "Project synced." even when `git pull` failed: `try/catch` only catches terminating PowerShell errors, but native exes (git) signal failure via `$LASTEXITCODE`, so the `catch` was dead code (proved empirically). Fixed by gating the message on `$LASTEXITCODE` in all 3 spots + swapping `--quiet`/`2>/dev/null` for `--stat` so pulls are observable. Rule for future `.ps1`: never expect `try/catch` to catch a native command's exit code — check `$LASTEXITCODE`. |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -109,7 +109,7 @@ claude-config/                         # marketplace repo
 
 **The S37 `/bx:seo` "messed up" breakage is RESOLVED (S39).** Root-caused to the `${CLAUDE_SKILL_DIR}` path bug (not a real Claude Code variable → the helper was never found → GSC silently fell back to heuristic-only) + an impossible "mint token once, reuse across Bash calls" auth model (shell state does not persist across Bash tool calls). Both fixed and verified against live GSC. See Session History S39 + Key Decisions.
 
-**Activation gap (not a code blocker):** `main` is unpushed, so the installed plugin still runs the broken pre-S39 GSC path until push + `/plugin update bx` (Next Step 1).
+**Activation gap closed (S40).** `main` is in sync with `origin` and the installed plugin is at HEAD (`e12c52c`) on this machine, so S38 + S39 are live here. Only *other* machines still need a `/plugin update bx` (or `cc` launch) to catch up.
 
 ## Environment Variables
 
@@ -119,11 +119,9 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 39) - 2026-05-29
-- **Fixed `/bx:seo`'s broken GSC integration** (the S37 "messed up" flag): two root causes — the `${CLAUDE_SKILL_DIR}` path bug (not a real var → helper never ran) and an impossible token-reuse auth model. Both repaired + verified against live GSC (sites.list HTTP 200).
-- **Auth reworked**: every call mints in-place via stdlib refresh-token grant (no `google-auth`/gcloud spawn), ADC-as-yourself NOT a service account (open Google bug blocks adding SAs to GSC), multi-machine via `adc_credentials_path` in config.yaml. New `bin/gsc-parse-helper` launcher (PATH-based, replaces the bogus var) + `.gitattributes` LF enforcement.
-- **Closed the sitemap gap**: skill read only a repo-local sitemap.xml (empty for generated sitemaps); now discovers the LIVE sitemap (GSC `sitemaps.list` → robots.txt → conventional). Validated on burakarik.com's 2,892-URL sitemap — the deindex-detection orphan slice is no longer silently empty.
-- **Hardened** via high-effort `/code-review`: typed `CredentialError` reason codes (quota-missing ≠ "no credentials"), no silent wrong-identity fallback, Turn-2b "credential failure ≠ zero findings" guard.
-- Merged to `main` (cabec2a, 79e2ebe, 0aab230, `--no-ff`); **not pushed** — activation (push + `/plugin update bx`) still pending. This save was the first real dogfood of `/bx:save`.
+### Last Session (Session 40) - 2026-05-30
+- **Fixed the `cc` launcher's unreliable git-pull** in both `start-claude.ps1` and `start-claude.sh`. PowerShell `try/catch` can't catch a native `git` failure (git signals via `$LASTEXITCODE`, not exceptions), so "Project synced." printed even on failure; both scripts also hid all pull output behind `--quiet`/`2>/dev/null`. Now gated on `$LASTEXITCODE` + `--stat`, so pulls are observable and the success message is honest. Verified (PS parse, both exit paths, `bash -n`).
+- **Corrected a stale CLAUDE.md claim:** the S39 "main is 3 commits ahead / not pushed" note was wrong — `git fetch` + `rev-list --left-right` showed `main` == `origin/main` (0/0) and the plugin cache is at HEAD (`e12c52c`). S38 + S39 are already active on this machine.
+- First real dogfood of `/bx:resume` + `/bx:save --full` since the S38 rework; no functional issues surfaced.
 
 > Full session detail: [docs/session-history.md](docs/session-history.md) S38
