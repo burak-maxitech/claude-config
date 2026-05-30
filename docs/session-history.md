@@ -260,3 +260,21 @@ Same-day continuation of S34 burakarik.com dogfood. User ran `/seo-review` on bu
 - **Push `main` + `/plugin update bx` (or `cc`) to activate `/bx:save`**, then dogfood it as the real session-save (first end-to-end test of the speedup, the packet round-trip to `save-writer`, and the `bx:save-writer` dispatch naming).
 - Resume the flagged priority: **fix `/bx:seo`** (user flagged "messed up" — diagnose concrete symptom first).
 - Watch on first `/bx:save` run: packet field round-trip, the key-decisions anchor rule (insert before trailing non-table content), drift-warning accuracy, and that `--full` rollups still fire on the orchestrator.
+
+### Session 39 - 2026-05-29
+**What happened:**
+- Root-caused + fixed `/bx:seo`'s broken GSC path (user: "we messed up and left it broken"): `${CLAUDE_SKILL_DIR}` is not a real Claude Code variable → every helper call expanded to an empty path → file-not-found → GSC silently heuristic-only. Fixed via a `bin/gsc-parse-helper` launcher on PATH (resolves its own dir, picks a real Python 3 preferring `python` over the Windows `python3` Store stub) + `.gitattributes` forcing LF on shell scripts.
+- Fixed GSC authentication: the "mint once / reuse across Bash calls" model was impossible (shell state doesn't persist; the probe only emitted TOKEN_LEN). Now every API-hitting call mints in-place via stdlib refresh-token grant (no `google-auth`, no per-call gcloud), authenticating as the user via ADC (authorized_user) — NOT a service account (open Google "email not found" bug blocks adding SAs to GSC; domain-wide delegation needs Workspace, which personal @gmail lacks). Multi-machine via `adc_credentials_path`/`quota_project`/`site_base_url`/`sitemap_url` config.yaml keys.
+- Hardened via high-effort `/code-review` (7 finder angles → fixed top 3+1): typed `CredentialError` reason codes (no_credentials/unreadable/wrong_type/mint_failed/quota_missing) so the probe reports the right remediation; an explicitly-configured bad credential file raises instead of silently using gcloud's default identity; inspect-batch emits `inspect_batch_error:<reason>`+exit4 and Turn-2b guards on it so a cred failure isn't read as zero findings; `_refresh_user_token` validates fields up front.
+- (A) Confirmed + (B) closed the sitemap-discovery gap: the skill only globbed a repo-local sitemap.xml → empty for generated/dynamic sitemaps. Added live discovery (GSC `sitemaps.list` → robots.txt `Sitemap:` → `<base>/sitemap.xml`; base auto-derived from `site_url`) + two helper subcommands (`sitemaps-list`, `sitemap-urls` with sitemapindex/.gz/relative handling + bounded orphan output). Validated live on burakarik.com: 2,892-URL generated sitemap fetched, 100 orphans emitted (was 0).
+- Merged to `main` with `--no-ff` (cabec2a auth+path, 79e2ebe sitemap, 0aab230 merge); not pushed. First real dogfood of `/bx:save` (this save ran the S38 fast UPDATE path).
+
+**Files created/modified:**
+- `bx/bin/gsc-parse-helper` (new — PATH launcher, mode 100755), `.gitattributes` (new — LF for `*.sh`/`bx/bin/*`)
+- `bx/skills/seo/references/gsc-parse-helper.py` (+~477 — CredentialError + resolve_credentials + stdlib token mint + sitemaps-list/sitemap-urls subcommands)
+- `bx/skills/seo/SKILL.md` (probe, config keys, mode resolution, reason-coded errors, sitemap discovery 1.6.6a, Turn-2b guard)
+- `bx/skills/seo/references/`: `gsc-cache.md`, `gsc-api-queries.md`, `gsc-api-schema.md`, `gsc-ingestion.md`, `gsc-setup-readme-template.md`
+
+**Next session should:**
+- Push `main` + `/plugin update bx` to activate, then run `/bx:seo` against burakarik.com (now genuinely functional).
+- Address remaining review items (#5 redundant per-call mints, #6 CWD assumption, #7 token-stdout hardening).

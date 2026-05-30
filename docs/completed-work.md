@@ -183,3 +183,8 @@
 - [x] **New `save-writer` Sonnet subagent** (`bx/agents/save-writer.md`, 15th agent) — absorbs the big `session-history.md` read + all doc file writes off the Opus main thread via an orchestrator-composed "update packet".
 - [x] **Skill renamed** `bx/skills/docs/` → `bx/skills/save/` + `/bx:docs` → `/bx:save` swept across all active files; historical archives left per S32 convention. Added `Task` to the skill's allowed-tools (final-review-caught runtime blocker); fixed README tree dir name + a broken `../docs/references/` path in resume's SKILL.md.
 - [x] **Process**: superpowers brainstorm → spec → writing-plans → subagent-driven-development (7 tasks, per-task review + final holistic review). Specs/plan in `docs/superpowers/`. 8 commits merged to `main` (not yet pushed).
+
+## Session 39 (2026-05-29) — /bx:seo GSC repair + /bx:save dogfood
+- [x] Diagnose + fix /bx:seo GSC path resolution + authentication (S39) — bx/bin/gsc-parse-helper (new), .gitattributes (new), bx/skills/seo/references/gsc-parse-helper.py, SKILL.md + gsc-cache/api-queries/api-schema/ingestion/setup-readme reference docs
+- [x] Close /bx:seo sitemap-discovery gap with live fetch (S39) — sitemaps-list + sitemap-urls helper subcommands; validated on burakarik.com's 2,892-URL sitemap
+- [x] Dogfood /bx:save end-to-end (S39) — first real run of the S38 fast-default UPDATE path + save-writer dispatch
