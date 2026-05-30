@@ -49,7 +49,15 @@ gcloud auth application-default set-quota-project <your-gcp-project-id>
 
 **Why `set-quota-project` is required:** Google Cloud APIs called via user-credential ADC (as opposed to service-account auth) require a quota project to bill against. The skill reads this value from ADC's stored credentials file and passes it as the `x-goog-user-project` header on every request. Without `set-quota-project`, the header is empty and all API calls return 403 SERVICE_DISABLED.
 
-After setup, `gcloud auth application-default print-access-token` returns an OAuth bearer token valid for ~1 hour. The skill fetches **one token per run** (cached in shared context) and reuses it across all API calls.
+After setup, the skill mints an OAuth bearer token (valid ~1 hour) from this ADC file. **It does NOT shell out to `gcloud` per call** — `gsc-parse-helper` reads the `authorized_user` credential and performs a refresh-token grant with Python stdlib (no `google-auth` dependency, no `gcloud` spawn). Tokens are **minted in the same Bash call that uses them, never cached or reused across calls** — shell state doesn't persist across Bash tool invocations, so there is no "token reused across the run."
+
+### Use ADC (login as yourself), NOT a service account
+
+Authenticate as your own Google account via ADC (`type: authorized_user`) — you already own your GSC properties, so nothing needs to be "added" in GSC. **Do not use a service account:** adding a service-account email under GSC *Users and permissions* is blocked by an open Google bug ("Failed to add user: email not found", since ~2026-04-23, unfixed), and the usual bypass (domain-wide delegation) requires Google Workspace, which personal `@gmail.com` accounts lack.
+
+### Multi-machine: configure once, run everywhere
+
+The ADC `application_default_credentials.json` holds a refresh token that is **not machine-locked**. To avoid logging in on every PC/Mac: run the login once, put the file in a synced folder (Drive/OneDrive/Dropbox), and set `adc_credentials_path` in `.seo-data/gsc/config.yaml` to that path (e.g. `adc_credentials_path: ~/Dropbox/bx-seo/adc.json`). `~` and `$VARS` are expanded, so the same config value resolves on every machine. Optionally set `quota_project` there too. The file is a secret (a refresh token) — keep it in private synced storage, never in a repo; revoke from your Google account permissions if it ever leaks.
 
 ### HTTP request headers
 

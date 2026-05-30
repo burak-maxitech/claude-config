@@ -94,7 +94,7 @@ filename  = "ui-<hash>.json"
 
 ## Cache wrapper (per-call inline bash — Turn 2a Search Analytics only)
 
-**Scope:** This wrapper is the canonical dispatch for **Search Analytics** (Q1/Q2/Q3) calls in Turn 2a. URL Inspection (Turn 2b) uses a DIFFERENT dispatch — a single Bash invocation of `gsc-parse-helper.py inspect-batch`, which parallelizes via Python's `ThreadPoolExecutor` and applies the same cache key + TTL + atomic-write contract internally. See SKILL.md Step 1.6.6 Turn 2b for the helper invocation; the helper's cache logic matches what's described here so `ui-*.json` files written by either path are mutually consumable. The boundary-violation history (S31 cont.², S34) makes the helper-driven dispatch the only sanctioned path for URL Inspection — never re-introduce per-URL Bash-curl loops.
+**Scope:** This wrapper is the canonical dispatch for **Search Analytics** (Q1/Q2/Q3) calls in Turn 2a. URL Inspection (Turn 2b) uses a DIFFERENT dispatch — a single Bash invocation of the `gsc-parse-helper inspect-batch` command, which parallelizes via Python's `ThreadPoolExecutor` and applies the same cache key + TTL + atomic-write contract internally. See SKILL.md Step 1.6.6 Turn 2b for the helper invocation; the helper's cache logic matches what's described here so `ui-*.json` files written by either path are mutually consumable. The boundary-violation history (S31 cont.², S34) makes the helper-driven dispatch the only sanctioned path for URL Inspection — never re-introduce per-URL Bash-curl loops.
 
 Each Q1/Q2/Q3 call uses a wrapper that checks cache, falls through on miss, and writes atomically. Single bash invocation per call so the orchestrator can fire 3 parallel cache-or-curl calls in one tool-use block:
 
@@ -117,7 +117,15 @@ if [ "$NO_CACHE" != "1" ] && [ -n "$(find "$CACHE_FILE" -mmin "-$TTL_MIN" 2>/dev
   exit 0
 fi
 
-# Cache miss → fresh curl, atomic write on 200
+# Cache miss → mint credentials IN THIS shell, then fresh curl.
+# Shell state does not persist across Bash tool calls, so there is no token to
+# "reuse" from Turn 1 — every API-hitting call mints its own. `auth-token`
+# prints the token then the quota project; capture both into vars and NEVER
+# echo them (keeps the live token out of the model transcript).
+_CREDS=$(gsc-parse-helper auth-token) || { echo "CACHE_STATUS:ERROR auth-failed reason=$(printf '%s' "$_CREDS" | sed -n 's/^AUTH_ERROR://p' | head -1)"; exit 0; }
+TOKEN=$(printf '%s' "$_CREDS" | sed -n 1p)
+QUOTA_PROJECT=$(printf '%s' "$_CREDS" | sed -n 2p)
+
 TMP="$CACHE_FILE.tmp.$$"
 HTTP_STATUS=$(curl -s -w '%{http_code}' -o "$TMP" -X POST \
   -H "Authorization: Bearer $TOKEN" \
@@ -152,8 +160,8 @@ The orchestrator substitutes before invocation:
 | Variable | Source | Example |
 |---|---|---|
 | `<prefix>-<hash>` | Per-call, computed from cache key inputs (above) | `sa-q1-a1b2c3...` |
-| `$TOKEN` | Turn 1 probe output | (1-hour ADC token) |
-| `$QUOTA_PROJECT` | Turn 1 probe output | `my-gcp-project` |
+| `$TOKEN` | Minted in-call via `gsc-parse-helper auth-token` (cache-miss branch) — NOT carried from Turn 1 | (1-hour ADC token) |
+| `$QUOTA_PROJECT` | 2nd line of `gsc-parse-helper auth-token` output | `my-gcp-project` |
 | `$BODY` | Per-call JSON body from `gsc-api-queries.md` | — |
 | `$URL` | Per-call endpoint URL with site_url substituted | — |
 | `$NO_CACHE` | `1` when `--no-cache` flag passed, else unset | `1` or empty |

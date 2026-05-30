@@ -85,6 +85,8 @@ configured or not.
 
    # Optional:
    # lookback_days: 90                # 7-365, default 90
+   # adc_credentials_path: ~/Dropbox/bx-seo/adc.json   # multi-machine — see below
+   # quota_project: my-gcp-project    # overrides the credential file's quota_project_id
    ```
 
    The exact `site_url` format must match what's registered in GSC.
@@ -94,6 +96,33 @@ configured or not.
 
 8. Run `/bx:seo`. The "Detected:" line should now say
    `Mode: heuristic + GSC (Search Console API — ...)`.
+
+> **Authenticate as yourself — do NOT use a service account.** You already own
+> your GSC properties, so ADC login (above) needs nothing "added" in GSC.
+> Adding a service-account email under GSC *Users and permissions* is currently
+> blocked by an open Google bug ("Failed to add user: email not found", since
+> ~Apr 2026), and the usual bypass (domain-wide delegation) needs Google
+> Workspace, which personal `@gmail.com` accounts don't have.
+
+### Multiple machines — configure once, run everywhere
+
+If you run `/bx:seo` from several PCs/Macs, you don't have to log in on each one.
+The credential file `application_default_credentials.json` (created by step 5)
+holds a refresh token that is **not** tied to one machine:
+
+1. Do steps 4-6 **once**, on any machine.
+2. Copy the resulting `application_default_credentials.json` into a folder your
+   machines already sync — Drive / OneDrive / Dropbox. (Find it at
+   `%APPDATA%\gcloud\application_default_credentials.json` on Windows, or
+   `~/.config/gcloud/application_default_credentials.json` on Mac/Linux.)
+3. In `config.yaml`, set `adc_credentials_path` to that synced path, e.g.
+   `adc_credentials_path: ~/Dropbox/bx-seo/adc.json`. `~` and `$VARS` expand, so
+   the same value works on every machine. (gcloud doesn't even need to be
+   installed on the other machines — the skill mints tokens with Python stdlib.)
+
+That file is a secret (a refresh token). Keep it in private synced storage,
+never in a git repo. If it ever leaks, revoke it from your Google Account →
+Security → Third-party access.
 
 ### Quick verification (optional)
 
@@ -278,8 +307,8 @@ The footer of each run reports cache hit/miss stats so you can see how much quot
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Mode says "heuristic-only" despite `config.yaml` filled in | `gcloud` CLI not installed | Install gcloud SDK: https://cloud.google.com/sdk/docs/install |
-| Same, with `gcloud` available | ADC not configured | Run `gcloud auth application-default login --scopes=...` (see Authenticate above) |
+| Mode says "heuristic-only" despite `config.yaml` filled in | No credential resolved (footer: `No GSC credentials found`) | Either run `gcloud auth application-default login --scopes=...` (see Authenticate above), OR set `adc_credentials_path` in `config.yaml` to a synced ADC file (see Multiple machines). gcloud need NOT be installed if you point at a credential file. |
+| Footer says credential file unreadable / token mint failed | `adc_credentials_path` points at a missing/corrupt file, or the refresh token was revoked | Check the path resolves on this machine; re-run the `gcloud auth application-default login` step to refresh the credential, then re-sync the file. |
 | Footer says `ADC quota project not set` | Skipped step 6 above | Run `gcloud auth application-default set-quota-project <your-gcp-project>` |
 | Footer says `Search Console API not enabled on quota project '<X>'` | Skipped step 4 above | Run `gcloud services enable searchconsole.googleapis.com --project=<X>` |
 | Footer says `Search Console API auth failed: 401 UNAUTHENTICATED` | OAuth scope insufficient | Re-run `gcloud auth application-default login` with the `--scopes=https://www.googleapis.com/auth/webmasters.readonly,...` flag |

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# gsc-parse-helper — launcher for the /bx:seo GSC JSON helper.
+#
+# Why this wrapper exists: skill-emitted Bash has no reliable way to locate a
+# plugin's bundled files. ${CLAUDE_SKILL_DIR} is NOT a real Claude Code
+# substitution (it expands to empty), and ${CLAUDE_PLUGIN_ROOT} is not exported
+# into the Bash tool's environment. The one mechanism that works is the plugin
+# `bin/` directory being auto-added to PATH while the plugin is enabled
+# (Claude Code 2.1.91+). So this launcher lives in bin/, resolves its own
+# location, and execs the real implementation with a working Python 3.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HELPER="$HERE/../skills/seo/references/gsc-parse-helper.py"
+
+if [ ! -f "$HELPER" ]; then
+  echo "gsc-parse-helper: implementation not found at $HELPER" >&2
+  exit 2
+fi
+
+# Pick a real Python 3. Prefer `python` first: on Windows `python3` is the
+# Microsoft Store stub (prints "Python was not found" and exits non-zero),
+# while `python` is the real interpreter. On macOS/Linux `python` is python3
+# when present, else we fall back to `python3`/`py`. The version probe rejects
+# both the Windows stub (probe fails) and any legacy python2 (major < 3).
+PY=""
+for cand in python python3 py; do
+  if command -v "$cand" >/dev/null 2>&1 && \
+     "$cand" -c 'import sys; raise SystemExit(0 if sys.version_info[0] >= 3 else 1)' >/dev/null 2>&1; then
+    PY="$cand"
+    break
+  fi
+done
+
+if [ -z "$PY" ]; then
+  echo "gsc-parse-helper: no Python 3 interpreter found on PATH (tried python, python3, py)" >&2
+  exit 3
+fi
+
+# Helper does its own UTF-8 file I/O, but force interpreter-level UTF-8 too so
+# Turkish + GSC prompt-injection query strings don't crash on Windows charmap.
+export PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"
+export PYTHONUTF8="${PYTHONUTF8:-1}"
+
+exec "$PY" "$HELPER" "$@"

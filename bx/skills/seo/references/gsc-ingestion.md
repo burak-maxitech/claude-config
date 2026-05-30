@@ -16,11 +16,10 @@ For the **finding output shape**, ranking formulas, and `score_impact: 0` invari
 GSC mode is **enabled** when all of these conditions hold:
 
 1. `.seo-data/gsc/config.yaml` exists with non-empty `site_url:` key
-2. `gcloud` SDK installed (`gcloud --version` returns)
-3. ADC authenticated (`gcloud auth application-default print-access-token` returns a token)
-4. ADC quota project set (`grep -oE '"quota_project_id"...' | sed ...` on `application_default_credentials.json` returns a non-empty project ID — written by `gcloud auth application-default set-quota-project <id>`). The skill sends this value as the `x-goog-user-project` header on every API call. grep+sed used instead of `jq` since `jq` isn't on PATH in many bash environments.
-5. Active probe: `curl GET https://www.googleapis.com/webmasters/v3/sites` with both the ADC token AND `x-goog-user-project` header returns HTTP 200 + valid JSON
-6. The configured `site_url` appears in the returned `siteEntry[*].siteUrl` list with a non-`siteUnverifiedUser` `permissionLevel`
+2. A credential resolves: `gsc-parse-helper auth-token` succeeds (`AUTH_TOKEN_OK:1`) — it finds an `authorized_user` ADC file (via `config.yaml adc_credentials_path`, `GOOGLE_APPLICATION_CREDENTIALS`, or gcloud's default path) and mints a token with stdlib. `gcloud` need NOT be installed (it's only a fallback). Use ADC-as-yourself, NOT a service account (Google's add-service-account-to-GSC bug — see `gsc-api-schema.md`).
+3. A quota project resolves (non-empty `QUOTA_PROJECT` from the probe): `config.yaml quota_project` or the credential file's `quota_project_id`. Sent as the `x-goog-user-project` header on every API call (required, else 403 SERVICE_DISABLED).
+4. Active probe: `curl GET https://www.googleapis.com/webmasters/v3/sites` with both the minted token AND `x-goog-user-project` header returns HTTP 200 + valid JSON
+5. The configured `site_url` appears in the returned `siteEntry[*].siteUrl` list with a non-`siteUnverifiedUser` `permissionLevel`
 
 Otherwise → **heuristic-only mode**. The skill runs normally; subagents get an empty GSC block; Section 1 banner fires if it's a first encounter (sentinel-gated).
 
@@ -37,7 +36,7 @@ When GSC mode is enabled, ingest data from the Search Console API per `gsc-api-q
 
 All Performance calls dispatch in one parallel Bash turn. URL Inspection calls dispatch in a second parallel turn after Performance (URL selection uses Q3's `url_impressions_map`).
 
-**Token + quota-project caching**: Turn 1's probe already fetched both the ADC token (`gcloud auth application-default print-access-token`) and the ADC quota project (extracted from `application_default_credentials.json` via `grep -oE '"quota_project_id"...' | sed -E '...'` — see Step 1.6.1 for the exact line). Both are reused as shared context across all Turn 2 curl invocations — every call must include `Authorization: Bearer $TOKEN` AND `x-goog-user-project: $QUOTA_PROJECT` headers. Tokens have a 1-hour TTL; a single Step 1.6 dispatch finishes in seconds, so one Turn 1 fetch is reused.
+**Token + quota-project (minted in-call, not reused)**: tokens are NOT carried between Bash calls (shell state doesn't persist). Each API-hitting call mints its own via `gsc-parse-helper`: the Search Analytics curl path calls `gsc-parse-helper auth-token` in its cache-miss branch (captures token + quota into shell vars, never echoed); `gsc-parse-helper inspect-batch` mints internally. Every curl includes `Authorization: Bearer $TOKEN` AND `x-goog-user-project: $QUOTA_PROJECT`. Minting is a free, fast refresh-token grant, so per-call minting costs nothing against API quota.
 
 ### Digest shape
 
@@ -477,7 +476,7 @@ Pass the brand name + 1-2 aliases (e.g., `"Burak Arık"` + `"burakarik"` + `"bur
 
 **Source:** orchestrator-emitted in SKILL.md Step 1.6.13 (NOT the seo-gsc-insights subagent — the snapshot diff lives in the orchestrator since it spans runs, and the finding is emitted directly into the findings pool). The subagent's catalog stays at sub-dims 1-13; the catalog total of 14 reflects sub-dim 14 as the orchestrator-emitted addition.
 
-**Mechanism:** every run writes a snapshot of `{url → coverageState}` for all inspected URLs to `.seo-data/gsc/snapshots/<YYYY-MM-DDTHHMMSS>-<commit_sha7>.json` (Step 1.6.13.1). On the next run, the orchestrator finds the most-recent prior snapshot (Step 1.6.13.2), diffs it against the current run's inspections (Step 1.6.13.3 via `gsc-parse-helper.py regression`), and emits sub-dim 14 findings for URLs whose coverageState flipped from indexed to non-indexed.
+**Mechanism:** every run writes a snapshot of `{url → coverageState}` for all inspected URLs to `.seo-data/gsc/snapshots/<YYYY-MM-DDTHHMMSS>-<commit_sha7>.json` (Step 1.6.13.1). On the next run, the orchestrator finds the most-recent prior snapshot (Step 1.6.13.2), diffs it against the current run's inspections (Step 1.6.13.3 via `gsc-parse-helper regression`), and emits sub-dim 14 findings for URLs whose coverageState flipped from indexed to non-indexed.
 
 **Trigger transitions** (each emits as evidence in the sub-dim 14 finding):
 

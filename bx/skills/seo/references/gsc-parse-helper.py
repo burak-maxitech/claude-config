@@ -35,10 +35,15 @@ Subcommands:
                       ThreadPoolExecutor (20 workers), per-URL cache check
                       (7d TTL on ui-* — coverageState is weeks-stable), atomic
                       write via .tmp + os.replace, never caches non-200.
-                      Reads GCLOUD_TOKEN + GCLOUD_QUOTA_PROJECT from env;
-                      NO_CACHE=1 bypasses cache lookup (writes still happen).
-                      Replaces the prior "N parallel Bash curl calls" spec —
-                      closes the S31cont.²+S34 boundary-violation pattern.
+                      Mints its own token via resolve_credentials() (token never
+                      leaves this process); NO_CACHE=1 bypasses cache lookup
+                      (writes still happen). Replaces the prior "N parallel Bash
+                      curl calls" spec — closes the S31cont.²+S34 boundary-
+                      violation pattern.
+    auth-token        Mint + print credentials for the Search Analytics curl
+                      path: two lines (access token, then quota project). Capture
+                      into shell vars in the SAME Bash call that runs curl; never
+                      run standalone (would leak a live token to the transcript).
     history-update <findings_jsonl> <history_path> <commit_sha> <run_date>
                       Group D: read newline-delimited finding objects, hash by
                       sub_dim+location, update finding-history.json's run_count
@@ -60,11 +65,19 @@ All subcommands print:
     --- <section> ---         # human-readable section separators
     <records>                 # data lines, format documented per subcommand
 
+Credentials (inspect-batch + auth-token):
+    Resolved by resolve_credentials() — gcloud ADC as the user (authorized_user),
+    NOT a service account. Looks at GCLOUD_TOKEN/GCLOUD_QUOTA_PROJECT env, then
+    GOOGLE_APPLICATION_CREDENTIALS (set by the orchestrator from config.yaml
+    `adc_credentials_path`), then gcloud's default ADC path. Token minted via
+    stdlib refresh-token grant (no google-auth dependency).
+
 Exit codes:
     0   success (incl. zero findings)
     1   file not found / unreadable
     2   JSON parse error
     3   unknown subcommand / bad arguments
+    4   credential resolution / token mint failure
 """
 # -*- coding: utf-8 -*-
 import json
@@ -73,12 +86,13 @@ import sys
 import glob
 import hashlib
 import time
+import subprocess
 import urllib.request
 import urllib.error
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode
 
 
 def load_json(path):
@@ -93,6 +107,255 @@ def load_json(path):
     except json.JSONDecodeError as e:
         print(f"ERROR: JSON parse failed for {path}: {e}", file=sys.stderr)
         sys.exit(2)
+
+
+# ---------------------------------------------------------------------------
+# Authentication — mint a GSC access token from gcloud ADC
+# ---------------------------------------------------------------------------
+# The user authenticates AS THEMSELVES via gcloud Application Default
+# Credentials (type: authorized_user), NOT a service account. (Adding a service
+# account to GSC is blocked by an open Google bug, and domain-wide delegation
+# needs Google Workspace, which a personal @gmail account lacks.) The ADC file
+# holds a refresh token that is NOT machine-locked, so it can live in a synced
+# folder (Drive/OneDrive/Dropbox) and be pointed at from every machine via the
+# config.yaml `adc_credentials_path` key → "configure once, all machines".
+#
+# Token minting is stdlib-only (no google-auth dependency): a refresh-token
+# grant POST to Google's OAuth endpoint. The token is minted INSIDE this helper
+# so it never crosses into the orchestrator's (model's) context for the URL
+# Inspection path; the `auth-token` subcommand exposes it for the Search
+# Analytics curl path, which must capture it into a shell var in the same call.
+
+OAUTH_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
+TOKEN_REFRESH_TIMEOUT_SEC = 20
+GCLOUD_TOKEN_TIMEOUT_SEC = 30
+REAUTH_HINT = ("gcloud auth application-default login "
+               "--scopes=https://www.googleapis.com/auth/webmasters.readonly,"
+               "https://www.googleapis.com/auth/cloud-platform")
+
+
+class CredentialError(Exception):
+    """Credential resolution failure with a machine-parseable `reason` so the
+    orchestrator can render the right remediation instead of one generic
+    'no credentials' message. reason ∈ {no_credentials, unreadable, wrong_type,
+    mint_failed, quota_missing}."""
+
+    def __init__(self, reason, message):
+        super().__init__(message)
+        self.reason = reason
+
+
+def _default_adc_path():
+    """gcloud's well-known Application Default Credentials path, cross-platform.
+
+    Windows: %APPDATA%\\gcloud\\application_default_credentials.json
+    POSIX:   ~/.config/gcloud/application_default_credentials.json"""
+    if os.name == 'nt':
+        base = os.environ.get('APPDATA') or os.path.join(
+            os.path.expanduser('~'), 'AppData', 'Roaming')
+        return os.path.join(base, 'gcloud',
+                            'application_default_credentials.json')
+    return os.path.join(os.path.expanduser('~'), '.config', 'gcloud',
+                        'application_default_credentials.json')
+
+
+def _refresh_user_token(adc, cred_path):
+    """Mint an OAuth2 access token from an authorized_user ADC dict via a
+    refresh-token grant. Stdlib only — same flow gcloud performs internally.
+
+    Validates required fields up front (raises CredentialError('unreadable')
+    on a malformed/partial file) so a KeyError isn't later mistaken for a
+    network/revoked-token failure."""
+    missing = [k for k in ('client_id', 'client_secret', 'refresh_token')
+               if not (adc.get(k) or '').strip()]
+    if missing:
+        raise CredentialError(
+            'unreadable',
+            f"authorized_user credential file '{cred_path}' is missing "
+            f"field(s) {', '.join(missing)}. Re-create it with: {REAUTH_HINT}")
+    body = urlencode({
+        'client_id': adc['client_id'],
+        'client_secret': adc['client_secret'],
+        'refresh_token': adc['refresh_token'],
+        'grant_type': 'refresh_token',
+    }).encode('utf-8')
+    req = urllib.request.Request(
+        OAUTH_TOKEN_ENDPOINT, data=body, method='POST',
+        headers={'Content-Type': 'application/x-www-form-urlencoded'})
+    with urllib.request.urlopen(req, timeout=TOKEN_REFRESH_TIMEOUT_SEC) as resp:
+        payload = json.loads(resp.read().decode('utf-8'))
+    token = (payload.get('access_token') or '').strip()
+    if not token:
+        raise RuntimeError('OAuth token endpoint returned no access_token')
+    return token
+
+
+def _gcloud_token():
+    """Fallback mint via the gcloud CLI (uses gcloud's own ADC resolution).
+    Returns '' on any failure — caller decides whether that's fatal."""
+    try:
+        out = subprocess.run(
+            ['gcloud', 'auth', 'application-default', 'print-access-token'],
+            capture_output=True, text=True, timeout=GCLOUD_TOKEN_TIMEOUT_SEC)
+        if out.returncode == 0:
+            return out.stdout.strip()
+    except Exception:
+        pass
+    return ''
+
+
+SKILL_CONFIG_PATH = os.path.join('.seo-data', 'gsc', 'config.yaml')
+
+
+def _read_skill_config():
+    """Best-effort flat parse of .seo-data/gsc/config.yaml (relative to CWD =
+    the audited project root) for credential keys. Mirrors the orchestrator's
+    flat-key parser: only top-level `key: value` lines, nested keys ignored.
+    Returns {} when the file is missing/unreadable."""
+    cfg = {}
+    try:
+        with open(SKILL_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.rstrip('\n')
+                if not line.strip() or line.lstrip().startswith('#'):
+                    continue
+                if line[0].isspace() or ':' not in line:  # nested / non-kv
+                    continue
+                k, _, v = line.partition(':')
+                cfg[k.strip()] = v.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return cfg
+
+
+def _expand_path(p):
+    """Expand ~ and $VARS so a config path resolves the same on Win/Mac."""
+    return os.path.expanduser(os.path.expandvars(p)) if p else p
+
+
+def resolve_credentials():
+    """Resolve (access_token, quota_project) for GSC API calls.
+
+    Credential file priority:
+      1. GCLOUD_TOKEN + GCLOUD_QUOTA_PROJECT env (explicit override / back-compat)
+      2. GOOGLE_APPLICATION_CREDENTIALS env (orchestrator may set it)
+      3. config.yaml `adc_credentials_path` — point every machine at one synced
+         authorized_user file for "configure once, all machines"
+      4. gcloud's default well-known ADC path
+    Quota project priority: GCLOUD_QUOTA_PROJECT env → config.yaml `quota_project`
+      → the credential file's `quota_project_id`.
+
+    authorized_user files are minted via stdlib refresh-token grant. The gcloud
+    CLI fallback is used ONLY when no credential path was explicitly configured
+    (so an explicitly-pointed-at file that is missing / wrong-type / fails to
+    mint raises a clear error instead of silently authenticating as gcloud's
+    default — possibly different — identity).
+
+    Raises CredentialError(reason, message) when resolution fails; reason lets
+    the orchestrator pick the right remediation."""
+    tok = os.environ.get('GCLOUD_TOKEN', '').strip()
+    qp = os.environ.get('GCLOUD_QUOTA_PROJECT', '').strip()
+    if tok and qp:
+        return tok, qp
+
+    cfg = _read_skill_config()
+    # `explicit` = the user pointed us at a specific file. When true we must NOT
+    # fall back to gcloud's default identity on failure (that's the wrong-account
+    # bug); we surface the specific error for the configured file instead.
+    cred_path = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '').strip()
+    explicit = bool(cred_path)
+    if not cred_path:
+        cred_path = _expand_path((cfg.get('adc_credentials_path') or '').strip())
+        explicit = bool(cred_path)
+    if not cred_path:
+        cred_path = _default_adc_path()
+
+    adc = None
+    if cred_path and os.path.exists(cred_path):
+        try:
+            with open(cred_path, 'r', encoding='utf-8') as f:
+                adc = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            raise CredentialError(
+                'unreadable', f"credential file '{cred_path}' is unreadable: {e}")
+    elif explicit:
+        raise CredentialError(
+            'unreadable',
+            f"configured adc_credentials_path '{cred_path}' does not exist on "
+            f"this machine. Check the path resolves here (synced folder mounted?) "
+            f"or re-create it with: {REAUTH_HINT}")
+
+    cred_type = adc.get('type') if adc is not None else None
+
+    if not tok and cred_type == 'authorized_user':
+        try:
+            tok = _refresh_user_token(adc, cred_path)
+        except CredentialError:
+            raise
+        except Exception as e:
+            if explicit:
+                raise CredentialError(
+                    'mint_failed',
+                    f"failed to mint a token from '{cred_path}' (revoked token "
+                    f"or network error): {e}. Re-auth with: {REAUTH_HINT}")
+            tok = _gcloud_token()  # default path: a stale gcloud login may still work
+            if not tok:
+                raise CredentialError(
+                    'mint_failed',
+                    f"failed to mint a token from '{cred_path}': {e}. "
+                    f"Re-auth with: {REAUTH_HINT}")
+    elif not tok and cred_type == 'service_account':
+        raise CredentialError(
+            'wrong_type',
+            f"'{cred_path}' is a service-account key, but /bx:seo needs an "
+            f"authorized_user ADC file. Run: {REAUTH_HINT}. (Service accounts "
+            f"can't be added to GSC — open Google bug; use ADC as yourself.)")
+    elif not tok:
+        # No usable credential file (none configured, default path absent or an
+        # unrecognized type) → let gcloud try its own resolution.
+        tok = _gcloud_token()
+
+    if not qp:
+        qp = (cfg.get('quota_project') or '').strip()
+    if not qp and adc is not None:
+        qp = (adc.get('quota_project_id') or '').strip()
+
+    if not tok:
+        raise CredentialError(
+            'no_credentials',
+            "no GSC credentials found. Set 'adc_credentials_path' in "
+            ".seo-data/gsc/config.yaml (point it at an "
+            "application_default_credentials.json), or run: " + REAUTH_HINT)
+    if not qp:
+        raise CredentialError(
+            'quota_missing',
+            "GSC quota project not set. Add 'quota_project' to "
+            ".seo-data/gsc/config.yaml, or run 'gcloud auth "
+            "application-default set-quota-project <project>'. Without it the "
+            "API returns 403 SERVICE_DISABLED.")
+    return tok, qp
+
+
+def cmd_auth_token():
+    """Print credentials for the Search Analytics curl path: two lines —
+    the access token, then the quota project.
+
+    SECURITY: capture this into shell variables in the SAME Bash call that
+    issues the curl; never run it standalone (a standalone run prints a live
+    OAuth token into the model transcript). URL Inspection does NOT use this —
+    inspect-batch mints internally so the token never leaves the helper.
+
+    On failure: prints `AUTH_ERROR:<reason>` to stdout (machine-parseable so the
+    probe can pick the right remediation) + the human message to stderr, exit 4.
+    The reason token is NOT a secret."""
+    try:
+        token, quota = resolve_credentials()
+    except CredentialError as e:
+        print(f"AUTH_ERROR:{e.reason}")
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(4)
+    sys.stdout.write(token + '\n')
+    sys.stdout.write(quota + '\n')
 
 
 def parse_q1(path):
@@ -720,14 +983,17 @@ def inspect_batch(cache_dir, site_url, urls_file):
     See gsc-cache.md "Cache key strategy" for the ui-<hash>.json scheme — this
     function matches it exactly so partial cache hits across Bash-wrapper and
     helper-driven runs interoperate cleanly."""
-    token = os.environ.get('GCLOUD_TOKEN', '').strip()
-    if not token:
-        print('ERROR: GCLOUD_TOKEN env var not set or empty', file=sys.stderr)
-        sys.exit(1)
-    quota_project = os.environ.get('GCLOUD_QUOTA_PROJECT', '').strip()
-    if not quota_project:
-        print('ERROR: GCLOUD_QUOTA_PROJECT env var not set or empty', file=sys.stderr)
-        sys.exit(1)
+    # Mint credentials inside the helper — the token never leaves this process,
+    # so URL Inspection never exposes it to the orchestrator/model context.
+    try:
+        token, quota_project = resolve_credentials()
+    except CredentialError as e:
+        # Emit a stdout marker BEFORE exiting non-zero so the orchestrator can't
+        # mistake a credential failure for "total_attempted:0 / zero findings"
+        # and silently drop the entire indexing signal.
+        print(f'inspect_batch_error:{e.reason}')
+        print(f'ERROR: {e}', file=sys.stderr)
+        sys.exit(4)
     no_cache = os.environ.get('NO_CACHE', '') == '1'
 
     os.makedirs(cache_dir, exist_ok=True)
@@ -1207,11 +1473,21 @@ def _watchpoint_status(baseline, current):
 
 
 def main():
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 2:
         print(__doc__, file=sys.stderr)
         sys.exit(3)
 
     cmd = sys.argv[1]
+
+    # Commands that take no positional file argument.
+    if cmd == 'auth-token':
+        cmd_auth_token()
+        return
+
+    if len(sys.argv) < 3:
+        print(__doc__, file=sys.stderr)
+        sys.exit(3)
+
     arg = sys.argv[2]
 
     if cmd == 'q1':

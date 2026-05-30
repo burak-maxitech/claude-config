@@ -15,19 +15,20 @@ For endpoint inventory, auth, quota model, and enum reference, see `gsc-api-sche
 
 ## Invocation contract
 
-### Token + quota-project acquisition (once per run, cached)
+### Token + quota-project acquisition (minted in-call, NOT reused)
 
-Both values are produced by Step 1.6's Turn 1 probe and reused across all Turn 2 calls. Re-fetch only if needed (e.g., token approaches 1-hour TTL):
+**Do not carry a token between Bash calls.** Shell state does not persist across Bash tool calls, so a `TOKEN` minted in one call is gone in the next. Every API-hitting call mints its own via the helper:
 
 ```
-TOKEN=$(gcloud auth application-default print-access-token)
-ADC_DIR=$(gcloud info --format="value(config.paths.global_config_dir)")
-QUOTA_PROJECT=$(grep -oE '"quota_project_id"[[:space:]]*:[[:space:]]*"[^"]+"' "$ADC_DIR/application_default_credentials.json" | head -1 | sed -E 's/.*"([^"]+)"$/\1/')
+# Search Analytics curl path — at the top of the cache-miss branch:
+_CREDS=$(gsc-parse-helper auth-token)      # line 1 = token, line 2 = quota project
+TOKEN=$(printf '%s' "$_CREDS" | sed -n 1p)
+QUOTA_PROJECT=$(printf '%s' "$_CREDS" | sed -n 2p)
 ```
 
-`QUOTA_PROJECT` is the ADC quota project written by `gcloud auth application-default set-quota-project <id>`. **Required on every Search Console API call** — without the `x-goog-user-project` header, all calls return HTTP 403 with `reason: SERVICE_DISABLED` (Google Cloud APIs need a billable project even though Search Console API itself is free).
+(URL Inspection does NOT do this — `gsc-parse-helper inspect-batch` mints internally so the token never leaves the helper process.)
 
-**Why grep + sed instead of `jq`:** `jq` is the obvious tool for JSON extraction but it isn't on PATH in many bash environments (notably claude-code's Bash on Windows; minimal Linux containers; CI runners without explicit install). `grep -oE` + `sed -E` are part of bash core and always available. The trade-off is the regex is JSON-flat-only (works because `quota_project_id` is a top-level string field) — acceptable for this one-shot extraction.
+`gsc-parse-helper auth-token` resolves credentials in this order: `GCLOUD_TOKEN`/`GCLOUD_QUOTA_PROJECT` env → `GOOGLE_APPLICATION_CREDENTIALS` → `config.yaml adc_credentials_path` (a synced ADC file, for multi-machine use) → gcloud's default ADC path; then mints the token with Python stdlib (a refresh-token grant — no `gcloud` spawn, no `jq`). `QUOTA_PROJECT` comes from `config.yaml quota_project` or the credential file's `quota_project_id`. **Required on every Search Console API call** — without the `x-goog-user-project` header, all calls return HTTP 403 with `reason: SERVICE_DISABLED` (Google Cloud APIs need a billable project even though Search Console API itself is free). **Capture the token into a shell var and never echo it** — keep it out of the model transcript.
 
 ### Search Analytics call shape
 
