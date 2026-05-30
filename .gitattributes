@@ -1,0 +1,7 @@
+# Shell scripts must stay LF on every platform. A bash script checked out with
+# CRLF gets a `\r` appended to its shebang and to every string value (paths,
+# command names), which breaks it on macOS/Linux AND in Windows Git-Bash.
+# This matters most for the plugin's bin/ launchers and SessionStart hooks,
+# which run as real shell processes.
+*.sh    text eol=lf
+bx/bin/* text eol=lf

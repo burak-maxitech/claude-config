@@ -132,13 +132,13 @@ Steps 1.5 (git scan) and 1.6 (GSC API ingestion when configured, else heuristic-
 - `Read references/gsc-api-schema.md` (optimistic; reference for API response parsing)
 - `Read references/gsc-cache.md` (optimistic; cache wrapper template + TTL policy used by Turn 2 dispatch)
 - `Bash: mkdir -p .seo-data/gsc/cache .seo-data/gsc/snapshots 2>/dev/null; find .seo-data/gsc/cache -type f -name 'sa-*' -mtime +7 -delete 2>/dev/null; find .seo-data/gsc/cache -type f -name 'ui-*' -mtime +14 -delete 2>/dev/null; find .seo-data/gsc/cache -type f ! -name 'sa-*' ! -name 'ui-*' -mtime +7 -delete 2>/dev/null; find .seo-data/gsc/snapshots -type f -mtime +30 -delete 2>/dev/null; ls .seo-data/gsc/cache 2>/dev/null | wc -l; ls .seo-data/gsc/snapshots 2>/dev/null | wc -l` (cache + snapshot dir setup + **two-tier cache prune** (sa-* at 7d, ui-* at 14d — matches the per-prefix TTL with slack; see `references/gsc-cache.md` "Eviction policy") + janitorial prune for orphaned `.tmp.$$` files + snapshot 30-day prune + counts of remaining entries — produces `<N>` for the footer cache stats line and `<M>` for the snapshot count. `mkdir` here is load-bearing — the Turn 2 wrapper assumes both dirs exist and does NOT recreate them per call. See `references/gsc-cache.md` "TTL policy" for the per-prefix split rationale (24h for sa-*, 7d for ui-* — codified after S34 burakarik6 dogfood scored 0/197 cache hits) and `references/gsc-ingestion.md` "Hard rules" for the 30-day snapshot retention rationale.)
-- `Glob **/sitemap.xml` + `Glob **/sitemap_index.xml` (sitemap location detection — both probed in parallel so Turn 1 can begin Read'ing the right file in Turn 1.5 if found. Search paths: repo root, `public/`, `static/`, `dist/`, `out/`, `_site/`. Used by Step 1.6.6 Turn 2b URL Inspection sitemap-orphan slice AND by Step 3.2 URL probe — both consume the same parsed URL list, so a single parse is sufficient. If neither Glob finds anything, the sitemap-orphan slice in Turn 2b is skipped silently and Step 3.2 footer-notes "no sitemap.xml — URL probe skipped".)
+- `Glob **/sitemap.xml` + `Glob **/sitemap_index.xml` (repo-local sitemap detection — the **fallback** source only. Search paths: repo root, `public/`, `static/`, `dist/`, `out/`, `_site/`. The **primary** sitemap source is the LIVE site, resolved in Step 1.6.6a (GSC `sitemaps.list` → robots.txt → `<base>/sitemap.xml`) — that's what catches generated/dynamic sitemaps a repo glob can't see. This glob result is used only when no live source resolves, e.g. a truly static site or an offline run with no base URL.)
 - `Read .seo-data/gsc/known-bad-urls.txt` (optimistic — the file is user-authored and may not exist; Read errors silently on missing file → `user_supplied_urls` stays empty. When present, parsed in Step 1.6.6's Pre-Turn-2 step into the URL Inspection user-supplied slice — see `references/gsc-api-queries.md` "URL Inspection — selection algorithm" 4-slice mix.)
 - `Bash: ls .seo-data/gsc/snapshots 2>/dev/null | sort | tail -1` (find most recent prior snapshot — used by Step 1.6.13.2 regression diff. Empty stdout means "first run for this property", in which case Step 1.6.13 emits no findings and footer-notes the activation.)
 - `Read .seo-data/gsc/finding-history.json` (optimistic — file is skill-auto-managed under Group D finding-lifecycle infra; absent on first run. When present, the orchestrator parses `{<hash>: {run_count, first_seen_date, ...}}` and passes the map to Step 7 report rendering so findings with `run_count >= 3` get an escalation hint appended to their `recommended_action`. See Step 6.8 for the write-back step.)
-- `Read .seo-data/gsc/watchpoints.json` (optimistic — same as above. When present, the orchestrator invokes `gsc-parse-helper.py watchpoint-check` AFTER Q2 cache lands in Turn 2a (since the check needs the current Q2 pages digest for metric comparison) — see **Step 1.6.14** below for the invocation block. Stash the helper output for Step 7 banner rendering.)
-- `Bash: gcloud --version 2>&1` (gcloud SDK install detection)
-- `Bash: TOKEN=$(gcloud auth application-default print-access-token 2>&1); ADC_DIR=$(gcloud info --format="value(config.paths.global_config_dir)" 2>/dev/null); QUOTA_PROJECT=$(grep -oE '"quota_project_id"[[:space:]]*:[[:space:]]*"[^"]+"' "$ADC_DIR/application_default_credentials.json" 2>/dev/null | head -1 | sed -E 's/.*"([^"]+)"$/\1/'); echo "TOKEN_LEN:${#TOKEN}"; echo "QUOTA_PROJECT:$QUOTA_PROJECT"; curl -s -w "\nHTTP_STATUS:%{http_code}\n" -H "Authorization: Bearer $TOKEN" -H "x-goog-user-project: $QUOTA_PROJECT" "https://www.googleapis.com/webmasters/v3/sites"` (combined ADC + quota-project + API auth probe in one Bash invocation; orchestrator parses `TOKEN_LEN:`, `QUOTA_PROJECT:`, and `HTTP_STATUS:` to determine ADC + quota project + API reachability. The `x-goog-user-project` header is required on every Search Console API call to bill quota to the user-controlled project; ADC stores the value in `application_default_credentials.json` after `gcloud auth application-default set-quota-project <id>`. Without it, all calls return 403 SERVICE_DISABLED. **Extraction uses `grep -oE` + `sed -E` instead of `jq`** — `jq` isn't on PATH in many bash environments (notably claude-code's Bash on Windows + minimal Linux containers); grep + sed are always available.)
+- `Read .seo-data/gsc/watchpoints.json` (optimistic — same as above. When present, the orchestrator invokes `gsc-parse-helper watchpoint-check` AFTER Q2 cache lands in Turn 2a (since the check needs the current Q2 pages digest for metric comparison) — see **Step 1.6.14** below for the invocation block. Stash the helper output for Step 7 banner rendering.)
+- `Bash: gcloud --version 2>&1` (gcloud SDK install detection — informational only; the helper mints tokens with Python stdlib, so gcloud is a fallback, not a requirement)
+- `Bash: SITES_OUT=$(mktemp); if _CREDS=$(gsc-parse-helper auth-token 2>/dev/null); then TOKEN=$(printf '%s' "$_CREDS" | sed -n 1p); QUOTA_PROJECT=$(printf '%s' "$_CREDS" | sed -n 2p); HTTP_STATUS=$(curl -s -o "$SITES_OUT" -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H "x-goog-user-project: $QUOTA_PROJECT" "https://www.googleapis.com/webmasters/v3/sites"); echo "AUTH_TOKEN_OK:1"; echo "QUOTA_PROJECT:$QUOTA_PROJECT"; echo "HTTP_STATUS:$HTTP_STATUS"; cat "$SITES_OUT"; else echo "AUTH_TOKEN_OK:0"; echo "AUTH_REASON:$(printf '%s' "$_CREDS" | sed -n 's/^AUTH_ERROR://p' | head -1)"; echo "HTTP_STATUS:000"; fi; rm -f "$SITES_OUT"` (combined auth probe in one Bash invocation. It mints credentials **via the helper exactly as Turn 2 will** — `gsc-parse-helper auth-token` resolves `config.yaml adc_credentials_path` → synced file → default gcloud ADC, then mints a token with stdlib — so the probe and the data fetch always agree on which credential file is used. Then it calls sites.list to confirm the token authenticates AND the property is verified. Orchestrator parses `AUTH_TOKEN_OK:`, `QUOTA_PROJECT:`, `HTTP_STATUS:`, the JSON body, and — on failure — `AUTH_REASON:` (one of `no_credentials` / `unreadable` / `wrong_type` / `mint_failed` / `quota_missing`, emitted by `auth-token` as `AUTH_ERROR:<reason>` on stdout) so the orchestrator picks the right remediation in Step 1.6.3 instead of a generic message. **The token is captured into shell vars and never echoed** — it never enters the model transcript; `AUTH_REASON` is a non-secret reason token. The `x-goog-user-project` header bills quota to the user-controlled project; without it calls return 403 SERVICE_DISABLED. Minting the token in the SAME Bash call that uses it is mandatory: shell state does NOT persist across Bash tool calls, so a token can never be carried from one call to another.)
 
 Only the **post-tool aggregation** (parsing git log, parsing config.yaml, resolving API or heuristic mode, parsing sites.list response) runs sequentially.
 
@@ -302,7 +302,7 @@ Four reference files cover the implementation:
 - `references/gsc-ingestion.md` — digest shapes, **14 sub-dim** finding catalog (incl. sub-dim 14 `deindex_regression` for snapshot-diff early warning), `coverageState` → 9-reason lookup, setup banner, `.gitignore` auto-append rules
 - `references/gsc-api-schema.md` — Search Console API endpoint inventory, auth/scope, quota model, `coverageState`/`pageFetchState` enums
 - `references/gsc-api-queries.md` — 3 parametrized `curl` templates (Q1/Q2/Q3) + URL Inspection per-URL template + URL selection algorithm + lookup table
-- `references/gsc-cache.md` — split-TTL response cache for `searchanalytics.query` (24h on `sa-*`) and `urlInspection.index.inspect` (7d on `ui-*` — coverageState is weeks-stable). Cache wrapper bash template (atomic write, skip-cache-on-non-200, stat portability) for Turn 2a Search Analytics; Turn 2b URL Inspection cache is helper-resident in `gsc-parse-helper.py inspect-batch`. `--no-cache` bypass behavior. Two-tier eviction policy (sa-* at 7d, ui-* at 14d). Footer line format.
+- `references/gsc-cache.md` — split-TTL response cache for `searchanalytics.query` (24h on `sa-*`) and `urlInspection.index.inspect` (7d on `ui-*` — coverageState is weeks-stable). Cache wrapper bash template (atomic write, skip-cache-on-non-200, stat portability) for Turn 2a Search Analytics; Turn 2b URL Inspection cache is helper-resident in `gsc-parse-helper inspect-batch`. `--no-cache` bypass behavior. Two-tier eviction policy (sa-* at 7d, ui-* at 14d). Footer line format.
 
 ### Mode resolution (binary)
 
@@ -320,9 +320,10 @@ All GSC-related tool calls listed in the "Parallel-batch note" above fire in Tur
 | Variable | Source | True/false condition |
 |---|---|---|
 | `config_yaml_present` | Read `.seo-data/gsc/config.yaml` | Read succeeded (non-error result) |
-| `gcloud_cli_installed` | `gcloud --version` exit + stdout | stdout contains version string (regex `\d+\.\d+\.\d+`) |
-| `adc_authenticated` | combined probe `TOKEN_LEN:` line | `TOKEN_LEN` is a positive integer (token returned, non-empty) |
-| `adc_quota_project` | combined probe `QUOTA_PROJECT:` line | the string after `QUOTA_PROJECT:` (empty when `set-quota-project` was never run); cached in shared context for Turn 2 reuse |
+| `gcloud_cli_installed` | `gcloud --version` exit + stdout | stdout contains version string (regex `\d+\.\d+\.\d+`) — informational only (not gating; the helper mints via stdlib) |
+| `adc_authenticated` | combined probe `AUTH_TOKEN_OK:` line | `AUTH_TOKEN_OK:1` (the helper resolved a credential and minted a token; `:0` means no credential found) |
+| `adc_quota_project` | combined probe `QUOTA_PROJECT:` line | the string after `QUOTA_PROJECT:` (only emitted when auth succeeded; if the quota project is missing, `auth-token` fails with `AUTH_REASON:quota_missing` instead). NOT reused for Turn 2 — each call re-mints. |
+| `auth_failure_reason` | combined probe `AUTH_REASON:` line (present only when `AUTH_TOKEN_OK:0`) | one of `no_credentials` / `unreadable` / `wrong_type` / `mint_failed` / `quota_missing` — drives the specific Step 1.6.3 remediation. Empty/absent when auth succeeded. |
 | `api_probe_succeeded` | combined probe `HTTP_STATUS:` line + body | `HTTP_STATUS:200` present AND body parses as JSON containing `siteEntry` array |
 | `api_probe_response` | same | full JSON body — used in 1.6.3 to check `site_url` membership |
 
@@ -332,16 +333,19 @@ When `config_yaml_present`, parse the file's content (already Read in Turn 1) vi
 
 1. Reject nested keys: any line matching `^\s+[a-z_]+:` (leading whitespace before key) → emit `Config error: nested keys not supported in .seo-data/gsc/config.yaml — use flat top-level keys only.` and set `api_configured = false`. Skip rest of parse.
 2. Extract flat keys: lines matching `^([a-z_]+):\s*(.*)$`. Build `config: {key: value, ...}`.
-3. Warn on unknown keys (not in `{site_url, lookback_days}`): log `Config warning: unknown key '<X>' — ignored.`
+3. Warn on unknown keys (not in `{site_url, lookback_days, adc_credentials_path, quota_project, site_base_url, sitemap_url}`): log `Config warning: unknown key '<X>' — ignored.`
 4. Default `lookback_days = 90` when omitted. Validate range [7, 365] when present.
 5. `api_configured = config.site_url is present AND non-empty after trimming`
+6. **`adc_credentials_path`** (optional) — path to an ADC `application_default_credentials.json`. Point it at a file in a synced folder (Drive/OneDrive/Dropbox) so every machine authenticates from the same credential without a per-machine login → "configure once, all machines". The helper reads this key directly (no orchestrator action needed beyond not warning on it); `~` and `$VARS` are expanded. When omitted, the helper falls back to gcloud's default ADC path.
+7. **`quota_project`** (optional) — overrides the `x-goog-user-project` billing project. When omitted, the helper uses the credential file's `quota_project_id`.
+8. **`site_base_url`** (optional) — the deployed base URL (e.g. `https://example.com`) used to fetch the LIVE sitemap + robots.txt. When omitted, the base is taken from `--url <base>`, else derived from `site_url` (`sc-domain:example.com` → `https://example.com`; a URL-prefix property is used as-is). Set this only when the property is `sc-domain:` and you need a specific scheme/host, or GSC is off and you aren't passing `--url`.
+9. **`sitemap_url`** (optional) — explicit sitemap URL, bypassing discovery. Use for non-standard locations (CDN-hosted, gzipped, split). When omitted, the sitemap is discovered (Step 1.6.6a).
 
 ### 1.6.3 — Resolve `api_active` and mode
 
 ```
 api_active = api_configured
-           AND gcloud_cli_installed
-           AND adc_authenticated
+           AND adc_authenticated            # AUTH_TOKEN_OK:1 — helper minted a token
            AND adc_quota_project is non-empty
            AND api_probe_succeeded
            AND <config.site_url appears in api_probe_response.siteEntry[*].siteUrl>
@@ -350,11 +354,16 @@ api_active = api_configured
 gsc_mode = "enabled" if api_active else "disabled"
 ```
 
+`gcloud_cli_installed` is **not** a gating condition — the helper mints tokens with Python stdlib from the ADC file, so gcloud need not be installed (it's only used as a fallback when the credential file isn't an `authorized_user` file).
+
 **Probe failure handling** — when `api_configured == true` but `api_active == false`:
-- Surface the exact error in footer (parse `error.code` + `error.status` per gsc-api-schema.md):
-  - `gcloud_cli_installed == false` → `gcloud SDK not installed. Install: https://cloud.google.com/sdk/docs/install. Then run "gcloud auth application-default login --scopes=https://www.googleapis.com/auth/webmasters.readonly,https://www.googleapis.com/auth/cloud-platform" + "gcloud auth application-default set-quota-project <your-gcp-project>"`
-  - `adc_authenticated == false` → `ADC not authenticated. Run "gcloud auth application-default login --scopes=https://www.googleapis.com/auth/webmasters.readonly,https://www.googleapis.com/auth/cloud-platform"`
-  - `adc_quota_project` empty → `ADC quota project not set. Run "gcloud auth application-default set-quota-project <your-gcp-project>" — required for Google Cloud APIs to bill quota. Also ensure "gcloud services enable searchconsole.googleapis.com --project=<your-gcp-project>" has been run on that project.`
+- When `AUTH_TOKEN_OK:0`, the token never minted — pick the message from `auth_failure_reason` (the probe's `AUTH_REASON:` line). Each reason has ONE correct fix; do NOT collapse them to a generic "no credentials" message:
+  - `quota_missing` → `GSC quota project not set. Add "quota_project: <your-gcp-project>" to .seo-data/gsc/config.yaml, OR run "gcloud auth application-default set-quota-project <your-gcp-project>". Also ensure "gcloud services enable searchconsole.googleapis.com --project=<your-gcp-project>" has been run. Required to bill quota — without it calls return 403 SERVICE_DISABLED.`
+  - `wrong_type` → `Your configured credential file is a service-account key. /bx:seo needs an authorized_user ADC file — run "gcloud auth application-default login --scopes=https://www.googleapis.com/auth/webmasters.readonly,https://www.googleapis.com/auth/cloud-platform". (Service accounts can't be added to GSC — open Google bug; authenticate as yourself.)`
+  - `unreadable` → `Your configured adc_credentials_path is missing, unreadable, or incomplete on this machine. Check the path resolves here (is the synced Drive/OneDrive/Dropbox folder mounted?), or re-create the credential with "gcloud auth application-default login --scopes=...".`
+  - `mint_failed` → `Token mint failed — the refresh token was likely revoked or expired (or a transient network error). Re-auth with "gcloud auth application-default login --scopes=..." and re-sync the credential file if you use adc_credentials_path.`
+  - `no_credentials` (or `AUTH_REASON` empty) → `No GSC credentials found. Either set "adc_credentials_path" in .seo-data/gsc/config.yaml (point it at an application_default_credentials.json — e.g. one in a synced Drive/OneDrive/Dropbox folder, for multi-machine use), OR run "gcloud auth application-default login --scopes=https://www.googleapis.com/auth/webmasters.readonly,https://www.googleapis.com/auth/cloud-platform". NOTE: use ADC (login as yourself), NOT a service account.`
+- When `AUTH_TOKEN_OK:1` but `HTTP_STATUS` is an error, parse `error.code` + `error.status` per gsc-api-schema.md:
   - HTTP 401 → `Search Console API auth failed: 401 UNAUTHENTICATED. Re-run "gcloud auth application-default login" with the --scopes flag above (scope likely insufficient).`
   - HTTP 403 + error body mentions "SERVICE_DISABLED" or "quota project" → `Search Console API not enabled on quota project '<adc_quota_project>'. Run "gcloud services enable searchconsole.googleapis.com --project=<adc_quota_project>".`
   - HTTP 403 (other) → `Search Console API access denied: 403 PERMISSION_DENIED. The configured site_url '<X>' isn't accessible by your Google account. Verify property ownership in GSC > Settings.`
@@ -391,14 +400,36 @@ The block covers `config.yaml` (which contains `site_url` — non-secret but pro
 
 Only fires when `api_active == true`. Skipped in heuristic-only mode.
 
-**Pre-Turn-2 sitemap parse.** Before dispatching Turn 2a/2b, parse the sitemap XML located in Turn 1's `Glob` results. If `Glob **/sitemap.xml` returned a path, issue a single `Read <path>` call (sequential, between Turn 1 aggregation and Turn 2 dispatch — adds one tool turn, cheap). If `Glob **/sitemap_index.xml` returned a path AND `sitemap.xml` did not, Read the index file and follow `<sitemap><loc>` entries to fetch child sitemaps (cap at 5 child sitemaps to avoid runaway). Parse `<url><loc>` entries in document order, build:
+#### 1.6.6a — Sitemap discovery + materialization
 
-- `sitemap_url_list`: ordered list of `<loc>` URLs (preserving document order — required for the deterministic sitemap-orphan slice in Turn 2b URL selection)
-- `sitemap_url_set`: a set for O(1) lookup when computing the orphan slice (`url in sitemap_url_set AND url NOT in url_impressions_map`)
+**Prefer the LIVE sitemap, not a repo-local file.** Modern frameworks generate the sitemap (Next.js `app/sitemap.ts`, CMS/DB-driven, build-time output) so a repo glob finds nothing or a stale copy — which silently empties the sitemap-orphan slice (sub-dim 14 deindex detection) and the URL-health probe. Resolve the sitemap from the deployed site instead.
 
-Both data structures live in shared context across the rest of Step 1.6 and are also passed to Step 3.2 (URL probe consumes the same parsed list — no re-parse needed).
+**Step 1 — resolve the base URL** (first that yields a value):
+1. `--url <base>` argument.
+2. `config.yaml site_base_url`.
+3. Derive from `config.yaml site_url`: `sc-domain:example.com` → `https://example.com`; a URL-prefix property (`https://example.com/`) → use as-is (strip trailing slash).
+4. None → no base; live discovery is limited to an explicit `sitemap_url`.
 
-If no sitemap.xml or sitemap_index.xml was located: both structures stay empty. Turn 2b URL selection skips the sitemap-orphan slice and footer-notes the absence. Step 3.2 URL probe also notes the absent sitemap.
+**Step 2 — resolve the sitemap URL** (first that yields a value):
+1. `config.yaml sitemap_url` (explicit override) → use directly.
+2. **GSC `sitemaps.list`** (when `api_active`) — most authoritative. Run `gsc-parse-helper sitemaps-list "<site_url>"`; it prints submitted sitemaps as `<path>|<type>|<submitted_count>`. Pick the entry whose host matches the base URL (or the first `sitemap`-type entry). Non-fatal: `sitemaps_found:0` / error → fall through.
+3. **`robots.txt` `Sitemap:` directive** — `WebFetch <base>/robots.txt` (or `curl`), take the first `Sitemap:` line's URL.
+4. **Conventional** — `<base>/sitemap.xml`, then `<base>/sitemap_index.xml`.
+5. **Repo-local fallback** — Turn 1's `Glob **/sitemap.xml` result (the old behavior; covers truly static sites + offline runs with no base).
+
+**Step 3 — materialize (after Turn 2a, so Q3 is available for the orphan slice).** Once Q3's cache file exists, call the helper once:
+
+```bash
+gsc-parse-helper sitemap-urls "<resolved_sitemap_url>" "<base_or_->" "$TMPFILE_SITEMAP" "<q3_cache_file>" 100
+```
+
+It writes ALL `<loc>` URLs (deduped, document order; sitemapindex + `.gz` + relative-URL aware) to `$TMPFILE_SITEMAP` (a `mktemp` file — kept out of the model context), and prints `sitemap_urls:<N>`, `source:<url>`, `is_index:<0|1>`, then up to 100 sitemap-orphan URLs (in the sitemap but NOT in Q3's `url_impressions_map`) under `--- orphans ---`. Capture:
+- `sitemap_url_count = N` and `$TMPFILE_SITEMAP` path → for Step 3.2 URL probe + the footer.
+- the `--- orphans ---` list (≤100) → the Turn 2b sitemap-orphan slice (replaces the old in-context set computation).
+
+When the repo-local fallback was used (no base, static file): pass the local path as `<resolved_sitemap_url>` — the helper reads `file://`? No — for a local file, skip the helper and use the legacy `Read`-parse path. (Helper fetch is for `http(s)` URLs.)
+
+If no sitemap resolves at all: `sitemap_url_count = 0`, orphan slice is skipped, and the footer states **explicitly** `Sitemap: none discovered (tried sitemap_url / GSC sitemaps.list / robots.txt / <base>/sitemap.xml / repo glob) — orphan slice + URL probe skipped` (NOT a silent skip).
 
 **Pre-Turn-2 known-bad-urls parse.** If Turn 1's optimistic `Read .seo-data/gsc/known-bad-urls.txt` returned content (file exists, non-empty after stripping), parse it line-by-line:
 
@@ -413,14 +444,12 @@ If no sitemap.xml or sitemap_index.xml was located: both structures stay empty. 
 
 Result: `user_supplied_urls` list, in shared context. Used by Turn 2b URL selection as the 4th URL Inspection slice — see `references/gsc-api-queries.md` "URL Inspection — selection algorithm" 4-slice mix. If the file is absent or all lines are blank/comments, `user_supplied_urls` stays empty; sitemap-orphan claims the full 100-slot bucket in Turn 2b.
 
-**Token + quota-project cache**: Turn 1's probe already produced both. Reuse from shared context across all curl invocations — no new gcloud calls needed in Turn 2:
+**Token minting (NOT reused across calls).** There is no "token cache in shared context." Shell state does **not** persist across Bash tool calls, and the token is never surfaced to the orchestrator anyway — so a token minted in Turn 1 cannot be carried into Turn 2. **Every API-hitting Bash call mints its own token, in-call, via `gsc-parse-helper`:**
 
-```
-TOKEN  = <from Turn 1 TOKEN_LEN-paired stdout (the token string itself, not the length)>
-QUOTA_PROJECT = <from Turn 1 QUOTA_PROJECT: line, validated non-empty in Step 1.6.3>
-```
+- **Turn 2a (Search Analytics curl):** the `gsc-cache.md` cache wrapper runs `gsc-parse-helper auth-token` in its cache-miss branch, captures the token + quota project into shell vars (never echoed), and uses them in the same call. Cache hits mint nothing.
+- **Turn 2b (URL Inspection):** `gsc-parse-helper inspect-batch` mints internally via `resolve_credentials()` — the token never leaves the Python process.
 
-If the Turn 2 dispatch needs to re-fetch (e.g., token approaching 1-hour TTL on long-running flows): re-run the same `gcloud auth application-default print-access-token` + `grep`/`sed` extraction chain from Step 1.6.1. In practice a single run completes in seconds — one Turn 1 fetch is reused.
+Both resolve the same credential (env → `config.yaml adc_credentials_path` → default ADC path) and mint with stdlib (no gcloud spawn, no `jq`). Minting is free and fast (a refresh-token grant), so re-minting per call costs nothing against API quota.
 
 **Every Turn 2 curl call MUST include both headers:** `Authorization: Bearer $TOKEN` AND `x-goog-user-project: $QUOTA_PROJECT`. Omitting the quota-project header returns 403 SERVICE_DISABLED even when auth is otherwise valid.
 
@@ -437,9 +466,9 @@ curl -s -w '%{http_code}' -o "$TMP" -X POST \
   "https://www.googleapis.com/webmasters/v3/sites/<SITE_URL_ENCODED>/searchAnalytics/query"
 ```
 
-**Turn 2b — URL Inspection (single helper invocation, internally parallel)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (top 80 by impressions from Q3 + 20 git-changed paths from Step 1.5 resolved via `page_type_map` + shared 100-slot bucket of user-supplied URLs from `.seo-data/gsc/known-bad-urls.txt` (up to 100) + sitemap-orphan URLs from the parsed sitemap.xml that don't appear in `url_impressions_map` (sorted document order, filling whatever the user-supplied slice doesn't claim); dedup precedence impressions > git > user-supplied > sitemap-orphan; hard cap 200).
+**Turn 2b — URL Inspection (single helper invocation, internally parallel)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (top 80 by impressions from Q3 + 20 git-changed paths from Step 1.5 resolved via `page_type_map` + shared 100-slot bucket of user-supplied URLs from `.seo-data/gsc/known-bad-urls.txt` (up to 100) + **sitemap-orphan URLs from the `--- orphans ---` list emitted by Step 1.6.6a's `sitemap-urls` call** (already filtered to sitemap entries not in `url_impressions_map`, in document order; filling whatever the user-supplied slice doesn't claim); dedup precedence impressions > git > user-supplied > sitemap-orphan; hard cap 200). The orphan list is now computed by the helper from the LIVE sitemap (Step 1.6.6a) — not from a repo-local file — so it is non-empty for generated/dynamic sitemaps.
 
-**Canonical dispatch path: single Bash invocation of `gsc-parse-helper.py inspect-batch`.** The helper handles parallel HTTP via `ThreadPoolExecutor` (20 workers — empirically balanced against the API's per-property rate limit), per-URL cache check (7d TTL on `ui-*.json` files since `coverageState` is weeks-stable — see `gsc-cache.md` "TTL policy" for the split-TTL rationale), atomic write via `.tmp` + `os.replace`, and never-cache-non-200. Per-URL cache files match `gsc-cache.md`'s key strategy exactly (`ui-<sha1(site_url|inspection_url)>.json`) — so partial cache hits across runs interoperate cleanly.
+**Canonical dispatch path: single Bash invocation of `gsc-parse-helper inspect-batch`.** The helper handles parallel HTTP via `ThreadPoolExecutor` (20 workers — empirically balanced against the API's per-property rate limit), per-URL cache check (7d TTL on `ui-*.json` files since `coverageState` is weeks-stable — see `gsc-cache.md` "TTL policy" for the split-TTL rationale), atomic write via `.tmp` + `os.replace`, and never-cache-non-200. Per-URL cache files match `gsc-cache.md`'s key strategy exactly (`ui-<sha1(site_url|inspection_url)>.json`) — so partial cache hits across runs interoperate cleanly.
 
 ```bash
 # 1. Write the resolved URL list to system temp — NEVER under .seo-data/gsc/
@@ -448,17 +477,22 @@ TMPFILE_URLS=$(mktemp -t gsc-inspect-urls-XXXXXX.txt)
 printf '%s\n' "${URL_LIST[@]}" > "$TMPFILE_URLS"
 
 # 2. Dispatch — single Bash call, helper parallelizes internally.
-GCLOUD_TOKEN="$TOKEN" \
-GCLOUD_QUOTA_PROJECT="$QUOTA_PROJECT" \
+#    The helper mints its own token via resolve_credentials() (config.yaml
+#    adc_credentials_path → synced file → default ADC), so NO token is passed
+#    in — it never leaves the helper process.
 NO_CACHE="${NO_CACHE:-0}" \
 PYTHONIOENCODING=utf-8 PYTHONUTF8=1 \
-python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" inspect-batch \
+gsc-parse-helper inspect-batch \
   .seo-data/gsc/cache \
   "$CONFIG_SITE_URL" \
   "$TMPFILE_URLS"
+INSPECT_RC=$?
 
 rm -f "$TMPFILE_URLS"
+echo "INSPECT_EXIT:$INSPECT_RC"
 ```
+
+**Failure handling — do NOT read a credential failure as "zero findings."** If `inspect-batch` exits non-zero (`INSPECT_EXIT` ≠ 0) OR its stdout contains a line `inspect_batch_error:<reason>` (instead of `total_attempted:<N>`), the URL Inspection signal **failed** for this run — it did NOT find zero indexed pages. Treat it as a skipped signal: footer-note `URL Inspection failed (<reason>) — indexing findings (incl. sub-dim 14 deindex_regression) unavailable this run`, surface the matching Step 1.6.3 remediation for `<reason>` (`quota_missing` / `wrong_type` / `unreadable` / `mint_failed` / `no_credentials`), and do NOT emit sub-dim 1-9/14 findings or write a snapshot from an empty cache. Performance (Turn 2a) and heuristic findings are unaffected. (A genuine zero-result run prints `total_attempted:0` with exit 0 — distinct from this failure marker.)
 
 **Helper output** (machine-parseable, parsed by the orchestrator for footer + Step 1.6.7 cluster aggregation):
 
@@ -617,7 +651,7 @@ RUN_TIMESTAMP=$(date -u +%Y-%m-%dT%H%M%S)
 COMMIT_SHA7=$(git rev-parse --short HEAD 2>/dev/null || echo "no-git")
 SNAPSHOT_PATH=".seo-data/gsc/snapshots/${RUN_TIMESTAMP}-${COMMIT_SHA7}.json"
 
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" \
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper \
   snapshot-write \
   .seo-data/gsc/cache \
   "$RUN_TIMESTAMP" \
@@ -645,7 +679,7 @@ When `PREV_SNAPSHOT_FILE` equals current snapshot's filename (orchestrator just 
 #### 1.6.13.3 — Run regression diff
 
 ```bash
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" \
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper \
   regression \
   "$SNAPSHOT_PATH" \
   ".seo-data/gsc/snapshots/$PREV_SNAPSHOT_FILE"
@@ -733,7 +767,7 @@ Q2_KEY="${CONFIG_SITE_URL}|${END_DATE}|${START_DATE}|page|25000|web"
 Q2_HASH=$(printf '%s' "$Q2_KEY" | sha1sum | cut -d' ' -f1)
 Q2_CACHE_FILE=".seo-data/gsc/cache/sa-q2-${Q2_HASH}.json"
 
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" \
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper \
   watchpoint-check \
   .seo-data/gsc/watchpoints.json \
   "$Q2_CACHE_FILE" \
@@ -775,8 +809,8 @@ Three rules the orchestrator must follow when ingesting external data. Surfaced 
 - `README.md` (skill-auto-written on first detection)
 - `cache/` (skill-auto-managed; **TTL'd API response cache** — see `references/gsc-cache.md`)
 - `snapshots/` (skill-auto-managed; **30-day coverage-state history** for sub-dim 14 regression detection — see `references/gsc-ingestion.md` sub-dim 14 + SKILL.md Step 1.6.13)
-- `finding-history.json` (skill-auto-managed; **per-finding run_count tracker** for Group D stale-finding escalation — written by `gsc-parse-helper.py history-update` after Step 6 score consolidation. When a finding's `run_count >= 3` and the underlying location/sub_dim hasn't changed, the orchestrator appends an escalation hint to `recommended_action` urging external action or severity reassessment. See Step 6.8 for the integration. Auto-evicted entries: none — the file grows slowly (~1 entry per persistent finding) and stable findings ARE the signal worth keeping.)
-- `watchpoints.json` (skill-auto-managed; **phase-applied watchpoints** auto-emitted when a finding has `code_changed_since_gsc_window=true` — see `gsc-parse-helper.py watchpoint-emit`. At Step 1.6 Turn 1, watchpoints past their `expected_recheck_date` (applied + 21 days, typical GSC pipeline lag) are checked via `watchpoint-check`; status delta surfaces as a top-level banner in Suggested Next Actions. Auto-evicted after 90 days to prevent unbounded growth.)
+- `finding-history.json` (skill-auto-managed; **per-finding run_count tracker** for Group D stale-finding escalation — written by `gsc-parse-helper history-update` after Step 6 score consolidation. When a finding's `run_count >= 3` and the underlying location/sub_dim hasn't changed, the orchestrator appends an escalation hint to `recommended_action` urging external action or severity reassessment. See Step 6.8 for the integration. Auto-evicted entries: none — the file grows slowly (~1 entry per persistent finding) and stable findings ARE the signal worth keeping.)
+- `watchpoints.json` (skill-auto-managed; **phase-applied watchpoints** auto-emitted when a finding has `code_changed_since_gsc_window=true` — see `gsc-parse-helper watchpoint-emit`. At Step 1.6 Turn 1, watchpoints past their `expected_recheck_date` (applied + 21 days, typical GSC pipeline lag) are checked via `watchpoint-check`; status delta surfaces as a top-level banner in Suggested Next Actions. Auto-evicted after 90 days to prevent unbounded growth.)
 - `.gsc-banner-shown` (sentinel — sits in `.seo-data/` not `.seo-data/gsc/`)
 
 The `cache/` subdirectory is the only sanctioned location for persisted API responses. The orchestrator owns its lifecycle (creates on Turn 1, writes via atomic mv in Turn 2, prunes entries >7d at the start of each run). Cache content is reproducible from the API on demand — safe to delete manually.
@@ -841,24 +875,24 @@ Same class of bug as the S30 `jq`-missing fix — the spec under-specified a pla
 
 | Need | Canonical path | NOT this |
 |---|---|---|
-| GSC JSON parsing (Q1/Q2/Q3, clusters, CTR, brand, snapshot, regression) | `${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py` subcommands (see invocation block below) | Inline Python heredocs, `_parse_*.py` scripts in `.seo-data/gsc/` |
+| GSC JSON parsing (Q1/Q2/Q3, clusters, CTR, brand, snapshot, regression) | `gsc-parse-helper` command subcommands (see invocation block below) | Inline Python heredocs, `_parse_*.py` scripts in `.seo-data/gsc/` |
 | URL Inspection dispatch (Turn 2b) | N parallel `Bash: curl ...` calls in one tool-use block, each wrapped in the `gsc-cache.md` cache pattern | `_inspect_batch.py` or similar orchestrator-written dispatch script |
 | Ephemeral scratch parsing (>200KB JSON that doesn't belong in cache) | `mktemp`-style system temp (`mktemp -t gsc-XXXXXX.json`) | Any file under `.seo-data/gsc/` |
 
 **If the helper script doesn't have a subcommand you need (e.g., URL Inspection batch dispatch isn't there as of 2026-05-26):** treat that as a skill-improvement signal, not a license to inline. Surface in the report footer (`gsc-parse-helper.py missing subcommand <X> — used <fallback approach>; file follow-up to extend the helper`) and proceed with the closest approximation that respects the boundary (typically: parallel Bash curl calls). Future helper extension is preferable to repeated boundary violations.
 
-**Helper invocation:** GSC JSON parsing MUST go through the shipped helper at `${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py`. Invoke with subcommand args:
+**Helper invocation:** GSC JSON parsing MUST go through the shipped helper, invoked as the bare `gsc-parse-helper` command (the plugin's `bin/` directory is auto-added to PATH while `bx` is enabled). Invoke with subcommand args:
 
 ```bash
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" q1 .seo-data/gsc/cache/sa-q1-<hash>.json
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" q2 .seo-data/gsc/cache/sa-q2-<hash>.json
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" q3 .seo-data/gsc/cache/sa-q3-<hash>.json
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" ctr .seo-data/gsc/cache/sa-q2-<hash>.json
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" clusters .seo-data/gsc/cache
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" brand .seo-data/gsc/cache/sa-q1-<hash>.json "Burak Arık"
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper q1 .seo-data/gsc/cache/sa-q1-<hash>.json
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper q2 .seo-data/gsc/cache/sa-q2-<hash>.json
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper q3 .seo-data/gsc/cache/sa-q3-<hash>.json
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper ctr .seo-data/gsc/cache/sa-q2-<hash>.json
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper clusters .seo-data/gsc/cache
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper brand .seo-data/gsc/cache/sa-q1-<hash>.json "Burak Arık"
 ```
 
-`${CLAUDE_SKILL_DIR}` is a Claude Code string substitution that resolves automatically to the skill's own directory (cross-platform, CWD-independent). No orchestrator-side path resolution needed — works whether the user runs `/bx:seo` from the repo root or any sub-directory of the target project.
+`gsc-parse-helper` is a launcher shipped in the plugin's `bin/` directory, which Claude Code adds to the Bash tool's PATH while the `bx` plugin is enabled (Claude Code 2.1.91+). The launcher resolves its own location, locates the real `references/gsc-parse-helper.py`, picks a working Python 3 interpreter (prefers `python` over the Windows `python3` Store stub), and execs it — so it works cross-platform and CWD-independent, whether the user runs `/bx:seo` from the repo root or any sub-directory of the target project. (Do NOT use `${CLAUDE_SKILL_DIR}` or `${CLAUDE_PLUGIN_ROOT}` in Bash commands — neither is exported to the Bash tool environment; that was the S33-introduced bug that silently disabled the entire GSC path until S39.)
 
 If the helper script itself is missing (skill install integrity issue): emit a footer error `gsc-parse-helper.py not found at <path> — GSC parsing aborted, falling back to heuristic-only mode` and continue without GSC findings.
 
@@ -914,14 +948,14 @@ Interpret `$ARGUMENTS`:
 
 ### 3.2 Sitemap URL Health Probe
 
-Runs **always when sitemap.xml exists locally** AND (sitemap URLs are absolute OR `--url <base>` provides a domain to synthesize bases from).
+Runs whenever a sitemap URL list is available (live-discovered or repo-local) with absolute URLs.
 
-1. **Locate sitemap.xml locally** — **reuse Step 1.6.6's pre-parsed `sitemap_url_list` when GSC mode is enabled** (the parse already happened in Step 1.6 for the sitemap-orphan URL Inspection slice). When GSC mode is disabled OR Step 1.6 didn't run, fall back to the standalone parse here: try in order: repo root, `public/sitemap.xml`, `static/sitemap.xml`, `dist/sitemap.xml`, `out/sitemap.xml`, `_site/sitemap.xml`. Also check for `sitemap_index.xml` — if found, parse it and follow `<sitemap><loc>` entries to find child sitemaps (cap at 5 child sitemaps to avoid runaway).
-2. **Parse with Read tool** (not network) — extract `<url><loc>` entries. **Skip when `sitemap_url_list` is already populated from Step 1.6.6** — single-parse contract.
-3. **URL list resolution:**
-   - If URLs are absolute (start with `http://` / `https://`) → use them as-is.
-   - If URLs are relative AND `--url <base>` provided → synthesize: `<base>` + relative path.
-   - If URLs are relative AND no `--url` provided → **skip the probe**, add a footer note: "URL probe skipped — sitemap.xml has relative URLs; re-run with `--url <base>` for live URL health check."
+1. **Source the URL list:**
+   - **Preferred — `$TMPFILE_SITEMAP` from Step 1.6.6a** (the live-fetched sitemap). When it exists, read the first 100 lines (the cap below) directly — already absolute, deduped, document order. No re-fetch, no Read of a huge XML.
+   - **Heuristic-only mode (Step 1.6 didn't run) but a base URL is resolvable** (`--url`, `site_base_url`, or derivable): run the same discovery as Step 1.6.6a Step 2 (robots.txt directive → `<base>/sitemap.xml` → `sitemap_index.xml`) and materialize via `gsc-parse-helper sitemap-urls "<url>" "<base>" "$TMPFILE_SITEMAP"` (omit the Q3/orphan args — heuristic mode has no impressions map). Then read it.
+   - **Repo-local fallback** (no base, static site): legacy path — `Glob`/`Read` a local `sitemap.xml` (`public/`, `static/`, `dist/`, `out/`, `_site/`); follow `sitemap_index.xml` children (cap 5). Use only when no live source resolves.
+2. **URL list resolution:**
+   - Live-fetched URLs are already absolute. For the repo-local fallback: absolute → use as-is; relative AND `--url <base>` → synthesize `<base>` + path; relative AND no base → **skip the probe**, footer-note "URL probe skipped — repo sitemap has relative URLs; re-run with `--url <base>` or set `site_base_url`."
 4. **Cap at top 100 URLs** by document order (or by `<priority>` descending if present). The cap is the ceiling, not the target — **take the literal top 100** (or all available if fewer). Do not under-sample to a "representative subset" or skip URLs based on perceived non-importance. See "Ingestion conventions → Budget utilization" for the contract.
 5. **Probe each URL in a single parallel turn** — multiple `WebFetch` calls in one tool-use block with a minimal prompt:
    > "Report the HTTP status code, final URL after any redirects, redirect chain hop count, and response time in seconds. Do not return page content."
@@ -1199,7 +1233,7 @@ The orchestrator builds the JSONL via direct Bash redirection from the in-memory
 RUN_DATE=$(date -u +%Y-%m-%d)
 COMMIT_SHA7=$(git rev-parse --short HEAD 2>/dev/null || echo "no-git")
 
-if ! PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" \
+if ! PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper \
     history-update \
     "$FINDINGS_JSONL" \
     .seo-data/gsc/finding-history.json \
@@ -1222,7 +1256,7 @@ Helper output includes per-finding `<hash>|<run_count>|<sub_dim>|<location>|<fir
 **Step 6.8.3 — Emit watchpoints for phase-applied findings** (only runs if 6.8.2 succeeded):
 
 ```bash
-if ! PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python "${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py" \
+if ! PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper \
     watchpoint-emit \
     "$FINDINGS_JSONL" \
     .seo-data/gsc/watchpoints.json \
