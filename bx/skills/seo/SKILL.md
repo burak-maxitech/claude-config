@@ -132,7 +132,7 @@ Steps 1.5 (git scan) and 1.6 (GSC API ingestion when configured, else heuristic-
 - `Read references/gsc-api-schema.md` (optimistic; reference for API response parsing)
 - `Read references/gsc-cache.md` (optimistic; cache wrapper template + TTL policy used by Turn 2 dispatch)
 - `Bash: mkdir -p .seo-data/gsc/cache .seo-data/gsc/snapshots 2>/dev/null; find .seo-data/gsc/cache -type f -name 'sa-*' -mtime +7 -delete 2>/dev/null; find .seo-data/gsc/cache -type f -name 'ui-*' -mtime +14 -delete 2>/dev/null; find .seo-data/gsc/cache -type f ! -name 'sa-*' ! -name 'ui-*' -mtime +7 -delete 2>/dev/null; find .seo-data/gsc/snapshots -type f -mtime +30 -delete 2>/dev/null; ls .seo-data/gsc/cache 2>/dev/null | wc -l; ls .seo-data/gsc/snapshots 2>/dev/null | wc -l` (cache + snapshot dir setup + **two-tier cache prune** (sa-* at 7d, ui-* at 14d — matches the per-prefix TTL with slack; see `references/gsc-cache.md` "Eviction policy") + janitorial prune for orphaned `.tmp.$$` files + snapshot 30-day prune + counts of remaining entries — produces `<N>` for the footer cache stats line and `<M>` for the snapshot count. `mkdir` here is load-bearing — the Turn 2 wrapper assumes both dirs exist and does NOT recreate them per call. See `references/gsc-cache.md` "TTL policy" for the per-prefix split rationale (24h for sa-*, 7d for ui-* — codified after S34 burakarik6 dogfood scored 0/197 cache hits) and `references/gsc-ingestion.md` "Hard rules" for the 30-day snapshot retention rationale.)
-- `Glob **/sitemap.xml` + `Glob **/sitemap_index.xml` (sitemap location detection — both probed in parallel so Turn 1 can begin Read'ing the right file in Turn 1.5 if found. Search paths: repo root, `public/`, `static/`, `dist/`, `out/`, `_site/`. Used by Step 1.6.6 Turn 2b URL Inspection sitemap-orphan slice AND by Step 3.2 URL probe — both consume the same parsed URL list, so a single parse is sufficient. If neither Glob finds anything, the sitemap-orphan slice in Turn 2b is skipped silently and Step 3.2 footer-notes "no sitemap.xml — URL probe skipped".)
+- `Glob **/sitemap.xml` + `Glob **/sitemap_index.xml` (repo-local sitemap detection — the **fallback** source only. Search paths: repo root, `public/`, `static/`, `dist/`, `out/`, `_site/`. The **primary** sitemap source is the LIVE site, resolved in Step 1.6.6a (GSC `sitemaps.list` → robots.txt → `<base>/sitemap.xml`) — that's what catches generated/dynamic sitemaps a repo glob can't see. This glob result is used only when no live source resolves, e.g. a truly static site or an offline run with no base URL.)
 - `Read .seo-data/gsc/known-bad-urls.txt` (optimistic — the file is user-authored and may not exist; Read errors silently on missing file → `user_supplied_urls` stays empty. When present, parsed in Step 1.6.6's Pre-Turn-2 step into the URL Inspection user-supplied slice — see `references/gsc-api-queries.md` "URL Inspection — selection algorithm" 4-slice mix.)
 - `Bash: ls .seo-data/gsc/snapshots 2>/dev/null | sort | tail -1` (find most recent prior snapshot — used by Step 1.6.13.2 regression diff. Empty stdout means "first run for this property", in which case Step 1.6.13 emits no findings and footer-notes the activation.)
 - `Read .seo-data/gsc/finding-history.json` (optimistic — file is skill-auto-managed under Group D finding-lifecycle infra; absent on first run. When present, the orchestrator parses `{<hash>: {run_count, first_seen_date, ...}}` and passes the map to Step 7 report rendering so findings with `run_count >= 3` get an escalation hint appended to their `recommended_action`. See Step 6.8 for the write-back step.)
@@ -333,11 +333,13 @@ When `config_yaml_present`, parse the file's content (already Read in Turn 1) vi
 
 1. Reject nested keys: any line matching `^\s+[a-z_]+:` (leading whitespace before key) → emit `Config error: nested keys not supported in .seo-data/gsc/config.yaml — use flat top-level keys only.` and set `api_configured = false`. Skip rest of parse.
 2. Extract flat keys: lines matching `^([a-z_]+):\s*(.*)$`. Build `config: {key: value, ...}`.
-3. Warn on unknown keys (not in `{site_url, lookback_days, adc_credentials_path, quota_project}`): log `Config warning: unknown key '<X>' — ignored.`
+3. Warn on unknown keys (not in `{site_url, lookback_days, adc_credentials_path, quota_project, site_base_url, sitemap_url}`): log `Config warning: unknown key '<X>' — ignored.`
 4. Default `lookback_days = 90` when omitted. Validate range [7, 365] when present.
 5. `api_configured = config.site_url is present AND non-empty after trimming`
 6. **`adc_credentials_path`** (optional) — path to an ADC `application_default_credentials.json`. Point it at a file in a synced folder (Drive/OneDrive/Dropbox) so every machine authenticates from the same credential without a per-machine login → "configure once, all machines". The helper reads this key directly (no orchestrator action needed beyond not warning on it); `~` and `$VARS` are expanded. When omitted, the helper falls back to gcloud's default ADC path.
 7. **`quota_project`** (optional) — overrides the `x-goog-user-project` billing project. When omitted, the helper uses the credential file's `quota_project_id`.
+8. **`site_base_url`** (optional) — the deployed base URL (e.g. `https://example.com`) used to fetch the LIVE sitemap + robots.txt. When omitted, the base is taken from `--url <base>`, else derived from `site_url` (`sc-domain:example.com` → `https://example.com`; a URL-prefix property is used as-is). Set this only when the property is `sc-domain:` and you need a specific scheme/host, or GSC is off and you aren't passing `--url`.
+9. **`sitemap_url`** (optional) — explicit sitemap URL, bypassing discovery. Use for non-standard locations (CDN-hosted, gzipped, split). When omitted, the sitemap is discovered (Step 1.6.6a).
 
 ### 1.6.3 — Resolve `api_active` and mode
 
@@ -398,14 +400,36 @@ The block covers `config.yaml` (which contains `site_url` — non-secret but pro
 
 Only fires when `api_active == true`. Skipped in heuristic-only mode.
 
-**Pre-Turn-2 sitemap parse.** Before dispatching Turn 2a/2b, parse the sitemap XML located in Turn 1's `Glob` results. If `Glob **/sitemap.xml` returned a path, issue a single `Read <path>` call (sequential, between Turn 1 aggregation and Turn 2 dispatch — adds one tool turn, cheap). If `Glob **/sitemap_index.xml` returned a path AND `sitemap.xml` did not, Read the index file and follow `<sitemap><loc>` entries to fetch child sitemaps (cap at 5 child sitemaps to avoid runaway). Parse `<url><loc>` entries in document order, build:
+#### 1.6.6a — Sitemap discovery + materialization
 
-- `sitemap_url_list`: ordered list of `<loc>` URLs (preserving document order — required for the deterministic sitemap-orphan slice in Turn 2b URL selection)
-- `sitemap_url_set`: a set for O(1) lookup when computing the orphan slice (`url in sitemap_url_set AND url NOT in url_impressions_map`)
+**Prefer the LIVE sitemap, not a repo-local file.** Modern frameworks generate the sitemap (Next.js `app/sitemap.ts`, CMS/DB-driven, build-time output) so a repo glob finds nothing or a stale copy — which silently empties the sitemap-orphan slice (sub-dim 14 deindex detection) and the URL-health probe. Resolve the sitemap from the deployed site instead.
 
-Both data structures live in shared context across the rest of Step 1.6 and are also passed to Step 3.2 (URL probe consumes the same parsed list — no re-parse needed).
+**Step 1 — resolve the base URL** (first that yields a value):
+1. `--url <base>` argument.
+2. `config.yaml site_base_url`.
+3. Derive from `config.yaml site_url`: `sc-domain:example.com` → `https://example.com`; a URL-prefix property (`https://example.com/`) → use as-is (strip trailing slash).
+4. None → no base; live discovery is limited to an explicit `sitemap_url`.
 
-If no sitemap.xml or sitemap_index.xml was located: both structures stay empty. Turn 2b URL selection skips the sitemap-orphan slice and footer-notes the absence. Step 3.2 URL probe also notes the absent sitemap.
+**Step 2 — resolve the sitemap URL** (first that yields a value):
+1. `config.yaml sitemap_url` (explicit override) → use directly.
+2. **GSC `sitemaps.list`** (when `api_active`) — most authoritative. Run `gsc-parse-helper sitemaps-list "<site_url>"`; it prints submitted sitemaps as `<path>|<type>|<submitted_count>`. Pick the entry whose host matches the base URL (or the first `sitemap`-type entry). Non-fatal: `sitemaps_found:0` / error → fall through.
+3. **`robots.txt` `Sitemap:` directive** — `WebFetch <base>/robots.txt` (or `curl`), take the first `Sitemap:` line's URL.
+4. **Conventional** — `<base>/sitemap.xml`, then `<base>/sitemap_index.xml`.
+5. **Repo-local fallback** — Turn 1's `Glob **/sitemap.xml` result (the old behavior; covers truly static sites + offline runs with no base).
+
+**Step 3 — materialize (after Turn 2a, so Q3 is available for the orphan slice).** Once Q3's cache file exists, call the helper once:
+
+```bash
+gsc-parse-helper sitemap-urls "<resolved_sitemap_url>" "<base_or_->" "$TMPFILE_SITEMAP" "<q3_cache_file>" 100
+```
+
+It writes ALL `<loc>` URLs (deduped, document order; sitemapindex + `.gz` + relative-URL aware) to `$TMPFILE_SITEMAP` (a `mktemp` file — kept out of the model context), and prints `sitemap_urls:<N>`, `source:<url>`, `is_index:<0|1>`, then up to 100 sitemap-orphan URLs (in the sitemap but NOT in Q3's `url_impressions_map`) under `--- orphans ---`. Capture:
+- `sitemap_url_count = N` and `$TMPFILE_SITEMAP` path → for Step 3.2 URL probe + the footer.
+- the `--- orphans ---` list (≤100) → the Turn 2b sitemap-orphan slice (replaces the old in-context set computation).
+
+When the repo-local fallback was used (no base, static file): pass the local path as `<resolved_sitemap_url>` — the helper reads `file://`? No — for a local file, skip the helper and use the legacy `Read`-parse path. (Helper fetch is for `http(s)` URLs.)
+
+If no sitemap resolves at all: `sitemap_url_count = 0`, orphan slice is skipped, and the footer states **explicitly** `Sitemap: none discovered (tried sitemap_url / GSC sitemaps.list / robots.txt / <base>/sitemap.xml / repo glob) — orphan slice + URL probe skipped` (NOT a silent skip).
 
 **Pre-Turn-2 known-bad-urls parse.** If Turn 1's optimistic `Read .seo-data/gsc/known-bad-urls.txt` returned content (file exists, non-empty after stripping), parse it line-by-line:
 
@@ -442,7 +466,7 @@ curl -s -w '%{http_code}' -o "$TMP" -X POST \
   "https://www.googleapis.com/webmasters/v3/sites/<SITE_URL_ENCODED>/searchAnalytics/query"
 ```
 
-**Turn 2b — URL Inspection (single helper invocation, internally parallel)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (top 80 by impressions from Q3 + 20 git-changed paths from Step 1.5 resolved via `page_type_map` + shared 100-slot bucket of user-supplied URLs from `.seo-data/gsc/known-bad-urls.txt` (up to 100) + sitemap-orphan URLs from the parsed sitemap.xml that don't appear in `url_impressions_map` (sorted document order, filling whatever the user-supplied slice doesn't claim); dedup precedence impressions > git > user-supplied > sitemap-orphan; hard cap 200).
+**Turn 2b — URL Inspection (single helper invocation, internally parallel)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (top 80 by impressions from Q3 + 20 git-changed paths from Step 1.5 resolved via `page_type_map` + shared 100-slot bucket of user-supplied URLs from `.seo-data/gsc/known-bad-urls.txt` (up to 100) + **sitemap-orphan URLs from the `--- orphans ---` list emitted by Step 1.6.6a's `sitemap-urls` call** (already filtered to sitemap entries not in `url_impressions_map`, in document order; filling whatever the user-supplied slice doesn't claim); dedup precedence impressions > git > user-supplied > sitemap-orphan; hard cap 200). The orphan list is now computed by the helper from the LIVE sitemap (Step 1.6.6a) — not from a repo-local file — so it is non-empty for generated/dynamic sitemaps.
 
 **Canonical dispatch path: single Bash invocation of `gsc-parse-helper inspect-batch`.** The helper handles parallel HTTP via `ThreadPoolExecutor` (20 workers — empirically balanced against the API's per-property rate limit), per-URL cache check (7d TTL on `ui-*.json` files since `coverageState` is weeks-stable — see `gsc-cache.md` "TTL policy" for the split-TTL rationale), atomic write via `.tmp` + `os.replace`, and never-cache-non-200. Per-URL cache files match `gsc-cache.md`'s key strategy exactly (`ui-<sha1(site_url|inspection_url)>.json`) — so partial cache hits across runs interoperate cleanly.
 
@@ -924,14 +948,14 @@ Interpret `$ARGUMENTS`:
 
 ### 3.2 Sitemap URL Health Probe
 
-Runs **always when sitemap.xml exists locally** AND (sitemap URLs are absolute OR `--url <base>` provides a domain to synthesize bases from).
+Runs whenever a sitemap URL list is available (live-discovered or repo-local) with absolute URLs.
 
-1. **Locate sitemap.xml locally** — **reuse Step 1.6.6's pre-parsed `sitemap_url_list` when GSC mode is enabled** (the parse already happened in Step 1.6 for the sitemap-orphan URL Inspection slice). When GSC mode is disabled OR Step 1.6 didn't run, fall back to the standalone parse here: try in order: repo root, `public/sitemap.xml`, `static/sitemap.xml`, `dist/sitemap.xml`, `out/sitemap.xml`, `_site/sitemap.xml`. Also check for `sitemap_index.xml` — if found, parse it and follow `<sitemap><loc>` entries to find child sitemaps (cap at 5 child sitemaps to avoid runaway).
-2. **Parse with Read tool** (not network) — extract `<url><loc>` entries. **Skip when `sitemap_url_list` is already populated from Step 1.6.6** — single-parse contract.
-3. **URL list resolution:**
-   - If URLs are absolute (start with `http://` / `https://`) → use them as-is.
-   - If URLs are relative AND `--url <base>` provided → synthesize: `<base>` + relative path.
-   - If URLs are relative AND no `--url` provided → **skip the probe**, add a footer note: "URL probe skipped — sitemap.xml has relative URLs; re-run with `--url <base>` for live URL health check."
+1. **Source the URL list:**
+   - **Preferred — `$TMPFILE_SITEMAP` from Step 1.6.6a** (the live-fetched sitemap). When it exists, read the first 100 lines (the cap below) directly — already absolute, deduped, document order. No re-fetch, no Read of a huge XML.
+   - **Heuristic-only mode (Step 1.6 didn't run) but a base URL is resolvable** (`--url`, `site_base_url`, or derivable): run the same discovery as Step 1.6.6a Step 2 (robots.txt directive → `<base>/sitemap.xml` → `sitemap_index.xml`) and materialize via `gsc-parse-helper sitemap-urls "<url>" "<base>" "$TMPFILE_SITEMAP"` (omit the Q3/orphan args — heuristic mode has no impressions map). Then read it.
+   - **Repo-local fallback** (no base, static site): legacy path — `Glob`/`Read` a local `sitemap.xml` (`public/`, `static/`, `dist/`, `out/`, `_site/`); follow `sitemap_index.xml` children (cap 5). Use only when no live source resolves.
+2. **URL list resolution:**
+   - Live-fetched URLs are already absolute. For the repo-local fallback: absolute → use as-is; relative AND `--url <base>` → synthesize `<base>` + path; relative AND no base → **skip the probe**, footer-note "URL probe skipped — repo sitemap has relative URLs; re-run with `--url <base>` or set `site_base_url`."
 4. **Cap at top 100 URLs** by document order (or by `<priority>` descending if present). The cap is the ceiling, not the target — **take the literal top 100** (or all available if fewer). Do not under-sample to a "representative subset" or skip URLs based on perceived non-importance. See "Ingestion conventions → Budget utilization" for the contract.
 5. **Probe each URL in a single parallel turn** — multiple `WebFetch` calls in one tool-use block with a minimal prompt:
    > "Report the HTTP status code, final URL after any redirects, redirect chain hop count, and response time in seconds. Do not return page content."

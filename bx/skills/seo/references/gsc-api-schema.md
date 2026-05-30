@@ -10,13 +10,14 @@ For ingestion behaviour, digest shape, and the 14 sub-dim catalog, see `gsc-inge
 
 ## Endpoints in scope
 
-The Search Console API exposes three endpoints used by `/bx:seo`:
+The Search Console API exposes these endpoints used by `/bx:seo`:
 
 | Endpoint | Purpose | Queried by the skill? |
 |---|---|---|
 | `POST https://www.googleapis.com/webmasters/v3/sites/{siteUrl}/searchAnalytics/query` | Performance — queries/pages/impressions/CTR/position | **Yes** (Q1, Q2, Q3) |
 | `POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect` | Per-URL indexing diagnostics — `coverageState`, `pageFetchState`, canonicals, last crawl, mobile usability, rich results | **Yes** (one call per inspected URL, up to 200/run — 4-slice mix of impressions-top + git-changed + user-supplied (`known-bad-urls.txt`) + sitemap-orphan; see `gsc-api-queries.md` selection algorithm) |
 | `GET https://www.googleapis.com/webmasters/v3/sites` | List user's verified properties | **Yes** (active auth probe — Step 1.6.1 activation condition 5) |
+| `GET https://www.googleapis.com/webmasters/v3/sites/{siteUrl}/sitemaps` | List the sitemaps submitted for the property (path, type, submitted-URL count) | **Yes** (sitemap discovery — Step 1.6.6a, the authoritative source for the live sitemap URL; via `gsc-parse-helper sitemaps-list`). Returns submitted sitemap *URLs*, NOT the URLs inside them — the skill then fetches the sitemap itself (`gsc-parse-helper sitemap-urls`, unauthenticated). |
 
 **Note two different base hosts**: `www.googleapis.com/webmasters/v3` for Search Analytics + Sites; `searchconsole.googleapis.com/v1` for URL Inspection. Same OAuth scope; same ADC token; different quota tracking (see "Quota model" below).
 

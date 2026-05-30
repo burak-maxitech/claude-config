@@ -87,7 +87,17 @@ configured or not.
    # lookback_days: 90                # 7-365, default 90
    # adc_credentials_path: ~/Dropbox/bx-seo/adc.json   # multi-machine — see below
    # quota_project: my-gcp-project    # overrides the credential file's quota_project_id
+   # site_base_url: https://example.com   # for live sitemap/robots fetch (else derived from site_url or --url)
+   # sitemap_url: https://example.com/sitemap.xml   # explicit override; else auto-discovered
    ```
+
+   **Sitemaps are read from your LIVE site, not the repo.** The skill discovers
+   the sitemap via GSC `sitemaps.list` → `robots.txt` `Sitemap:` directive →
+   `<base>/sitemap.xml`, so framework-generated sitemaps (Next.js, CMS-driven,
+   build-time) are covered. It only falls back to a repo-local `sitemap.xml` when
+   no live source resolves. For a `sc-domain:` property the base URL is derived
+   automatically (`sc-domain:example.com` → `https://example.com`); set
+   `site_base_url` only to override, or `sitemap_url` for a non-standard location.
 
    The exact `site_url` format must match what's registered in GSC.
    Check at https://search.google.com/search-console > Settings > Property settings.

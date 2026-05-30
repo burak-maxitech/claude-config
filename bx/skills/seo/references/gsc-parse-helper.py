@@ -44,6 +44,16 @@ Subcommands:
                       path: two lines (access token, then quota project). Capture
                       into shell vars in the SAME Bash call that runs curl; never
                       run standalone (would leak a live token to the transcript).
+    sitemaps-list <site_url>
+                      Authenticated GSC sitemaps.list — print the sitemap URLs
+                      submitted for the property (authoritative discovery). Non-
+                      fatal on API error (exit 0); credential failure exits 4.
+    sitemap-urls <sitemap_url> <base_or_-> <out_file> [<q3_cache> <orphan_limit>]
+                      Fetch + parse the LIVE sitemap (handles sitemapindex
+                      recursion, .gz, relative URLs) → write all <loc> URLs to
+                      <out_file>. Optionally print up to <orphan_limit> sitemap-
+                      orphan URLs (not in the Q3 url_impressions_map). Non-fatal
+                      on fetch error (exit 0, sitemap_urls:0).
     history-update <findings_jsonl> <history_path> <commit_sha> <run_date>
                       Group D: read newline-delimited finding objects, hash by
                       sub_dim+location, update finding-history.json's run_count
@@ -82,8 +92,10 @@ Exit codes:
 # -*- coding: utf-8 -*-
 import json
 import os
+import re
 import sys
 import glob
+import gzip
 import hashlib
 import time
 import subprocess
@@ -92,7 +104,7 @@ import urllib.error
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
-from urllib.parse import urlparse, urlencode
+from urllib.parse import urlparse, urlencode, urljoin, quote
 
 
 def load_json(path):
@@ -356,6 +368,158 @@ def cmd_auth_token():
         sys.exit(4)
     sys.stdout.write(token + '\n')
     sys.stdout.write(quota + '\n')
+
+
+# ---------------------------------------------------------------------------
+# Sitemap discovery + fetch
+# ---------------------------------------------------------------------------
+# The skill used to only read a repo-local static sitemap.xml — invisible for
+# the common case of a framework-generated sitemap (Next.js app/sitemap.ts,
+# CMS-driven, build-time output not committed). That silently emptied the
+# URL-Inspection sitemap-orphan slice (sub-dim 14 deindex detection) and the
+# URL-health probe. These subcommands fetch the LIVE sitemap instead:
+#   sitemaps-list <site_url>   — authenticated GSC sitemaps.list (authoritative:
+#                                the sitemap URLs you actually submitted)
+#   sitemap-urls <url> ...     — fetch + parse the sitemap XML (handles
+#                                sitemapindex recursion, .gz, relative URLs),
+#                                materialize the full <loc> list to a file.
+
+SITEMAP_FETCH_TIMEOUT_SEC = 30
+SITEMAP_MAX_CHILDREN = 50          # cap child sitemaps in an index (runaway guard)
+SITEMAP_USER_AGENT = 'bx-seo-sitemap/1.0'
+_LOC_RE = re.compile(r'<loc>\s*([^<\s][^<]*?)\s*</loc>', re.IGNORECASE)
+
+
+def _fetch_text(url):
+    """Fetch a URL and return decoded text; transparently gunzips .gz / gzip
+    magic-byte bodies (sitemaps are commonly served gzipped)."""
+    req = urllib.request.Request(url, headers={'User-Agent': SITEMAP_USER_AGENT})
+    with urllib.request.urlopen(req, timeout=SITEMAP_FETCH_TIMEOUT_SEC) as resp:
+        raw = resp.read()
+    if url.lower().endswith('.gz') or raw[:2] == b'\x1f\x8b':
+        raw = gzip.decompress(raw)
+    return raw.decode('utf-8', errors='replace')
+
+
+def _collect_sitemap_urls(url, base, _depth=0):
+    """Return (urls, is_index). Recurses one level into <sitemapindex> children
+    (capped). Resolves relative <loc> values against `base` (or the sitemap's
+    own URL). Best-effort: a child that fails to fetch is skipped, not fatal."""
+    text = _fetch_text(url)
+    is_index = '<sitemapindex' in text.lower()
+    locs = [m.group(1).strip() for m in _LOC_RE.finditer(text)]
+    resolve_base = base or url
+    locs = [urljoin(resolve_base, u) if not urlparse(u).scheme else u
+            for u in locs]
+    if is_index and _depth == 0:
+        out = []
+        for child in locs[:SITEMAP_MAX_CHILDREN]:
+            try:
+                child_urls, _ = _collect_sitemap_urls(child, base, _depth + 1)
+                out.extend(child_urls)
+            except Exception:
+                pass  # one bad child shouldn't sink the whole sitemap
+        return out, True
+    return locs, is_index
+
+
+def cmd_sitemaps_list(site_url):
+    """Authenticated GSC `sitemaps.list` — prints the sitemap URLs submitted for
+    the property (the authoritative discovery source). Non-fatal on API error
+    (exit 0, sitemaps_found:0) so the orchestrator can fall back to robots.txt /
+    conventional paths; only a credential failure exits 4."""
+    try:
+        token, quota = resolve_credentials()
+    except CredentialError as e:
+        print('sitemaps_found:0')
+        print(f'sitemaps_error:{e.reason}')
+        print(f'ERROR: {e}', file=sys.stderr)
+        sys.exit(4)
+    api = (f'https://www.googleapis.com/webmasters/v3/sites/'
+           f'{quote(site_url, safe="")}/sitemaps')
+    req = urllib.request.Request(api, headers={
+        'Authorization': f'Bearer {token}', 'x-goog-user-project': quota})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+    except Exception as e:
+        print('sitemaps_found:0')
+        print(f'sitemaps_error:api')
+        print(f'ERROR: sitemaps.list failed: {e}', file=sys.stderr)
+        sys.exit(0)
+    entries = data.get('sitemap', []) or []
+    print(f'sitemaps_found:{len(entries)}')
+    print('--- sitemaps ---')
+    for s in entries:
+        contents = s.get('contents') or [{}]
+        submitted = contents[0].get('submitted', '?')
+        print(f"  {s.get('path', '')}|{s.get('type', '?')}|{submitted}")
+
+
+def cmd_sitemap_urls(args):
+    """Fetch + parse a sitemap into a flat URL list.
+
+    Usage: sitemap-urls <sitemap_url> <base_or_-> <out_file> [<q3_cache> <orphan_limit>]
+      - Writes ALL <loc> URLs (deduped, document order) to <out_file>, one per
+        line — for the URL-health probe + traffic_orphan, kept out of the model
+        context.
+      - Prints sitemap_urls:N / source / is_index to stdout (bounded).
+      - When <q3_cache> + <orphan_limit> are given, also prints up to
+        <orphan_limit> sitemap-orphan URLs (in the sitemap but NOT in the Q3
+        url_impressions_map) under `--- orphans ---` — the bounded list the
+        orchestrator feeds into the inspect-batch sitemap-orphan slice.
+    Non-fatal on fetch error (exit 0, sitemap_urls:0) so the run continues."""
+    sitemap_url = args[0]
+    base = '' if args[1] == '-' else args[1]
+    out_file = args[2]
+    q3_cache = args[3] if len(args) > 3 else None
+    orphan_limit = int(args[4]) if len(args) > 4 and args[4].isdigit() else 0
+
+    try:
+        locs, is_index = _collect_sitemap_urls(sitemap_url, base)
+    except Exception as e:
+        print('sitemap_urls:0')
+        print('sitemap_error:fetch')
+        print(f'ERROR: failed to fetch sitemap {sitemap_url}: {e}',
+              file=sys.stderr)
+        sys.exit(0)
+
+    seen, urls = set(), []
+    for u in locs:
+        if u and u not in seen:
+            seen.add(u)
+            urls.append(u)
+
+    try:
+        with open(out_file, 'w', encoding='utf-8') as f:
+            for u in urls:
+                f.write(u + '\n')
+    except OSError as e:
+        print('sitemap_urls:0')
+        print('sitemap_error:write')
+        print(f'ERROR: could not write {out_file}: {e}', file=sys.stderr)
+        sys.exit(0)
+
+    print(f'sitemap_urls:{len(urls)}')
+    print(f'source:{sitemap_url}')
+    print(f'is_index:{1 if is_index else 0}')
+
+    if q3_cache and orphan_limit:
+        impressions = set()
+        try:
+            with open(q3_cache, 'r', encoding='utf-8') as f:
+                d = json.load(f)
+            for row in d.get('rows', []):
+                keys = row.get('keys', [])
+                if keys:
+                    impressions.add(keys[0])
+        except (OSError, json.JSONDecodeError):
+            pass  # no Q3 yet → every sitemap URL counts as an orphan candidate
+        orphans = [u for u in urls if u not in impressions][:orphan_limit]
+        print(f'orphans_found:{len(orphans)}')
+        print('--- orphans ---')
+        for u in orphans:
+            print(f'  {u}')
 
 
 def parse_q1(path):
@@ -1524,6 +1688,15 @@ def main():
                   "<cache_dir> <site_url> <urls_file>", file=sys.stderr)
             sys.exit(3)
         inspect_batch(arg, sys.argv[3], sys.argv[4])
+    elif cmd == 'sitemaps-list':
+        cmd_sitemaps_list(arg)  # arg = site_url
+    elif cmd == 'sitemap-urls':
+        if len(sys.argv) < 5:
+            print("ERROR: sitemap-urls subcommand needs <sitemap_url> "
+                  "<base_or_-> <out_file> [<q3_cache> <orphan_limit>]",
+                  file=sys.stderr)
+            sys.exit(3)
+        cmd_sitemap_urls(sys.argv[2:])
     elif cmd == 'history-update':
         if len(sys.argv) < 6:
             print("ERROR: history-update subcommand needs "
