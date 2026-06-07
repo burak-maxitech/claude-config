@@ -29,7 +29,7 @@ From the gathered context:
 - **Filtered commit list** (commits since Last Updated) → feeds the session entry + drift probes.
 - **Diff file list** → tells you whether README/`docs/` changed (drift signal; drives the `--full` recommendation).
 - **TaskList state** → drives the task drain (Part 0) and the In Progress / Next Steps deltas.
-- **CLAUDE.md size + Key Decisions row count + session count** — cheap: `wc -c CLAUDE.md`, count `^| ` rows in the Key Decisions table, and (for the drift probe only) `grep -c '^### Session' docs/session-history.md` (one cheap grep, not a full read). These drive the drift warnings and the `--full` rollup gates.
+- **CLAUDE.md size + Key Decisions row count + session count** — cheap: `wc -c CLAUDE.md` for size; count the Key Decisions table rows with the **Grep tool** (`output_mode: count`, pattern `^\| `); and (for the drift probe only) count sessions with the **Grep tool** (`output_mode: count`, pattern `^### Session`) on `docs/session-history.md` — not a full read. Use the Grep tool (not shell `grep`) for the two counts so no extra Bash permission is needed; `wc`/`awk`/`sort` are declared in `allowed-tools`. These drive the drift warnings and the `--full` rollup gates.
 
 ## Step 0.1: Path Routing
 
@@ -69,16 +69,21 @@ The orchestrator owns everything that needs conversation context or user input; 
 Compose this structure and pass it to `save-writer` as the task prompt (fill every field; use the section references in Part 1 to decide *what* each field contains):
 
 - `project_root` — absolute repo path.
-- `today` — current date (e.g. `2026-05-29`).
-- `claude_md_deltas` — exact `old → new` string pairs (or "replace block under `## Section` with: …") for: the `Last Updated:` line, any Current Status row changes (Part 1.2), In Progress (Part 1.4), Next Steps (Part 1.5). Source the *old* strings from the CLAUDE.md you read in Step 0.
+- `today` — current date (e.g. `2026-05-29`). Resolve it from the session's current date supplied by the environment; if that's unavailable, fall back to the most recent commit date from the Step 0.1 `git log` (`git log -1 --date=short`). Do not invoke a bare `date` command — it isn't in `allowed-tools`.
+- `claude_md_deltas` — exact `old → new` string pairs (or "replace block under `## Section` with: …") for every CLAUDE.md section the session changed: the `Last Updated:` line, Current Status rows (Part 1.2), the `## Completed` summary line if the drain changed the completed count (Part 0 / Part 1.3), In Progress (Part 1.4), Next Steps (Part 1.5), and `## Known Issues / Blockers` (Part 1.7 — a blocker resolved or added this session). Source the *old* strings verbatim from the CLAUDE.md you read in Step 0.
 - `claude_md_session_block` — the full replacement text for the `## Session History` last-session block (Part 1.8 format, ≤5 bullets).
 - `session_history_entry` — the detailed entry for `docs/session-history.md` (Part 1.8 format, capped).
 - `completed_items` — `- [x] …` lines from the task drain (may be empty).
-- `decision_row` — a single `| decision | rationale |` row IF a genuinely architectural decision was made this session (Part 1.6 criteria), else `null`.
+- `decision_rows` — a list of `| decision | rationale |` rows, **one per** genuinely architectural decision made this session (Part 1.6 criteria); empty list if none. Most sessions have 0–1, but a session that locks in several architectural decisions lists each as its own row (don't drop the extras).
 
 ### Dispatch
 
-Dispatch one `save-writer` subagent via the Task tool with `subagent_type: "bx:save-writer"`, passing the packet as the prompt (serialize as labeled sections). Await its change report. If it returns a `warnings:` line about exceeded density caps, tighten the offending field and note it in your report — do not re-dispatch unless a file write failed.
+Dispatch one `save-writer` subagent via the Task tool with `subagent_type: "bx:save-writer"`, passing the packet as the prompt (serialize as labeled sections). Await its change report.
+
+Handling its `warnings:` line:
+- **Density-cap warning** (a field exceeded the prose caps) → tighten the offending field, note it in your report, do NOT re-dispatch.
+- **Delta-not-found warning** (an `old_string` didn't match, so that CLAUDE.md section was left un-updated) → re-source the exact current string from the CLAUDE.md you read in Step 0 (or re-read the affected lines) and re-dispatch **only** those deltas. This is the one case where re-dispatch IS warranted — silently leaving a section stale is the failure mode this guards against.
+- No warning / write succeeded → done, no re-dispatch.
 
 ### Drift warning format (show only lines whose probe fires)
 

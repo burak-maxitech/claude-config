@@ -13,20 +13,20 @@ You are the writer half of the `/bx:save` skill. The orchestrator — which has 
 The packet contains:
 - `project_root` — absolute path to the repo.
 - `today` — the date string to stamp into the `Last Updated:` line and the session header.
-- `claude_md_deltas` — an ordered list of CLAUDE.md edits. Each is either an exact `old → new` string pair, or an explicit "replace the block under `## <Section>` with: …" instruction. Covers the `Last Updated:` line, Current Status rows, In Progress, and Next Steps.
+- `claude_md_deltas` — an ordered list of CLAUDE.md edits. Each is either an exact `old → new` string pair, or an explicit "replace the block under `## <Section>` with: …" instruction. Covers the `Last Updated:` line, Current Status rows, the `## Completed` summary line, In Progress, Next Steps, and `## Known Issues / Blockers`.
 - `claude_md_session_block` — the exact replacement text for CLAUDE.md's `## Session History` last-session block (already capped to ≤5 bullets). CLAUDE.md must end up with exactly ONE session block.
 - `session_history_entry` — the full detailed entry to append to `docs/session-history.md` (already capped per the density rules below).
 - `completed_items` — list of `- [x] …` lines to append to `docs/completed-work.md` (may be empty).
-- `decision_row` — a single `| decision | rationale |` table row to append, or `null`.
+- `decision_rows` — a list of `| decision | rationale |` table rows to append (may be empty).
 
 You do NOT call `TaskList` — the orchestrator already drained it and folded the result into `claude_md_deltas`.
 
 ## What you do
 
 1. **Read** `<project_root>/CLAUDE.md`.
-2. **Apply `claude_md_deltas`** as non-overlapping exact-string Edits. Always update the `Last Updated:` line to `today`.
-3. **Replace the `## Session History` last-session block** with `claude_md_session_block`. There must be exactly one session block; all older sessions live only in `docs/session-history.md`.
-4. **If `decision_row` is non-null**, append it to CLAUDE.md's `## Key Decisions` condensed table — immediately after the last `|`-row of that table, and BEFORE the `> Full decision log:` link line.
+2. **Apply `claude_md_deltas`** as non-overlapping exact-string Edits. Always update the `Last Updated:` line to `today`. If a delta's `old_string` is not found verbatim (stale read, paraphrase, or whitespace mismatch), do NOT fuzzy-match or guess — skip that one delta, leave its section unchanged, apply the rest normally, and record the unmatched delta under `warnings:` (quote its `old_string`) so the orchestrator can re-source and re-dispatch it.
+3. **Replace the `## Session History` last-session block** with `claude_md_session_block`. Derive the `old_string` from the CLAUDE.md you read in step 1: the existing `### Last Session …` block under `## Session History` — everything after the `> Full history:` link line, up to the next `## ` header or EOF. **Preserve the `> Full history:` link line.** CLAUDE.md must end up with exactly one session block; all older sessions live only in `docs/session-history.md`.
+4. **If `decision_rows` is non-empty**, append each row (in order) to CLAUDE.md's `## Key Decisions` condensed table — immediately after the last `|`-row of that table, and BEFORE the `> Full decision log:` link line.
 5. **Append `session_history_entry`** to `docs/session-history.md`. Read it only far enough to find the append point: this repo orders newest-last, so append after the final session block, preserving one blank line between entries. If the file is missing, create it with this header first:
    ```markdown
    # Session History Archive
@@ -43,7 +43,7 @@ You do NOT call `TaskList` — the orchestrator already drained it and folded th
 
    ---
    ```
-7. **If `decision_row` is non-null**, also append it to `docs/key-decisions.md` using the anchor rule below.
+7. **If `decision_rows` is non-empty**, also append each row (same order) to `docs/key-decisions.md` using the anchor rule below.
 8. **Do NOT** run rollups, README sync, or auto-memory sync — those stay with the orchestrator (`--full` mode only).
 9. **Do NOT** echo any file's full contents back. Return only the change report.
 
@@ -61,16 +61,16 @@ Append the new row immediately after the last consecutive `|`-row of the main ta
 
 ## Density guard
 
-The packet content arrives already capped. Do NOT rewrite or expand it. If `session_history_entry` exceeds ~5 bullets or `decision_row`'s rationale exceeds ~3 sentences, apply it as given but add a `warnings:` note so the orchestrator can tighten next run.
+The packet content arrives already capped. Do NOT rewrite or expand it. If `session_history_entry` exceeds ~5 bullets or any row in `decision_rows` has a rationale exceeding ~3 sentences, apply it as given but add a `warnings:` note so the orchestrator can tighten next run.
 
 ## Output — change report ONLY
 
 Return this compact report and nothing else (no file contents):
 ```
 files:
-  CLAUDE.md: <old>k → <new>k chars (session block + <N> deltas[, +1 decision row])
+  CLAUDE.md: <old>k → <new>k chars (session block + <N> deltas[, +<K> decision rows])
   docs/session-history.md: appended S<N> (+<X> lines)
   docs/completed-work.md: +<M> items     # omit line if completed_items empty
-  docs/key-decisions.md: +1 row           # omit line if decision_row null
-warnings: <any warnings, or "none">
+  docs/key-decisions.md: +<K> rows        # omit line if decision_rows empty
+warnings: <any warnings (density caps, unmatched deltas), or "none">
 ```

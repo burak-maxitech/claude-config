@@ -49,7 +49,7 @@ Saved session [N] ([mode], [path]):
   CLAUDE.md            — session block + [N] section updates ([old]k → [new]k)
   session-history.md   — appended S[N] (+[X] lines)
   completed-work.md    — +[M] items          (omit if none)
-  key-decisions.md     — +1 row               (omit if none)
+  key-decisions.md     — +N rows              (omit if none)
 [--full only] README.md / docs/*.md — [summary of edits]
 [--full only] rollups  — [Part 5/6/7 results, or "none triggered"]
 Drift: [drift warnings, or "none"]
