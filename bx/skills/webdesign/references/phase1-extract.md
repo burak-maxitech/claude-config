@@ -14,8 +14,8 @@ Read `references/web-stack-detection.md` and execute all four passes in a single
 
 - **Pass 1** gates on web-project signals. On fail, stop cleanly.
 - **Pass 3** gates on EXISTING vs. GREENFIELD. On greenfield detection, stop cleanly.
-- **Pass 4** resolves `app_runnable`, `build_cmd`, `serve_cmd`.
-- Write `styling_system`, `build_cmd`, `serve_cmd`, `app_runnable` to `.webdesign/state.json`.
+- **Pass 4** resolves `app_runnable`, `build_cmd`, `serve_cmd`, and `port`.
+- Write `styling_system`, `build_cmd`, `serve_cmd`, `app_runnable`, `port` to `.webdesign/state.json`.
 
 Print the one-line detected-stack summary produced by `web-stack-detection.md`:
 
@@ -101,6 +101,36 @@ Briefs written to .webdesign/briefs/. Review and refine each brief — especiall
 ```
 
 **Wait for the user to confirm before continuing.** If the user wants to edit briefs, pause; proceed only when they say to continue.
+
+### 2.4 — Initialize `pages[]` in `state.json`
+
+After all briefs are written (and before moving to Step 3), write the `pages[]` array and remaining Phase-1 scaffolding keys to `state.json`. Merge — do not overwrite the whole file.
+
+For each brief:
+- Read the brief's YAML frontmatter to get `page:` (→ `slug`), `route:`, `file:`, and `states:` (a list of state names; default `["default"]` if the key is absent).
+- Emit one `pages[]` entry with these fields:
+
+```json
+{
+  "slug": "<page: frontmatter value>",
+  "route": "<route: frontmatter value>",
+  "file": "<file: frontmatter value>",
+  "status": "pending",
+  "states": {
+    "<state_name>": { "screen_id": null, "status": "pending" }
+  }
+}
+```
+
+`states` must be the **object-keyed shape** (keyed by state name, not a flat array). One key per name in the brief's `states:` list.
+
+Also merge these two scalar keys if not already present (seed them once when `state.json` is first created in Step 1.2, or add them here if they were missed):
+
+```json
+{ "mode": "refactor", "tokens_applied": false }
+```
+
+After writing, `state.json` will contain `mode`, `tokens_applied`, and a fully-initialized `pages[]` array ready for Phase 2.
 
 ---
 
@@ -300,10 +330,19 @@ Run /bx:webdesign again (or continue in this session) to start generating screen
 | Key | Type | Written in | Consumed by |
 |-----|------|-----------|-------------|
 | `branch` | string | Step 1.2 | all subsequent phases (branch checkout on resume) |
+| `mode` | string (`refactor`) | Step 1.2 (seeded on first create) or Step 2.4 | Phase 2/3 guard logic |
+| `tokens_applied` | boolean (`false`) | Step 1.2 (seeded on first create) or Step 2.4 | Phase 3 token-inject guard; `page <name>` pre-check |
 | `styling_system` | string | Step 1.1 | Phase 3 token injection |
 | `build_cmd` | string \| null | Step 1.1 | Step 4, Phase 3 build |
 | `serve_cmd` | string \| null | Step 1.1 | Step 3, Phase 3 Playwright |
 | `app_runnable` | boolean | Step 1.1 | Step 3, Step 4, Phase 3 |
+| `port` | integer | Step 1.1 (via web-stack-detection.md Pass 4) | Step 3 screenshots (`http://localhost:<port>`), Phase 3 Playwright |
+| `pages[]` | array of page objects | Step 2.4 (after briefs are written) | Phase 2 screen generation, Phase 3 per-page loop, `status` arg |
+| `pages[].slug` | string | Step 2.4 | Phase 2/3 page lookup |
+| `pages[].route` | string | Step 2.4 | Phase 1 screenshots, Phase 3 Playwright navigation |
+| `pages[].file` | string | Step 2.4 | Phase 3 injection target |
+| `pages[].status` | string (`pending`) | Step 2.4 | Phase 3 per-page loop gate; `status` display |
+| `pages[].states` | object keyed by state name | Step 2.4 (object shape, not array) | Phase 2 fills `screen_id`; Phase 3 `get_screen` |
 | `stitch_project_id` | string | Step 4a only (app_runnable: true) — absent on source-only fallback path | Phase 2 screen generation, Step 5b |
 | `design_system_id` | string | Step 5a or 5b | Phase 2 screen generation |
 | `phase` | string (`direction_set`) | Step 6 | resume logic in skill entry |

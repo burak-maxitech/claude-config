@@ -59,6 +59,12 @@ No design system found — Phase 1 Step 5 must set the design direction before g
 ```
 Then STOP. Do not call `generate_screen_from_text` with a null design system.
 
+**Guard — `stitch_project_id` must be set before generating.** Also read `state.json["stitch_project_id"]`. If it is absent or null (the Phase 1 source-only fallback path does not set it), print:
+```
+No Stitch project found — Phase 1 must seed the Stitch project (it didn't, likely because the app wasn't runnable). Re-run /bx:webdesign once the app builds/serves, or set up the project manually in Stitch.
+```
+Then STOP. Do not call `generate_screen_from_text` with a null project id.
+
 Iterate over every page brief. For each page, generate one screen per state.
 
 ### 2.1 — Build the generation prompt

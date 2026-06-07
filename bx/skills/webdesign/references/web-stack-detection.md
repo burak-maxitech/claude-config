@@ -135,16 +135,40 @@ Otherwise set `app_runnable: false`.
 
 **Do NOT actually run the build or dev server** during this probe — this is a static check only.
 
+### Port resolution
+
+After resolving `serve_cmd`, also resolve the dev-server `port` and record it in `state.json`. This value is used by Phase 1 screenshots and Phase 3 Playwright verification (`http://localhost:<port><route>`).
+
+**Resolution order (first match wins):**
+
+1. Check the dev/serve script's value in `package.json` for an explicit `--port <N>` flag (e.g. `"dev": "next dev --port 4000"` → `4000`).
+2. Otherwise use the framework default:
+   | Framework | Default port |
+   |-----------|-------------|
+   | Next.js | 3000 |
+   | Nuxt | 3000 |
+   | Remix | 3000 |
+   | Gatsby | 8000 |
+   | Vite | 5173 |
+   | SvelteKit | 5173 |
+   | Astro | 4321 |
+   | Hugo | 1313 |
+   | Jekyll | 4000 |
+   | (fallback) | 3000 |
+
+> If the dev server logs a different port at startup during Phase 1 (Step 3.1), prefer the logged port over the value resolved here. Update `state.json["port"]` if it differs.
+
 ### State written to `state.json`
 ```json
 {
   "build_cmd": "npm run build",
   "serve_cmd": "npm run dev",
-  "app_runnable": true
+  "app_runnable": true,
+  "port": 3000
 }
 ```
 
-Set to `null` (not omitted) when a value cannot be resolved, so downstream steps can distinguish "not detected" from "not checked."
+Set `build_cmd`/`serve_cmd` to `null` (not omitted) when a value cannot be resolved, so downstream steps can distinguish "not detected" from "not checked." `port` is always set to an integer (never null — falls back to `3000`).
 
 ### Degradation rule
 
@@ -185,3 +209,4 @@ Detected: React + react-router · styling: css-in-js · app_runnable: true
 | `build_cmd` | string \| null | Pass 4 | Phase 3 build verification |
 | `serve_cmd` | string \| null | Pass 4 | Phase 1 screenshots, Phase 3 Playwright |
 | `app_runnable` | boolean | Pass 4 | Phase 1 screenshots/extract-static-html, Phase 3 Playwright |
+| `port` | integer | Pass 4 | Phase 1 `browser_navigate` (`http://localhost:<port><route>`), Phase 3 Playwright verification |

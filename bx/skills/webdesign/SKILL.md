@@ -69,6 +69,8 @@ done               → print final report; offer to retry a page
 
 There is **no `approved` phase** — Phase 2 transitions directly into Phase 3 in the same turn after approval without writing an intermediate state value. There is **no `setup`, `extracted`, or `generating` phase** — these are not written by any reference file.
 
+> **Note:** the design spec lists 8 conceptual states; this skill persists only 6 — `setup`, `extracted`, and `generating` are transient/in-session and never written to `state.json`.
+
 ### Canonical `state.json` shape
 
 ```json
