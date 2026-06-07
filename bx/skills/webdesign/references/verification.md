@@ -73,13 +73,13 @@ npm run dev      # if "dev" script exists
 npm start        # fallback
 ```
 
-Poll the dev server with a bash loop until it responds, with a timeout, before navigating:
+Poll the dev server until it responds, with a timeout, before navigating:
 ```bash
-# wait up to ~30s for the dev server, then navigate
-for i in $(seq 1 30); do curl -sf "http://localhost:<port>/" >/dev/null && break; sleep 1; done
+# wait up to ~30s for the dev server
+curl -sf --retry 30 --retry-delay 1 --retry-connrefused "http://localhost:<port>/" >/dev/null
 ```
 
-Fallback: if bash polling is not available, call `browser_navigate` immediately and retry on connection error up to 5 times with a short pause between attempts.
+Fallback: if the curl poll fails or is not available, call `browser_navigate` immediately and retry on connection error up to 5 times with a short pause between attempts.
 
 ### 2b — Navigate to the page
 
