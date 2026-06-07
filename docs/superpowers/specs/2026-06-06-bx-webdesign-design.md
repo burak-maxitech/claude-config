@@ -32,6 +32,8 @@ So `/bx:webdesign` is a **thin orchestrator** over Google's engine that adds the
 7. **Verification:** **build/typecheck/test + Playwright behavior check + before/after screenshots**, per page, before commit. Pixel-identical regression is explicitly *not* the bar (visuals are supposed to change) — the bar is **functionality preserved**.
 8. **Name:** **`bx:webdesign`** (not `design` — too broad, collides with "design doc"/system-design sense and sits ambiguously next to `bx:arch`/`bx:plan`; not `redesign` — under-covers future greenfield). Single lowercase token, fits convention, pairs conceptually with `bx:seo` (both web-only).
 9. **Vibe-setting is flexible (user's call per run).** The MCP is **non-interactive** — it never asks the user anything. So the high-level design-direction questions Stitch's web UI used to ask ("elegant / simple / retro …") are gathered by **one of two paths, chosen per run in Phase 1**: (a) **Claude-led interview** — Claude asks the vibe questions, then maps the answers to the Stitch design-system params (`colorMode`, font enums, `roundness`, `customColor` seed, `colorVariant`) + `DESIGN.md`, and sets them via MCP; or (b) **user sets it in the Stitch web canvas** — the user shapes the design system at stitch.withgoogle.com (vibe questions / Voice Canvas / visual exploration) and Claude reads it back via `list_design_systems` and uses that design-system ID for all generation. The Stitch project created via MCP is the *same* project visible in the web UI (same Google account), so both views interoperate. This honors the user's "don't remove manual steps" preference — the web-UI experience stays available without being mandatory. **Regardless of path, the Phase-2 visual review happens in the web UI** (look at generated screens, optionally hand-tweak vs. `edit_screens`).
+10. **Responsive/mobile — preserve existing, restyle within it.** Stitch generates desktop-first (2560px base). Phase-3 injection keeps each page's existing responsive structure/breakpoints and applies the new visual language *within* them — mobile keeps its proven layout behavior and gains the new tokens/components. (Rejected: generating mobile+desktop screens — ~2× quota + 2× injection + higher risk; deferring responsive to v2.)
+11. **Work-branch isolation — auto-create a dedicated branch.** On first run the skill creates/uses `webdesign/<date>` (persisted in `state.json`); the global token commit + every per-page commit land there, so the whole refactor is reviewable / revertible / mergeable as a unit (matches the repo's branch-per-feature convention). Resumed runs reuse the recorded branch.
 
 ---
 
@@ -85,8 +87,8 @@ bx/skills/webdesign/
     ├── brief-format.md            # per-page brief schema incl. dynamic-state handling
     ├── phase2-design-review.md    # generate via Google skills + the visual-review checkpoint
     ├── phase3-inject.md           # tokens-first + per-page safe-restyle algorithm (the core)
-    ├── verification.md            # build/test + Playwright behavior + before/after capture
-    └── stitch-formats.md          # bundled DESIGN.md schema + prompt format + runtime fresh-fetch
+    ├── verification.md            # build/test + Playwright behavior (assertions = brief PRESERVE list) + before/after
+    └── stitch-formats.md          # DESIGN.md schema + prompt format + vibe→design-system-knob mapping table + runtime fresh-fetch
 ```
 Auto-discovered from `bx/skills/` — no `plugin.json` / `marketplace.json` edits. Frontmatter: `name: webdesign`, `disable-model-invocation: true`, `effort: high`. `allowed-tools` includes the `stitch*` MCP tools, the Playwright MCP tools (`mcp__plugin_playwright_playwright__*`), `Task`, `Skill`, Read/Write/Edit/Glob/Grep, and `Bash(npm:*)`/`Bash(npx:*)`/`Bash(git:*)`/`Bash(curl:*)`.
 
@@ -103,8 +105,9 @@ npx plugins add google-labs-code/stitch-skills --scope project --target claude-c
 Named `.webdesign/` (not `.design/`) to avoid colliding with Google skills' own `.stitch/` scratch directory. Sentinel-marked into `.gitignore` like `/bx:seo` does.
 ```
 .webdesign/
-├── state.json        # {phase, mode, styling_system, stitch_project_id, design_direction,
-│                     #  tokens_applied, pages:[{route, file, states[], status}]}
+├── state.json        # {phase, mode, styling_system, branch, stitch_project_id, design_direction,
+│                     #  build_cmd, serve_cmd, app_runnable, tokens_applied,
+│                     #  pages:[{route, file, states[], status}]}
 ├── SITE.md           # "constitution" (Google's stitch-loop pattern): identity, visual language,
 │                     #  live sitemap + per-page status, stitch_project_id  ← long-term memory
 ├── briefs/<page>.md  # auto-drafted preserve-aware briefs (user refines)
@@ -113,8 +116,11 @@ Named `.webdesign/` (not `.design/`) to avoid colliding with Google skills' own 
 ```
 `/bx:webdesign` reads `state.json` and **auto-routes** to the correct phase (Approach A: single auto-detecting command). Two escape hatches: `/bx:webdesign status` (print progress, take no action) and `/bx:webdesign page <name>` (re-run/force one page).
 
+**Phase state machine** (drives auto-routing): `setup → extracted → direction_set → generating → review_pending → tokens_injected → injecting_pages → done`. Each `pages[].status` advances `pending → generated → injected → verified`, or terminates at `failed` / `manual`.
+
 ### Phase 1 — Extract & Stage *(Claude)*
-1. **Step 0 — detect & gate.** Reuse `/bx:seo`'s web-project detection. Additionally detect the **styling system** (Tailwind / CSS-modules / styled-components / vanilla-extract / CSS-vars / theme file) — this determines where tokens land in Phase 3. Detect **refactor vs greenfield**; greenfield → print "not supported in v1" and exit. Print the detected stack.
+1. **Step 0 — detect & gate.** Reuse `/bx:seo`'s web-project detection. Additionally detect the **styling system** (Tailwind / CSS-modules / styled-components / vanilla-extract / CSS-vars / theme file) — this determines where tokens land in Phase 3. Detect **refactor vs greenfield**; greenfield → print "not supported in v1" and exit. Detect **how to build + serve** the app (package.json scripts / framework defaults) and probe whether it runs → set `app_runnable`, `build_cmd`, `serve_cmd`. **Three later steps depend on a runnable app** (before/after screenshots, Playwright behavior checks, `extract-static-html`'s build output) — so consolidate the probe here. **If the app can't build/serve, degrade gracefully:** skip Playwright + before/after capture, warn the user, and fall back to **build-only verification** in Phase 3 — never hard-fail. Print the detected stack + runnability.
+1b. **Create/resume the work branch (decision 11).** First run → create `webdesign/<date>` and record it in `state.json`; resumed runs → check out the recorded branch. All later commits land here.
 2. **Enumerate routes** (stack-aware, reusing `/bx:seo`'s pathspec table) → draft a **preserve-aware brief per page** (purpose · **functionality to PRESERVE** · key components · UX notes · per-state list for dynamic pages).
 3. **Capture `before/` screenshots** via Playwright (verification baseline + reusable as Stitch image references).
 4. **Seed Stitch** — build the project, then delegate to Google's **`code-to-design`** (which chains `extract-static-html` → `extract-design-md` → `manage-design-system`): creates a Stitch project carrying the project's **current** DESIGN.md as a baseline. Persist `stitch_project_id` into `state.json` + `SITE.md`.
@@ -125,15 +131,17 @@ Named `.webdesign/` (not `.design/`) to avoid colliding with Google skills' own 
    **The new design *direction* comes from this step (the new vibe), not from the current-design extraction in step 4.** Step 4's extraction supplies *structure* (page/component inventory, functionality to preserve) and *brand invariants* to optionally keep (logo, a brand color); it does **not** dictate the new aesthetic. After this step, Stitch holds the **new** design language and the project is ready for per-screen generation.
 
 ### Phase 2 — Design & Review *(Claude via Google skills + user)*
+- **Quota pre-flight:** estimate total screens = Σ(states per page) and compare to the remaining monthly budget; show the estimate and **confirm before generating** (free tier ~350 screens/month, and per-state screens add up fast). Skip on user override.
 - Per brief, delegate to Google's **`generate-design`** (`generate_screen_from_text`, **layout/content only**, design system applied at project level so no color/font drift).
 - **Dynamic/JS-heavy pages:** generate **one screen per UI state**; record explicit interactions in the brief for Phase-3 preservation.
 - **Mandatory human visual checkpoint:** emit a review card (Stitch project URL + what to review + how to tweak via voice / direct edits / "Claude, `edit_screens` to …"). The user approves when satisfied. The skill resumes cleanly on the next invocation via `state.json`. (This is where the user's "handback / clear human instructions + clean resume" requirement lives in the MCP world — file-moving is unnecessary since the MCP transfers assets, but the human review-and-resume step remains explicit.)
 
 ### Phase 3 — Safe Inject & Verify *(Claude — the differentiated core)*
+All Phase-3 commits land on the dedicated `webdesign/<date>` branch (decision 11).
 1. **`get_screen`** per approved screen → `curl` the signed `htmlCode.downloadUrl` + `screenshot.downloadUrl`.
 2. **Tokens-first (one global commit):** merge the Stitch design-system tokens (including the localized `tailwind.config` from the generated HTML `<head>`) into the project's theme layer (location determined by the Step-0 styling system) → verify build → commit.
-3. **Per-page loop (resumable):** read the existing page + the Stitch HTML/screenshot side-by-side; **restyle the existing page's markup/classes to match the new design while preserving every handler, API call, route, and piece of state**; keep `data-stitch-id` as comments for future re-sync; **verify** (build/typecheck/test + Playwright behavior check + `after/` screenshot vs `before/`); commit; update `SITE.md` live sitemap. Report "N of M pages done."
-4. **Safety valve:** if a page's structure diverged too far to safely preserve logic, **flag it for manual handling** rather than risk clobbering behavior.
+3. **Per-page loop (resumable):** read the existing page + the Stitch HTML/screenshot side-by-side; **restyle the existing page's markup/classes to match the new design while preserving every handler, API call, route, and piece of state.** Preservation also covers **the page's real content/copy and existing images/assets** — Stitch's placeholder text and stock images are *discarded*; only its **visual structure/styling** is adopted. Apply the new visual language **within the page's existing responsive breakpoints** (decision 10), so mobile behavior is retained. Keep `data-stitch-id` as comments for future re-sync. **Verify** — build/typecheck/test + a Playwright behavior check **whose assertions are the brief's *functionality-to-PRESERVE* list** + `after/` screenshot vs `before/` (build-only when `app_runnable` is false). **On green:** commit, update `SITE.md` live sitemap, set `status = verified`. **On failure:** `git restore` the page's uncommitted changes, set `status = failed`, surface the reason, and **continue to the next page** (retry later via `page <name>`). Report "N of M pages done (K failed/manual)."
+4. **Safety valve:** if a page's structure diverged too far to safely preserve logic, **flag it `status = manual`** rather than risk clobbering behavior.
 
 ### What `/bx:webdesign` owns vs delegates
 | Concern | Owner |
@@ -163,16 +171,19 @@ Google's `react-components` is **not** used in the refactor path (it replaces ra
 
 - **Stitch is experimental + evolving** — mitigated by a bundled baseline (`stitch-formats.md`) + runtime fresh-fetch of the official prompting doc, and by pinning the expected `stitch-skills` skill names.
 - **Generation quota** (~350 screens/month standard tier) — surface remaining budget; dynamic pages multiply screen count (one per state).
-- **Build-output dependency** — `extract-static-html` needs a built app; the skill must run/locate the build (or dev server) in Phase 1.
+- **Build-output / app-runnability** — `extract-static-html`, Playwright checks, and before/after screenshots all need the app to build/serve; consolidated into one Step-0 runnability probe with graceful degradation (build-only verification when it can't run).
 - **Styling-system coverage** — token-merge logic must handle Tailwind / CSS-modules / styled-components / CSS-vars; start with the project's detected system, flag unsupported ones.
-- **Playwright behavior checks** are heuristic (load page, assert key elements/flows) — they reduce but don't eliminate the need for the human review checkpoint.
+- **Playwright behavior checks** are heuristic (the brief's PRESERVE list → load page, assert those elements/flows) — they reduce but don't eliminate the need for the human review checkpoint.
+- **Responsive fidelity** — restyling within existing breakpoints (decision 10) keeps mobile working, but a desktop-derived visual language may still need minor mobile-specific tuning; flag pages where the new components don't obviously map onto the existing breakpoint structure.
 
 ## Success criteria
 
 - A user with the Stitch MCP + `stitch-skills` installed can run `/bx:webdesign` on an existing web project and, across resumable sessions, land a **completely new visual design** with **every page's functionality intact** (build/test/Playwright green per page).
 - Step 0 correctly detects web-project + styling system, and exits cleanly on greenfield and non-web repos.
-- Per-page commits each preserve handlers/API/state; no page is committed with failing verification.
+- Per-page commits each preserve handlers/API/state; no page is committed with failing verification. A failed page reverts cleanly (`status = failed`) and doesn't contaminate the next.
+- Injected pages preserve **real content + existing assets** (no Stitch placeholder copy/stock images) and retain **existing responsive behavior**.
 - Multi-page output shows **no visual drift** (single project-level design system; layout-only per-page prompts).
 - Dynamic pages are handled as per-state screens with interactions preserved in code.
-- Missing dependencies produce a clear guided-setup banner, never a silent failure.
+- Missing dependencies produce a clear guided-setup banner, never a silent failure; a non-runnable app degrades to build-only verification rather than failing.
+- All refactor commits land on a **dedicated `webdesign/<date>` branch**, reviewable/revertible as a unit.
 - The skill is resumable: re-running `/bx:webdesign` always continues from the correct phase; `status` and `page <name>` work as specified.
