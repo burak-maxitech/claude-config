@@ -180,9 +180,9 @@ Execute verification per `references/verification.md` (authoritative). The verif
 
 Verification substeps (summary — see `references/verification.md` for full rules):
 
-1. **Build / typecheck:** run `build_cmd`. If it fails, this page fails — go to Step 3e.
+1. **Static checks — build/typecheck/test** (per `references/verification.md` — typecheck runs first; `verification.md` is authoritative on ordering). If any check fails, this page fails — go to Step 3e.
 2. **Playwright behavior check (`app_runnable == true` only):** navigate to the page's route and assert each item in the "Functionality to PRESERVE" list (e.g. submit fires the API call, filter updates results). Capture `.webdesign/after/<page>-post-inject.png` for before/after comparison.
-3. **Build-only (`app_runnable == false`):** skip Playwright; a green build is the verification gate.
+3. **Build-only (`app_runnable == false`):** skip Playwright and screenshot capture; green static checks are the verification gate.
 
 If all checks pass: go to Step 3d. If any check fails: go to Step 3e.
 

@@ -63,7 +63,7 @@ npx jest --passWithNoTests # fallback for Jest projects without a script
 
 ## Step 2 — Playwright Behavior Check (`app_runnable == true` only)
 
-Skip this step entirely if `app_runnable` is `false`. Proceed to Step 4 (build-only degradation note).
+Skip this step entirely if `app_runnable` is `false`. When `app_runnable == false`, BOTH Step 2 (Playwright behavior check) and Step 3 (screenshot capture) are skipped entirely — proceed directly to Step 4. Green static checks (Step 1) alone constitute green ("build-only") verification in that case.
 
 ### 2a — Serve the app
 
@@ -73,7 +73,13 @@ npm run dev      # if "dev" script exists
 npm start        # fallback
 ```
 
-Wait for the server to be ready before navigating (check for a listening port or a ready-signal in stdout).
+Poll the dev server with a bash loop until it responds, with a timeout, before navigating:
+```bash
+# wait up to ~30s for the dev server, then navigate
+for i in $(seq 1 30); do curl -sf "http://localhost:<port>/" >/dev/null && break; sleep 1; done
+```
+
+Fallback: if bash polling is not available, call `browser_navigate` immediately and retry on connection error up to 5 times with a short pause between attempts.
 
 ### 2b — Navigate to the page
 
