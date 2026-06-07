@@ -61,9 +61,10 @@ For each state under `pages[].states`:
    - `screenshot.downloadUrl` — a signed URL for the rendered PNG
    - `data-stitch-id` attributes on elements (preserve as comments in Step 3b)
 
-2. Download the HTML to a temp file via `curl`:
+2. Download the HTML to a temp file via `curl` (create `.webdesign/tmp/` if it does not exist):
    ```bash
-   curl -sL "<htmlCode.downloadUrl>" -o /tmp/stitch-<page>-<state>.html
+   mkdir -p .webdesign/tmp
+   curl -sL "<htmlCode.downloadUrl>" -o .webdesign/tmp/stitch-<page>-<state>.html
    ```
 
 3. Download the screenshot to the `after/` artefact directory:
@@ -91,7 +92,7 @@ Merge strategy by `styling_system`:
 | `tailwind` | Extract the `tailwind.config` block from any fetched Stitch `<head>` + the DESIGN.md token values; merge into the project's `tailwind.config.js` / `tailwind.config.ts` (colors, fonts, radius, spacing under `theme.extend`). Do not overwrite custom project extensions — merge at the token key level. | `tailwind.config.js` or `tailwind.config.ts` |
 | `css-vars` | Write the DESIGN.md color/typography/spacing tokens as CSS custom properties in the `--` namespace into the `:root {}` block of the project's theme stylesheet (create a dedicated `tokens.css` / `design-tokens.css` if no single `:root` file exists). | theme / `:root` stylesheet |
 | `plain-css` | Same as `css-vars` — write as `--token-name: value` properties under `:root {}`. | theme / `:root` stylesheet |
-| `css-in-js` | Update the project's theme object (e.g. `theme.ts`, `theme.js`, `styled-components ThemeProvider`) with the new token values. Match the existing key naming convention. | theme object / token file |
+| `css-in-js` | Update the project's theme object with the new token values. **Detection:** locate the theme object by grepping for `ThemeProvider` (e.g. `Grep -r "ThemeProvider" src/`); the object passed to it at its definition site is the merge target. Match the existing key-naming convention (camelCase vs kebab) in that file. | theme object / token file |
 | `css-modules` | Write tokens as CSS custom properties in a shared `variables.module.css` or equivalent root-level module. | shared variables module |
 | `vanilla-extract` | Update the `contract` or `vars` file (e.g. `vars.css.ts`) with the new token values following the existing `createGlobalTheme` / `createTheme` structure. | `vars.css.ts` or equivalent |
 | `unknown` | Apply tokens as CSS custom properties under `:root {}` in the closest available global stylesheet, and warn: `⚠ styling_system: unknown — tokens applied as CSS custom properties in <file>. Manual verification required.` | best-effort global stylesheet |
@@ -102,7 +103,7 @@ After writing the tokens:
    ```bash
    <build_cmd from state.json>
    ```
-   If the build fails, print the error, **do not commit**, and stop Phase 3. The token merge must produce a green build before any page work begins.
+   If the build fails: print the build error, **do not commit**, leave `phase` as-is (do NOT advance to `tokens_injected`), and stop Phase 3. Surface the build error to the user and instruct them to fix the token merge (or revert it) and re-run `/bx:webdesign` — which cleanly re-enters Step 2.
 
 2. Commit:
    ```bash
@@ -110,7 +111,7 @@ After writing the tokens:
    git -C <project-root> commit -m "tokens: apply new design system"
    ```
 
-3. Write to `state.json`:
+3. Write to `state.json` **only after the token commit succeeds**:
    ```json
    { "tokens_applied": true, "phase": "tokens_injected" }
    ```
@@ -119,16 +120,35 @@ After writing the tokens:
 
 ## Step 3 — Per-Page Restyle Loop (resumable)
 
+**Before starting the loop**, write to `state.json`:
+```json
+{ "phase": "injecting_pages" }
+```
+This ensures a mid-loop interruption resumes into the page loop correctly. `phase` stays `injecting_pages` until Step 4 sets it to `done`.
+
 Iterate over `pages[]` in order. **Skip any page whose page-level `status` is already `verified`.** (Resume: if the skill is re-run after a partial Phase 3, pages already verified are not re-touched.)
 
 For each page with `status != verified`:
+
+**At the start of each loop iteration, assert the working tree is clean:**
+```bash
+git -C <project-root> status --porcelain
+```
+If the output is non-empty, **STOP** and warn the user:
+```
+⚠ Unexpected dirty working tree before starting <page>. Phase 3 cannot continue safely.
+  Resolve or commit the outstanding changes, then re-run /bx:webdesign.
+```
+Do not proceed to 3a until the tree is confirmed clean. This is safe to assert because Phase 3 commits after every successful page — the tree is always clean between pages.
+
+**Resume rule — `injected` status:** if a page's `status == injected` (the restyle write completed but verification was interrupted), **skip Steps 3a and 3b** and go straight to Step 3c (verify only). Do not re-restyle an already-restyled file.
 
 ### 3a — Read sources side-by-side
 
 Load into context in a single parallel turn:
 
 - The **existing page source** (the file at `pages[].file`)
-- The **Stitch HTML** (`/tmp/stitch-<page>-<default-state>.html`, or all states if the page has multiple)
+- The **Stitch HTML** (`.webdesign/tmp/stitch-<page>-<default-state>.html`, or all states if the page has multiple)
 - The `.webdesign/after/<page>-<state>.png` screenshot(s) (visual reference)
 - The page's brief (`.webdesign/briefs/<page>.md`) — specifically the **"Functionality to PRESERVE"** list, which is the verification contract
 
@@ -156,9 +176,9 @@ After writing the restyled file, set page-level `status = injected` in `state.js
 
 ### 3c — Verify
 
-Execute verification per `references/verification.md`. The verification contract is the page brief's **"Functionality to PRESERVE"** list (from `.webdesign/briefs/<page>.md`).
+Execute verification per `references/verification.md` (authoritative). The verification contract is the page brief's **"Functionality to PRESERVE"** list (from `.webdesign/briefs/<page>.md`).
 
-Verification substeps:
+Verification substeps (summary — see `references/verification.md` for full rules):
 
 1. **Build / typecheck:** run `build_cmd`. If it fails, this page fails — go to Step 3e.
 2. **Playwright behavior check (`app_runnable == true` only):** navigate to the page's route and assert each item in the "Functionality to PRESERVE" list (e.g. submit fires the API call, filter updates results). Capture `.webdesign/after/<page>-post-inject.png` for before/after comparison.
@@ -168,11 +188,11 @@ If all checks pass: go to Step 3d. If any check fails: go to Step 3e.
 
 ### 3d — On green: commit and continue
 
-1. Commit the restyled page:
-   ```bash
-   git -C <project-root> add <pages[].file>
-   git -C <project-root> commit -m "webdesign: restyle <page>"
-   ```
+Commit ALL files changed by the restyle (page file + any co-changed components, CSS modules, or new files — restyles are multi-file; `git add <pages[].file>` alone makes an incomplete commit that fails on fresh checkout):
+```bash
+git -C <project-root> add -A
+git -C <project-root> commit -m "webdesign: restyle <page>"
+```
 
 2. Update `SITE.md` — add or update the live-sitemap entry for this page with its new route/status (create `SITE.md` at project root if absent).
 
@@ -182,10 +202,13 @@ If all checks pass: go to Step 3d. If any check fails: go to Step 3e.
 
 ### 3e — On failure: rollback and continue
 
-1. Restore the file to its pre-restyle state (clean working tree):
-   ```bash
-   git -C <project-root> restore <pages[].file>
-   ```
+Clean ALL uncommitted changes since the last commit (a restyle may have touched shared components, CSS modules, or created new files; restoring only `pages[].file` leaks dirty files into the next page's iteration):
+```bash
+git -C <project-root> restore .
+git -C <project-root> clean -fd
+```
+
+After rollback, assert the tree is clean (`git status --porcelain` is empty) before continuing to the next page.
 
 2. Set page-level `status = failed` in `state.json`. Record the failure reason in `state.json` under `pages[].failure_reason`.
 
@@ -226,7 +249,7 @@ When all pages have been processed (every page is `verified`, `manual`, or `fail
 | manual   |   K   | <slugs> |
 | failed   |   J   | <slugs> |
 
-**Token commit:** tokens: apply new design system
+**Token commit:** <if tokens_applied was set THIS run: "tokens: apply new design system" | if tokens_applied was already true on entry: "design system already applied (prior session)">
 **Page commits:** webdesign: restyle <page> × N
 
 **Next steps:**
@@ -246,7 +269,7 @@ When all pages have been processed (every page is `verified`, `manual`, or `fail
 | Key | Type | Written in | Value set |
 |-----|------|-----------|-----------|
 | `tokens_applied` | boolean | Step 2 | `true` after token commit |
-| `phase` | string | Step 2 / Step 4 | `tokens_injected` → `done` |
+| `phase` | string | Step 2 / Step 3 (loop start) / Step 4 | `tokens_injected` → `injecting_pages` → `done` |
 | `pages[].status` | string | Step 3b / 3d / 3e / 3f | `injected` → `verified` / `failed` / `manual` |
 | `pages[].failure_reason` | string | Step 3e | error description on failure |
 | `pages[].states.<name>.status` | string | Step 1 (fetch confirmed) | updated as each state is fetched |
@@ -255,7 +278,7 @@ When all pages have been processed (every page is `verified`, `manual`, or `fail
 
 | Artefact | Path |
 |----------|------|
-| Fetched Stitch HTML (temp) | `/tmp/stitch-<page>-<state>.html` |
+| Fetched Stitch HTML (temp) | `.webdesign/tmp/stitch-<page>-<state>.html` |
 | After screenshots (approved design) | `.webdesign/after/<page>-<state>.png` |
 | After screenshots (post-inject capture) | `.webdesign/after/<page>-post-inject.png` |
 | State file (updated) | `.webdesign/state.json` |
