@@ -16,6 +16,7 @@
 | **Architecture Audit** | `/bx:arch` | Repo-wide complexity + refactor + perf + over-engineering audit (4 dimensions, reports `lines_deletable`) |
 | **Test Suite Audit** | `/bx:tests` | Repo-wide test health — coverage gaps on critical paths + smells (T01-T05) + suite economics. Twin headline metric. |
 | **SEO + GEO Audit** | `/bx:seo` | Repo-wide SEO + Generative Engine Optimization audit for web projects. Fetches current best practices every run. Probes sitemap URL health. **Optional GSC integration via Search Console API** (Performance via `searchanalytics.query` + per-URL Indexing via `urlInspection.index.inspect`). Configure `.seo-data/gsc/config.yaml` `site_url:` after `gcloud auth application-default login`. Score `/100` tracked over time. |
+| **Visual Re-skin** | `/bx:webdesign` | Re-skin an existing web project's visual design via Google Stitch (MCP). Web projects only. Requires one-time Stitch MCP + `stitch-skills` setup. Works on a dedicated `webdesign/<date>` branch. |
 | **End Session** | `/bx:save` | Save progress & context |
 
 ---
@@ -457,6 +458,42 @@ Mode resolution is binary: **enabled** (API reachable) or **heuristic-only** (no
 
 ---
 
+### /bx:webdesign
+
+**When:** You want to re-skin an existing web project's visual design — freshen the palette, typography, spacing, or component look — without touching business logic or DOM structure. Web projects only (rejects non-web repos). **Refactor-only (v1):** the skill restyles existing components in place; it never raw-replaces markup, removes features, or rewrites JavaScript. Use when the codebase is functionally solid but visually dated, or when you want a design refresh scoped purely to the visual layer.
+
+**One-time setup (per machine):**
+1. Install the **Stitch MCP server** — Google's design-generation backend (follow Google's Stitch MCP install guide; adds a `stitch` MCP tool group).
+2. Install the **`stitch-skills` plugin** inside Claude Code — provides Stitch-aware slash commands used internally by this skill.
+
+Once installed, no further setup is needed across sessions.
+
+**Usage:**
+```bash
+/bx:webdesign                         # Full 3-phase run (Extract → Design & Review → Inject & Verify)
+/bx:webdesign --phase extract         # Run only Phase 1 (inventory existing palette/typography/components)
+/bx:webdesign --phase design          # Run only Phase 2 (generate + review Stitch proposals)
+/bx:webdesign --phase inject          # Run only Phase 3 (apply approved design, verify no regressions)
+```
+
+**Three resumable phases:**
+1. **Extract** — Inventories the existing visual layer: color palette, typography scale, spacing tokens, component list. Produces a `webdesign-brief.md` in the repo root summarizing what was found.
+2. **Design & Review** — Drives Google Stitch (via the Stitch MCP) to generate visual proposals based on the brief. Presents proposals for your approval before writing any code. Nothing is changed until you approve.
+3. **Inject & Verify** — Applies the approved design as CSS / design-token updates to existing components. Verifies no DOM structure, behavior, or accessibility regressions were introduced (diff preview per finding; uses `--verify` pattern from `/bx:review`).
+
+**Branch discipline:** always works on a dedicated `webdesign/<date>` branch (e.g. `webdesign/2026-06-06`), created automatically at Phase 1. The main branch is never touched until you merge manually after a full review. This makes the re-skin reversible at any point.
+
+**Design guardrails:**
+- Modifies only CSS, design tokens, and equivalent styling primitives — never HTML structure, JavaScript, or server-side code.
+- Per-component diff preview before each write.
+- Accessibility checks (contrast ratios, focus indicators) run as part of Phase 3 verification.
+
+**Output:** Phase 1 → `webdesign-brief.md` (inventory). Phase 2 → Stitch proposal(s) presented for approval. Phase 3 → summary of changed files + verification results.
+
+**Useful chain:** `/bx:seo` (confirm indexability) → `/bx:webdesign` (visual refresh) → `/bx:review` (check the styling diff before merge). Or: `/bx:webdesign --phase extract` to preview scope, then re-invoke with `--phase design` once you're ready.
+
+---
+
 ### /bx:health
 
 **When:** You have time and want to do *something*, but you're not sure which of the other skills to reach for. Read-only routing call — never invokes anything.
@@ -774,7 +811,8 @@ Commands are stored in:
 │       ├── bx:review/
 │       ├── bx:seo/
 │       ├── bx:tests/
-│       └── bx:save/
+│       ├── bx:save/
+│       └── bx:webdesign/
 ├── .gitignore
 ├── Workflow.md              # This file
 └── README.md

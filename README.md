@@ -31,16 +31,17 @@ claude-config/                         # marketplace repo
 │   ├── scripts/
 │   │   ├── session-start-context.sh   # SessionStart hook (Mac/Linux)
 │   │   └── session-start-context.ps1  # SessionStart hook (Windows)
-│   └── skills/                        # 9 skills → /bx:<name> (each: SKILL.md + references/)
-│       ├── arch/                      # /bx:arch  — repo-wide architecture audit
-│       ├── clean/                     # /bx:clean — codebase cleanup audit
-│       ├── health/                    # /bx:health — skill-routing advisor
-│       ├── plan/                      # /bx:plan  — feature planning interview
-│       ├── resume/                    # /bx:resume — resume a dev session
-│       ├── review/                    # /bx:review — senior-engineer code review
-│       ├── save/                      # /bx:save  — session save + docs management
-│       ├── seo/                       # /bx:seo   — SEO + GEO audit
-│       └── tests/                     # /bx:tests — test-suite audit
+│   └── skills/                        # 10 skills → /bx:<name> (each: SKILL.md + references/)
+│       ├── arch/                      # /bx:arch      — repo-wide architecture audit
+│       ├── clean/                     # /bx:clean     — codebase cleanup audit
+│       ├── health/                    # /bx:health    — skill-routing advisor
+│       ├── plan/                      # /bx:plan      — feature planning interview
+│       ├── resume/                    # /bx:resume    — resume a dev session
+│       ├── review/                    # /bx:review    — senior-engineer code review
+│       ├── save/                      # /bx:save      — session save + docs management
+│       ├── seo/                       # /bx:seo       — SEO + GEO audit
+│       ├── tests/                     # /bx:tests     — test-suite audit
+│       └── webdesign/                 # /bx:webdesign — visual re-skin via Google Stitch MCP
 ├── .claude/
 │   ├── scripts/                       # Launchers (not plugin components)
 │   │   ├── start-claude.sh            # Mac/Linux launcher
@@ -189,6 +190,7 @@ git pull
 | `/bx:arch` | Repo-wide architecture audit — complexity hotspots, refactor opportunities, perf suspects, **and over-engineering** (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable` as a top-line metric. 4 parallel subagents, with `--plan`/`--fix`/`--map`/`--full-scan` | Skill |
 | `/bx:tests` | Repo-wide test suite audit — missing coverage on critical paths AND wasteful/redundant tests, in a single report. **Twin headline metric** (`Coverage gaps in critical code: X lines | Tests we can delete: Y lines`). 3 parallel subagents (`test-coverage` / `test-quality` / `test-economics`), T01-T05 smell catalog, with `--plan`/`--fix` (T01-only safe deletion)/`--coverage` (opt-in report reading)/`--full-scan`. Defers entirely to `/bx:clean` for orphans / stale snapshots / >3mo skips. | Skill |
 | `/bx:seo` | Repo-wide SEO + Generative Engine Optimization audit for **web projects only** (rejects non-web repos silently). **Fetches current best practices fresh every run** via WebSearch + WebFetch (4 source categories: Google Search Central+web.dev, Schema.org+JSON-LD, GEO sources, third-party authority blogs). **Discovers + probes the live sitemap** (GSC `sitemaps.list` → robots.txt → `<base>/sitemap.xml` — not a repo-local file, so framework-generated sitemaps are covered) for 4xx/5xx/redirect-chains/slow-responses (cap 100 URLs; score-impact capped at 8 points). **Optional GSC integration via Search Console API** — auth **as yourself** via gcloud ADC (`webmasters.readonly` scope; **not** a service account) + `.seo-data/gsc/config.yaml` (`site_url:` required; optional `lookback_days`, `quota_project`, `adc_credentials_path` for multi-machine, `site_base_url`/`sitemap_url`) + three endpoints (`searchanalytics.query` Performance + `urlInspection.index.inspect` per-URL Indexing + `sitemaps.list` discovery). Binary mode: API-enabled or heuristic-only fallback (see [Enabling GSC](#enabling-gsc-for-bxseo-optional) below). 35-day git-history overlap flags "may already be fixed" findings against the GSC reporting lag. **Score stays /100** (purely heuristic) so `docs/seo-history.md` is comparable across runs regardless of GSC availability. 3 parallel subagents (4 when GSC API enabled: `seo-technical` / `seo-content` / `geo-generative` / `seo-gsc-insights`). Single headline: **score /100 (Δ since last run) + top-3 highest-impact opportunities**. Score tracked over time in `docs/seo-history.md`. Flags: `--plan` / `--fix` (strict allowlist, never fabricates content — only inserts TODO placeholders) / `--url <deployed-url>` (live HTML diff). | Skill |
+| `/bx:webdesign` | Re-skin an existing web project's visual design via Google Stitch (MCP), preserving functionality (refactor; web-only). Drives 3 resumable phases — Extract (palette/typography/component inventory), Design & Review (Stitch-generated proposals, user approval), Inject & Verify (apply CSS/tokens, verify no DOM/behavior breakage). Requires one-time setup: Stitch MCP server + Google's `stitch-skills` plugin. Works on a dedicated `webdesign/<date>` branch so the main branch is never destabilized. **Refactor-only (v1):** restyles existing components in place — never raw-replaces markup or business logic. Web projects only. | Skill |
 | `/bx:health` | Routing advisor — looks at `git status`, branch, recent commits, `CLAUDE.md`, open PR, then suggests which skills to run in what order. **Read-only, never invokes anything.** Use when unsure where to start. | Skill |
 | `/bx:save` | End session - save progress | Skill |
 
@@ -213,6 +215,7 @@ git pull
 > | `/bx:arch` | whole repo | structural audit — complexity hotspots, refactor opportunities, perf suspects, AND sub-file over-engineering (single-impl interfaces, pass-through wrappers, defensive code, unread config). Reports `lines_deletable`. |
 > | `/bx:tests` | whole repo, test suite focus | test suite audit — coverage gaps on critical paths + test smells (T01-T05) + suite economics (snapshot bloat, flakiness, LOC ratio extremes). Reports twin headline (coverage gap LOC + deletable LOC). |
 > | `/bx:seo` | whole web repo, SEO + GEO focus | SEO + Generative Engine Optimization audit. Fetches current best practices each run. Discovers + probes the live sitemap (GSC `sitemaps.list` → robots.txt → conventional). **Optional GSC integration via Search Console API** — authenticate **as yourself** with gcloud ADC (not a service account), set `site_url:` in `.seo-data/gsc/config.yaml` (+ optional `adc_credentials_path` for multi-machine). Three endpoints (Search Analytics + URL Inspection + `sitemaps.list`) cover Performance, Indexing, and sitemap discovery. Binary mode: API-enabled or heuristic-only. See [Enabling GSC for `/bx:seo`](#enabling-gsc-for-bxseo-optional) below. 35-day git-history overlap to flag "may already be fixed" findings against the GSC reporting lag. Single score `/100` headline + top-3 priorities. Tracked over time in `docs/seo-history.md` (comparable across runs whether GSC API is configured or not — score stays purely heuristic). Web projects only — rejects others silently. |
+> | `/bx:webdesign` | whole web repo, visual layer only | Re-skin an existing web project's visual design via Google Stitch (MCP). Refactor-only — restyles existing components in place, never replaces markup or business logic. 3 resumable phases (Extract → Design & Review → Inject & Verify) on a dedicated `webdesign/<date>` branch. Requires one-time Stitch MCP + `stitch-skills` plugin setup. Web projects only. |
 >
 > Useful chain on an unfamiliar repo: `/bx:clean` → `/bx:arch` → `/bx:tests` → (if web) `/bx:seo` → `/bx:arch --plan` → `/bx:plan` per phase.
 >
