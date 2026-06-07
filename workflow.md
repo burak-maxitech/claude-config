@@ -460,7 +460,7 @@ Mode resolution is binary: **enabled** (API reachable) or **heuristic-only** (no
 
 ### /bx:webdesign
 
-**When:** You want to re-skin an existing web project's visual design — freshen the palette, typography, spacing, or component look — without touching business logic or DOM structure. Web projects only (rejects non-web repos). **Refactor-only (v1):** the skill restyles existing components in place; it never raw-replaces markup, removes features, or rewrites JavaScript. Use when the codebase is functionally solid but visually dated, or when you want a design refresh scoped purely to the visual layer.
+**When:** You want to re-skin an existing web project's visual design — freshen the palette, typography, spacing, or component look — while preserving all business logic and functionality. Web projects only (rejects non-web repos). **Refactor-only (v1):** the skill restyles existing pages in place; it never raw-replaces working components, removes features, or rewrites JavaScript. Use when the codebase is functionally solid but visually dated, or when you want a full design-language refresh.
 
 **One-time setup (per machine):**
 1. Install the **Stitch MCP server** — Google's design-generation backend (follow Google's Stitch MCP install guide; adds a `stitch` MCP tool group).
@@ -470,27 +470,32 @@ Once installed, no further setup is needed across sessions.
 
 **Usage:**
 ```bash
-/bx:webdesign                         # Full 3-phase run (Extract → Design & Review → Inject & Verify)
-/bx:webdesign --phase extract         # Run only Phase 1 (inventory existing palette/typography/components)
-/bx:webdesign --phase design          # Run only Phase 2 (generate + review Stitch proposals)
-/bx:webdesign --phase inject          # Run only Phase 3 (apply approved design, verify no regressions)
+/bx:webdesign                  # Auto-detects current phase from .webdesign/state.json and continues
+                                # (run it repeatedly — it advances through all 3 phases automatically)
+/bx:webdesign status           # Print current phase + per-page progress table; take no action
+/bx:webdesign page <name>      # Re-run/force a single page in Phase 3 (e.g. retry a failed page)
+/bx:webdesign --force-setup    # Re-show the one-time Stitch setup banner; always stops after banner
 ```
 
+The skill **auto-advances through phases and is fully resumable** — there is no flag to run a specific phase in isolation. Run `/bx:webdesign` repeatedly to move forward; it picks up exactly where it left off.
+
 **Three resumable phases:**
-1. **Extract** — Inventories the existing visual layer: color palette, typography scale, spacing tokens, component list. Produces a `webdesign-brief.md` in the repo root summarizing what was found.
-2. **Design & Review** — Drives Google Stitch (via the Stitch MCP) to generate visual proposals based on the brief. Presents proposals for your approval before writing any code. Nothing is changed until you approve.
-3. **Inject & Verify** — Applies the approved design as CSS / design-token updates to existing components. Verifies no DOM structure, behavior, or accessibility regressions were introduced (diff preview per finding; uses `--verify` pattern from `/bx:review`).
+1. **Extract & Stage** — Inventories the existing visual layer: color palette, typography scale, spacing tokens, component list. Creates `.webdesign/state.json`, per-page briefs under `.webdesign/briefs/<page>.md`, and baseline screenshots under `.webdesign/before/`.
+2. **Design & Review** — Drives Google Stitch (via the Stitch MCP) to generate visual proposals based on the briefs. Presents proposals for your approval before writing any code. Nothing is changed until you approve. Ends with `phase = review_pending` so designs are **never auto-injected** without your visual review.
+3. **Inject & Verify** — Restyles each page's markup and classes in place to match the new design, while preserving every handler, API call, route, piece of state, and the real content/assets — Stitch's placeholder text/images are discarded; only its visual design is adopted. Verifies each page with build/typecheck/test + Playwright behavior check before committing it. A failed page is rolled back and skipped (retry later with `page <name>`).
 
 **Branch discipline:** always works on a dedicated `webdesign/<date>` branch (e.g. `webdesign/2026-06-06`), created automatically at Phase 1. The main branch is never touched until you merge manually after a full review. This makes the re-skin reversible at any point.
 
 **Design guardrails:**
-- Modifies only CSS, design tokens, and equivalent styling primitives — never HTML structure, JavaScript, or server-side code.
-- Per-component diff preview before each write.
-- Accessibility checks (contrast ratios, focus indicators) run as part of Phase 3 verification.
+- **Web projects + refactor only.** Non-web repos and greenfield projects exit cleanly.
+- **Restyle in place, never raw-replace.** Every page is restyled by adopting Stitch's class list, spacing, typography, and color tokens into the existing markup — logic, handlers, routes, state variables, real copy, and existing assets are all preserved. Stitch placeholder text and stock images are discarded.
+- **No auto-injection of unreviewed designs.** Phase 2 always ends with `phase = review_pending` and stops; Phase 3 only starts after your explicit approval.
+- **All commits on the `webdesign/<date>` branch.** No commits to `main` or any other branch.
+- **Per-page verification before commit.** Each page passes build/typecheck/test + Playwright behavior check (asserting the brief's "Functionality to PRESERVE" list) + before/after screenshots before its commit lands. A failing page is rolled back and skipped.
 
-**Output:** Phase 1 → `webdesign-brief.md` (inventory). Phase 2 → Stitch proposal(s) presented for approval. Phase 3 → summary of changed files + verification results.
+**Output:** Phase 1 → `.webdesign/state.json` + per-page briefs + before-screenshots. Phase 2 → Stitch proposal(s) presented for approval. Phase 3 → per-page verified commits + final report (verified / manual / failed counts).
 
-**Useful chain:** `/bx:seo` (confirm indexability) → `/bx:webdesign` (visual refresh) → `/bx:review` (check the styling diff before merge). Or: `/bx:webdesign --phase extract` to preview scope, then re-invoke with `--phase design` once you're ready.
+**Useful chain:** `/bx:seo` (confirm indexability) → `/bx:webdesign` (visual refresh) → `/bx:review` (check the styling diff before merge).
 
 ---
 
