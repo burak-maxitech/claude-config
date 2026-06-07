@@ -46,7 +46,7 @@ Determines where design tokens land in Phase 3 injection. Detect in **priority o
 
 | Priority | System | Detection signals | `styling_system` value |
 |----------|--------|-------------------|------------------------|
-| 1 | Tailwind CSS | `tailwind.config.{js,ts,cjs,mjs}` exists **OR** `@tailwind` directives in any CSS file | `tailwind` |
+| 1 | Tailwind CSS | `tailwind.config.{js,ts,cjs,mjs}` exists (definitive) **OR** `@tailwind` directives in `*.css` files under `src/` and repo root (tiebreaker — use `Grep "@tailwind" glob:"*.css"` scoped to those directories, not a repo-wide scan) | `tailwind` |
 | 2 | CSS-in-JS | `styled-components` or `@emotion/react` / `@emotion/styled` in `package.json` | `css-in-js` |
 | 3 | CSS Modules | Any `*.module.css` file in the project | `css-modules` |
 | 4 | vanilla-extract | `@vanilla-extract/css` in `package.json` **OR** `*.css.ts` files | `vanilla-extract` |
@@ -72,12 +72,24 @@ Warning: styling system could not be determined — token-merge in Phase 3 will 
 
 **Detection logic:**
 ```
-IF no source code files exist (only docs/config):
+// Evaluate EXISTING signals FIRST — before concluding greenfield.
+// Non-Node projects (Django, Rails, Hugo, Jekyll, etc.) may have no
+// package.json but are still EXISTING if any renderable pages are present.
+
+EXISTING signals (check ALL of these before concluding GREENFIELD):
+  - pages/, app/, src/pages/, src/app/, src/views/, src/routes/,
+    src/components/ containing .jsx/.tsx/.vue/.svelte/.html files
+  - templates/ directory containing .html files
+  - index.html with non-trivial body content (more than a placeholder)
+
+IF any EXISTING signal is present:
+    -> EXISTING (proceed)
+ELSE IF no source code files exist (only docs/config):
     -> GREENFIELD
 ELSE IF package.json exists but no page/component/route files exist:
     -> GREENFIELD
 ELSE:
-    -> EXISTING (proceed)
+    -> GREENFIELD   // no renderable pages AND no EXISTING signals
 ```
 
 Signals that confirm an EXISTING project (at least one must be present):
@@ -114,11 +126,10 @@ Determines whether Playwright/screenshots/`extract-static-html` can run. Resolve
 
 ### Runnability check
 
-Set `app_runnable: true` only if **both**:
+Set `app_runnable: true` only if **all** of the following hold:
 1. At least one of `build_cmd` or `serve_cmd` resolved (non-null), AND
-2. A quick non-blocking check suggests it can run:
-   - `node_modules/` exists (for Node projects) **OR** dependencies are otherwise installed
-   - No obviously fatal configuration missing (e.g. required env vars documented as mandatory in README)
+2. `node_modules/` exists (for Node projects) **OR** dependencies are otherwise installed, AND
+3. A `.env.example` or `.env.sample` file does **not** exist without a corresponding `.env` or `.env.local` — if an env-example file is present but no filled-in counterpart exists, the app likely needs env config that isn't supplied → set `app_runnable: false`.
 
 Otherwise set `app_runnable: false`.
 
@@ -138,13 +149,13 @@ Set to `null` (not omitted) when a value cannot be resolved, so downstream steps
 ### Degradation rule
 
 **Three later steps depend on `app_runnable`:**
-1. Before/after screenshots (Phase 1 + Phase 5) — requires Playwright + a live dev server
-2. Playwright interaction checks (Phase 5 verification) — requires a live dev server
-3. `extract-static-html` (Phase 2 page-content extraction) — requires a build output
+1. Before/after screenshots (Phase 1 + Phase 3) — requires Playwright + a live dev server
+2. Playwright interaction checks (Phase 3 verification) — requires a live dev server
+3. `extract-static-html` (Phase 1 page-content extraction) — requires a build output
 
 When `app_runnable: false`:
 - The skill **degrades to build-only verification** — it still injects styles and applies Stitch tokens, but skips all Playwright steps and screenshot comparisons.
-- Print a warning at the end of Step 0 and again at the start of Phase 5.
+- Print a warning at the end of Step 0 and again at the start of Phase 3.
 - **Never hard-fail** on `app_runnable: false` — degrade gracefully.
 
 ---
@@ -171,6 +182,6 @@ Detected: React + react-router · styling: css-in-js · app_runnable: true
 | Key | Type | Set by Pass | Consumed by |
 |-----|------|-------------|-------------|
 | `styling_system` | string | Pass 2 | Phase 3 token injection |
-| `build_cmd` | string \| null | Pass 4 | Phase 5 build verification |
-| `serve_cmd` | string \| null | Pass 4 | Phase 1 screenshots, Phase 5 Playwright |
-| `app_runnable` | boolean | Pass 4 | Phase 1 screenshots, Phase 2 extract-static-html, Phase 5 Playwright |
+| `build_cmd` | string \| null | Pass 4 | Phase 3 build verification |
+| `serve_cmd` | string \| null | Pass 4 | Phase 1 screenshots, Phase 3 Playwright |
+| `app_runnable` | boolean | Pass 4 | Phase 1 screenshots/extract-static-html, Phase 3 Playwright |
