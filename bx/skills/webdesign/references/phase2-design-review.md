@@ -61,11 +61,19 @@ No design system found — Phase 1 Step 5 must set the design direction before g
 ```
 Then STOP. Do not call `generate_screen_from_text` with a null design system.
 
-**Guard — `stitch_project_id` must be set before generating.** Also read `state.json["stitch_project_id"]`. If it is absent or null (the Phase 1 source-only fallback path does not set it), print:
+**Guard — `stitch_project_id` must be set before generating.** Also read `state.json["stitch_project_id"]`. If it is absent or null, this almost always means Phase 1 took the source-only fallback (app not runnable) and no project was established yet. **Offer recovery before stopping** — do not dead-end:
+
 ```
-No Stitch project found — Phase 1 must seed the Stitch project (it didn't, likely because the app wasn't runnable). Re-run /bx:webdesign once the app builds/serves, or set up the project manually in Stitch.
+No Stitch project is recorded yet (Phase 1 likely ran the source-only fallback because the
+app wasn't runnable). To generate screens I need a project. Create one in the Stitch web
+canvas (https://stitch.withgoogle.com) seeded from the DESIGN.md Phase 1 wrote, then paste
+its project ID here — or type "skip" to stop.
 ```
-Then STOP. Do not call `generate_screen_from_text` with a null project id.
+
+- **If the user pastes a project ID:** write `{ "stitch_project_id": "<id>" }` to `state.json` (merge) and to `.webdesign/SITE.md`, then continue to Step 2.1. This is the closure for the `app_runnable:false` path — without it the skill would dead-end here forever.
+- **If the user types "skip" (or the runnable app simply needs a re-run):** print `Stopping — re-run /bx:webdesign once the app builds/serves, or once you've supplied a project ID.` and STOP.
+
+Never call `generate_screen_from_text` with a null project id.
 
 Iterate over every page brief. For each page, generate one screen per state.
 

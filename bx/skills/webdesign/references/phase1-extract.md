@@ -47,17 +47,22 @@ Immediately after the branch is created or resumed, ensure `.webdesign/` exists:
 mkdir -p .webdesign/briefs .webdesign/before .webdesign/after
 ```
 
-Then check the **target repo's** `.gitignore` for the sentinel start marker `# /bx:webdesign managed`. If absent, append the following sentinel-marked block (create `.gitignore` if the file does not exist):
+Then check the **target repo's** `.gitignore` for the sentinel start marker `# /bx:webdesign managed`:
 
-```
-# /bx:webdesign managed — do not edit between markers
-.webdesign/
-# /end /bx:webdesign managed
-```
+- **Marker absent:** append the sentinel-marked block (create `.gitignore` if the file does not exist), then print `Added .webdesign/ + .stitch/ to .gitignore (sentinel-marked block).`
 
-This covers `.webdesign/state.json`, `.webdesign/.setup-shown`, `.webdesign/briefs/`, `.webdesign/before/`, and all other working state — so the transient design artefacts are never committed alongside the refactored code.
+  ```
+  # /bx:webdesign managed — do not edit between markers
+  .webdesign/
+  .stitch/
+  # /end /bx:webdesign managed
+  ```
 
-**Print** `Added .webdesign/ to .gitignore (sentinel-marked block).` on first append. Silent on subsequent runs (sentinel already present).
+- **Marker already present:** do **not** append a second block — but **verify the existing block lists both `.webdesign/` and `.stitch/`**. If `.stitch/` is missing (a pre-fix block written by an older run), add the `.stitch/` line **inside** the existing markers and print `Added .stitch/ to existing .gitignore block.`. If both are already present, stay silent. (Don't rely on a separate "migration note" — this check is part of the present-marker branch, so it always runs.)
+
+This covers `.webdesign/state.json`, `.webdesign/.setup-shown`, `.webdesign/SITE.md`, `.webdesign/briefs/`, `.webdesign/before/`, and all other working state — so the transient design artefacts are never committed alongside the refactored code.
+
+**The general invariant (load-bearing for Phase 3):** every artifact the skill *or Google's `stitch-skills`* create at the repo root must be either **gitignored** (working state) or **staged into the right commit** (a real design artifact) — otherwise it false-trips Phase 3's per-page "working tree must be clean" assertion and risks deletion by `git clean -fd` on a page failure. Two such artifacts exist today: Google's `.stitch/` scratch dir (gitignored here) and a root-level `DESIGN.md` (staged into the Phase 3 token commit). Any new root artifact a future `stitch-skills` release emits must be handled the same way.
 
 ---
 
@@ -144,7 +149,13 @@ After writing, `state.json` will contain `mode`, `tokens_applied`, and a fully-i
 
 ### 3.1 — Serve the app
 
-Start the dev server using `serve_cmd` from `state.json`. Wait for it to be ready (probe the local URL, up to 30 s).
+Start the dev server in the **background** using `serve_cmd` from `state.json` — **keep the background task/shell handle so you can stop it in Step 3.3** — then wait for it to be ready by polling the local URL (same idiom as `references/verification.md` Step 2a):
+
+```bash
+curl -sf --retry 30 --retry-delay 1 --retry-connrefused "http://localhost:<port>/" >/dev/null
+```
+
+If the server logs a different port at startup than `state.json["port"]`, prefer the logged port and update `state.json["port"]`.
 
 ### 3.2 — Screenshot each route
 
@@ -157,9 +168,9 @@ mcp__plugin_playwright_playwright__browser_take_screenshot → .webdesign/before
 
 Use desktop viewport (1280 × 800 minimum). Screenshot sequentially (Playwright is stateful).
 
-### 3.3 — Confirm or warn
+### 3.3 — Confirm, stop the server, or warn
 
-After all screenshots: print `Captured N before/ screenshots in .webdesign/before/.`
+After all screenshots: **stop the background dev server** (the task/shell handle from Step 3.1) — it is not needed for Step 4's build or the rest of Phase 1, and leaving it running leaks a background process for the session. Then print `Captured N before/ screenshots in .webdesign/before/.`
 
 **Condition: `app_runnable == false`.** Skip this step entirely. Print:
 
@@ -194,13 +205,15 @@ Phase 3 will also skip Playwright verification — degrade to build-only.
    { "stitch_project_id": "<id>" }
    ```
 
-5. Record in `SITE.md` (create if absent, append if present):
+5. Record in `.webdesign/SITE.md` (create if absent, append if present):
    ```markdown
    ## Stitch project
    - **Project ID:** <id>
    - **Seeded:** <YYYY-MM-DD> from Phase 1 (current design baseline)
    - **URL:** https://stitch.withgoogle.com/project/<id>
    ```
+
+   > `SITE.md` lives **inside** `.webdesign/` (gitignored working memory), not at the repo root. A root-level `SITE.md` would be an untracked file that trips Phase 3's clean-tree guard and gets swept into the per-page restyle commit by `git add -A`.
 
 Print: `Stitch project seeded: <id>. URL: https://stitch.withgoogle.com/project/<id>`
 
@@ -216,14 +229,25 @@ Build output is unavailable. Use the source-only seeding path:
    ```
    Skill("stitch::manage-design-system")
    ```
-3. Print a limitation notice:
+
+3. **Establish a Stitch project and persist its ID.** Phase 2 cannot generate screens without a `stitch_project_id`, so this path must still produce one — it just can't seed it from a build:
+
+   - **If step 1/2 (or a `create_project` call) returned a project ID**, persist it: write `{ "stitch_project_id": "<id>" }` to `state.json` and record it in `.webdesign/SITE.md`.
+   - **If no project was created** (the source-only path only produced a design system), prompt the user and capture the ID they supply:
+     ```
+     The app isn't runnable, so I couldn't auto-create a full Stitch project from a build.
+     To continue, open the Stitch web canvas (https://stitch.withgoogle.com), create a
+     project seeded from the DESIGN.md I just wrote, and paste its project ID here.
+     ```
+     Write the pasted ID to `state.json["stitch_project_id"]` and to `.webdesign/SITE.md`. (If the user declines, Phase 1 still closes at `phase: direction_set`; Phase 2 will re-offer this capture before it can generate — see `phase2-design-review.md` Step 2 guard.)
+
+4. Print a limitation notice:
    ```
    ⚠ app_runnable: false — Stitch seeded from source files only (no static HTML).
    Design-system tokens are extracted heuristically; accuracy is lower than build-seeding.
-   stitch_project_id is not set (no full project was created in this path).
    ```
 
-`stitch_project_id` is **not** written to `state.json` in this fallback path — downstream steps treat its absence as "seeded from source, no project URL available."
+Unlike the build path, `stitch_project_id` here comes from a captured/returned ID rather than from `code-to-design`. If the user declines to supply one now, it stays unset until the Phase 2 guard captures it.
 
 ---
 
@@ -248,7 +272,7 @@ Present both paths and let the user choose:
 Which would you prefer — (a) or (b)?
 ```
 
-*(If `stitch_project_id` is absent because `app_runnable == false`, omit the project URL from path (b) and note: "Stitch project URL unavailable (source-only seeding) — you can still create a new Stitch project at stitch.withgoogle.com and paste the project ID here.")*
+*(If `stitch_project_id` is absent because `app_runnable == false` and the user didn't supply one in Step 4b, omit the project URL from path (b) and note: "Stitch project URL unavailable (source-only seeding) — you can still create a new Stitch project at stitch.withgoogle.com and paste the project ID here." **When the user pastes a project ID, write it to `state.json["stitch_project_id"]` and `.webdesign/SITE.md` immediately** — otherwise Phase 2 will dead-end on its null-project guard.)*
 
 ### 5a — Claude-led interview (path a)
 
@@ -309,7 +333,7 @@ Identify the design system the user configured (by project, or ask the user to c
 
 ## Step 6 — Close Phase 1
 
-1. Write `{ "phase": "direction_set" }` to `state.json` (merge with existing keys, do not overwrite the whole file).
+1. Write `{ "phase": "direction_set", "design_direction": "<one-line summary of the chosen knobs (path a) or the canvas direction (path b)>" }` to `state.json` (merge with existing keys, do not overwrite the whole file). `design_direction` is the human-readable record of the new aesthetic (e.g. `"minimal/clean, TONAL blue #2D6BE4, INTER, ROUND_EIGHT, light"`); it is surfaced in the Phase 1 summary and on `status`.
 
 2. Print the Phase 1 summary:
 
@@ -347,8 +371,9 @@ Run /bx:webdesign again (or continue in this session) to start generating screen
 | `pages[].file` | string | Step 2.4 | Phase 3 injection target |
 | `pages[].status` | string (`pending`) | Step 2.4 | Phase 3 per-page loop gate; `status` display |
 | `pages[].states` | object keyed by state name | Step 2.4 (object shape, not array) | Phase 2 fills `screen_id`; Phase 3 `get_screen` |
-| `stitch_project_id` | string | Step 4a only (app_runnable: true) — absent on source-only fallback path | Phase 2 screen generation, Step 5b |
+| `stitch_project_id` | string | Step 4a (build path) — or Step 4b/5b (source-only path, via a returned or user-supplied ID) | Phase 2 screen generation, Step 5b |
 | `design_system_id` | string | Step 5a or 5b | Phase 2 screen generation |
+| `design_direction` | string | Step 6 | Phase 1 summary; `status` display |
 | `phase` | string (`direction_set`) | Step 6 | resume logic in skill entry |
 
 ## Artefact Paths Written in Phase 1
@@ -358,6 +383,6 @@ Run /bx:webdesign again (or continue in this session) to start generating screen
 | State file | `.webdesign/state.json` |
 | Per-page briefs | `.webdesign/briefs/<page>.md` |
 | Before screenshots | `.webdesign/before/<page>.png` |
-| Stitch project record | `SITE.md` |
+| Stitch project record | `.webdesign/SITE.md` (gitignored) |
 | gitignore block | `.gitignore` (sentinel-marked) |
 | DESIGN.md | created/updated by stitch::extract-design-md in Step 4b (source-only fallback path) |

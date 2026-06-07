@@ -27,7 +27,8 @@ Full canonical shape: **SKILL.md Step B**. Phase 3 touches only these keys:
 | `failure_reason` | write | recorded on `failed` |
 | `phase` | write | `tokens_injected` → `injecting_pages` → `done` |
 | `tokens_applied` | write | set `true` after token commit |
-| `serve_cmd`, `app_runnable`, `port` | read | dev-server startup (Step 3 pre-step) |
+| `serve_cmd`, `app_runnable` | read | dev-server startup (Step 3 pre-step) |
+| `port` | read + write | dev-server startup (Step 3 pre-step); rewritten if the server logs a different port at startup |
 | `build_cmd` | read | token-merge build verification (Step 2) |
 
 ---
@@ -41,6 +42,8 @@ git -C <project-root> checkout <state.json["branch"]>
 ```
 
 Signed URLs returned by `get_screen` are short-lived — issue ALL `get_screen` calls in a **single parallel MCP turn**, then immediately issue ALL `curl` downloads in a **single parallel Bash turn**. Do not interleave them page-by-page.
+
+> **Single-page entry (`/bx:webdesign page <name>`):** scope Round 1 + Round 2 to just that page's state(s). The re-fetch is **required** even if a prior run downloaded the HTML — the earlier signed URLs have expired and the `.webdesign/tmp/stitch-<page>-<state>.html` file may have been cleaned, so the Step 3 restyle loop cannot assume it is still on disk.
 
 **Round 1 — one parallel MCP turn, all pages × all states:**
 
@@ -96,11 +99,17 @@ After writing the tokens:
    ```
    If the build fails: print the build error, **do not commit**, leave `phase` as-is (do NOT advance to `tokens_injected`), and stop Phase 3. Surface the build error to the user and instruct them to fix the token merge (or revert it) and re-run `/bx:webdesign` — which cleanly re-enters Step 2.
 
-2. Commit:
+2. Stage and commit. Stage the token file(s) first, then a **root-level** `DESIGN.md` **only if one exists** — it is the portable design system and belongs with the token commit. A `.stitch/`-internal `DESIGN.md` is already gitignored; leave it.
+
    ```bash
    git -C <project-root> add <token file(s)>
+   git -C <project-root> add DESIGN.md   # run this line ONLY if a root-level DESIGN.md exists
    git -C <project-root> commit -m "tokens: apply new design system"
    ```
+
+   > **Do not pass `DESIGN.md` to `git add` unconditionally.** When no root-level `DESIGN.md` exists (the common Tailwind case), `git add … DESIGN.md` fails with `fatal: pathspec 'DESIGN.md' did not match any files`, stages **nothing** (not even the token files), and the commit then fails — dead-ending Phase 3. Check for the file first (Glob/Read), and only run the second `add` line when it's present.
+
+   Staging `DESIGN.md` here is also what keeps Phase 3's per-page clean-tree assertion (Step 3) true. The general rule is in **Phase 1 Step 1.3**: every root artifact the skill or Google's skills produce must be either gitignored (working state) or staged into the right commit (design artifacts), or it false-trips that assertion and risks `git clean -fd`. Don't add a separate clean-tree check here — Step 3 already asserts it per iteration.
 
 3. Write to `state.json` **only after the token commit succeeds**:
    ```json
@@ -137,8 +146,10 @@ If the output is non-empty, **STOP** and warn the user:
 ```
 ⚠ Unexpected dirty working tree before starting <page>. Phase 3 cannot continue safely.
   Resolve or commit the outstanding changes, then re-run /bx:webdesign.
+  (Common cause: a root-level DESIGN.md / SITE.md or Google's .stitch/ scratch dir that
+   isn't committed or gitignored — see Phase 1 Step 1.3 and Step 2 above.)
 ```
-Do not proceed to 3a until the tree is confirmed clean. This is safe to assert because Phase 3 commits after every successful page — the tree is always clean between pages.
+Do not proceed to 3a until the tree is confirmed clean. This holds because Phase 3 commits after every successful page (so the tree is clean between pages) **and** because Phase 1 Step 1.3's general invariant ensures every skill/Google artifact is gitignored or staged. If something slipped through, this guard catches it.
 
 **Resume rule — `injected` status:** if a page's `status == injected` (the restyle write completed but verification was interrupted), **skip Steps 3a and 3b** and go straight to Step 3c (verify only). Do not re-restyle an already-restyled file.
 
@@ -194,7 +205,7 @@ git -C <project-root> add -A
 git -C <project-root> commit -m "webdesign: restyle <page>"
 ```
 
-2. Update `SITE.md` — add or update the live-sitemap entry for this page with its new route/status (create `SITE.md` at project root if absent).
+2. Update `.webdesign/SITE.md` — add or update the live-sitemap entry for this page with its new route/status (create it if absent). It lives inside the gitignored `.webdesign/` dir, so it is **not** part of this page's restyle commit (and `git add -A` will not pick it up).
 
 3. Set page-level `status = verified` in `state.json`.
 
@@ -207,6 +218,8 @@ Clean ALL uncommitted changes since the last commit (a restyle may have touched 
 git -C <project-root> restore .
 git -C <project-root> clean -fd
 ```
+
+`git clean -fd` (no `-x`) removes only untracked files that are **not** gitignored — so it leaves `.webdesign/`, `.stitch/`, and the project's gitignored build output (`.next/`, `dist/`, `node_modules/`) untouched, and only ever deletes files born *during* this iteration's restyle. This is safe **because** the start-of-iteration clean-tree assertion already guaranteed the tree held nothing untracked before the restyle began: anything `clean -fd` now removes was created by the restyle itself. (Corollary: if the project does **not** gitignore its build output, that output is untracked and the start-of-iteration assertion will have halted the run *before* any `clean -fd` ran — never silently deleting it.)
 
 After rollback, assert the tree is clean (`git status --porcelain` is empty) before continuing to the next page.
 
@@ -282,6 +295,6 @@ When all pages have been processed (every page is `verified`, `manual`, or `fail
 | After screenshots (approved design) | `.webdesign/after/<page>-<state>.png` |
 | After screenshots (post-inject capture) | `.webdesign/after/<page>-post-inject.png` |
 | State file (updated) | `.webdesign/state.json` |
-| Live sitemap record | `SITE.md` (project root) |
+| Live sitemap record | `.webdesign/SITE.md` (gitignored) |
 | Token commit | one commit on `webdesign/<date>` branch |
 | Per-page commits | one `webdesign: restyle <page>` commit per verified page |

@@ -29,15 +29,16 @@ checklist (Step A) first if they are not yet present.
 
 - [ ] Phase 1 creates and checks out the `webdesign/<YYYY-MM-DD>` branch (date matches today). No commits yet on main/other branches.
 - [ ] `.webdesign/` directory is created with `briefs/`, `before/`, and `after/` subdirectories.
-- [ ] `.webdesign/` block is appended to the project's `.gitignore` between sentinel markers (`# /bx:webdesign managed`). Second run is idempotent (block not duplicated).
-- [ ] `state.json` exists at `.webdesign/state.json` with correct initial shape: `branch`, `styling_system`, `build_cmd`, `serve_cmd`, `app_runnable`, `pages[]`.
+- [ ] `.webdesign/` **and `.stitch/`** are appended to the project's `.gitignore` between sentinel markers (`# /bx:webdesign managed`). Second run is idempotent (block not duplicated). Confirm Google's `.stitch/` scratch dir is ignored — otherwise Phase 3's clean-tree guard false-trips on it and `git clean -fd` would delete it.
+- [ ] `state.json` exists at `.webdesign/state.json` with correct initial shape: `branch`, `styling_system`, `build_cmd`, `serve_cmd`, `port`, `app_runnable`, `pages[]`.
 - [ ] One brief per discovered route is written to `.webdesign/briefs/<page>.md`; each brief has a non-empty "Functionality to PRESERVE" section sourced from real handlers/API calls (not placeholder text).
 - [ ] The page inventory table is printed before proceeding; the skill pauses and waits for user confirmation.
 - [ ] **If `app_runnable: true`:** before/ screenshots are captured for each route into `.webdesign/before/<page>.png` via Playwright. Confirm screenshot files exist and show the current design.
 - [ ] **If `app_runnable: false`:** the warning prints and screenshots are skipped cleanly (no error).
 - [ ] Stitch is seeded: `stitch::code-to-design` is invoked (or the source-only fallback path via `stitch::extract-design-md` + `stitch::manage-design-system` when `app_runnable: false`).
-- [ ] `stitch_project_id` is persisted to `state.json` (app_runnable: true path). Absent on source-only fallback.
-- [ ] The Stitch project URL is recorded in `SITE.md` at the project root.
+- [ ] `stitch_project_id` is persisted to `state.json` (app_runnable: true path).
+- [ ] **Source-only fallback (`app_runnable: false`):** Step 4b prompts for a Stitch project ID (or captures one returned by `manage-design-system`/`create_project`) and **writes it to `state.json`**. Confirm it is persisted — the old behavior (never setting it) dead-ended Phase 2.
+- [ ] The Stitch project URL is recorded in `.webdesign/SITE.md` (inside the gitignored working dir, **not** the repo root).
 
 ### 2a. Vibe-setting — Claude-led interview path (a)
 
@@ -57,6 +58,7 @@ checklist (Step A) first if they are not yet present.
 ## 3. Phase 2 — Design & Review
 
 - [ ] Phase 2 resumes correctly from `phase: direction_set` without re-running Phase 1 steps (no branch re-creation, no `.gitignore` re-append, no Stitch re-seeding).
+- [ ] **Null-project recovery (only when `app_runnable: false` and no ID was supplied in Phase 1):** the Step 2 guard prompts for a Stitch project ID instead of hard-stopping; pasting one writes `stitch_project_id` to `state.json` and generation proceeds. Typing "skip" stops cleanly. (If `stitch_project_id` is already set, no prompt — this guard is invisible.)
 - [ ] Quota pre-flight prints the screen estimate (`Σ states per page`) and waits for `yes / no / edit briefs first` before calling `generate_screen_from_text`.
 - [ ] Generation proceeds sequentially per page/state pair (not parallelised). Progress notes print after each page.
 - [ ] `pages[].states.<name>.screen_id` and `pages[].states.<name>.status = generated` are written to `state.json` after each successful generation.
@@ -114,7 +116,7 @@ checklist (Step A) first if they are not yet present.
 - [ ] **`/bx:webdesign status`** before any run: prints `No /bx:webdesign run started in this project yet.` and stops.
 - [ ] **`/bx:webdesign status`** mid-run: prints current phase + table of all pages with `status` and per-state `screen_id` / `status`. Takes no action.
 - [ ] **`/bx:webdesign page <name>`** before tokens are applied (or before Phase 2 generates the page): prints the guard message (`Cannot inject <name> yet — ...`) and stops.
-- [ ] **`/bx:webdesign page <name>`** after Phase 3 tokens applied + page generated: re-runs only the Phase-3 per-page loop for that page. Useful for retrying a `failed` page.
+- [ ] **`/bx:webdesign page <name>`** after Phase 3 tokens applied + page generated: re-runs only the Phase-3 per-page loop for that page. Useful for retrying a `failed` page. **Confirm it re-fetches the screen first** (scoped Step 1 `get_screen` + re-download) rather than assuming the old `.webdesign/tmp/stitch-<page>-<state>.html` is still on disk — signed URLs expire between sessions.
 - [ ] **`/bx:webdesign --force-setup`** when both dependencies are present: prints `Stitch MCP + stitch-skills both detected — setup complete.` and stops.
 - [ ] **`/bx:webdesign --force-setup`** when a dependency is missing: re-prints the setup banner (respecting the specificity rule — only the missing step(s)).
 
@@ -130,4 +132,4 @@ checklist (Step A) first if they are not yet present.
 ## 7. Notes / known caveats to record during dogfood
 
 - If the Stitch MCP server name differs from `stitch`, update `allowed-tools: mcp__stitch__*` in `SKILL.md` and the detection pattern in Step A.
-- `hugo` and `bundle exec jekyll` are framework-default `serve_cmd`/`build_cmd` values stored in `state.json` and executed via `Bash(<serve_cmd>)`. These are NOT covered by the current `allowed-tools` (`Bash(git:*)`, `Bash(npm:*)`, `Bash(npx:*)`, `Bash(curl:*)`, `Bash(mkdir:*)`). If running against a Hugo or Jekyll project, add `Bash(hugo:*)` and `Bash(bundle:*)` to allowed-tools. (See structural validation report 2026-06-06 for details.)
+- `hugo` and `bundle exec jekyll` are framework-default `serve_cmd`/`build_cmd` values stored in `state.json` and executed via `Bash(<serve_cmd>)`. These **are** now covered by `allowed-tools` (`Bash(hugo:*)` + `Bash(bundle:*)` were added in commit `cff36c7`). During a Hugo/Jekyll dogfood, confirm no permission prompt blocks the serve/build step; if a different framework default is hit (e.g. `Bash(astro:*)` via a non-`npx` invocation), add it then.

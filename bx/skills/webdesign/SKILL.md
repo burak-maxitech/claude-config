@@ -62,7 +62,7 @@ done               → print final report; offer to retry a page
 
 There is **no `approved` phase** — Phase 2 transitions directly into Phase 3 in the same turn after approval without writing an intermediate state value. There is **no `setup`, `extracted`, or `generating` phase** — these are not written by any reference file.
 
-> **Note:** the design spec lists 8 conceptual states; this skill persists only 6 — `setup`, `extracted`, and `generating` are transient/in-session and never written to `state.json`.
+> **Note:** the design spec lists 8 conceptual states; this skill persists only **5** distinct `phase` values (`direction_set`, `review_pending`, `tokens_injected`, `injecting_pages`, `done`) — `setup`, `extracted`, and `generating` are transient/in-session and never written to `state.json`. (The initial "no `state.json`" case is not a stored value.)
 
 ### Canonical `state.json` shape
 
@@ -77,6 +77,7 @@ There is **no `approved` phase** — Phase 2 transitions directly into Phase 3 i
   "design_direction": "…",
   "build_cmd": "npm run build",
   "serve_cmd": "npm run dev",
+  "port": 3000,
   "app_runnable": true,
   "tokens_applied": false,
   "pages": [
@@ -93,6 +94,8 @@ There is **no `approved` phase** — Phase 2 transitions directly into Phase 3 i
 }
 ```
 
+`port` (integer, written by `web-stack-detection.md` Pass 4) is the dev-server port used for screenshots and Playwright verification. On a page failure, Phase 3 also adds `pages[].failure_reason` (string) to the failing page entry — it is not present until something fails.
+
 `pages[].states` is an **object keyed by state name** (not an array). Phase 1 initializes it with `screen_id: null, status: "pending"` for each state. Phase 2 fills in `screen_id` and sets `status: "generated"`. Phase 3 sets `status` to `"injected"` → `"verified"` (or `"failed"` / `"manual"`).
 
 Per-page `status` lifecycle: `pending → generated → injected → verified`, terminal: `failed` / `manual`.
@@ -101,7 +104,7 @@ Phase 1 sets `slug` from each brief's `page:` frontmatter field (e.g. `page: hom
 
 ### Argument handling
 
-**`status` arg** — If `.webdesign/state.json` does not exist, print `No /bx:webdesign run started in this project yet. Run /bx:webdesign to begin Phase 1.` and stop. Otherwise read `state.json`, print the current phase and a table of all pages with their `status` and per-state `screen_id` / `status`. Stop — take no action.
+**`status` arg** — If `.webdesign/state.json` does not exist, print `No /bx:webdesign run started in this project yet. Run /bx:webdesign to begin Phase 1.` and stop. Otherwise read `state.json`, print the current phase, the `design_direction` (if set), and a table of all pages with their `status` and per-state `screen_id` / `status`. Stop — take no action.
 
 **`page <name>` arg** — Read `state.json`. Locate the page entry where `slug == <name>` (match by `slug` first, then by `route` if no slug match). If not found, print an error and stop.
 
@@ -117,6 +120,8 @@ Before routing to the Phase-3 per-page loop, apply this guard:
   and **stop**.
 
 Only proceed to the Phase-3 per-page loop when `tokens_applied == true` AND the page's `status` is one of `generated` / `injected` / `verified` / `failed` / `manual`. (Re-validate the stack cheaply first — see Step C.)
+
+When entering via `page <name>`, **first run `references/phase3-inject.md` Step 1 scoped to this one page** (re-issue `get_screen` for its state(s) and re-download the HTML/screenshot), *then* run Step 3 for this page only — **including Step 3's pre-loop setup, not just the loop body**: start the dev server once if `app_runnable == true` (Step 3 pre-step 2) so verification has a live server, and assert a clean working tree. You may skip the `phase` rewrite to `injecting_pages` if `phase` is already `done`. The Step-1 re-fetch is mandatory: `get_screen`'s signed URLs are short-lived and the prior `.webdesign/tmp/stitch-<page>-<state>.html` download may have expired or been cleaned in a later session, so the restyle loop cannot assume it is still on disk.
 
 ---
 
