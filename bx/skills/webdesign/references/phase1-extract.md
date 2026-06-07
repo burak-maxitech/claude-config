@@ -1,6 +1,6 @@
 # Phase 1 — Extract & Stage
 
-**Goal:** detect the stack, branch, enumerate routes, draft page briefs, capture baseline screenshots, seed Stitch with the current design, then record the new design direction. On completion, `state.json` carries `branch`, `stitch_project_id`, and `phase: direction_set`.
+**Goal:** detect the stack, branch, enumerate routes, draft page briefs, capture baseline screenshots, seed Stitch with the current design, then record the new design direction. On completion, `state.json` carries `branch`, `stitch_project_id` (if set), `design_system_id`, and `phase: direction_set`.
 
 There are **three phases only**: Phase 1 (this file), Phase 2 (Design & Review), Phase 3 (Inject & Verify). Never reference a Phase 4 or Phase 5.
 
@@ -43,7 +43,7 @@ Check `.webdesign/state.json` for an existing `branch` key:
 Immediately after the branch is created or resumed, ensure `.webdesign/` exists:
 
 ```bash
-mkdir -p .webdesign/briefs .webdesign/before
+mkdir -p .webdesign/briefs .webdesign/before .webdesign/after
 ```
 
 Then check the **target repo's** `.gitignore` for the sentinel start marker `# /bx:webdesign managed`. If absent, append the following sentinel-marked block (create `.gitignore` if the file does not exist):
@@ -151,7 +151,7 @@ Phase 3 will also skip Playwright verification — degrade to build-only.
    ```
    Skill("stitch::code-to-design")
    ```
-   Pass the project's **current** `DESIGN.md` as the baseline (read it if it exists; omit the argument if the file is absent — `stitch::code-to-design` will infer design tokens from the build output).
+   Pass the project's **current** `DESIGN.md` as the baseline (read it if it exists; omit the argument if the file is absent — `stitch::code-to-design` will infer design tokens from the build output). Pass the DESIGN.md content per `stitch::code-to-design`'s own input convention (e.g. as the design-md content argument). If the exact argument signature is unknown, invoke the skill and follow its prompts rather than guessing a flag name.
 
 3. From the Skill result, capture the `stitch_project_id` (the newly created Stitch project identifier).
 
@@ -304,7 +304,7 @@ Run /bx:webdesign again (or continue in this session) to start generating screen
 | `build_cmd` | string \| null | Step 1.1 | Step 4, Phase 3 build |
 | `serve_cmd` | string \| null | Step 1.1 | Step 3, Phase 3 Playwright |
 | `app_runnable` | boolean | Step 1.1 | Step 3, Step 4, Phase 3 |
-| `stitch_project_id` | string | Step 4a | Phase 2 screen generation, Step 5b |
+| `stitch_project_id` | string | Step 4a only (app_runnable: true) — absent on source-only fallback path | Phase 2 screen generation, Step 5b |
 | `design_system_id` | string | Step 5a or 5b | Phase 2 screen generation |
 | `phase` | string (`direction_set`) | Step 6 | resume logic in skill entry |
 
@@ -317,3 +317,4 @@ Run /bx:webdesign again (or continue in this session) to start generating screen
 | Before screenshots | `.webdesign/before/<page>.png` |
 | Stitch project record | `SITE.md` |
 | gitignore block | `.gitignore` (sentinel-marked) |
+| DESIGN.md | created/updated by stitch::extract-design-md in Step 4b (source-only fallback path) |
