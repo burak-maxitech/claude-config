@@ -10,18 +10,19 @@ There are **three phases only**: Phase 1 (this file), Phase 2 (Design & Review),
 
 ### 1.1 — Run `web-stack-detection.md`
 
-Read `references/web-stack-detection.md` and execute all four passes in a single parallel turn.
-
-- **Pass 1** gates on web-project signals. On fail, stop cleanly.
-- **Pass 3** gates on EXISTING vs. GREENFIELD. On greenfield detection, stop cleanly.
-- **Pass 4** resolves `app_runnable`, `build_cmd`, `serve_cmd`, and `port`.
-- Write `styling_system`, `build_cmd`, `serve_cmd`, `app_runnable`, `port` to `.webdesign/state.json`.
-
-Print the one-line detected-stack summary produced by `web-stack-detection.md`:
+Read and execute `references/web-stack-detection.md` (all four passes, single parallel turn). On Pass 1 or Pass 3 failure, stop per that file's exit messages. On success, print its one-line summary:
 
 ```
 Detected: <framework> · styling: <styling_system> · app_runnable: <true|false>
 ```
+
+Then fetch the live Stitch prompting doc (see `references/stitch-formats.md` preamble note) — this is the Phase-1-execution-time fetch; issue it in parallel with Step 1.2 below if feasible:
+
+```
+WebFetch https://stitch.withgoogle.com/docs/learn/prompting/
+```
+
+If the fetch fails, proceed with the baseline in `stitch-formats.md` and note it in the Phase 1 summary.
 
 ### 1.2 — Create or resume the work branch
 
@@ -72,16 +73,19 @@ Enumerate the project's page routes using the same stack-specific pathspec overl
 
 ### 2.2 — Draft a brief per page
 
-For each enumerated route, draft `.webdesign/briefs/<page>.md` following the template in `references/brief-format.md`:
+Use two sequential batched turns:
+
+1. **Read turn (parallel):** issue a single parallel Read turn to read ALL route source files at once.
+2. **Write turn (parallel):** draft ALL briefs from the in-context sources and issue a single parallel Write turn to write them all at once.
+
+For each brief (following the template in `references/brief-format.md`):
 
 - Set `page:` to a slug (lowercase, hyphenated URL segment, e.g. `home`, `about`, `blog-post`)
 - Set `route:` to the URL path
 - Set `file:` to the source file path
-- **Read the source file** before writing the brief; populate "Functionality to PRESERVE" from actual handlers, API calls, form submissions, and interactive states found in the source. Do not invent placeholder items.
+- Populate "Functionality to PRESERVE" from actual handlers, API calls, form submissions, and interactive states found in the source. Do not invent placeholder items.
 - Populate "Key components" from imported components visible in the file.
 - Leave "UX notes / new-design intent" with a one-line placeholder — the user will refine it.
-
-Write briefs in parallel (one `Write` call per page, all in a single turn when feasible).
 
 ### 2.3 — Present inventory for user review
 

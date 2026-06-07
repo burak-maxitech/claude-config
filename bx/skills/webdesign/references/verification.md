@@ -1,6 +1,6 @@
 # Per-Page Verification Procedure
 
-**Scope:** this file is the authoritative spec for Phase 3, Step 3c. `phase3-inject.md` carries a short summary that points here — the rules below govern. There are **three phases only** in this skill; this file contains no Phase 4 or Phase 5 references.
+**Scope:** this file is the authoritative spec for Phase 3, Step 3c. `phase3-inject.md` carries a short summary that points here — the rules below govern.
 
 **Core principle:** this is a DESIGN change. Pixel-identical regression is the wrong bar. The bar is **functionality preserved**. The brief's "Functionality to PRESERVE" list (`.webdesign/briefs/<page>.md`) IS the assertion set — every bullet maps 1-to-1 to a concrete check.
 
@@ -65,21 +65,16 @@ npx jest --passWithNoTests # fallback for Jest projects without a script
 
 Skip this step entirely if `app_runnable` is `false`. When `app_runnable == false`, BOTH Step 2 (Playwright behavior check) and Step 3 (screenshot capture) are skipped entirely — proceed directly to Step 4. Green static checks (Step 1) alone constitute green ("build-only") verification in that case.
 
-### 2a — Serve the app
+### 2a — Connect to the running dev server
 
-Start the development server. Detect the dev-server command from `package.json`:
-```bash
-npm run dev      # if "dev" script exists
-npm start        # fallback
-```
+The dev server is started **once** by Phase 3 before the per-page loop (see `phase3-inject.md`). Verification assumes it is already running. Read the port from `state.json["port"]`.
 
-Poll the dev server until it responds, with a timeout, before navigating:
+If the server is not yet responding (e.g. verification is being run standalone), poll:
 ```bash
-# wait up to ~30s for the dev server
 curl -sf --retry 30 --retry-delay 1 --retry-connrefused "http://localhost:<port>/" >/dev/null
 ```
 
-Fallback: if the curl poll fails or is not available, call `browser_navigate` immediately and retry on connection error up to 5 times with a short pause between attempts.
+If `serve_cmd` is ever needed (e.g. running verification outside the normal Phase 3 flow), use `state.json["serve_cmd"]` — never guess `npm run dev` or `npm start` directly. `serve_cmd` is resolved by Pass 4 of `web-stack-detection.md` and includes Hugo, Jekyll, and other non-Node frameworks.
 
 ### 2b — Navigate to the page
 

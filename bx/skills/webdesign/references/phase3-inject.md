@@ -11,32 +11,24 @@ There are **three phases only**: Phase 1 (Extract & Stage), Phase 2 (Design & Re
 - `styling_system` — one of `tailwind | css-vars | plain-css | css-in-js | css-modules | vanilla-extract | unknown`. Drives token-merge strategy in Step 2.
 - `build_cmd` — command to verify a build (may be `null`).
 - `app_runnable` — `true | false`. Controls whether Playwright verification is available.
-- `pages[]` — one entry per page with the shape described under **Canonical State Shape** below.
+- `pages[]` — one entry per page (canonical shape: SKILL.md Step B); keys Phase 3 reads/writes are listed under **Keys Phase 3 reads / writes** below.
 
 ---
 
-## Canonical State Shape
+## Keys Phase 3 reads / writes in `state.json`
 
-`pages[]` entries in `state.json` have this exact shape (established by Phase 1, filled in by Phase 2):
+Full canonical shape: **SKILL.md Step B**. Phase 3 touches only these keys:
 
-```json
-{
-  "route": "/about",
-  "file": "src/app/about/page.tsx",
-  "slug": "about",
-  "status": "pending|generated|injected|verified|failed|manual",
-  "states": {
-    "<state-name>": {
-      "screen_id": "<stitch-screen-id>",
-      "status": "pending|generated|injected|verified|failed"
-    }
-  }
-}
-```
-
-- `pages[].states.<name>.screen_id` is passed to `get_screen` in Step 1 (one screen per state).
-- The per-page loop in Step 3 checks the **page-level** `pages[].status` (skip pages already `verified`).
-- Page-level `status` transitions in Phase 3: `generated` → `injected` (after restyle write) → `verified` (after green verification) or `failed` / `manual` (on failure).
+| Key | Direction | Notes |
+|-----|-----------|-------|
+| `status` (page-level) | read + write | loop gate (skip `verified`); written: `injected` → `verified` / `failed` / `manual` |
+| `states.<name>.screen_id` | read | passed to `get_screen` in Step 1 |
+| `route`, `file`, `slug` | read | navigation, injection target, commit message |
+| `failure_reason` | write | recorded on `failed` |
+| `phase` | write | `tokens_injected` → `injecting_pages` → `done` |
+| `tokens_applied` | write | set `true` after token commit |
+| `serve_cmd`, `app_runnable`, `port` | read | dev-server startup (Step 3 pre-step) |
+| `build_cmd` | read | token-merge build verification (Step 2) |
 
 ---
 
@@ -48,33 +40,32 @@ There are **three phases only**: Phase 1 (Extract & Stage), Phase 2 (Design & Re
 git -C <project-root> checkout <state.json["branch"]>
 ```
 
-Then, for each page in `pages[]` (all pages, regardless of current status — fetch is idempotent):
+Signed URLs returned by `get_screen` are short-lived — issue ALL `get_screen` calls in a **single parallel MCP turn**, then immediately issue ALL `curl` downloads in a **single parallel Bash turn**. Do not interleave them page-by-page.
 
-For each state under `pages[].states`:
+**Round 1 — one parallel MCP turn, all pages × all states:**
 
-1. Call `get_screen` with the state's `screen_id`:
-   ```
-   get_screen(screen_id = pages[page].states[state].screen_id)
-   ```
-   This returns a response containing:
-   - `htmlCode.downloadUrl` — a **signed URL** (short-lived; must be fetched immediately with `curl`, not WebFetch)
-   - `screenshot.downloadUrl` — a signed URL for the rendered PNG
-   - `data-stitch-id` attributes on elements (preserve as comments in Step 3b)
-
-2. Download the HTML to a temp file via `curl` (create `.webdesign/tmp/` if it does not exist):
-   ```bash
-   mkdir -p .webdesign/tmp
-   curl -sL "<htmlCode.downloadUrl>" -o .webdesign/tmp/stitch-<page>-<state>.html
-   ```
-
-3. Download the screenshot to the `after/` artefact directory:
-   ```bash
-   curl -sL "<screenshot.downloadUrl>" -o .webdesign/after/<page>-<state>.png
-   ```
-
-Print a one-line confirmation after each page completes:
+For every page in `pages[]` and every state under `pages[].states`, call `get_screen` in parallel:
 ```
-Fetched: <page> / <state> → .webdesign/after/<page>-<state>.png
+get_screen(screen_id = pages[page].states[state].screen_id)
+```
+Each response contains:
+- `htmlCode.downloadUrl` — a **signed URL** (short-lived; fetch immediately with `curl`, not WebFetch)
+- `screenshot.downloadUrl` — a signed URL for the rendered PNG
+- `data-stitch-id` attributes on elements (preserve as comments in Step 3b)
+
+**Round 2 — one parallel Bash turn, all downloads:**
+
+Immediately after Round 1 (before signed URLs expire), issue all `curl` commands in a single parallel Bash turn:
+```bash
+mkdir -p .webdesign/tmp .webdesign/after
+curl -sL "<htmlCode.downloadUrl>" -o .webdesign/tmp/stitch-<page>-<state>.html
+curl -sL "<screenshot.downloadUrl>" -o .webdesign/after/<page>-<state>.png
+# (one pair per page/state, all in the same parallel turn)
+```
+
+Print a one-line confirmation after all downloads complete:
+```
+Fetched: <N> screens → .webdesign/after/ and .webdesign/tmp/
 ```
 
 ---
@@ -120,11 +111,19 @@ After writing the tokens:
 
 ## Step 3 — Per-Page Restyle Loop (resumable)
 
-**Before starting the loop**, write to `state.json`:
-```json
-{ "phase": "injecting_pages" }
-```
-This ensures a mid-loop interruption resumes into the page loop correctly. `phase` stays `injecting_pages` until Step 4 sets it to `done`.
+**Before starting the loop:**
+
+1. Write to `state.json`:
+   ```json
+   { "phase": "injecting_pages" }
+   ```
+   This ensures a mid-loop interruption resumes into the page loop correctly. `phase` stays `injecting_pages` until Step 4 sets it to `done`.
+
+2. **Start the dev server once (if `app_runnable == true`).** Using `state.json["serve_cmd"]`, start the dev server in the background and wait for it to be ready (poll up to 30 s). Note the port it reports at startup; if it differs from `state.json["port"]`, update `state.json["port"]`. Keep the server running for the entire loop; stop it after Step 4 (or on early exit). Do not restart it per-page. Verification (`references/verification.md`) assumes the server is already running.
+
+   If `app_runnable == false`, skip this sub-step.
+
+3. **Pre-read all page briefs.** Issue a single parallel Read turn to load every `.webdesign/briefs/<page>.md` into context before the loop starts. Hold the "Functionality to PRESERVE" list for each page in context so per-iteration reads are unnecessary.
 
 Iterate over `pages[]` in order. **Skip any page whose page-level `status` is already `verified`.** (Resume: if the skill is re-run after a partial Phase 3, pages already verified are not re-touched.)
 
@@ -150,7 +149,8 @@ Load into context in a single parallel turn:
 - The **existing page source** (the file at `pages[].file`)
 - The **Stitch HTML** (`.webdesign/tmp/stitch-<page>-<default-state>.html`, or all states if the page has multiple)
 - The `.webdesign/after/<page>-<state>.png` screenshot(s) (visual reference)
-- The page's brief (`.webdesign/briefs/<page>.md`) — specifically the **"Functionality to PRESERVE"** list, which is the verification contract
+
+The page's brief "Functionality to PRESERVE" list was pre-read before the loop (Step 3 pre-step 3) — use the in-context copy; no re-read needed.
 
 ### 3b — Restyle in place (the core invariant)
 

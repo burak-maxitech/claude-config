@@ -39,14 +39,7 @@ One setup override:
 
 ## Step A — Setup check
 
-Read `references/setup-stitch-mcp.md` and run both checks in parallel (passive — no shell invocation needed):
-
-1. **Stitch MCP present?** Inspect available tools for any name beginning with `stitch` (i.e. `mcp__stitch__*`). If none visible → Stitch MCP not configured.
-2. **`stitch-skills` installed?** Confirm `stitch::code-to-design` is among available skills (callable via the Skill tool). If absent → `stitch-skills` not installed.
-
-If either dependency is missing → print the banner from `setup-stitch-mcp.md` (applying its specificity rule and sentinel-dedup logic), write `.webdesign/.setup-shown` if this is the first display, and **stop**. Do not proceed to stack detection, state loading, or any phase.
-
-If `--force-setup` was passed → apply the banner/confirmation logic from `setup-stitch-mcp.md` and **stop** regardless of dependency state.
+Read `references/setup-stitch-mcp.md`. Run both dependency checks per that file's Detection section (passive — no shell invocation needed). If either is missing (or `--force-setup` was passed), apply that file's banner/sentinel logic and **stop**. Do not proceed to stack detection, state loading, or any phase.
 
 > **Note:** The exact Stitch MCP tool-name prefix (`mcp__stitch__*`) depends on the server name used in `claude mcp add ... stitch ...`. On first dogfood, confirm the prefix matches the installed MCP registration — if the server was registered under a different name, the pattern above needs updating in `allowed-tools` and in this file.
 
@@ -143,15 +136,7 @@ Cheaply re-validate (web gate + `app_runnable`). Read `references/phase2-design-
 
 ### `phase = review_pending` → Approval check → Phase 3
 
-Cheaply re-validate. Ask:
-
-```
-The designs are generated and waiting for review.
-Are they approved, or would you like to request changes?
-```
-
-- **Approved** → print `Designs approved. Proceeding to Phase 3 — Inject & Verify.` then execute `references/phase3-inject.md` starting at Step 1. Do **not** write an intermediate `phase = approved` — the phase stays `review_pending` until Phase 3 writes `tokens_injected`.
-- **Changes requested** → route through `edit_screens` per Phase 2's Resume Behavior section (`references/phase2-design-review.md`), then re-present the review card and set `phase = review_pending` again.
+Cheaply re-validate. Execute `references/phase2-design-review.md` "Resume Behavior": ask for approval; if approved → proceed to `references/phase3-inject.md` Step 1 (there is **no intermediate `approved` phase** written); if changes requested → `edit_screens` → re-present review card → `phase = review_pending` again.
 
 ### `phase = tokens_injected` → Phase 3 (resume, skip token step)
 

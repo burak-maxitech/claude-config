@@ -7,7 +7,7 @@ There are **three phases only**: Phase 1 (Extract & Stage), Phase 2 (this file),
 **Inputs from `state.json` (written by Phase 1):**
 - `design_system_id` — applied to every `generate_screen_from_text` call so colors/fonts come from the project design system, not from the prompt.
 - `stitch_project_id` — the Stitch project where screens are created.
-- `pages[]` — one entry per page (slug, route, brief path, states object). Phase 1 initialized `pages[].states` as an object keyed by state name; Phase 2 fills in `screen_id` + per-state `status`. Page-level `pages[].status` is what Phase 3's per-page loop checks; `pages[].states.<name>.screen_id` is what Phase 3 passes to `get_screen`.
+- `pages[]` — one entry per page (slug, route, brief path, states object). Phase 2 fills in `screen_id` + per-state `status`. Page-level `pages[].status` is what Phase 3's per-page loop checks; `pages[].states.<name>.screen_id` is what Phase 3 passes to `get_screen`.
 
 ---
 
@@ -17,15 +17,17 @@ Before calling `generate_screen_from_text` even once, compute the estimated scre
 
 ### 1.1 — Count screens
 
-For each page brief in `.webdesign/briefs/`, read the `states:` list from the YAML frontmatter (see `brief-format.md`). A page with no explicit states list counts as 1 (the `default` state).
+Compute the screen count from `pages[]` in `state.json` (already in context from SKILL.md Step B — no file reads needed):
 
 ```
-estimated_screens = Σ len(states) for each page brief
+estimated_screens = Σ len(pages[i].states) for each page entry
 ```
+
+`pages[i].states` is an object keyed by state name; `len` = number of keys. A page with only `default` counts as 1.
 
 **Examples:**
 - 4 pages × 1 state each = 4 screens
-- 2 static pages + 1 dynamic page with `[empty, loading, loaded, error]` = 6 screens
+- 2 static pages + 1 dynamic page with `{empty, loading, loaded, error}` = 6 screens
 
 ### 1.2 — Show the pre-flight prompt and wait
 
@@ -69,21 +71,9 @@ Iterate over every page brief. For each page, generate one screen per state.
 
 ### 2.1 — Build the generation prompt
 
-For each `(page, state)` pair, construct a prompt from the brief using the **layout/content-only format** from `stitch-formats.md § Per-screen generation prompt format`:
+For each `(page, state)` pair, construct a prompt from the brief using the **layout/content-only format** from `stitch-formats.md § Per-screen generation prompt format`. Populate the PAGE STRUCTURE sections from the brief's fields (Header → nav/branding, Hero → headline/subtext/CTA, Content → Key components, Footer → links/legal), per the format defined there.
 
-```
-[One-line page purpose + vibe, e.g. "Portfolio home — minimal, above-fold hero with CTA"]
-
-**PLATFORM:** Web, Desktop-first
-
-**PAGE STRUCTURE:**
-1. **Header:** <from brief: navigation + branding>
-2. **Hero Section:** <from brief: headline, subtext, primary CTA>
-3. **<Content area>:** <component-by-component from brief's "Key components">
-4. **Footer:** <from brief: links, legal>
-```
-
-**Critical constraint:** the prompt contains **layout, content, and structure ONLY — never colors, font names, roundness, or hex codes.** The `design_system_id` supplies all visual tokens; adding theme values to the prompt causes drift across pages. This is the multi-page consistency mechanism (see `stitch-formats.md`).
+> Layout/content/structure ONLY — never colors, fonts, roundness, or hex codes. See `stitch-formats.md § Per-screen generation prompt format`.
 
 For dynamic pages (brief has multiple `states:`), generate each state as a separate screen. Adjust the one-line purpose to name the state: e.g. `"Blog listing — loading state, skeleton placeholders"`.
 

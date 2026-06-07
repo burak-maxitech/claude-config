@@ -1,8 +1,8 @@
 # Stitch canonical formats
 
-> Bundled baseline. Stitch evolves fast — at the **start of Phase 1**, fetch the official prompting doc fresh and let it supersede anything here that diverges:
+> Bundled baseline. Stitch evolves fast — **when Phase 1 begins executing** (setup passed, web/refactor gate passed), fetch the official prompting doc fresh and let it supersede anything here that diverges:
 > `WebFetch https://stitch.withgoogle.com/docs/learn/prompting/ "Extract the current recommended prompt structure, frameworks, and any changes to design-system handling."`
-> If the fetch fails, proceed with this baseline and note it in the run summary.
+> This fetch happens in `phase1-extract.md` Step 1 (after stack detection, before route enumeration). If the fetch fails, proceed with this baseline and note it in the run summary. Banner-stop sessions (Step A dependency missing) do not trigger this fetch.
 
 ## Per-screen generation prompt format
 

@@ -28,7 +28,7 @@ Check `package.json` dependencies + devDependencies:
 - `pom.xml` / `build.gradle` with Spring Boot Web (`spring-boot-starter-web`) **AND** `templates/` or `static/`
 - `.NET` (`*.csproj` with `Microsoft.AspNetCore`)
 
-> **Signal source:** mirrors `/bx:seo` Step 0 exactly — the authoritative signal list lives there.
+> **Signal source:** this list is kept in sync with `/bx:seo` Step 0 — update both if the signal set changes.
 
 **If none match**, print exactly:
 
@@ -76,13 +76,7 @@ Warning: styling system could not be determined — token-merge in Phase 3 will 
 // Non-Node projects (Django, Rails, Hugo, Jekyll, etc.) may have no
 // package.json but are still EXISTING if any renderable pages are present.
 
-EXISTING signals (check ALL of these before concluding GREENFIELD):
-  - pages/, app/, src/pages/, src/app/, src/views/, src/routes/,
-    src/components/ containing .jsx/.tsx/.vue/.svelte/.html files
-  - templates/ directory containing .html files
-  - index.html with non-trivial body content (more than a placeholder)
-
-IF any EXISTING signal is present:
+IF any EXISTING signal is present (see list below):
     -> EXISTING (proceed)
 ELSE IF no source code files exist (only docs/config):
     -> GREENFIELD
@@ -92,7 +86,7 @@ ELSE:
     -> GREENFIELD   // no renderable pages AND no EXISTING signals
 ```
 
-Signals that confirm an EXISTING project (at least one must be present):
+EXISTING signals (check ALL of these before concluding GREENFIELD):
 - `pages/`, `app/`, `src/pages/`, `src/app/`, `src/views/`, `src/routes/`, `src/components/` containing `.jsx`, `.tsx`, `.vue`, `.svelte`, or `.html` files
 - A `templates/` directory containing `.html` files
 - An `index.html` with non-trivial body content (more than a placeholder)
