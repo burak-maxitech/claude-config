@@ -192,3 +192,6 @@
 ## Session 40 (2026-05-30) — cc launcher git-pull fix + stale activation-gap correction
 - [x] Verified S38 + S39 already active on this machine (main == origin/main 0/0, plugin cache at HEAD e12c52c) — corrected stale "3 commits ahead" note - CLAUDE.md (S40)
 - [x] Fixed `cc` launcher unreliable git-pull ($LASTEXITCODE gating + --stat, dropped --quiet/2>/dev/null) - .claude/scripts/start-claude.ps1, start-claude.sh (S40)
+
+## Session 41 (2026-06-06) — /bx:webdesign (10th skill)
+- [x] Built `/bx:webdesign` skill (10th bx skill) — Stitch-driven web design refactor, 3 resumable phases, brainstorm→spec→plan→subagent-driven, merged `d5e98ab` - `bx/skills/webdesign/` (SKILL.md + 8 references), `docs/superpowers/{specs,plans}/2026-06-06-bx-webdesign*`

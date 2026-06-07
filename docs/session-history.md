@@ -175,3 +175,24 @@
 **Next session should:**
 - Run the real `/bx:seo` dogfood against burakarik.com (now genuinely unblocked)
 - Pick up the `/bx:seo` code-review items #5-#7
+
+### Session 41 - 2026-06-06
+**What happened:**
+- Built `/bx:webdesign`, the 10th `bx` skill: web-only, refactor-only re-skin of an existing web project's visual design via Google Stitch, driven through the Stitch MCP + Google's official `stitch-skills` plugin (Model A — reuse Google's skills, detect-and-guide setup; NOT re-implement). Thin orchestrator owning the layer Google lacks: web/styling/runnability detection, preserve-aware page briefs, tokens-first + per-page safe restyle (preserve logic/content/assets, restyle within existing breakpoints, `git restore .` + `git clean -fd` rollback on failure), and build/test + Playwright + before/after verification. 3 resumable phases (Extract & Stage → Design & Review → Inject & Verify) on a dedicated `webdesign/<date>` branch; state in `.webdesign/state.json`.
+- Ran the full superpowers flow: brainstorm (11 decisions incl. MCP-driven over manual handoff, Model A reuse of Google's skills, flexible vibe-setting) → spec → plan (12 tasks) → subagent-driven execution with two-stage review per task → final holistic review → merge (`d5e98ab`).
+- Researched Google's `google-labs-code/stitch-skills` repo for canonical formats (DESIGN.md YAML schema, layout/content-only per-screen prompt, `update_design_system` knob enums, MCP tool surface) — bundled into `references/stitch-formats.md` + runtime fresh-fetch of the official prompting doc.
+- Two-stage reviews caught real bugs before merge: multi-file rollback/commit leakage in the injection core (`git restore <one-file>` → `git restore .` + `git clean -fd`; `git add <one-file>` → `git add -A`), `pages[].states` array→object schema drift across phases, 7 phase-number errors, an unguarded `page <name>` override (would inject with no design / null screen_id), a missing `pages[]` state writer in Phase 1, and hallucinated docs (invented `--phase` flag, false "CSS-only / never HTML structure" claim, fake `webdesign-brief.md` artifact, made-up guardrails).
+- Merged 26 commits to `main` via `--no-ff` (`d5e98ab`); deleted `feat/bx-webdesign`. NOT pushed (local merge per request).
+- Ran `/simplify` on the new skill (`429f63a`, +84/−116): deduped canonical content to single-source pointers (per-screen prompt template, no-colors rule, and the `phase3` "Canonical State Shape" block → SKILL.md Step B; slimmed SKILL.md Step A + the `review_pending` route to delegation; de-duped the doubled EXISTING-signals list + the over-repeated "states is an object" reminder), batched runtime tool calls (dev-server started **once** before the per-page loop instead of per-page; parallel `get_screen`+`curl`; parallel source-reads/brief-writes; quota count from `state.json`), and made `verification.md` read `serve_cmd`/`port` from `state.json` (Hugo/Jekyll-correct rather than hardcoding `npm run dev`). **Skipped (behavior change, flagged for dogfood):** the `app_runnable:false` path completes Phase 1 but dead-ends in Phase 2 — no mechanism feeds a user-supplied `stitch_project_id` back to unblock generation. `main` is ~30 ahead of `origin`, unpushed.
+
+**Files created/modified:**
+- `bx/skills/webdesign/SKILL.md` + 8 `references/*.md` (setup-stitch-mcp, web-stack-detection, stitch-formats, brief-format, phase1-extract, phase2-design-review, phase3-inject, verification) - the new skill
+- `docs/superpowers/specs/2026-06-06-bx-webdesign-design.md` - design spec (11 decisions)
+- `docs/superpowers/plans/2026-06-06-bx-webdesign.md` - 12-task implementation plan
+- `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md` - first-run dogfood checklist
+- `README.md`, `workflow.md` - added `/bx:webdesign` (10th skill)
+
+**Next session should:**
+- Push `main` (~30 ahead of origin, unpushed) + `/plugin update bx` (or `cc`) to activate `/bx:webdesign`.
+- Install the Stitch MCP + `stitch-skills` plugin, then dogfood `/bx:webdesign` against a real web project (burakarik.com?) using the dogfood checklist — confirm the `mcp__stitch__*` prefix, dev-server port, and `stitch::code-to-design` arg convention.
+- Still pending: real `/bx:seo` run; dogfood `/bx:tests` / `/bx:arch` / `/bx:health`.

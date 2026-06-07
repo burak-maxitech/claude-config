@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-05-30 (Session 40)
+Last Updated: 2026-06-06 (Session 41)
 
 ## Project Overview
 
@@ -15,7 +15,7 @@ Last Updated: 2026-05-30 (Session 40)
 
 | Area | Status |
 |------|--------|
-| Skills (9) | Complete |
+| Skills (10) | Complete |
 | Subagents (15) | Complete |
 | Plugin packaging (`bx`) | Core complete (S37) — pending install smoke-test + symlink retirement |
 | Startup scripts | Complete |
@@ -25,7 +25,7 @@ Last Updated: 2026-05-30 (Session 40)
 
 ## Completed
 
-All 9 skills, 15 subagents, cross-platform setup, and documentation system are complete.
+All 10 skills, 15 subagents, cross-platform setup, and documentation system are complete.
 
 See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
@@ -33,17 +33,18 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 ## In Progress
 
-**S38 + S39 are active on this machine.** Verified S40: `main` == `origin/main` (0 ahead / 0 behind) and the installed plugin cache is `e12c52c` (= HEAD) — the S39 "3 commits ahead / not pushed" note was stale (the push had already landed). Other machines still pick up S38+S39 on their next `/plugin update bx` (or `cc` launch).
+**S41 — `/bx:webdesign` shipped, pending activation.** The new 10th skill is built + merged to `main` (`d5e98ab`) + a `/simplify` cleanup pass (`429f63a`), but not yet live: `main` is **~30 commits ahead of `origin/main`** (local, unpushed), the installed plugin cache is still at `03fa75a` (pre-webdesign), and a real run needs the **Stitch MCP + `stitch-skills` plugin** installed once. Dogfood checklist: `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
 
-**S37 plugin packaging (#4) — remaining:** install smoke-test, verify agent-dispatch naming, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, SessionEnd→`/bx:save` nudge, launcher-script symlink-check retirement. (GSC MCP migration #1 declined; Playwright #2 deferred.)
+**S37 plugin packaging — remaining:** install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement. (GSC MCP migration #1 declined; Playwright #2 deferred.)
 
 ## Next Steps
 
-1. **Real `/bx:seo` run against burakarik.com** — first genuinely-working end-to-end (auth fixed, live sitemap discovery, sub-dim 14 deindex detection now fed). Confirmed live in S39: GSC auth HTTP 200, the 2,892-URL sitemap yields 100 orphans. Now fully unblocked — activation confirmed.
-2. **Remaining `/bx:seo` code-review items (non-blocking, from S39 review):** #5 redundant per-call token mints (mint once → mode-600 temp file); #6 `_read_skill_config` CWD assumption; #7 token-to-stdout structural hardening (a `fetch-sa` subcommand so Search Analytics never exposes a token to the orchestrator).
-3. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — built but never run end-to-end.
-4. **Address `/bx:seo` deferred refactors** (S25/S27/S29 `/simplify` passes): batched-Grep alternation across scan-technical/content/geo; fix-mode + plan-mode scaffolding extraction.
-5. Improve skill reference files based on usage; consider pre-commit hooks.
+1. **Activate + dogfood `/bx:webdesign`** — push `main` (~30 ahead, unpushed) + `/plugin update bx` (or `cc`), install the Stitch MCP + `stitch-skills`, then run it against a real web project using the dogfood checklist (confirm the `mcp__stitch__*` tool prefix, dev-server port, `stitch::code-to-design` arg convention). **Known gap (from S41 `/simplify`):** the `app_runnable:false` path dead-ends in Phase 2 (no mechanism to feed a user-supplied `stitch_project_id` back) — address during dogfood.
+2. **Real `/bx:seo` run against burakarik.com** — first genuinely-working end-to-end (auth fixed S39, live sitemap discovery). Now fully unblocked.
+3. **Remaining `/bx:seo` code-review items (non-blocking, S39):** #5 redundant per-call token mints; #6 `_read_skill_config` CWD assumption; #7 `fetch-sa` subcommand so Search Analytics never exposes a token.
+4. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — built but never run end-to-end.
+5. **Address `/bx:seo` deferred refactors** (S25/S27/S29): batched-Grep alternation; fix-mode + plan-mode scaffolding extraction.
+6. Improve skill reference files based on usage; consider pre-commit hooks.
 
 ## Key Decisions
 
@@ -67,6 +68,7 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 | `/bx:docs` → `/bx:save` rework — fast-by-default + Sonnet offload (S38, 2026-05-29) | The end-of-session save (paired with `/bx:resume`) routinely took >10 min so the user abandoned it. Root causes: Step 0 read all docs every run (~60k tokens incl. the 70k+53k append-only archives the update never reads *from*) even on `--fast`; the verification step echoed full file contents back; verbose prose. Fix: the lean session-save is now the **default** (drain tasks → CLAUDE.md session block → session-history append → commit), with README/docs sync + rollups moved to `--full`; a new `save-writer` Sonnet subagent does the big reads + all file writes off the main thread while the Opus orchestrator composes a small "update packet" + dispatches; full-file output dump → compact change report; prose caps on new entries; scoped Step-0 reads. Skill renamed `/bx:docs` → `/bx:save` (collision-proof pair-name with `/bx:resume`). Subagents 14 → 15. Built via superpowers brainstorm→spec→writing-plans→subagent-driven flow; specs in [docs/superpowers/](docs/superpowers/). Full: [docs/key-decisions.md](docs/key-decisions.md). |
 | `/bx:seo` GSC path+auth+sitemap repair (S39, 2026-05-29) | The skill's entire GSC path was dead since plugin packaging: `${CLAUDE_SKILL_DIR}` isn't a real Claude Code variable (→ helper file-not-found, silent heuristic-only), and the token-passing assumed shell state persists across Bash calls (it doesn't). Fixed with a `bin/` launcher on PATH + in-call stdlib refresh-token minting — ADC **as the user, NOT a service account** (open Google bug blocks adding SAs to GSC; multi-machine via `adc_credentials_path` in config.yaml). Also closed the sitemap-discovery gap: fetch the LIVE sitemap (GSC `sitemaps.list` → robots.txt → conventional) instead of globbing a repo-local file that's empty for generated sitemaps — which had silently starved sub-dim 14 deindex detection. Verified against live GSC (sites.list 200) + burakarik.com (2,892-URL sitemap). Full: [docs/key-decisions.md](docs/key-decisions.md). |
 | PowerShell `try/catch` can't gate native-exe failures — `cc` launcher git-pull fix (S40) | `start-claude.ps1` printed "Project synced." even when `git pull` failed: `try/catch` only catches terminating PowerShell errors, but native exes (git) signal failure via `$LASTEXITCODE`, so the `catch` was dead code (proved empirically). Fixed by gating the message on `$LASTEXITCODE` in all 3 spots + swapping `--quiet`/`2>/dev/null` for `--stat` so pulls are observable. Rule for future `.ps1`: never expect `try/catch` to catch a native command's exit code — check `$LASTEXITCODE`. |
+| `/bx:webdesign` — Stitch-driven web design refactor skill (S41, 2026-06-06) | New 10th skill: re-skins an existing web project's visual design via Google Stitch, driven through the **Stitch MCP + Google's official `google-labs-code/stitch-skills`** (Model A: reuse their skills + detect-and-guide one-time setup, NOT re-implement). Web-only, refactor-only v1 (greenfield/non-web exit cleanly). Thin orchestrator owning what Google's kit lacks: web/styling/runnability detection, preserve-aware page briefs, **tokens-first + per-page safe restyle** (preserve logic/content/assets, restyle within existing responsive breakpoints, `git restore .`+`git clean -fd` rollback on failure), and build/test + Playwright + before/after verification. 3 resumable phases (Extract & Stage → Design & Review → Inject & Verify) on a dedicated `webdesign/<date>` branch; state in `.webdesign/state.json`; canonical Stitch formats from Google's repo bundled + runtime fresh-fetch. Built brainstorm→spec→plan→subagent-driven (two-stage review per task); merged `d5e98ab`. Full: [docs/key-decisions.md](docs/key-decisions.md). |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -81,10 +83,11 @@ claude-config/                         # marketplace repo
 │   ├── agents/                        # 15 subagents (Sonnet-routed) → bx:<agent>
 │   ├── hooks/hooks.json               # SessionStart project-orientation injection
 │   ├── scripts/                       # session-start-context.{sh,ps1}
-│   └── skills/                        # 9 skills (SKILL.md + references/) → /bx:<name>
+│   └── skills/                        # 10 skills (SKILL.md + references/) → /bx:<name>
 │       ├── arch/    clean/   health/
 │       ├── plan/    resume/  review/
 │       ├── save/    seo/     tests/   # save = /bx:save (was docs)
+│       └── webdesign/                  # /bx:webdesign — visual re-skin via Stitch MCP
 ├── .claude/
 │   ├── scripts/             # start-claude.{sh,ps1} launchers (not plugin components)
 │   └── settings.local.json  # Local Claude Code settings
@@ -119,9 +122,11 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 40) - 2026-05-30
-- **Fixed the `cc` launcher's unreliable git-pull** in both `start-claude.ps1` and `start-claude.sh`. PowerShell `try/catch` can't catch a native `git` failure (git signals via `$LASTEXITCODE`, not exceptions), so "Project synced." printed even on failure; both scripts also hid all pull output behind `--quiet`/`2>/dev/null`. Now gated on `$LASTEXITCODE` + `--stat`, so pulls are observable and the success message is honest. Verified (PS parse, both exit paths, `bash -n`).
-- **Corrected a stale CLAUDE.md claim:** the S39 "main is 3 commits ahead / not pushed" note was wrong — `git fetch` + `rev-list --left-right` showed `main` == `origin/main` (0/0) and the plugin cache is at HEAD (`e12c52c`). S38 + S39 are already active on this machine.
-- First real dogfood of `/bx:resume` + `/bx:save --full` since the S38 rework; no functional issues surfaced.
+### Last Session (Session 41) - 2026-06-06
+- **Built `/bx:webdesign` (10th skill)** — web-only, refactor-only re-skin of an existing web project's visual design via Google Stitch, driven through the Stitch MCP + Google's official `stitch-skills` (Model A: reuse + detect-and-guide). Thin orchestrator owning what Google's kit lacks: web/styling/runnability detection, preserve-aware page briefs, **tokens-first + per-page safe restyle** (preserve logic/content/assets, restyle within existing breakpoints), and build/test + Playwright + before/after **verification**. 3 resumable phases on a dedicated `webdesign/<date>` branch.
+- **Full superpowers flow:** brainstorm (11 decisions) → spec → plan (12 tasks) → subagent-driven execution (per task: implement → spec review → code-quality review → fix) → final holistic review → merged to `main` (`d5e98ab`, 26 commits). Two-stage reviews caught real bugs: multi-file rollback/commit leakage in the injection core, `pages[].states` array-vs-object drift, 7 phase-number errors, an unguarded `page <name>` override, a missing `pages[]` writer, and hallucinated docs (`--phase` flag, "CSS-only" claim).
+- **Grounded in Google's official formats** — researched `google-labs-code/stitch-skills` (DESIGN.md schema, layout/content-only prompt format, `update_design_system` knob enums, MCP tool surface); bundled as `references/stitch-formats.md` + runtime fresh-fetch.
+- **Then a `/simplify` cleanup pass** (`429f63a`, +84/−116) — deduped canonical content to single-source pointers, batched runtime tool calls (dev-server-once, parallel `get_screen`+`curl`/reads), and made verification read `serve_cmd`/`port` from state (Hugo/Jekyll-correct).
+- **Not yet active:** `main` is ~30 ahead of `origin` (unpushed), plugin cache still at `03fa75a`, and a real run needs the Stitch MCP + `stitch-skills` installed. Dogfood checklist written.
 
-> Full session detail: [docs/session-history.md](docs/session-history.md) S38
+> Full session detail: [docs/session-history.md](docs/session-history.md) S41
