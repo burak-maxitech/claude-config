@@ -33,13 +33,13 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 ## In Progress
 
-**S41 — `/bx:webdesign` shipped, pending activation.** The new 10th skill is built + merged to `main` (`d5e98ab`) + a `/simplify` cleanup pass (`429f63a`), but not yet live: `main` is **~30 commits ahead of `origin/main`** (local, unpushed), the installed plugin cache is still at `03fa75a` (pre-webdesign), and a real run needs the **Stitch MCP + `stitch-skills` plugin** installed once. Dogfood checklist: `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
+**S41 — `/bx:webdesign` shipped, pending activation.** The new 10th skill is built + merged to `main` (`d5e98ab`) + a `/simplify` cleanup pass (`429f63a`), but not yet live: `main` is **pushed and in sync with `origin/main`**, yet the installed plugin cache is still at `03fa75a` (pre-webdesign), so a real run needs **`/plugin update bx`** (or `cc`) + the **Stitch MCP + `stitch-skills` plugin** installed once. Dogfood checklist: `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
 
 **S37 plugin packaging — remaining:** install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement. (GSC MCP migration #1 declined; Playwright #2 deferred.)
 
 ## Next Steps
 
-1. **Activate + dogfood `/bx:webdesign`** — push `main` (~30 ahead, unpushed) + `/plugin update bx` (or `cc`), install the Stitch MCP + `stitch-skills`, then run it against a real web project using the dogfood checklist (confirm the `mcp__stitch__*` tool prefix, dev-server port, `stitch::code-to-design` arg convention). **Known gap (from S41 `/simplify`):** the `app_runnable:false` path dead-ends in Phase 2 (no mechanism to feed a user-supplied `stitch_project_id` back) — address during dogfood.
+1. **Activate + dogfood `/bx:webdesign`** — `/plugin update bx` (or `cc`) to pull the now-pushed skill into the plugin cache, install the Stitch MCP + `stitch-skills`, then run it against a real web project using the dogfood checklist (confirm the `mcp__stitch__*` tool prefix, dev-server port, `stitch::code-to-design` arg convention). **Known gap (from S41 `/simplify`):** the `app_runnable:false` path dead-ends in Phase 2 (no mechanism to feed a user-supplied `stitch_project_id` back) — address during dogfood.
 2. **Real `/bx:seo` run against burakarik.com** — first genuinely-working end-to-end (auth fixed S39, live sitemap discovery). Now fully unblocked.
 3. **Remaining `/bx:seo` code-review items (non-blocking, S39):** #5 redundant per-call token mints; #6 `_read_skill_config` CWD assumption; #7 `fetch-sa` subcommand so Search Analytics never exposes a token.
 4. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — built but never run end-to-end.
@@ -127,6 +127,6 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 - **Full superpowers flow:** brainstorm (11 decisions) → spec → plan (12 tasks) → subagent-driven execution (per task: implement → spec review → code-quality review → fix) → final holistic review → merged to `main` (`d5e98ab`, 26 commits). Two-stage reviews caught real bugs: multi-file rollback/commit leakage in the injection core, `pages[].states` array-vs-object drift, 7 phase-number errors, an unguarded `page <name>` override, a missing `pages[]` writer, and hallucinated docs (`--phase` flag, "CSS-only" claim).
 - **Grounded in Google's official formats** — researched `google-labs-code/stitch-skills` (DESIGN.md schema, layout/content-only prompt format, `update_design_system` knob enums, MCP tool surface); bundled as `references/stitch-formats.md` + runtime fresh-fetch.
 - **Then a `/simplify` cleanup pass** (`429f63a`, +84/−116) — deduped canonical content to single-source pointers, batched runtime tool calls (dev-server-once, parallel `get_screen`+`curl`/reads), and made verification read `serve_cmd`/`port` from state (Hugo/Jekyll-correct).
-- **Not yet active:** `main` is ~30 ahead of `origin` (unpushed), plugin cache still at `03fa75a`, and a real run needs the Stitch MCP + `stitch-skills` installed. Dogfood checklist written.
+- **Pushed, pending activation:** `main` is pushed + in sync with `origin`; the installed plugin cache is still at `03fa75a`, so `/plugin update bx` (or `cc`) + the Stitch MCP + `stitch-skills` install are needed before a real run. Dogfood checklist written.
 
 > Full session detail: [docs/session-history.md](docs/session-history.md) S41
