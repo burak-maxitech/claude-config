@@ -34,23 +34,23 @@ Store the detected stack info and use it to skip irrelevant scan categories auto
 
 ## Step 1 — Parallel Scan
 
-Launch subagents in parallel using the Task tool. Each agent handles an independent domain.
+Launch the three dedicated scanner subagents in parallel using the Task tool. They run on **Sonnet** for cost efficiency with least-privilege tool scopes; the detailed scan instructions live in this skill's `references/` files and are passed to each agent as its task prompt. Each agent handles an independent domain.
 
 **Important orchestration rules:**
-- Launch ALL agents in a single turn (one Task call per agent)
+- Launch ALL agents in a single turn (one Task call per agent), setting each call's `subagent_type` to the agent named in its section below (`cleanup-files-code` / `cleanup-deps-config` / `cleanup-styles-tests`)
 - Each agent returns structured findings — do NOT ask agents to format final output
 - If `$ARGUMENTS` contains a filter flag (`--files`, `--code`, `--css`, `--deps`, `--tests`, `--vulns`), skip parallelization and scan that single category directly in the main context
 - If a category is irrelevant to the detected stack (e.g., CSS for a Python CLI tool), skip it entirely
 - **Vulnerability scanning is opt-in only.** Section 4.5 (Vulnerable Dependencies) runs ONLY if `$ARGUMENTS` contains `--vulns` or the user explicitly asks for it. Default scans never call `npm audit`, `pip-audit`, etc. — those hit network registries and slow the audit. Tell the user once that a vuln scan is available via `/bx:clean --vulns` if they want it.
 
 ### Agent 1: Files & Dead Code Scanner
-Read the `references/scan-files-code.md` file from this skill's directory, then spawn a Task subagent with those instructions. Pass it the detected project stack info so it knows what file extensions matter.
+Read the `references/scan-files-code.md` file from this skill's directory, then dispatch the `cleanup-files-code` subagent with those instructions + the detected project stack info so it knows what file extensions matter.
 
 ### Agent 2: Dependencies & Config Scanner
-Read the `references/scan-deps-config.md` file from this skill's directory, then spawn a Task subagent with those instructions. Pass it the detected package manager and config file paths. **If `--vulns` is in `$ARGUMENTS`, also tell the agent to run Section 4.5 (Vulnerable Dependencies) using the audit command appropriate to the detected stack.** Without `--vulns`, the agent skips that section silently.
+Read the `references/scan-deps-config.md` file from this skill's directory, then dispatch the `cleanup-deps-config` subagent with those instructions + the detected package manager and config file paths. **If `--vulns` is in `$ARGUMENTS`, also tell the agent to run Section 4.5 (Vulnerable Dependencies) using the audit command appropriate to the detected stack.** Without `--vulns`, the agent skips that section silently.
 
 ### Agent 3: Styles & Tests Scanner
-**Only spawn if the project has CSS files AND/OR test files.** Read the `references/scan-styles-tests.md` file from this skill's directory, then spawn a Task subagent with those instructions. If neither CSS nor tests exist, skip this agent entirely.
+**Only spawn if the project has CSS files AND/OR test files.** Read the `references/scan-styles-tests.md` file from this skill's directory, then dispatch the `cleanup-styles-tests` subagent with those instructions. If neither CSS nor tests exist, skip this agent entirely.
 
 ## Step 2 — Consolidate & Deduplicate
 

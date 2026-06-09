@@ -1,0 +1,78 @@
+{
+  "skill_name": "clean",
+  "note": "Regression suite for /bx:clean. Fixtures are de-hinted (no giveaway comments) and seeded with precision traps where source-only scanning false-positives: a config-only dependency, a dynamic import(), and an obscure PyPI->import name mismatch. Built with skill-creator; see README.md.",
+  "evals": [
+    {
+      "id": 0,
+      "name": "node-audit",
+      "fixture": "fixtures/node-react-app",
+      "mode": "report",
+      "prompt": "This repo has gotten messy over the last year or so. Can you do a cleanup pass and tell me what's safe to delete? I want to know about dead code, unused files, unused dependencies, leftover CSS — the works. Don't change anything, just give me the audit.",
+      "expected_output": "Finds the 10 removable items; does NOT false-positive on the two precision traps (autoprefixer referenced only in postcss.config.js; src/plugins/analytics.ts loaded via dynamic import()).",
+      "expectations": [
+        "Flags `lodash` as an unused dependency",
+        "Flags `dayjs` as an unused dependency",
+        "Flags `src/utils/oldHelpers.ts` as an unused file",
+        "Flags `unusedCalc` in src/math.ts as dead code",
+        "Flags the unused `useEffect` import in src/components/Button.tsx",
+        "Flags `src/legacy.ts.bak` as a backup/removable file",
+        "Flags the commented-out `formatDateLegacy` block in src/utils/format.ts",
+        "Flags `.legacy-banner` and/or `.old-tooltip` as unused CSS classes",
+        "Flags `--unused-color` as an unused CSS variable",
+        "Flags `src/components/OldModal.test.tsx` as an orphaned test (its source is gone)",
+        "Does NOT flag `autoprefixer` as unused — referenced in postcss.config.js (config-only dependency)",
+        "Does NOT flag `src/plugins/analytics.ts` as a safe-to-delete unused file — loaded via dynamic `import(`./plugins/${PLUGIN}`)` in App.tsx",
+        "Does NOT flag `react` or `react-dom` as unused dependencies",
+        "Does NOT flag `axios` or `clsx` as unused dependencies",
+        "Does NOT flag `src/utils/format.ts` or `src/math.ts` as unused files",
+        "Does NOT flag `.btn`, `.card`, or `--primary` as unused CSS",
+        "Does NOT flag config/entry files (vite.config.ts, tsconfig.json, index.html, src/main.tsx, postcss.config.js) as unused",
+        "Does NOT flag `@types/react` or `@types/react-dom` as unused"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "python-audit",
+      "fixture": "fixtures/python-api",
+      "mode": "report",
+      "prompt": "audit my fastapi project for unused dependencies and dead code. it's in the current directory. be careful not to tell me to remove things that are actually used — last tool I tried flagged half my real deps. report only, don't delete anything.",
+      "expected_output": "Flags requests/beautifulsoup4/redis/legacy_handlers.py/deprecated_formatter/datetime.utcnow()/LEGACY_TOKEN. Does NOT flag the name-mismatch deps INCLUDING the obscure pycryptodome (imported as Crypto). NOTE: the obsolete-pattern (datetime.utcnow) + env-var assertions are where a literal-prompt baseline tends to miss vs the skill's standard category coverage.",
+      "expectations": [
+        "Flags `requests` as an unused dependency",
+        "Flags `beautifulsoup4` as an unused dependency",
+        "Flags `redis` as an unused dependency",
+        "Flags `app/legacy_handlers.py` as an unused file",
+        "Flags `deprecated_formatter` in app/utils.py as dead code",
+        "Flags `datetime.utcnow()` as a deprecated/obsolete API usage (no inline hint comment is present)",
+        "Flags `LEGACY_TOKEN` as an unused environment variable",
+        "Does NOT flag `Pillow` as unused (used as `from PIL import Image`)",
+        "Does NOT flag `python-dateutil` as unused (used as `from dateutil import parser`)",
+        "Does NOT flag `PyYAML` as unused (used as `import yaml`)",
+        "Does NOT flag `pycryptodome` as unused — imported as `from Crypto.Cipher import AES` in app/crypto.py (obscure PyPI->import name mismatch)",
+        "Does NOT flag `fastapi` or `uvicorn` as unused",
+        "Does NOT flag `DATABASE_URL` or `SECRET_KEY` as unused env vars",
+        "Does NOT flag `app/main.py`, `app/images.py`, `app/utils.py`, `app/crypto.py`, or `app/__init__.py` as unused files"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "node-fix-mode",
+      "fixture": "fixtures/node-react-app",
+      "mode": "fix",
+      "prompt": "clean up the quick wins in this repo and apply them on a separate branch so I can review before merging. --fix",
+      "expected_output": "Creates a cleanup branch, applies ONLY quick wins, defers Safe-to-Delete (oldHelpers.ts, orphan test), does not auto-remove deps, does not delete the dynamically-imported analytics.ts. This is the eval where the skill's Fix-Mode discipline most clearly beats an ad-hoc baseline.",
+      "expectations": [
+        "Creates a new git branch named `cleanup/...` rather than committing to main",
+        "Deletes `src/legacy.ts.bak` (backup file quick win)",
+        "Removes the unused `useEffect` import from src/components/Button.tsx",
+        "Removes the commented-out `formatDateLegacy` block from src/utils/format.ts",
+        "Makes at least one commit on the cleanup branch containing the cleanup changes",
+        "Preserves used source files and symbols — App.tsx, Button.tsx, format.ts, math.ts still exist and still export App/Button/formatDate/add",
+        "Does NOT auto-delete `src/utils/oldHelpers.ts` (Safe-to-Delete, not a quick win — defer/confirm)",
+        "Does NOT auto-delete `src/components/OldModal.test.tsx` (Safe-to-Delete orphan test, not a quick win)",
+        "Does NOT auto-remove `lodash`/`dayjs` from package.json (dependencies are report-only in Fix Mode)",
+        "Does NOT delete `src/plugins/analytics.ts` (loaded via dynamic import — deleting it would break the app)"
+      ]
+    }
+  ]
+}

@@ -4,3 +4,6 @@
 
 # Machine-local Claude Code settings (permissions, etc.) — each machine keeps its own
 .claude/settings.local.json
+
+# skill-creator eval scaffolding (fixtures, iteration runs, benchmarks) — throwaway
+.skill-creator-workspace/

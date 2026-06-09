@@ -1,0 +1,28 @@
+:root {
+  --primary: #3b82f6;
+  --unused-color: #ff00ff;
+}
+
+.card {
+  border: 1px solid var(--primary);
+  padding: 16px;
+}
+
+.btn {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-hover {
+  opacity: 0.8;
+}
+
+.legacy-banner {
+  background: linear-gradient(90deg, red, orange);
+  height: 200px;
+}
+
+.old-tooltip {
+  position: absolute;
+  display: none;
+}
