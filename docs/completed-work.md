@@ -199,3 +199,9 @@
 ## Session 42 (2026-06-06) — pre-dogfood review-hardening of /bx:webdesign + /bx:save
 - [x] Reviewed + hardened `/bx:webdesign` (skill-creator content review + `/code-review` xhigh, 16 fixes; merged + pushed `d6681e8`) — closed the S41 `app_runnable:false` Phase-2 dead-end (project-ID recovery path); Phase-3 git-safety (gitignore `.stitch/`, relocate `SITE.md` into `.webdesign/`, stage `DESIGN.md` in the token commit — fixes clean-tree self-trip + `git clean -fd` deletion risk); conditional `git add DESIGN.md`; `page <name>` re-fetch - `bx/skills/webdesign/SKILL.md` + `references/{phase1-extract,phase2-design-review,phase3-inject}.md`, dogfood checklist
 - [x] Reviewed + hardened `/bx:save` (content review, 7 findings A–G) — `allowed-tools` += `wc`/`awk`/`sort` (fast path no longer prompts on `wc`); `decision_row` → `decision_rows` list; `## Known Issues`/`## Completed` added to packet delta scope; `save-writer` delta-not-found `warnings:` + re-dispatch contract; `today` + session-block derivation clarified; `disable-model-invocation` flipped to `true` (explicit-only) - `bx/skills/save/SKILL.md` + `references/{mode-update,verification-checklists}.md`, `bx/agents/save-writer.md`
+
+## Session 43 (2026-06-08) — /bx:clean eval loop + Sonnet-dispatch fix
+- [x] /bx:clean skill-creator full eval loop — 2 iterations, 12 graded runs, 2 benchmarks (bx/skills/clean/evals/)
+- [x] /bx:clean Step 1 Sonnet-dispatch fix — route to dedicated cleanup-* agents (bx/skills/clean/SKILL.md, 65179cd)
+- [x] /bx:clean committed regression eval suite — de-hinted fixtures + precision traps (bx/skills/clean/evals/, 65179cd)
+- [x] /bx:clean description tightened — scope + motivation + negative boundaries (bx/skills/clean/SKILL.md, 1e5a455)

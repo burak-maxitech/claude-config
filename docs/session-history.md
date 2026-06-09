@@ -85,24 +85,7 @@
 
 ### Session 37 - 2026-05-28: GSC-auth investigation — listed Search Console properties via `mcp__gsc__list_properties`; set up portable multi-machine OAuth (`token.json` refresh_token in `~/.config/bx-seo/` + `GSC_CONFIG_DIR`, 7-day consent-screen caveat); confirmed the skill was **never** on MCP (exhaustive `git log -S` across branches/remotes/reflog/stash — only the roadmap doc mentions it); evaluated + **declined** roadmap #1 (GSC→MCP migration: no response caching + 10-URL batch cap regress the S31/S35 quota economics). Machine-local only; repo: no changes.
 
-### Session 38 - 2026-05-29
-**What happened:** The user reported `/bx:docs` (the end-of-session save paired with `/bx:resume`) routinely takes >10 min and they'd stopped using it; asked for an analysis of where to save time + whether an out-of-box skill could replace it. Diagnosed the cost, then reworked the skill end-to-end and renamed it `/bx:save`.
-- **Diagnosis (measured on this repo):** UPDATE mode ran an 8-part inline pipeline on Opus. Top costs: (1) Step 0 read ALL docs (~60k tokens) every run — incl. the 70k `key-decisions.md` + 53k `completed-work.md` append-only archives the update never reads *from* — and `--fast` didn't skip it (Step 0 ran before routing); (2) `verification-checklists.md §2` mandated echoing full file contents back; (3) verbose 300-600-word session/decision prose. Confirmed no out-of-box replacement (auto-memory = stable facts only; compaction = intra-session; `/init` = one-shot).
-- **Design (brainstorming skill):** locked 3 decisions — fast-by-default (`--full` opt-in), tight prose caps on new entries, surgical fixes + Sonnet subagent offload. Renamed `/bx:docs` → `/bx:save` ("save"/"resume" is a clean collision-proof pair). Spec at `docs/superpowers/specs/2026-05-29-bx-save-rework-design.md`.
-- **Architecture:** Opus orchestrator owns conversation-context + user-prompt work (composes a small "update packet": `claude_md_deltas`, `claude_md_session_block`, `session_history_entry`, `completed_items`, `decision_row`; runs the commit checkpoint). New `save-writer` Sonnet subagent (dispatched `bx:save-writer`) reads the big `session-history.md` + applies all file edits off the main thread. Scoped Step 0 reads only CLAUDE.md + git + TaskList on the fast path; `--full` defers README/docs reads to Step 0.3 and keeps rollups on the orchestrator (subagents can't `AskUserQuestion`).
-- **Execution (subagent-driven-development):** 7 tasks (rename dir → save-writer agent → change-report output → mode-update control-flow rewrite → SKILL.md body → cross-ref sweep → verify), implementer + review per substantive task. Final holistic review caught a **runtime blocker** — the skill dispatches via the Task tool but `Task` was missing from `allowed-tools` (every other dispatching skill has it) — plus a stale README tree dir name + a broken `../docs/references/` path in resume's SKILL.md; all fixed. Merged to `main` with `--no-ff` (8 commits); feature branch deleted.
-- **Note:** ran this very `/bx:docs` save on the OLD cached (slow) version — the new `/bx:save` activates only after push + `/plugin update bx`.
-
-**Files created/modified:**
-- `bx/agents/save-writer.md` (new) — Sonnet doc-writer subagent
-- `bx/skills/save/` (renamed from `bx/skills/docs/`) — `SKILL.md` (name/description/title/argument-hint/dispatch note + `Task` in allowed-tools); `references/mode-update.md` (scoped reads, fast-default routing, packet + dispatch, prose caps, Full Path); `references/verification-checklists.md` (change-report, no full-file dump)
-- `bx/skills/{resume,plan,health}/**`, `README.md`, `workflow.md`, `CLAUDE.md` — `/bx:docs` → `/bx:save` sweep; resume `SKILL.md` ref path `../docs/` → `../save/`; README tree `docs/` → `save/`
-- `docs/superpowers/specs/2026-05-29-bx-save-rework-design.md` + `docs/superpowers/plans/2026-05-29-bx-save-rework.md` (new)
-
-**Next session should:**
-- **Push `main` + `/plugin update bx` (or `cc`) to activate `/bx:save`**, then dogfood it as the real session-save (first end-to-end test of the speedup, the packet round-trip to `save-writer`, and the `bx:save-writer` dispatch naming).
-- Resume the flagged priority: **fix `/bx:seo`** (user flagged "messed up" — diagnose concrete symptom first).
-- Watch on first `/bx:save` run: packet field round-trip, the key-decisions anchor rule (insert before trailing non-table content), drift-warning accuracy, and that `--full` rollups still fire on the orchestrator.
+### Session 38 - 2026-05-29: Reworked `/bx:docs` → `/bx:save` — fast-by-default (`--full` opt-in for the README/docs sweep + rollups), tight prose caps on new entries, and a new `save-writer` Sonnet subagent that reads the big append-only archives & applies all doc edits off the main thread (Opus orchestrator composes a small update packet: `claude_md_deltas`/`session_block`/`session_history_entry`/`completed_items`/`decision_rows`). Diagnosed the >10-min slowness (Step 0 read ~60k of docs every run incl. archives the update never reads *from*; full-file echo in verification). Built brainstorm→spec→subagent-driven; final review caught a runtime blocker (`Task` missing from `allowed-tools`). Merged `--no-ff` (8 commits). (commits: 7432b87, 890fe06, f49d4ac, 77c8601)
 
 ### Session 39 - 2026-05-29
 **What happened:**
@@ -172,3 +155,21 @@
 **Next session should:**
 - `/plugin update bx` (or `cc`) to activate S41–S42 (the webdesign skill + both hardening passes) in the plugin cache, then dogfood `/bx:webdesign` against a real web project — verify the `app_runnable:false` recovery path — plus the real `/bx:seo` run.
 - Dogfood `/bx:tests` / `/bx:arch` / `/bx:health` (still never run end-to-end).
+
+### Session 43 - 2026-06-08
+**What happened:**
+- Ran the **skill-creator full eval loop** on `/bx:clean`: built 2 fixture repos (TS/React/Vite + FastAPI) with planted cleanup targets AND precision traps, dispatched with-skill vs no-skill baseline runs across 3 evals (node report, python report, node `--fix`), graded against the assertion set, and built 2 benchmarks. Iteration 1 used self-labeling fixtures (non-discriminating — both 100%); iteration 2 de-hinted them + added precision traps (config-only dep `autoprefixer`, dynamic-`import()` `analytics.ts`, obscure `pycryptodome`→`Crypto`). Result: with-skill 100% vs baseline 87.6%; the skill's real edge is **fix-mode discipline** (eval-2 10/10 vs 7/10 — baseline auto-deleted Safe-to-Delete files + deps) and **prompt-independent category coverage** (eval-1 caught `datetime.utcnow()` the baseline skipped). Raw detection ties the baseline.
+- **Fixed the skill's core dispatch bug** (`65179cd`): Step 1 said "spawn a Task subagent" → a generic Opus subagent, so the dedicated `cleanup-files-code`/`-deps-config`/`-styles-tests` agents (`model: sonnet`, least-privilege) were dead code. Now dispatches them by name, matching `/bx:arch`+`/bx:tests`.
+- **Committed a regression eval suite** under `bx/skills/clean/evals/` (de-hinted fixtures + traps + ground-truth + README), promoted from the gitignored skill-creator workspace.
+- **Tightened the skill description** (`1e5a455`) with scoped coverage, motivation triggers, and negative boundaries — hand-tuned because the auto-optimizer is Windows-broken.
+- **Two skill-creator Windows tooling breakages** found + worked around: viewer UTF-8 console crash (`PYTHONUTF8=1`) and `run_loop.py` asyncio `WinError 10038` (every triggering probe fails → unusable). Saved to auto-memory.
+
+**Files created/modified:**
+- `bx/skills/clean/SKILL.md` — Step 1 dispatch → named Sonnet agents; tightened `description:`
+- `bx/skills/clean/evals/**` — new committed eval suite (evals.json, GROUND-TRUTH.md, README.md, node-react-app + python-api fixtures)
+- `.gitignore` — ignore `.skill-creator-workspace/`
+- auto-memory `skill-creator-windows-gotchas.md` — new
+
+**Next session should:**
+- `/plugin update bx` (or `cc`) to activate S41–S43 in the plugin cache, then dogfood `/bx:webdesign`.
+- Consider applying the committed-eval-suite pattern to other never-dogfooded skills (`/bx:tests`, `/bx:arch`, `/bx:health`).
