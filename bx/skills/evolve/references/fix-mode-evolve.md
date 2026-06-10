@@ -10,11 +10,13 @@ A finding is fix-eligible only if **all** of the following hold. Check each in o
 
 1. **`tier: official`** — the finding originates from the changelog or docs lane, not the community lane. Advisory findings (community source) are never fix-eligible, regardless of the `--fix` flag. Why: community sources are not authoritative — acting on them without human review inverts the skill's risk model.
 
-2. **Current decision-log state is `open` or re-raised** — the finding has `decision: "open"` in `docs/upstream/state.json`, including entries re-raised from `rejected` because their `source_content_hash` changed. `deferred` findings re-surface in the report (Section 4) but are not offered to `--fix` — they are deferred deliberately. `applied` findings are not surfaced at all. `rejected`-and-unchanged findings are suppressed from the report entirely. Why: acting on a deferred or rejected finding without explicit re-evaluation bypasses the decision log.
+2. **Current decision-log state is `open` or re-raised** — the finding has `decision: "open"` in `docs/upstream/state.json`, including entries re-raised from `rejected` because their `source_content_hash` changed. `deferred` findings that were re-emitted by a lane re-surface in the report (Section 2 when re-emitted live, Section 4 when carried forward) but are not offered to `--fix` — they are deferred deliberately. `applied` findings are not surfaced at all. `rejected`-and-unchanged findings are suppressed from the report entirely. Why: acting on a deferred or rejected finding without explicit re-evaluation bypasses the decision log.
 
 3. **The proposed edit is a text change to files inside this repo** — the `affected_files` list contains only paths within this repo, excluding: historical archives (`docs/key-decisions.md`, `docs/session-history.md`, CLAUDE.md history sections) and `docs/upstream/state.json` (state writes are owned by the decision-log mechanics, not by finding edits). `README.md` and `workflow.md` ARE fix-eligible — they are operational docs and the lanes' Grep scope includes them deliberately (S45 sibling-echo rule). Changes that require external actions (updating a dependency, running a CLI, adding a new file not yet in the repo) are not mechanically applyable via Edit and are display-only. Why: the Edit tool requires an existing file with a unique old_string — non-text or out-of-repo changes cannot be expressed as Edit operations.
 
-If all three hold, the finding is fix-eligible and joins the ordered gate flow below.
+**Sentinel exclusion:** findings with a `finding_id` beginning `lane-unavailable-` (i.e., `lane-unavailable-changelog`, `lane-unavailable-docs`, `lane-unavailable-community`) are never eligible. They are lane-health reports, not findings about the toolkit, and are never written to the decision log.
+
+If all three hold (and the finding is not a sentinel), the finding is fix-eligible and joins the ordered gate flow below.
 
 **Eligible set scope:** only findings consolidated THIS RUN (Section 2 of the report) are gated. Section 4 carried-forward entries are display-only — `state.json` lacks the diff-able `source_excerpt` field for them (they were never re-emitted this run). To act on a carried-forward entry, re-run `/bx:evolve` so a lane re-emits it and Section 2 picks it up.
 
@@ -72,10 +74,10 @@ The combined diff covers ALL files in `affected_files`. Partial application rein
 
 **Verdicts:**
 
-- `y` — apply the edit to every file in `affected_files` using the Edit tool, one file at a time in list order. After all edits succeed, write the decision-log entry: `decision: "applied"`, `date`: today, `note`: one-line description of what was changed. See `bx/skills/evolve/references/state-schema.md` for the exact write procedure (Rule 2).
-- `n` — write `decision: "rejected"`, `date`: today, `note`: reason. Advance to the next finding.
-- `skip` — leave `decision: "open"`, advance to the next finding. The finding re-surfaces next run.
-- `abort` — stop the pass immediately. Findings already acted on in this pass keep their new verdicts. Remaining eligible findings stay `open`. Print the summary (below) with remaining counts as "aborted-remaining".
+- `y` — apply the edit to every file in `affected_files` using the Edit tool, one file at a time in list order. After all edits succeed, record the verdict in the in-context decision object: `decision: "applied"`, `date`: today, `note`: one-line description of what was changed. The single state write happens at the end of the pass (or immediately on abort), per state-schema's checkpoint rule.
+- `n` — record in-context: `decision: "rejected"`, `date`: today, `note`: reason. Advance to the next finding.
+- `skip` — leave `decision: "open"` (no in-context change). Advance to the next finding. The finding re-surfaces next run.
+- `abort` — stop the pass immediately. Findings already acted on in this pass keep their in-context verdicts. Write state immediately (Checkpoint 2 on abort). Remaining eligible findings stay `open`. Print the summary (below) with remaining counts as "aborted-remaining".
 
 ---
 
@@ -121,4 +123,4 @@ The "applied" count shows findings, not files. Surface the file count separately
 - **Edit historical archives.** `docs/key-decisions.md`, `docs/session-history.md`, and the history sections of `CLAUDE.md` are repo records-of-past-state per the S32 convention. They are never touched by `--fix` mode.
 - **Touch files outside the repo.** MCP configs, shell profiles, OS settings — out of scope.
 - **Apply advisory findings.** Community-sourced findings (tier: community) are never fix-eligible; they render in Section 3 of the report only.
-- **Advance the watermark.** The orchestrator advances the watermark at the end of every run (Step 5) regardless of whether `--fix` was passed. Fix-mode verdicts are written to the decision log; they do not alter the watermark logic. See `bx/skills/evolve/references/state-schema.md` Rule 4.
+- **Advance the watermark.** The orchestrator advances the watermark at the end of every run (Step 6) regardless of whether `--fix` was passed. Fix-mode verdicts are written to the decision log; they do not alter the watermark logic. See `bx/skills/evolve/references/state-schema.md` Rule 4.

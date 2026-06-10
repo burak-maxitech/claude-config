@@ -3,7 +3,7 @@ name: evolve
 description: Audits the bx toolkit against upstream Anthropic changes — new Claude Code releases, official-docs best practices, and community patterns — since the last run's watermark. Reports breakage/best-practice/opportunity findings with citations; --fix applies them behind a per-finding diff gate. Use when Anthropic ships a new Claude Code version, when built-ins change or collide, periodically (monthly) to keep skills current, or when asking "are my skills up to date with the latest capabilities".
 disable-model-invocation: true
 effort: high
-allowed-tools: Read, Grep, Glob, Edit, Write, Bash(git:*), Bash(gh:*), Bash(wc:*), Bash(jq:*), Bash(cat:*), Bash(head:*), Bash(python:*), Bash(python3:*), WebFetch, Task
+allowed-tools: Read, Grep, Glob, Edit, Write, Bash(git:*), Bash(python:*), Bash(python3:*), Task
 argument-hint: "[--full] [--fix] [--no-community]"
 ---
 
@@ -88,9 +88,9 @@ For each Task call:
 
 ```
 Watermark: last_changelog_version=<value|null> · docs_checked_at=<value|null> · community_checked_at=<value|null>
-Capability inventory: <the list from Step 0.2>
-Pain points: <the list from Step 0.3>
-Tier definitions: official = actionable with citation; community = advisory-only, never fix-eligible
+capability_inventory: <the list from Step 0.2>
+pain_point_list: <the list from Step 0.3>
+tier_definitions: official = actionable with citation; community = advisory-only, never fix-eligible
 Repo root: the working directory. Grep scope for affected_files: bx/, README.md, workflow.md.
 Output: structured JSON-shaped findings per the schema in your scan instructions. finding_id: null and source_excerpt as specified — the orchestrator computes all hashes. Do NOT format a report.
 ```
@@ -129,12 +129,12 @@ For each consolidated finding, look up its computed `finding_id` in the stored `
 
 - **`rejected` + source_content_hash UNCHANGED:** suppress from the report; count in footer as "N rejected (unchanged, suppressed)".
 - **`rejected` + source_content_hash CHANGED:** surface with `[re-raised — source changed since rejection]` badge. Update the stored entry: `decision → open`, `source_content_hash → new hash`, `date → today` (per state-schema Rule 3).
-- **`deferred`:** surface in Section 4 of the report with `[deferred <original date>]` badge (per state-schema Rule 5). If the live `source_content_hash` differs from stored, update stored hash and note "source changed since deferral" alongside the badge. Do NOT update the `date` field.
+- **`deferred`:** if re-emitted by a lane this run → surface in Section 2 (ranked, live) with `[deferred <original date>]` badge; if not re-emitted this run → carry forward in Section 4 (per state-schema Rule 5). If the live `source_content_hash` differs from stored, update stored hash and note "source changed since deferral" alongside the badge. Do NOT update the `date` field.
 - **`open` or no existing entry:** surface normally.
 
 ### 3.5 — Cross-lane dedup
 
-Same `finding_id` from two lanes → keep the higher-authority lane's version (changelog > docs > community); merge citations into a single `citation` string (e.g. `"v2.1.169 / docs"`). Tier-2 (community) findings are advisory regardless of class — never promote a community finding to actionable by merging it with a Tier-1 finding that shares a `finding_id`.
+Cross-lane corroboration matches on `affected_capability`: when two lanes emit findings for the same capability describing the same upstream change, keep the higher-authority lane's finding (changelog > docs > community) and append the other lane's citation to the detail block. `finding_id` dedup applies only within a lane (already handled lane-side) — `finding_id` can never collide across lanes because the URL spaces are disjoint. Tier-2 (community) findings are advisory regardless of class — never promote a community finding to actionable by merging it with a Tier-1 finding that describes the same capability.
 
 ---
 
@@ -142,7 +142,9 @@ Same `finding_id` from two lanes → keep the higher-authority lane's version (c
 
 Read `bx/skills/evolve/references/report-template.md` and render exactly as specified there. Do not improvise the report structure; report-template.md owns every section, the headline format, the empty-state rows, and the footer shape.
 
-**New actionable findings → decision log.** Before rendering the report, write every NEW finding (no existing `finding_id` entry in `decisions`) to `docs/upstream/state.json` as `decision: "open"` per state-schema Rule 1. Use the Read-modify-in-context-Write procedure from state-schema.md's Update Mechanics section.
+**New actionable findings → decision log.** Before rendering the report, write every NEW finding (no existing `finding_id` entry in `decisions`) to `docs/upstream/state.json` as `decision: "open"` per state-schema Rule 1. Use the Read-modify-in-context-Write procedure from state-schema.md's Update Mechanics section. **This is Checkpoint 1** — the full validated state write at the end of Step 4 (new `open` entries + re-raise transitions). After this write, the report and state agree; a crash between the checkpoint and Step 5 re-runs cleanly from the saved state.
+
+**`lane-unavailable-*` sentinels are NEVER written to the decision log.** Sentinels are lane-health reports, not actionable findings about the toolkit. Their content renders only in: the Section 1 lane row's status detail (the sentinel's `upstream_delta` — the verbatim errors), the report footer, and the blocked watermark advance in Step 6. They do not produce `decisions` entries.
 
 **Advisory findings are NOT written to the decision log.** Community-sourced (`tier: community`) findings are advisory-only and never actionable on their own. There is nothing to track in `decisions` for them — they appear in Section 3 of the report and are gone when the run ends. The decision log tracks only actionable findings that require a verdict.
 
@@ -154,7 +156,7 @@ Read `bx/skills/evolve/references/report-template.md` and render exactly as spec
 
 Read `bx/skills/evolve/references/fix-mode-evolve.md` and run the gate flow exactly as specified there. fix-mode-evolve.md owns: eligibility rules, the pre-pass summary format, the per-finding display format, verdicts (y/n/skip/abort), Edit-tool edge cases, and the post-pass summary.
 
-Apply verdicts to `docs/upstream/state.json` per state-schema Rule 2 (overwrite in place, never append).
+Apply verdicts to `docs/upstream/state.json` per state-schema Rule 2 (overwrite in place, never append). **This is Checkpoint 2** — one full validated state write at the end of the pass (or immediately on abort), covering all verdicts recorded during the pass. Record verdicts in-context as the pass proceeds; the single write happens at the end.
 
 ### Default (no `--fix`):
 
@@ -162,7 +164,7 @@ End with one closing line:
 
 > Run `/bx:evolve --fix` to apply N eligible findings. M open findings carried forward in `docs/upstream/state.json`.
 
-Where N = count of Tier-1 open findings in this run's report (fix-eligible), and M = total `open` + `deferred` entries in the decision log after this run.
+Where N = count of Tier-1 open findings in this run's report that pass ALL of fix-mode-evolve.md's eligibility rules (pre-compute by applying the full eligibility check — tier:official, decision:open or re-raised, text edit in-repo), and M = total `open` + `deferred` entries in the decision log after this run.
 
 ---
 
@@ -174,7 +176,7 @@ At the end of EVERY run (default or `--fix`), advance the watermark per state-sc
 - `docs_checked_at` ← today's date (only if docs `lane_status` is `ok` or `degraded`).
 - `community_checked_at` ← today's date (only if community `lane_status` is `ok` or `degraded`). A `--no-community` run leaves this field unchanged.
 
-Rewrite `docs/upstream/state.json` using the canonical Read-modify-in-context-Write procedure from state-schema.md's Update Mechanics section. Validate before writing; on any validation failure, do NOT write and report the failure explicitly — leave `state.json` at its previous valid state.
+Rewrite `docs/upstream/state.json` using the canonical Read-modify-in-context-Write procedure from state-schema.md's Update Mechanics section. Validate before writing; on any validation failure, do NOT write and report the failure explicitly — leave `state.json` at its previous valid state. **This is Checkpoint 3** — the watermark-advance write. If Checkpoint 2 already wrote the file in this same run and no new state changes occurred between that write and this step, this write may be merged with Checkpoint 2 (write the watermark update together with the final verdict state in a single Write call).
 
 ---
 

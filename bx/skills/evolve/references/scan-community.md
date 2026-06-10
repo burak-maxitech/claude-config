@@ -216,7 +216,7 @@ pages_failed: [<url>: <error>, ...]         # empty list [] if all fetches succe
 searches_failed: [<query>: <error>, ...]    # empty list [] if no query failed with an error
 lane_status: ok | degraded | unavailable
 scan_note: <optional — used for: zero findings despite clean run; stale_source flags; cap_reached note; official_source_found notices; other non-error observations>
-discarded_findings: <count of findings dropped by the 10-finding cap PLUS zero-hit affected_files discards from Step 6 PLUS unconfirmable discards from Step 4, or 0>   # same semantics in all three lanes
+discarded_findings: <count of findings dropped by the 10-finding cap PLUS zero-hit affected_files discards from Step 6 PLUS unconfirmable discards from Step 4, or 0>
 ```
 
 **Zero-findings-but-searches-ran case:** set `searches_run` to the count of queries issued, `pages_fetched` to the count of pages successfully fetched, `pages_failed` and `searches_failed` to their real contents (empty lists only if truly no failures occurred), `lane_status` to what actually happened (`ok` only if nothing failed with an error; `degraded` if any query or fetch failed with an error), and use `scan_note` to explain that no gaps were found. Never return an empty finding list without a `scan_note` — that is indistinguishable from a partial run.

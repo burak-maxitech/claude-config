@@ -51,7 +51,7 @@ The AI tooling space moves fast: Anthropic ships new Claude Code versions, renam
    - `best_practice` — official guidance changed for something the plugin does.
    - `opportunity` — new capability that maps to a recorded pain point.
    - Tier-2 findings are always `advisory` regardless of class.
-3. **Decision-log filter.** Drop findings whose `finding_id` has a `rejected` decision AND whose source content hash is unchanged since that decision. Surface previously-`deferred` findings with a `[deferred <date>]` badge.
+3. **Decision-log filter.** Drop findings whose `finding_id` has a `rejected` decision AND whose source content hash is unchanged since that decision. Cross-lane corroboration matches on `affected_capability` (not `finding_id` — URL spaces are disjoint across lanes so `finding_id` can never collide cross-lane): when two lanes emit findings for the same capability, keep the higher-authority lane's finding and append the other's citation. Surface previously-`deferred` findings that were re-emitted this run with a `[deferred <date>]` badge in Section 2; entries not re-emitted carry forward to Section 4.
 4. **Report.** Headline: `Breakage: N · Best-practice: M · Opportunities: K · Advisory: J`. Per finding: classification, severity, certainty, **all affected files** (the S45 doc-drift rule is baked into the finding schema — a proposed edit that doesn't enumerate every sibling-file echo is incomplete), proposed edit, Tier-1 citation. Footer disclosure: sources fetched + versions, watermark old → new, decision-log filters applied, community fetch count vs cap. **Every new actionable finding is written to the decision log as `open`** — findings survive the watermark advance until explicitly decided.
 5. **`--fix` tail.** Per-finding diff preview gate (y / n / skip / abort). Every verdict overwrites the finding's `open` entry in the decision log. Advisory findings are never offered. After the pass: remind `/plugin update bx` + `/reload-plugins`, and recommend the S42 content-review treatment for any skill that received non-trivial edits.
 6. **Closing + watermark.** The watermark advances at the end of **every** run (default or `--fix`) — safe because undecided findings persist as `open` in the decision log and re-surface in every report until decided. Default-mode closing line: how to apply (`--fix`) and the count of `open` findings carried forward.
@@ -100,8 +100,8 @@ Committed to the repo (multi-machine sync, like everything else here). Rejected 
 
 ## Orchestrator allowed-tools
 
-`Read, Grep, Glob, Edit, Write, Bash(git:*), Bash(gh:*), Bash(wc:*), Bash(jq:*), Bash(cat:*), Bash(head:*), Bash(python:*), Bash(python3:*), WebFetch, Task`
-(Write is for state.json; Edit for `--fix`; WebFetch for orchestrator-side citation spot-checks. The S42/S45 rule applies: this list must be re-verified against the final body before ship.)
+`Read, Grep, Glob, Edit, Write, Bash(git:*), Bash(python:*), Bash(python3:*), Task`
+(Write is for state.json; Edit for `--fix`; gh/WebFetch/wc/jq/cat/head are lane tools — lanes carry their own network/CLI tools and jq is forbidden for state writes; orchestrator needs only python for hashing.)
 
 ## Validation plan
 

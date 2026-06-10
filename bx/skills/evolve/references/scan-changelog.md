@@ -83,6 +83,8 @@ For each candidate delta: check whether it intersects the `capability_inventory`
 
 For each surviving delta (post-filter), identify the old/changed token (command name, flag name, frontmatter key, hook event name). Run Grep over the repo with scope `bx/`, `README.md`, and `workflow.md` to find every file that contains that token. List every hit file in `affected_files`. This is how sibling-file echoes are found (S45 rule). Do not fill `affected_files` from the capability string alone — always grep first.
 
+**Zero-hit discard rule:** for `breakage` and `best_practice` findings, zero Grep hits for the old/changed token means the plugin does not contain it — discard the finding and increment `discarded_findings`. For `opportunity` findings there is no old token to search for; instead, set `affected_files` to the file(s) the proposed edit would touch, identified from the pain point's subject area. An empty `affected_files` is never legal in an emitted finding — if you cannot identify at least one file for any class, discard.
+
 Example: if a flag `--allowed-tools` is renamed, run `Grep pattern="--allowed-tools" path="bx/"` and also check `README.md` and `workflow.md` individually. Every returned file path goes into `affected_files`.
 
 ---
@@ -197,8 +199,11 @@ releases_scanned: <n — 0 if lane_status is unavailable, since nothing was succ
 newest_version_seen: <unprefixed version string, or null if unavailable>
 lane_status: ok | degraded | unavailable
 scan_note: <optional — used when scan ran cleanly but zero capability matches found, when the --limit 50 window was exhausted, or when the watermark anchor was not found>
-discarded_findings: <count of findings dropped by the 20-finding cap PLUS zero-hit affected_files discards from Step 7, or 0>   # same semantics in all three lanes
+discarded_findings: <count of findings dropped by the 20-finding cap PLUS zero-hit affected_files discards from Step 7, or 0>
+releases_digest: [<unprefixed version> — <publishedAt date> — <one-line summary>, ...]   # one entry per in-scope release processed; on the degraded path (CHANGELOG.md fallback) the date field is omitted since publishedAt is unavailable
 ```
+
+`releases_digest` feeds the report's Section 1 per-release lines. Include one entry for every release that was in scope (i.e., every release fetched and evaluated, regardless of whether it produced a finding). If `lane_status` is `unavailable`, emit an empty list `[]`.
 
 **Zero-new-releases case:** when `last_changelog_version` equals the newest release tag in the window (i.e., no in-scope releases exist since the watermark), set `releases_scanned: 0`, `lane_status: ok`, and `newest_version_seen` to the incoming `last_changelog_version` value (a no-op advance). Never emit `null` for `newest_version_seen` on an `ok` run — the orchestrator advances the watermark to this value, and `null` would clobber the stored watermark and force a full rescan on the next run.
 

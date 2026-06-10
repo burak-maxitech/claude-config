@@ -32,9 +32,26 @@ The watermark records the furthest upstream point checked on the most recent com
 
 Without it, every run would re-evaluate the entire changelog from the beginning. Most of the time the orchestrator would reach the same "already applied" or "already rejected" verdict for each entry — wasting tokens and obscuring the genuinely new findings the user needs to act on. The watermark makes runs incremental: only changes since the last run reach the report.
 
-The watermark advances at the END of every run (Step 5), not the beginning. Advancing at the start would mean a partial failure (network error mid-run, skill crash) marks entries as checked when they were never fully evaluated.
+The watermark advances at the END of every run (Step 6), not the beginning. Advancing at the start would mean a partial failure (network error mid-run, skill crash) marks entries as checked when they were never fully evaluated.
 
 Each `*_checked_at` field advances ONLY if that source class was actually checked this run (lane_status ok or degraded). A lane that was skipped (`--no-community`) or unavailable keeps its previous timestamp so the missed range is re-checked next run.
+
+### Null-seed shape (first-run / recovery)
+
+When `docs/upstream/state.json` is missing (first-ever run or corrupted), Step 0 recreates it from this normative null-seed shape via Write, then treats the run as `--full`:
+
+```json
+{
+  "watermark": {
+    "last_changelog_version": null,
+    "docs_checked_at": null,
+    "community_checked_at": null
+  },
+  "decisions": []
+}
+```
+
+This is the committed initial file shape and the recovery form — both are identical. Every field that appears in a non-seed state.json is populated by the skill during its first successful run.
 
 ---
 
@@ -103,8 +120,8 @@ Each entry in the `decisions` array represents one actionable finding that has b
 | `source_url` | string | yes | The canonicalized URL of the upstream source page that drove this finding (see canonicalization rule below). Makes `finding_id` recomputable from stored state and makes the log self-describing. |
 | `affected_capability` | string | yes | The capability string used in the `finding_id` computation (e.g. `"bx:seo/allowed-tools"`). Makes `finding_id` recomputable from stored state without re-running the hash logic over free-text fields. |
 | `source_content_hash` | string (40-char hex SHA-1) | yes | Normalized SHA-1 of the specific upstream section text that drove this finding (the cited paragraph or bullet, not the whole page). Used by the trigger-based re-raise rules for `rejected` and `deferred` entries — see Rules 3 and 5. |
-| `class` | enum string or null | yes | The finding's class at its last surfacing: `breakage`, `best_practice`, or `opportunity`. Null for sentinel/degenerate entries. **Why stored:** carried-forward findings must be renderable in the report's Section 4 from state alone — without a stored class the orchestrator cannot label entries no lane re-emitted this run. |
-| `title` | string or null | yes | The finding's one-line title at its last surfacing (e.g. `` "`allowed-tools` glob syntax changed" ``). Null for sentinel/degenerate entries. **Why stored:** same reason as `class` — Section 4 rendering requires it without a live lane re-emit. |
+| `class` | enum string | yes | The finding's class at its last surfacing: `breakage`, `best_practice`, or `opportunity`. Always non-null for stored entries — `lane-unavailable-*` sentinels are never written to the `decisions` array (they are lane-health reports, not actionable findings), so every stored entry has a non-null class. **Why stored:** carried-forward findings must be renderable in the report's Section 4 from state alone — without a stored class the orchestrator cannot label entries no lane re-emitted this run. |
+| `title` | string | yes | The finding's one-line title at its last surfacing (e.g. `` "`allowed-tools` glob syntax changed" ``). Always non-null for stored entries — same reason as `class`: sentinels never enter the `decisions` array. **Why stored:** same reason as `class` — Section 4 rendering requires it without a live lane re-emit. |
 | `note` | string or null | yes (nullable) | Human-readable explanation of the verdict — a one-liner covering what was done or why it was skipped. The key must always be present; the value may be null (use null, not absent key). |
 
 ### finding_id computation (normative)
@@ -153,9 +170,9 @@ def source_content_hash(text: str) -> str:
 
 These rules are invariants — the orchestrator must not deviate from them. Each rule is stated with its reason because the reason is the guard against well-intentioned improvisation that breaks the contract.
 
-### Rule 1: New actionable findings are written as `open` at report time
+### Rule 1: New actionable findings are written as `open` at the Step-4 checkpoint
 
-When the orchestrator identifies a finding that has no existing `finding_id` entry in `decisions`, it writes a new entry with `decision: "open"` before emitting the report. **Why:** findings survive watermark advances. Because every undecided finding persists as an `open` entry and re-surfaces in every report until the user reaches a verdict, the watermark can safely advance at the end of every run — there is no risk of a finding disappearing between runs just because the watermark moved past its source version. A secondary bonus: if the run crashes after reporting but before writing state, re-running re-surfaces the finding from state rather than re-announcing it as new.
+When the orchestrator identifies a finding that has no existing `finding_id` entry in `decisions`, it writes a new entry with `decision: "open"` at the Step-4 checkpoint (the first state write of every run, covering new `open` entries + re-raise transitions, written before the report is rendered). **Why:** findings survive watermark advances. Because every undecided finding persists as an `open` entry and re-surfaces in every report until the user reaches a verdict, the watermark can safely advance at the end of every run — there is no risk of a finding disappearing between runs just because the watermark moved past its source version. A crash between the checkpoint write and Step 5 leaves state current; re-running re-surfaces findings from state rather than re-announcing them as new.
 
 ### Rule 2: Every verdict overwrites the entry in place
 
@@ -180,7 +197,7 @@ A `rejected` finding is re-raised ONLY when a current run's lane emits a finding
 
 ### Rule 4: Each watermark timestamp advances only if its lane ran this run
 
-After all findings have been written to state (Rule 1) and any `--fix` verdicts applied (Rule 2), the orchestrator updates the watermark fields: `last_changelog_version` to the highest tag processed. `docs_checked_at` advances to today ONLY if the docs lane ran this run (lane_status ok or degraded). `community_checked_at` advances to today ONLY if the community lane ran this run. A lane that was skipped (`--no-community`) or unavailable keeps its previous timestamp, ensuring the missed range is re-checked on the next run.
+After all findings have been written to state (Rule 1) and any `--fix` verdicts applied (Rule 2), the orchestrator updates the watermark fields at Step 6: `last_changelog_version` to the highest tag processed. `docs_checked_at` advances to today ONLY if the docs lane ran this run (lane_status ok or degraded). `community_checked_at` advances to today ONLY if the community lane ran this run. A lane that was skipped (`--no-community`) or unavailable keeps its previous timestamp, ensuring the missed range is re-checked on the next run.
 
 **Why:** advancing at the end, not the beginning, means a failed or partial run leaves the watermark at the last fully-completed run's value. Per-lane tracking means a `--no-community` run does not falsely claim community sources were checked.
 
@@ -196,14 +213,20 @@ Any later verdict (applied/rejected) overwrites the `deferred` entry per Rule 2 
 
 ## Update mechanics
 
-The orchestrator rewrites the entire file on every run that changes state. No appending, no shell-based in-place edits, no `jq` streaming writes that assume a particular shell environment. This file owns this procedure — `SKILL.md` must reference here rather than restate it.
+The orchestrator rewrites the entire file at exactly three sanctioned checkpoints per run. No appending, no shell-based in-place edits, no `jq` streaming writes that assume a particular shell environment, and no per-finding mid-pass writes. This file owns this procedure — `SKILL.md` must reference here rather than restate it.
 
-**Canonical procedure:**
+**Three-checkpoint rule:**
 
-1. **Read** `docs/upstream/state.json` via the Read tool at the start of the run (Step 1). Deserialize into an in-context object.
-2. **Modify** the in-context object as findings are evaluated and verdicts recorded throughout the run. Do not write intermediate states.
+1. **Checkpoint 1 — end of Step 4** (new `open` entries + re-raise transitions): written before the report is rendered so report and state agree. This is the only write in default-mode runs.
+2. **Checkpoint 2 — end of the `--fix` pass, OR immediately on abort**: one write covering all verdicts of the pass. Record verdicts in-context as the pass proceeds; do not write after each verdict.
+3. **Checkpoint 3 — Step 6 watermark advance**: the watermark-field update write. May be merged with Checkpoint 2 if nothing changed between that write and Step 6 (write both together in a single Write call).
+
+**Canonical procedure (applied at each checkpoint):**
+
+1. **Read** `docs/upstream/state.json` via the Read tool at the start of the run (Step 0). Deserialize into an in-context object.
+2. **Modify** the in-context object as findings are evaluated and verdicts recorded throughout the run. Do not write between checkpoints.
 3. **Validate** the modified object before writing: confirm the `decisions` array has no duplicate `finding_id` values; confirm all required fields are present on every entry; confirm `decision` values are in the allowed enum set. **On ANY validation failure, do NOT write the file.** Report the validation failure in the run output and leave `state.json` untouched so the previous valid state is preserved.
-4. **Write** the validated object back to `docs/upstream/state.json` via the Write tool at the end of the run (Step 5), serialized as pretty-printed JSON (2-space indent, keys in schema order). The Write tool is an atomic overwrite — no temp file needed.
+4. **Write** the validated object back to `docs/upstream/state.json` via the Write tool, serialized as pretty-printed JSON (2-space indent, keys in schema order). The Write tool is an atomic overwrite — no temp file needed.
 
 **Why no shell-based writes:** shell state does not persist across Bash tool calls in Claude Code. A `jq` command that reads from a file in one Bash call and writes in another has no guaranteed consistency if the run interleaves tool calls. The Read-modify-in-context-Write pattern keeps the entire state transition inside a single logical unit the orchestrator controls, with no shell state assumptions.
 

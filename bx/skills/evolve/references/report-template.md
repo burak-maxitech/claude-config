@@ -16,7 +16,7 @@ Normal case:
 **Breakage: N · Best-practice: M · Opportunities: K · Advisory (community): J**
 ```
 
-Numbers from Step 4 consolidation. All-zero special case — render instead:
+Numbers from Step 3 consolidation. All-zero special case — render instead:
 
 ```
 ## /bx:evolve — upstream delta report
@@ -56,7 +56,9 @@ For the changelog lane, the "Range covered" shows `<old watermark version> → <
 
 For docs and community lanes, the "Range covered" shows `<old *_checked_at> → today`. If the old timestamp was null (first run), render the old end as "first run". For a skipped or unavailable lane, render `—`.
 
-Below the table, one line per release processed by the changelog lane:
+**Unavailable lane status detail:** when a lane's status is `unavailable`, include the sentinel's `upstream_delta` field (the verbatim errors from the failed fetch/auth attempts) as the status detail in that lane's row. This is the one place sentinel content renders — the sentinel is never written to the decision log and never appears in Sections 2–4.
+
+Below the table, one line per release processed by the changelog lane. These lines come from the changelog lane's `releases_digest` footer field (one entry per in-scope release: `<unprefixed version> — <publishedAt date> — <one-line summary>`). On the degraded path, the date is omitted from the digest entries (not available via raw CHANGELOG.md):
 
 ```
 **Changelog entries scanned this run:**
@@ -94,7 +96,7 @@ Empty state: render the header row plus one row: `| — | — | — | None — n
 - **Title:** the finding's short title.
 - **Sev:** `H` (High), `M` (Medium), `L` (Low).
 - **Cert:** certainty float 0.0–1.0 (2 decimal places).
-- **Citation:** the release tag and/or lane that sourced the finding (e.g. `v2.1.169`, `docs`, `v2.1.169 / docs` when corroborated by multiple lanes).
+- **Citation:** the release tag and/or lane that sourced the finding (e.g. `v2.1.169`, `docs`, `v2.1.169 / docs` when two lanes emitted findings for the same `affected_capability` describing the same upstream change — the higher-authority lane's finding is kept and the other lane's citation is appended here).
 
 Below each table, render a "Top finding detail" block for the #1 ranked finding:
 
@@ -123,9 +125,15 @@ Citation: https://code.claude.com/docs/en/settings#allowed-tools · v2.1.169 rel
 **#2 — Hook event `PreToolUse` renamed** [breakage · H · cert 0.90] [re-raised — source changed since rejection]
 ```
 
+**Deferred findings badge:** a finding whose `finding_id` matched a `deferred` entry AND was re-emitted by a lane this run renders in Section 2 (ranked, live) — NOT in Section 4. Add a `[deferred <original date>]` badge, where the date is from the stored entry's `date` field. If the live `source_content_hash` differs from the stored one, add a note in the detail block: "source changed since deferral". Example:
+
+```
+**#3 — Hooks rework could simplify /bx:health** [opportunity · M · cert 0.65] [deferred 2026-05-28]
+```
+
 **Completeness rule (S45 doc-drift):** an entry whose `affected_files` list misses a sibling echo is an incomplete finding — all files that contain the affected pattern must be listed. The orchestrator must cross-check sibling skill files before emitting a finding. A finding that touches one SKILL.md but not its sibling references/ files is incomplete unless the pattern genuinely does not appear there.
 
-**Hash fields:** lane agents emit `finding_id: null` plus `source_excerpt` (the verbatim heading-bounded extract), `source_url`, and `affected_capability`. The orchestrator computes `finding_id` and `source_content_hash` at consolidation (Step 4) per the normative snippets in `bx/skills/evolve/references/state-schema.md`, running them via `Bash(python:*)`. By the time the report is rendered, both hash fields exist in the consolidated finding object.
+**Hash fields:** lane agents emit `finding_id: null` plus `source_excerpt` (the verbatim heading-bounded extract), `source_url`, and `affected_capability`. The orchestrator computes `finding_id` and `source_content_hash` at consolidation (Step 3) per the normative snippets in `bx/skills/evolve/references/state-schema.md`, running them via `Bash(python:*)`. By the time the report is rendered, both hash fields exist in the consolidated finding object.
 
 ### Best-practice
 
@@ -227,10 +235,10 @@ Watermark: changelog 2.1.145 → 2.1.170 · docs 2026-05-10 → 2026-06-09 · co
 Open entries written this run: 7
   (these persist in docs/upstream/state.json and re-surface until acted on)
 
-Discarded findings (cap drops + zero-hit affected_files discards + unconfirmable discards, per lane):
-  changelog lane: 3 discarded
-  docs lane:      1 discarded
-  community lane: 0 discarded
+Discarded findings (per lane — each lane reports its own composition):
+  changelog lane: 3 discarded  (cap drops + zero-hit affected_files discards from Step 7)
+  docs lane:      1 discarded  (cap drops + zero-hit affected_files discards from Step 5 + verification-gate discards from Step 3)
+  community lane: 0 discarded  (cap drops + zero-hit affected_files discards from Step 6 + unconfirmable discards from Step 4)
 ```
 
 The "Decision-log filters" line makes the suppression count explicit. If zero findings were suppressed, render "0 rejected findings suppressed." If a community lane was skipped, its watermark line shows the old value with a note: `community 2026-05-10 → (skipped — no advance)`.
