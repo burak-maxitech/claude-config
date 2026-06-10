@@ -10,7 +10,7 @@ allowed-tools: Read, Glob, Bash(git:*), Bash(ls:*), Bash(gh:*), Bash(wc:*), Bash
 
 You are a routing advisor. Your only output is a short report that tells the user **which skills to run in what order**, given the current state of their repo. **You do not invoke any skills, edit any files, or take any actions** beyond the read-only inspection below.
 
-The available skills you route between are: `/bx:resume`, `/simplify`, `/code-review`, `/bx:review`, `/code-review ultra`, `/bx:clean`, `/bx:arch`, `/bx:tests`, `/bx:seo`, `/bx:plan`, `/bx:save`. (`/simplify`, `/code-review`, and `/code-review ultra` are Anthropic built-ins; the `/bx:*` skills are this repo's. `/code-review ultra` is the cloud pass formerly called `/ultrareview`.)
+The available skills you route between are: `/bx:resume`, `/simplify`, `/code-review`, `/bx:review`, `/code-review ultra`, `/bx:clean`, `/bx:arch`, `/bx:tests`, `/bx:seo`, `/bx:webdesign`, `/bx:plan`, `/bx:save`. (`/simplify`, `/code-review`, and `/code-review ultra` are Anthropic built-ins; the `/bx:*` skills are this repo's. `/code-review ultra` is the cloud pass formerly called `/ultrareview`. `/bx:webdesign` is web-projects-only and routed only from Bucket E when the improvement appetite is visual — it re-skins the site's design, it is not a code-health audit.)
 
 ---
 

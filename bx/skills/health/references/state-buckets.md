@@ -145,6 +145,7 @@ Build the doc surface first; everything downstream is easier with it.
 
 Why:
 - `/bx:arch` is the highest-signal entry point when nothing is on fire — it surfaces deletions, refactors, and perf wins ranked by impact. Use `/bx:tests` instead when the test suite specifically is what you want to invest in (coverage gaps in critical code + redundant/wasteful tests). When `is_web: true`, `/bx:seo` is also a strong inline option — SEO/GEO findings tend to deliver visible business impact (search ranking, AI citation) and the skill tracks scores over time in `docs/seo-history.md` so progress compounds across runs.
+- When `is_web: true` and the user's improvement appetite is *visual* rather than structural — "the app works but looks dated" — route to `/bx:webdesign` instead of the audit chain. It re-skins the site's design via Google Stitch as a self-contained pipeline (extract → design → inject/verify) on a dedicated `webdesign/<date>` branch with rollback. It replaces the whole flow above (no `/bx:plan` step needed — it plans internally), and it needs a one-time Stitch MCP + `stitch-skills` setup, so flag that prerequisite when recommending it to someone who hasn't run it before.
 - Pick **one** finding (don't try to do them all).
 - `/bx:plan` to scope the change before writing code.
 - Then the standard implement → review → docs loop.
@@ -177,6 +178,6 @@ When two buckets match the signal pattern roughly equally:
 - **Active debugging / incident response.** This skill assumes calm-water decision-making. If something is on fire, the user reaches for grep, debugger, and `/bx:review --security` directly — not a routing advisor.
 - **Greenfield / new feature work.** That's `/bx:plan` directly. The advisor will route there from Bucket E if `Next Steps` lists it, but it doesn't try to be a feature router.
 - **Doc-only sessions.** That's `/bx:save` directly. The advisor will mention it as part of every flow but never as the standalone recommendation — if the user already knows it's a doc session, they don't need routing.
-- **Visual redesign work.** Re-skinning a site's look is `/bx:webdesign` directly — it has its own phased pipeline (extract → design → inject/verify) and doesn't belong in a code-health sequence, which is why it's absent from the skill roster on purpose.
+- **Visual redesign execution inside audit chains.** The advisor *can* route to `/bx:webdesign` (Bucket E, web projects, visual appetite) but never sequences it as a step inside an audit flow — it's a self-contained pipeline on its own branch, not a code-health pass that feeds findings downstream.
 
 The advisor's job is the *gray zone*: "I have time, the repo is in some state, what's the best use of my next hour?" That's it.
