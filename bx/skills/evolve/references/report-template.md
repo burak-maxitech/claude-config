@@ -131,9 +131,9 @@ Citation: https://code.claude.com/docs/en/settings#allowed-tools · v2.1.169 rel
 **#3 — Hooks rework could simplify /bx:health** [opportunity · M · cert 0.65] [deferred 2026-05-28]
 ```
 
-**Completeness rule (S45 doc-drift):** an entry whose `affected_files` list misses a sibling echo is an incomplete finding — all files that contain the affected pattern must be listed. The orchestrator must cross-check sibling skill files before emitting a finding. A finding that touches one SKILL.md but not its sibling references/ files is incomplete unless the pattern genuinely does not appear there.
+**Completeness rule (S45 doc-drift):** for the #1-ranked finding per class (the detail-block entries), confirm the `affected_files` list is complete — the lanes already populate `affected_files` via mandatory Grep; spot-check that the #1 finding's sibling files are included where the pattern appears.
 
-**Hash fields:** lane agents emit `finding_id: null` plus `source_excerpt` (the verbatim heading-bounded extract), `source_url`, and `affected_capability`. The orchestrator computes `finding_id` and `source_content_hash` at consolidation (Step 3) per the normative snippets in `bx/skills/evolve/references/state-schema.md`, running them via `Bash(python:*)`. By the time the report is rendered, both hash fields exist in the consolidated finding object.
+**Hash fields:** both `finding_id` and `source_content_hash` exist by render time — computed at Step 3 per `bx/skills/evolve/references/state-schema.md`.
 
 ### Best-practice
 
@@ -236,9 +236,9 @@ Open entries written this run: 7
   (these persist in docs/upstream/state.json and re-surface until acted on)
 
 Discarded findings (per lane — each lane reports its own composition):
-  changelog lane: 3 discarded  (cap drops + zero-hit affected_files discards from Step 7)
-  docs lane:      1 discarded  (cap drops + zero-hit affected_files discards from Step 5 + verification-gate discards from Step 3)
-  community lane: 0 discarded  (cap drops + zero-hit affected_files discards from Step 6 + unconfirmable discards from Step 4)
+  changelog lane: 3 discarded
+  docs lane:      1 discarded
+  community lane: 0 discarded
 ```
 
 The "Decision-log filters" line makes the suppression count explicit. If zero findings were suppressed, render "0 rejected findings suppressed." If a community lane was skipped, its watermark line shows the old value with a note: `community 2026-05-10 → (skipped — no advance)`.

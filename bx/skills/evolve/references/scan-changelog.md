@@ -10,8 +10,7 @@ You have these tools available: Read, Grep, Glob, Bash (gh commands only — pat
 
 - `last_changelog_version` — string (e.g. `"2.1.170"`) or null. The highest claude-code release processed on the last run, stored as an **unprefixed version string** (no leading `v`). Null means this is the first run — scan ALL releases in the window.
 - `capability_inventory` — list of bx capability strings (e.g. `"bx:seo/allowed-tools"`, `"bx:save/agent-model"`). Only produce findings that intersect this list or a pain-point from the list below.
-- `pain_point_list` — list of short strings describing known friction areas in the bx toolkit (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). A release note addressing a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to the `bx:pain/<kebab-slug>` form — see the `bx:pain/<kebab-slug>` convention in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
-- `tier_definitions` — the tier table from the orchestrator (currently only one tier for this lane: `tier: official`). You only emit `tier: official`; the definitions are context for correctly NOT emitting community-style advisory findings.
+- `pain_point_list` — list of short strings describing known friction areas in the bx toolkit (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). A release note addressing a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to the `bx:pain/<kebab-slug>` form (use the `bx:pain/<kebab-slug>` form — see the schema notes below).
 
 ---
 
@@ -23,35 +22,29 @@ claude-code release tags use a leading `v` (e.g. `v2.1.170`); CHANGELOG.md headi
 
 ## Method
 
-### Step 1 — Enumerate releases (primary: gh)
+### Step 1 — Fetch releases (primary: gh)
 
-Run:
-
-```
-gh release list --repo anthropics/claude-code --limit 50
-```
-
-This returns releases newest-first. Collect the tag names in that order.
-
-**Watermark stop rule:** Normalize each tag (strip leading `v`) before comparing. Iterate from newest to oldest. Stop when you reach the release whose normalized version **exactly equals** `last_changelog_version`. Do not fetch or evaluate that release or any older ones. If no exact match is found within the 50-release window (the watermark tag was yanked, or more than 50 releases have shipped since the last run — claude-code ships near-daily so this is realistic), process the entire window AND emit a `scan_note: watermark anchor <last_changelog_version> not found in the 50-release window; window may be incomplete — consider re-running with a larger limit`.
-
-If `last_changelog_version` is null, process ALL releases returned in the 50-release window and emit a `scan_note` if the window was exhausted (i.e., you hit the `--limit 50` cap without finding a stopping point).
-
-### Step 2 — Fetch each in-scope release body (primary: gh)
-
-For each in-scope tag, run:
+Run ONE call:
 
 ```
-gh release view <tag> --repo anthropics/claude-code --json body,tagName,publishedAt
+gh api "repos/anthropics/claude-code/releases?per_page=50"
 ```
 
-Parse `body` (markdown), `tagName` (the tag string), and `publishedAt` (ISO timestamp).
+This returns a JSON array of release objects, newest-first. Each object contains `tag_name`, `body`, and `published_at`. Parse the array in-context — no per-release follow-up calls needed.
 
-**Failure definition:** A call fails if it exits non-zero OR returns an empty body where content is expected. If `gh release list` succeeds but ANY `gh release view` call fails, do not mix sources — fall back to the WebFetch CHANGELOG path for the entire window (Step 3) and set `lane_status: degraded`. There are no mixed-source runs; the lane is all-or-nothing by design.
+**Failure definition:** A call fails if it exits non-zero OR returns empty/invalid JSON. On failure, fall back to the WebFetch CHANGELOG path (Step 3) and set `lane_status: degraded`.
+
+**Watermark stop rule:** Normalize each `tag_name` (strip leading `v`) before comparing. Slice the returned array from newest to oldest; stop (exclude) the release whose normalized version **exactly equals** `last_changelog_version` and all older ones. If no exact match is found within the 50-release window (the watermark tag was yanked, or more than 50 releases have shipped since the last run — claude-code ships near-daily so this is realistic), process the entire window AND emit a `scan_note: watermark anchor <last_changelog_version> not found in the 50-release window; window may be incomplete`.
+
+If `last_changelog_version` is null, process ALL releases in the returned array and emit a `scan_note` if the window appears exhausted (50 entries returned with no null stopping point).
+
+### Step 2 — Extract release content (primary: gh)
+
+The `gh api` call above returns `body` (markdown), `tag_name`, and `published_at` for every release in the array — no additional fetch needed. Apply the watermark slice from Step 1 to select in-scope releases, then proceed directly to Step 5 extraction.
 
 ### Step 3 — Fallback when gh fails
 
-If `gh release list` or any `gh release view` call fails (no auth, network error, rate limit, or empty body), fall back to:
+If the `gh api` call in Step 1 fails (non-zero exit, empty JSON, or invalid JSON), fall back to:
 
 ```
 WebFetch https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md
@@ -77,15 +70,15 @@ For each in-scope release body, extract these categories of change. Each is a ca
 
 ### Step 6 — Filter against capability inventory and pain points
 
-For each candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point matches with no inventory capability produce a finding with `affected_capability` set to the `bx:pain/<kebab-slug>` form (see the `bx:pain/<kebab-slug>` convention in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section).
+For each candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point matches with no inventory capability produce a finding with `affected_capability` set to the `bx:pain/<kebab-slug>` form (use the `bx:pain/<kebab-slug>` form — see the schema notes below).
 
 ### Step 7 — Populate affected_files via Grep
 
-For each surviving delta (post-filter), identify the old/changed token (command name, flag name, frontmatter key, hook event name). Run Grep over the repo with scope `bx/`, `README.md`, and `workflow.md` to find every file that contains that token. List every hit file in `affected_files`. This is how sibling-file echoes are found (S45 rule). Do not fill `affected_files` from the capability string alone — always grep first.
+For each surviving delta (post-filter), identify the old/changed token (command name, flag name, frontmatter key, hook event name). Run one Grep call using `glob="{bx/**,README.md,workflow.md}"` from repo root to find every file containing that token. List every hit file in `affected_files`. This is how sibling-file echoes are found (S45 rule). Do not fill `affected_files` from the capability string alone — always grep first.
+
+**When multiple deltas survive**, batch them: issue one Grep in content mode with an alternation pattern (`tok1|tok2|...`) across `glob="{bx/**,README.md,workflow.md}"`, then map each file→token in-context. This is the repo's batched-Grep idiom.
 
 **Zero-hit discard rule:** for `breakage` and `best_practice` findings, zero Grep hits for the old/changed token means the plugin does not contain it — discard the finding and increment `discarded_findings`. For `opportunity` findings there is no old token to search for; instead, set `affected_files` to the file(s) the proposed edit would touch, identified from the pain point's subject area. An empty `affected_files` is never legal in an emitted finding — if you cannot identify at least one file for any class, discard.
-
-Example: if a flag `--allowed-tools` is renamed, run `Grep pattern="--allowed-tools" path="bx/"` and also check `README.md` and `workflow.md` individually. Every returned file path goes into `affected_files`.
 
 ---
 

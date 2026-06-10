@@ -219,7 +219,7 @@ The orchestrator rewrites the entire file at exactly three sanctioned checkpoint
 
 1. **Checkpoint 1 — end of Step 4** (new `open` entries, re-raise transitions, and Rule-5 deferred hash updates): written before the report is rendered so report and state agree. This is the only *decision-log* write in default-mode runs (the Checkpoint-3 watermark write still happens at Step 6).
 2. **Checkpoint 2 — end of the `--fix` pass, OR immediately on abort**: one write covering all verdicts of the pass. Record verdicts in-context as the pass proceeds; do not write after each verdict.
-3. **Checkpoint 3 — Step 6 watermark advance**: the watermark-field update write. May be merged with Checkpoint 2 if nothing changed between that write and Step 6 (write both together in a single Write call).
+3. **Checkpoint 3 — Step 6 watermark advance**: the watermark-field update write. May be merged with the nearest prior checkpoint — Checkpoint 2 in `--fix` runs, or Checkpoint 1 in default runs (lane statuses are known by Step 3, so the watermark values are already final at the CP1 write) — write both together in a single Write call.
 
 **Canonical procedure (applied at each checkpoint):**
 

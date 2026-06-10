@@ -11,12 +11,6 @@ argument-hint: "[--full] [--fix] [--no-community]"
 
 This skill watches upstream Anthropic sources — claude-code releases, official docs, and community patterns — and audits the `bx` plugin against what has changed since the last run's watermark. It surfaces breakage (upstream invalidated something bx says or does), best-practice (guidance changed for something bx does), and opportunity (new capability maps to a recorded pain point) findings with mandatory citations, then applies approved changes behind a per-finding diff gate when `--fix` is passed.
 
-This skill is distinct from related tooling in this repo:
-
-- **`/bx:health`** — routing advisor; answers "which skill should I run next on this project". It reads your codebase, not upstream sources.
-- **S42 content-review treatment via skill-creator** — audits skill quality (correctness, completeness, internal consistency). It reads `bx/` files against themselves, not against upstream.
-- **`deep-research`** — generic multi-source web research. It has no concept of the bx plugin, no watermark, no decision log, and no relevance gate tied to the capability inventory.
-
 **Run-in-repo precondition.** This skill only makes sense in the claude-config repo. Before doing any other work, confirm that both `bx/` and `docs/upstream/` exist in the working directory via Glob. If either is absent, say so clearly and exit — do not attempt to recreate them or continue.
 
 ---
@@ -31,7 +25,7 @@ Read `docs/upstream/state.json`. The canonical shape, all validation rules, and 
 
 Enumerate current bx capabilities by reading across `bx/**`, `README.md`, and `workflow.md`. Gather these four categories in parallel (multiple Read/Grep/Glob calls in one turn):
 
-**(a) Frontmatter keys in use across all skills and agents.** Glob `bx/skills/*/SKILL.md` and `bx/agents/*.md`; for each file, read the YAML frontmatter block and note every key present (e.g. `allowed-tools`, `effort`, `disable-model-invocation`, `argument-hint`, `when_to_use`, `model`, `tools`, `user-invocable`).
+**(a) Frontmatter keys in use across all skills and agents.** Run a single line-anchored Grep in content mode — pattern `^(name|description|allowed-tools|effort|disable-model-invocation|argument-hint|when_to_use|model|tools|user-invocable):`, glob `{bx/skills/*/SKILL.md,bx/agents/*.md}` — to enumerate every frontmatter key present across the plugin. No per-file reads needed.
 
 **(b) Built-in skill references.** Grep `bx/` + `README.md` + `workflow.md` for `/code-review`, `/simplify`, `/code-review ultra`, and any other slash-commands that are not bx-namespaced. These are the built-in surface area the repo depends on — changes here are breakage candidates.
 
@@ -78,22 +72,17 @@ Launch all three lane agents in a single turn (three Task calls in one message).
 - Task 2: `subagent_type: upstream-docs`
 - Task 3: `subagent_type: upstream-community` (omit when `--no-community`)
 
-For each Task call:
-
-1. Read the agent's scan reference file (`upstream-changelog` → `bx/skills/evolve/references/scan-changelog.md`; `upstream-docs` → `bx/skills/evolve/references/scan-docs.md`; `upstream-community` → `bx/skills/evolve/references/scan-community.md`) and pass its **full content** in the task prompt.
-
-2. Also pass the full content of `bx/skills/evolve/references/state-schema.md` (agents point to it for canonicalization conventions and cannot reliably read sibling paths from their own CWD — inline it).
-
-3. Include the following shared context block verbatim:
+For each Task call, include the following shared context block verbatim, then instruct the agent as described below:
 
 ```
 Watermark: last_changelog_version=<value|null> · docs_checked_at=<value|null> · community_checked_at=<value|null>
 capability_inventory: <the list from Step 0.2>
 pain_point_list: <the list from Step 0.3>
-tier_definitions: official = actionable with citation; community = advisory-only, never fix-eligible
 Repo root: the working directory. Grep scope for affected_files: bx/, README.md, workflow.md.
 Output: structured JSON-shaped findings per the schema in your scan instructions. finding_id: null and source_excerpt as specified — the orchestrator computes all hashes. Do NOT format a report.
 ```
+
+Instruct each agent to **first Read** its own scan reference file (`upstream-changelog` → `bx/skills/evolve/references/scan-changelog.md`; `upstream-docs` → `bx/skills/evolve/references/scan-docs.md`; `upstream-community` → `bx/skills/evolve/references/scan-community.md`) and then Read the following named sections of `bx/skills/evolve/references/state-schema.md`: "source_url canonicalization (normative)", "affected_capability normalization" (within the finding_id computation section), and the "`bx:pain/<kebab-slug>` convention" paragraph. These files live at repo-root-relative paths; the run-in-repo precondition guarantees CWD = repo root. The agent follows the scan file exactly — it is canonical. Do NOT inline the content of these files in the task prompt.
 
 **`--no-community`:** omit the Task call for `upstream-community` entirely. Record `lane_status: skipped` for that lane in the report footer.
 
@@ -111,17 +100,17 @@ After all lane agents return (wait for all three Task calls to complete):
 
 Record each lane's `lane_status` (ok / degraded / unavailable / skipped). These govern watermark advancement (Step 6) and the report footer (Step 4).
 
+**Sentinels exit the pipeline here.** A `lane-unavailable-*` finding is a lane-health report, not a finding: record the lane's `lane_status: unavailable`, stash its `upstream_delta` (the verbatim errors) for the report's Section 1 lane row, and REMOVE it from the finding set. Nothing downstream of 3.1 — hashing, gating, decision log, fix mode — ever sees a sentinel; every downstream sentinel rule is entailed by this one.
+
 ### 3.2 — Compute finding_id and source_content_hash
 
-For every non-sentinel finding (i.e., every finding whose `finding_id` is null), compute both hashes via `Bash(python:*)`. Run the ENTIRE batch in ONE python invocation — shell state does not persist between Bash calls, so splitting across calls loses the results. Pass findings as a heredoc or inline JSON string; print computed pairs.
+For every finding (all `finding_id: null` after Step 3.1's sentinel removal), compute both hashes via `Bash(python:*)`. Run the ENTIRE batch in ONE python invocation — shell state does not persist between Bash calls, so splitting across calls loses the results. Pass findings as a heredoc or inline JSON string; print computed pairs.
 
 The normative hash snippets are defined in `bx/skills/evolve/references/state-schema.md` (finding_id computation section and source_content_hash normalization section). Use them exactly. Do not reimplement.
 
-Sentinel findings (`lane-unavailable-changelog`, `lane-unavailable-docs`, `lane-unavailable-community`) keep their literal string IDs — do not hash them.
-
 ### 3.3 — Relevance spot-check
 
-The relevance gate is applied lane-side. Spot-check: drop any **non-sentinel** finding whose `affected_capability` intersects neither the capability inventory nor the pain-point list (sentinels carry null capability by design and must survive to render in Section 1). This catches improvised lane output that slipped through.
+The relevance gate is applied lane-side. Spot-check: drop any finding whose `affected_capability` intersects neither the capability inventory nor the pain-point list. This catches improvised lane output that slipped through.
 
 ### 3.4 — Decision-log filter
 
@@ -142,11 +131,9 @@ Cross-lane corroboration matches on `affected_capability`: when two lanes emit f
 
 Read `bx/skills/evolve/references/report-template.md` and render exactly as specified there. Do not improvise the report structure; report-template.md owns every section, the headline format, the empty-state rows, and the footer shape.
 
-**New actionable findings → decision log.** Before rendering the report, write every NEW finding (no existing `finding_id` entry in `decisions`) to `docs/upstream/state.json` as `decision: "open"` per state-schema Rule 1. Use the Read-modify-in-context-Write procedure from state-schema.md's Update Mechanics section. **This is Checkpoint 1** — the full validated state write at the end of Step 4 (new `open` entries + re-raise transitions). After this write, the report and state agree; a crash between the checkpoint and Step 5 re-runs cleanly from the saved state.
+**New actionable findings → decision log.** Before rendering the report, write new and re-raised findings to `docs/upstream/state.json`. **Checkpoint 1** — write state per `bx/skills/evolve/references/state-schema.md`'s Update Mechanics (it owns the contents and procedure).
 
-**`lane-unavailable-*` sentinels are NEVER written to the decision log.** Sentinels are lane-health reports, not actionable findings about the toolkit. Their content renders only in: the Section 1 lane row's status detail (the sentinel's `upstream_delta` — the verbatim errors), the report footer, and the blocked watermark advance in Step 6. They do not produce `decisions` entries.
-
-**Advisory findings are NOT written to the decision log.** Community-sourced (`tier: community`) findings are advisory-only and never actionable on their own. There is nothing to track in `decisions` for them — they appear in Section 3 of the report and are gone when the run ends. The decision log tracks only actionable findings that require a verdict.
+**Advisory findings** (`tier: community`) are not written to the decision log — they appear in Section 3 and are gone when the run ends.
 
 ---
 
@@ -156,15 +143,15 @@ Read `bx/skills/evolve/references/report-template.md` and render exactly as spec
 
 Read `bx/skills/evolve/references/fix-mode-evolve.md` and run the gate flow exactly as specified there. fix-mode-evolve.md owns: eligibility rules, the pre-pass summary format, the per-finding display format, verdicts (y/n/skip/abort), Edit-tool edge cases, and the post-pass summary.
 
-Apply verdicts to `docs/upstream/state.json` per state-schema Rule 2 (overwrite in place, never append). **This is Checkpoint 2** — one full validated state write at the end of the pass (or immediately on abort), covering all verdicts recorded during the pass. Record verdicts in-context as the pass proceeds; the single write happens at the end.
+**Checkpoint 2** — write state per `bx/skills/evolve/references/state-schema.md`'s Update Mechanics (it owns the contents and procedure).
 
 ### Default (no `--fix`):
 
 End with one closing line:
 
-> Run `/bx:evolve --fix` to apply N eligible findings. M open findings carried forward in `docs/upstream/state.json`.
+> Run `/bx:evolve --fix` to act on the open Tier-1 findings. M open findings carried forward.
 
-Where N = count of Tier-1 open findings in this run's report that pass ALL of fix-mode-evolve.md's eligibility rules (pre-compute by applying the full eligibility check — tier:official, decision:open or re-raised, text edit in-repo), and M = total `open` + `deferred` entries in the decision log after this run.
+Where M = total `open` + `deferred` entries in the decision log after this run.
 
 ---
 
@@ -176,7 +163,7 @@ At the end of EVERY run (default or `--fix`), advance the watermark per state-sc
 - `docs_checked_at` ← today's date (only if docs `lane_status` is `ok` or `degraded`).
 - `community_checked_at` ← today's date (only if community `lane_status` is `ok` or `degraded`). A `--no-community` run leaves this field unchanged.
 
-Rewrite `docs/upstream/state.json` using the canonical Read-modify-in-context-Write procedure from state-schema.md's Update Mechanics section. Validate before writing; on any validation failure, do NOT write and report the failure explicitly — leave `state.json` at its previous valid state. **This is Checkpoint 3** — the watermark-advance write. If Checkpoint 2 already wrote the file in this same run and no new state changes occurred between that write and this step, this write may be merged with Checkpoint 2 (write the watermark update together with the final verdict state in a single Write call).
+**Checkpoint 3** — write state per `bx/skills/evolve/references/state-schema.md`'s Update Mechanics (it owns the contents and procedure).
 
 ---
 

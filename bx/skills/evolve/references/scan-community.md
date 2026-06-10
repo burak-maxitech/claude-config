@@ -23,8 +23,7 @@ A community pattern becomes actionable (and `--fix`-eligible) ONLY when a Tier-1
 
 - `community_checked_at` — ISO date string (YYYY-MM-DD) or null. The date the community lane last ran successfully. Null means this is the first run. Used only to frame the report ("community checked as of <date>"); it does NOT gate what you search — you always search with fresh queries.
 - `capability_inventory` — list of bx capability strings (e.g. `"bx:seo/allowed-tools"`, `"bx:save/agent-model"`). Only produce findings that intersect this list or a pain point from the list below.
-- `pain_point_list` — list of short strings describing known friction areas in the bx toolkit (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). Community guidance that addresses a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to the `bx:pain/<kebab-slug>` form — see the `bx:pain/<kebab-slug>` convention in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
-- `tier_definitions` — the tier table from the orchestrator (currently only one tier for this lane: `tier: community`). You only emit `tier: community`; the definitions are context for correctly NOT emitting official-tier findings.
+- `pain_point_list` — list of short strings describing known friction areas in the bx toolkit (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). Community guidance that addresses a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to the `bx:pain/<kebab-slug>` form (use the `bx:pain/<kebab-slug>` form — see the schema notes below).
 
 ---
 
@@ -67,7 +66,7 @@ Apply both filters to produce a ranked shortlist for Step 3. Never fetch a resul
 
 **Hard cap: 5 WebFetch calls for this entire run.** This is the worst-signal-to-noise lane; unbounded fetching is how blogspam and outdated advice get in. The cap forces pre-fetch triage (Step 2 filters) to do its job.
 
-For each shortlisted URL (in rank order, up to 5):
+**Issue all shortlisted WebFetch calls in a single message — they are independent; tally lane_status after all return.** For each shortlisted URL (in rank order, up to 5):
 - Call WebFetch using the bx capability area most relevant to that URL as the fetch focus.
 - **Verbatim-extract requirement (hash stability):** for each claim that becomes a candidate finding, capture the **verbatim page text** of the smallest heading-bounded section containing that claim — from its own heading to the next same-or-higher-level heading. That verbatim extract (NOT WebFetch's summary prose) is what gets returned as `source_excerpt`. Hashing WebFetch's model-processed summary would produce an unstable hash that changes between calls even when the underlying content is unchanged — which re-raises every rejected finding on every run (state-schema Rule 3). The verbatim extract is the only stable hash input; the orchestrator normalizes and hashes it.
 - **Failure definition:** A fetch fails if WebFetch returns an error, a redirect to an unrelated page, or empty content where content is expected. Record each failed URL in `pages_failed` for the footer. Continue with remaining URLs.
@@ -86,11 +85,13 @@ Only candidates that survive the verification gate proceed to Step 5.
 
 ### Step 5 — Filter against capability inventory and pain points
 
-For each verified candidate: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point-only findings use `affected_capability: bx:pain/<kebab-slug>` — the slug convention and normalization rule are defined in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
+For each verified candidate: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point-only findings use `affected_capability: bx:pain/<kebab-slug>` (use the `bx:pain/<kebab-slug>` form — see the schema notes below).
 
 ### Step 6 — Populate affected_files via Grep
 
-For each surviving candidate, identify the token, pattern, or capability area it claims bx uses. Run Grep over the repo with scope `bx/`, `README.md`, and `workflow.md` to find every file that contains that token. List every hit file in `affected_files`.
+For each surviving candidate, identify the token, pattern, or capability area it claims bx uses. Run one Grep call using `glob="{bx/**,README.md,workflow.md}"` from repo root to find every file containing that token. List every hit file in `affected_files`.
+
+**When multiple candidates survive**, batch them: issue one Grep in content mode with an alternation pattern (`tok1|tok2|...`) across `glob="{bx/**,README.md,workflow.md}"`, then map each file→token in-context. This is the repo's batched-Grep idiom.
 
 **Zero-hit Grep rule:** zero Grep hits for a `breakage` or `best_practice` finding → discard (the verification gate in Step 4 should have caught this; Step 6 is the final check). For `opportunity` findings there is no old token to grep for — set `affected_files` to the file(s) the proposed "consider" edit would touch, identified from the pain point's subject (e.g. the relevant skill's SKILL.md or references/ file). The zero-hit discard applies only to `breakage`/`best_practice` claims about existing bx behavior. An empty `affected_files` is never legal in any emitted finding — if you cannot identify at least one file for any class, discard.
 

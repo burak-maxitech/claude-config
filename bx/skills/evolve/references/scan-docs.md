@@ -10,8 +10,7 @@ You have these tools available: Read, Grep, Glob, WebFetch. Use WebFetch for all
 
 - `docs_checked_at` — ISO date string (YYYY-MM-DD) or null. The date the docs pages were last fetched and compared against the capability inventory. Null means this is the first run. This field frames the report ("docs checked as of <date>") but does NOT gate what you fetch — you always re-read all allowlisted pages on every run and compare against the live capability inventory (see Delta detection below).
 - `capability_inventory` — list of bx capability strings (e.g. `"bx:seo/allowed-tools"`, `"bx:save/agent-model"`). Only produce findings that intersect this list or a pain point from the list below.
-- `pain_point_list` — list of short strings describing known friction areas in the bx toolkit (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). Official guidance that addresses a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to the `bx:pain/<kebab-slug>` form — see the `bx:pain/<kebab-slug>` convention in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
-- `tier_definitions` — the tier table from the orchestrator (currently only one tier for this lane: `tier: official`). You only emit `tier: official`.
+- `pain_point_list` — list of short strings describing known friction areas in the bx toolkit (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). Official guidance that addresses a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to the `bx:pain/<kebab-slug>` form (use the `bx:pain/<kebab-slug>` form — see the schema notes below).
 
 ---
 
@@ -56,7 +55,7 @@ For each URL in the pinned allowlist above, call `WebFetch` using that URL's "Ca
 
 **Verbatim-extract requirement (hash stability):** for each guidance item that becomes a candidate delta, capture the **verbatim page text** of the smallest heading-bounded section containing that guidance — from its own heading to the next same-or-higher-level heading. That verbatim extract (not WebFetch's summary prose) is what gets returned as `source_excerpt`. Hashing a summary hashes noise: WebFetch's model-processed output varies between calls, causing the hash to change even when the underlying guidance is unchanged — which re-raises every rejected finding on every run (state-schema Rule 3). The verbatim extract is the only stable hash input; the orchestrator normalizes and hashes it.
 
-**Order:** fetch every allowlisted URL. Do not stop early on a failure — fetch all, then tally `lane_status`.
+**Issue all allowlisted WebFetch calls in a single message — they are independent; tally `lane_status` after all return.** Do not stop early on a failure — fetch all, then tally.
 
 ### Step 2 — Extract candidate deltas per page
 
@@ -88,17 +87,17 @@ Only candidates that survive the verification gate proceed to Step 4.
 
 ### Step 4 — Filter against capability inventory and pain points
 
-For each verified candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point-only findings use `affected_capability: bx:pain/<kebab-slug>` — the slug convention and normalization rule are defined in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
+For each verified candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point-only findings use `affected_capability: bx:pain/<kebab-slug>` (use the `bx:pain/<kebab-slug>` form — see the schema notes below).
 
 ### Step 5 — Populate affected_files via Grep
 
-For each surviving delta, identify the old/changed token (frontmatter key, hook event name, settings key, command name, flag name). Run Grep over the repo with scope `bx/`, `README.md`, and `workflow.md` to find every file that contains that token. List every hit file in `affected_files`.
+For each surviving delta, identify the old/changed token (frontmatter key, hook event name, settings key, command name, flag name). Run one Grep call using `glob="{bx/**,README.md,workflow.md}"` from repo root to find every file containing that token. List every hit file in `affected_files`.
 
 This is how sibling-file echoes are found (S45 rule: a rework isn't done until its echoes are swept from sibling files). Do not fill `affected_files` from the capability string alone — always grep first.
 
-**Zero-hit grep rule:** for `breakage` and `best_practice` findings, zero Grep hits for the old/changed token means the plugin does not contain it — discard the finding and increment the discarded count in the footer. (The verification gate in Step 3 should have caught this; Step 5 is the final check.) For `opportunity` findings, there is no old token to search for; instead, set `affected_files` to the file(s) the proposed edit would touch, identified from the pain point's subject area. An empty `affected_files` is never legal in an emitted finding — if you cannot identify at least one file, discard the finding.
+**When multiple deltas survive**, batch them: issue one Grep in content mode with an alternation pattern (`tok1|tok2|...`) across `glob="{bx/**,README.md,workflow.md}"`, then map each file→token in-context. This is the repo's batched-Grep idiom.
 
-Example: if a frontmatter key `when_to_use` is described differently in the docs, run `Grep pattern="when_to_use" path="bx/"` and also check `README.md` and `workflow.md` individually. Every returned file path goes into `affected_files`.
+**Zero-hit grep rule:** for `breakage` and `best_practice` findings, zero Grep hits for the old/changed token means the plugin does not contain it — discard the finding and increment the discarded count in the footer. (The verification gate in Step 3 should have caught this; Step 5 is the final check.) For `opportunity` findings, there is no old token to search for; instead, set `affected_files` to the file(s) the proposed edit would touch, identified from the pain point's subject area. An empty `affected_files` is never legal in an emitted finding — if you cannot identify at least one file, discard the finding.
 
 ---
 
