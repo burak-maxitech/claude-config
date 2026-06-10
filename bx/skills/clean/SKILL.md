@@ -3,7 +3,7 @@ name: clean
 description: Codebase-wide cleanup audit that finds dead code, unused files, stale dependencies, unused CSS, and technical debt that's safe to remove. Use whenever the user wants to find what can be deleted — dead code, unused files or components, a dependency audit, leftover CSS, stale imports, backup/old files, or general pruning — whether whole-repo or scoped to a module ("any dead code in src/payments?"), phrased formally or casually ("this repo is messy", "let's clean things up"), or by motivation (shrinking the bundle, clearing leftovers after a migration or rewrite). Different from /code-review (which reviews recent changes for quality) — this audits the entire existing codebase for things that can be removed. Not for trivial one-offs like deleting a couple of known lines, fixing broken imports, or configuring a linter.
 disable-model-invocation: true
 effort: high
-allowed-tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(sort:*), Bash(uniq:*), Bash(sed:*), Bash(awk:*), Bash(git:*), Bash(jq:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(pip:*), Bash(pip-audit:*), Bash(safety:*), Bash(cargo:*), Bash(composer:*), Bash(govulncheck:*), Bash(bundle:*), Bash(gh:*), Task
+allowed-tools: Read, Grep, Glob, Edit, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(sort:*), Bash(uniq:*), Bash(sed:*), Bash(awk:*), Bash(md5sum:*), Bash(git:*), Bash(jq:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(pip:*), Bash(pip-audit:*), Bash(safety:*), Bash(cargo:*), Bash(composer:*), Bash(govulncheck:*), Bash(bundle:*), Bash(gh:*), Task
 ---
 
 # Code Cleanup — Codebase Cleanup Audit
@@ -39,7 +39,7 @@ Launch the three dedicated scanner subagents in parallel using the Task tool. Th
 **Important orchestration rules:**
 - Launch ALL agents in a single turn (one Task call per agent), setting each call's `subagent_type` to the agent named in its section below (`cleanup-files-code` / `cleanup-deps-config` / `cleanup-styles-tests`)
 - Each agent returns structured findings — do NOT ask agents to format final output
-- If `$ARGUMENTS` contains a filter flag (`--files`, `--code`, `--css`, `--deps`, `--tests`, `--vulns`), skip parallelization and scan that single category directly in the main context
+- If `$ARGUMENTS` contains a filter flag (`--files`, `--code`, `--css`, `--deps`, `--tests`), skip parallelization and scan that single category directly in the main context. **`--vulns` is NOT a filter flag** — it *adds* Section 4.5 on top of whatever else runs; on its own it means full parallel scan + vuln scan (see Scope Handling)
 - If a category is irrelevant to the detected stack (e.g., CSS for a Python CLI tool), skip it entirely
 - **Vulnerability scanning is opt-in only.** Section 4.5 (Vulnerable Dependencies) runs ONLY if `$ARGUMENTS` contains `--vulns` or the user explicitly asks for it. Default scans never call `npm audit`, `pip-audit`, etc. — those hit network registries and slow the audit. Tell the user once that a vuln scan is available via `/bx:clean --vulns` if they want it.
 
@@ -58,7 +58,7 @@ After all agents return:
 
 1. **Deduplicate** — An unused file containing dead code should appear once (in "Unused Files", not also in "Dead Code")
 2. **Cross-reference** — If a dependency is unused AND the only file importing it is also unused, group them together
-3. **Classify risk** for each finding:
+3. **Normalize risk** — the agents already tag each finding `safe`/`likely_safe`/`needs_investigation`; don't re-derive from scratch, but spot-check against these definitions and downgrade anything that doesn't meet the bar:
    - **Safe** — No references found anywhere in codebase (grep confirms zero hits)
    - **Likely Safe** — Appears unused but has indirect reference patterns (dynamic imports, reflection, string-based lookups)
    - **Needs Investigation** — Used in ways that are hard to statically analyze (metaprogramming, plugin systems, config-driven loading)
@@ -102,7 +102,7 @@ Format as a checklist:
 
 ### Detailed Findings
 
-Group into four sections:
+Group into four sections (plus a fifth when `--vulns` was passed):
 
 **Safe to Delete** — Zero references, safe to remove. Include file path and line numbers.
 
@@ -125,17 +125,16 @@ Be conservative — when in doubt, flag for investigation rather than deletion.
 
 If the user passes `--fix`, apply Quick Wins automatically:
 
-1. Create a cleanup branch: `git checkout -b cleanup/YYYYMMDD`
-2. **Auto-apply Quick Wins only** — delete empty files, remove unused imports, delete `.backup`/`.old` files, remove commented-out blocks >5 lines
-3. For each "Safe to Delete" item, show it and ask for confirmation before removing
-4. If `--aggressive` is also present, include "Likely Safe" items in step 3 (show and ask for confirmation before removing each one) — never auto-delete "Likely Safe" items
-5. Skip "Needs Investigation" entirely (report only)
-6. **Skip "Vulnerable Dependencies" entirely.** `--fix` never auto-runs `npm audit fix` / `pip-audit --fix` / `cargo audit fix` / equivalents — version bumps can break the app, transitive constraints get rewritten, and lockfile churn is project-policy. Vulnerable deps are report-only; the user runs the suggested `fix_command` themselves after reviewing.
-7. Stage all changes and commit: `chore: automated cleanup — [count] items removed`
-8. Show a summary diff with `git diff --stat HEAD~1`
-9. Tell the user: "Review the changes on the `cleanup/YYYYMMDD` branch. Merge when satisfied, or `git checkout main && git branch -D cleanup/YYYYMMDD` to discard the whole branch. For finer-grained undo (single deletion, single edit), press `Esc Esc` or run `/rewind` — Claude's edits are checkpointed automatically and `/rewind` persists across sessions."
-
-If the working tree is dirty (uncommitted changes), warn the user and ask whether to stash first.
+1. **Check the working tree first.** If it's dirty (uncommitted changes), warn the user and ask whether to stash before doing anything else — never create the branch on top of unrelated changes
+2. Create a cleanup branch: `git checkout -b cleanup/YYYYMMDD`
+3. **Auto-apply Quick Wins only** — delete empty files, remove unused imports, delete `.backup`/`.old` files, remove commented-out blocks >5 lines. Delete files with `git rm` (not bare `rm`) so every removal is staged and trivially reversible; in-file removals use Edit
+4. For each "Safe to Delete" item, show it and ask for confirmation before removing
+5. If `--aggressive` is also present, include "Likely Safe" items in step 4 (show and ask for confirmation before removing each one) — never auto-delete "Likely Safe" items
+6. Skip "Needs Investigation" entirely (report only)
+7. **Skip "Vulnerable Dependencies" entirely.** `--fix` never auto-runs `npm audit fix` / `pip-audit --fix` / `cargo audit fix` / equivalents — version bumps can break the app, transitive constraints get rewritten, and lockfile churn is project-policy. Vulnerable deps are report-only; the user runs the suggested `fix_command` themselves after reviewing.
+8. Stage all changes and commit: `chore: automated cleanup — [count] items removed`
+9. Show a summary diff with `git diff --stat HEAD~1`
+10. Tell the user: "Review the changes on the `cleanup/YYYYMMDD` branch. Merge when satisfied, or `git checkout main && git branch -D cleanup/YYYYMMDD` to discard the whole branch. For finer-grained undo (single deletion, single edit), press `Esc Esc` or run `/rewind` — Claude's edits are checkpointed automatically and `/rewind` persists across sessions."
 
 > **CI gating.** Not self-gating. To pause for approval in headless `claude -p` runs, configure a `PreToolUse` `defer` hook scoped (via the `if` field) to destructive Bash patterns. Full recipe in README "Interop with Claude Code 2.1 features".
 
@@ -145,9 +144,9 @@ If the user passes `--dry-run`, simulate the fix without deleting anything:
 
 1. Run the full scan as normal
 2. Create a cleanup branch: `git checkout -b cleanup/dry-run-YYYYMMDD`
-3. For each Quick Win and "Safe to Delete" item, stage the removal but do NOT commit yet
-4. Show `git diff --stat` so the user can see the full impact
-5. Reset the branch: `git checkout main && git branch -D cleanup/dry-run-YYYYMMDD`
+3. For each Quick Win and "Safe to Delete" item, stage the removal (`git rm` for files, Edit + `git add` for in-file removals) but do NOT commit
+4. Show `git diff --stat --cached` so the user can see the full impact (plain `git diff` shows nothing once removals are staged)
+5. Restore everything, then drop the branch: `git reset --hard HEAD && git checkout main && git branch -D cleanup/dry-run-YYYYMMDD`. The `reset --hard` is load-bearing: both branches point at the same commit, so a bare `git checkout main` carries the staged deletions over — the files would actually be gone from disk on main, breaking the dry-run promise
 6. Tell the user: "This was a dry run — nothing was deleted. Run with `--fix` to apply."
 
 ## Scope Handling
@@ -165,7 +164,7 @@ If the user passes `--dry-run`, simulate the fix without deleting anything:
 | `--vulns` | Adds Section 4.5 (Vulnerable Dependencies) — runs the stack-appropriate audit command (`npm audit`, `pip-audit`, `cargo audit`, etc.). Combinable with anything; on its own, runs the full scan + vuln scan. Network-dependent; never auto-fixed by `--fix`. |
 | `--tests` | Only Section 7 (Test Cleanup) |
 | `--fix` | Full scan + auto-apply Quick Wins |
-| `--dry-run` | Full scan + generate cleanup branch with commits, but do NOT delete anything — show what *would* happen via `git diff --stat` |
+| `--dry-run` | Full scan + stage removals on a throwaway branch (no commits), show impact via `git diff --stat --cached`, then restore everything — nothing is permanently deleted |
 | `--aggressive` | In report mode: move "Likely Safe" → "Safe to Delete" in the output. Only actually deletes them if combined with `--fix` (i.e., `--aggressive --fix`). Without `--fix`, it's cosmetic reclassification only |
 | Combined (e.g., `src/ --code --deps`) | Scoped + filtered |
 

@@ -84,6 +84,15 @@ Tag every finding with the workspace it belongs to (use `root` for the top-level
 - Grep for `use crate_name` or `extern crate crate_name` in `.rs` files
 - Note: Rust crate names use hyphens in Cargo.toml but underscores in code — when alternating, include both forms (`tokio_util|tokio-util`)
 
+**For Go (go.mod):**
+- Extract module paths from the `require` block, skipping `// indirect` entries (those are transitive — not the user's to remove)
+- Go import paths contain the module path verbatim, so one batched Grep alternating the module paths across `*.go` files finds usage directly
+- A module with zero import hits is an "unused" candidate; the `uninstall_command` is simply `go mod tidy` (it removes unrequired modules natively)
+
+**For PHP (composer.json) / Ruby (Gemfile):**
+- PHP: grep for the package's autoload namespace (`use Vendor\Package`) across `.php` files; Ruby: grep for `require "gem_name"` / `require 'gem_name'` across `.rb` files
+- Composer autoloading, Laravel service discovery, and Rails' implicit `Bundler.require` all load packages with zero greppable references — cap these findings at `likely_safe`, never `safe`
+
 **For any ecosystem:**
 - Flag duplicate packages serving the same purpose (e.g., both `moment` and `dayjs`, both `lodash` and `underscore`, both `axios` and `node-fetch`)
 - Note version pinning issues (exact pins on packages that should float, or floating versions on packages that should be pinned)
