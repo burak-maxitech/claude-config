@@ -24,7 +24,7 @@ Verified 2026-06-09. For each URL: the working form confirmed by WebFetch, the c
 | `https://code.claude.com/docs/en/skills` | skill authoring — SKILL.md frontmatter, invocation control, subagent execution, dynamic context injection | loads directly |
 | `https://code.claude.com/docs/en/plugins` | plugin creation — manifest schema, directory layout, skills/agents/hooks packaging, marketplace submission | loads directly |
 | `https://code.claude.com/docs/en/plugins-reference` | plugin technical reference — complete schema specs, CLI commands, version management, monitors, LSP servers | loads directly |
-| `https://code.claude.com/docs/en/hooks-reference` | hook events — lifecycle points, matcher patterns, handler types, JSON schemas, exit codes, async/HTTP/MCP/prompt hooks | candidate `/hooks` redirects here; use this URL |
+| `https://code.claude.com/docs/en/hooks` | hook events — lifecycle points, matcher patterns, handler types, JSON schemas, exit codes, async/HTTP/MCP/prompt hooks | loads directly (page title is "Hooks reference"; the `/hooks-reference` path 404s) |
 | `https://code.claude.com/docs/en/settings` | settings — scope hierarchy, settings files, permissions, allowed-tools syntax, env vars | loads directly |
 | `https://code.claude.com/docs/en/sub-agents` | subagent configuration — system prompts, tool restrictions, model routing, persistent memory | loads directly |
 | `https://code.claude.com/docs/en/memory` | memory — CLAUDE.md authoring, auto memory, .claude/rules/, path-scoped rules, import syntax | loads directly |
