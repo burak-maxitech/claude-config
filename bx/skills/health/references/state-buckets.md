@@ -168,6 +168,7 @@ When two buckets match the signal pattern roughly equally:
 2. **Open PR beats main-branch state.** If on a feature branch with an open PR and clean tree, prefer Bucket B over Bucket C.
 3. **Long staleness beats recent shipping.** If last commit was >1 week ago, prefer Bucket D over Bucket C — the user likely needs orientation, not an audit.
 4. **No CLAUDE.md beats everything else clean.** Always escalate to Bucket D when the doc is missing — orient before improving.
+5. **C vs E (both match a clean main with empty `In Progress`):** their signals overlap by design. Prefer **C** when the recent commits just shipped something substantial — audit the new surface while it's fresh. Prefer **E** when `Next Steps` lists specific actionable items — the user already has a backlog and wants one targeted improvement, not a full audit chain.
 
 ---
 
@@ -176,5 +177,6 @@ When two buckets match the signal pattern roughly equally:
 - **Active debugging / incident response.** This skill assumes calm-water decision-making. If something is on fire, the user reaches for grep, debugger, and `/bx:review --security` directly — not a routing advisor.
 - **Greenfield / new feature work.** That's `/bx:plan` directly. The advisor will route there from Bucket E if `Next Steps` lists it, but it doesn't try to be a feature router.
 - **Doc-only sessions.** That's `/bx:save` directly. The advisor will mention it as part of every flow but never as the standalone recommendation — if the user already knows it's a doc session, they don't need routing.
+- **Visual redesign work.** Re-skinning a site's look is `/bx:webdesign` directly — it has its own phased pipeline (extract → design → inject/verify) and doesn't belong in a code-health sequence, which is why it's absent from the skill roster on purpose.
 
 The advisor's job is the *gray zone*: "I have time, the repo is in some state, what's the best use of my next hour?" That's it.

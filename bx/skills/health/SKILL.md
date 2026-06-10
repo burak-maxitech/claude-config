@@ -3,14 +3,14 @@ name: health
 description: "Looks at the current repo state (git status, branch, recent commits, CLAUDE.md In Progress / Next Steps, open PR) and suggests which existing skills to run in what order for technical-debt / code-health work. Pure advisor — never invokes other skills, never edits files. Use when unsure which skill to reach for next, or when entering an unfamiliar repo and wanting a sequenced plan."
 disable-model-invocation: true
 effort: low
-allowed-tools: Read, Glob, Bash(git:*), Bash(ls:*), Bash(gh:*), Bash(wc:*)
+allowed-tools: Read, Glob, Bash(git:*), Bash(ls:*), Bash(gh:*), Bash(wc:*), Bash(grep:*), Bash(head:*), Bash(awk:*), Bash(tr:*)
 ---
 
 # /bx:health — Skill Routing Advisor
 
 You are a routing advisor. Your only output is a short report that tells the user **which skills to run in what order**, given the current state of their repo. **You do not invoke any skills, edit any files, or take any actions** beyond the read-only inspection below.
 
-The available skills you route between are: `/bx:resume`, `/simplify`, `/code-review`, `/bx:review`, `/code-review ultra`, `/bx:clean`, `/bx:arch`, `/bx:tests`, `/bx:seo`, `/bx:plan`, `/bx:save`. (`/simplify`, `/code-review`, and `/code-review ultra` are Anthropic built-ins; the `/bx-*` skills are this repo's. `/code-review ultra` is the cloud pass formerly called `/ultrareview`.)
+The available skills you route between are: `/bx:resume`, `/simplify`, `/code-review`, `/bx:review`, `/code-review ultra`, `/bx:clean`, `/bx:arch`, `/bx:tests`, `/bx:seo`, `/bx:plan`, `/bx:save`. (`/simplify`, `/code-review`, and `/code-review ultra` are Anthropic built-ins; the `/bx:*` skills are this repo's. `/code-review ultra` is the cloud pass formerly called `/ultrareview`.)
 
 ---
 
@@ -24,6 +24,7 @@ The snapshots below were captured by Claude Code's shell-injection layer **befor
 - **Current branch:** !`git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "(not a git repo)"`
 - **Time since last commit:** !`git log -1 --format=%cr 2>/dev/null || echo "(no commits)"`
 - **Commits ahead of origin/main:** !`git rev-list --count HEAD ^origin/main 2>/dev/null || echo "(no remote tracking)"`
+- **Commits behind origin/main:** !`git rev-list --count origin/main ^HEAD 2>/dev/null || echo "(no remote tracking)"`
 
 **Recent commits (last 10):**
 ```!
@@ -40,11 +41,11 @@ gh pr view --json number,state,title 2>/dev/null || echo "(no open PR or gh unav
 if [ -f CLAUDE.md ]; then
   grep -i "Last Updated" CLAUDE.md | head -1
   echo "---"
-  awk '/^## Current Status/,/^## [^C]/' CLAUDE.md | head -25
+  awk '/^## /{f=0} /^## Current Status/{f=1} f' CLAUDE.md | head -25
   echo "---"
-  awk '/^## In Progress/,/^## [^I]/' CLAUDE.md | head -20
+  awk '/^## /{f=0} /^## In Progress/{f=1} f' CLAUDE.md | head -20
   echo "---"
-  awk '/^## Next Steps/,/^## [^N]/' CLAUDE.md | head -20
+  awk '/^## /{f=0} /^## Next Steps/{f=1} f' CLAUDE.md | head -20
 else
   echo "(no CLAUDE.md at repo root)"
 fi
@@ -56,10 +57,9 @@ if [ -f package.json ]; then
   grep -E '"(next|nuxt|vue|svelte|astro|remix|gatsby|angular|react-router)"' package.json 2>/dev/null | head -3
 fi
 ls index.html public/index.html static/index.html templates/ 2>/dev/null | head -5
-echo "(absence of all signals above = is_web:false; presence of any = is_web:true and `/bx:seo` may belong in the flow)"
 ```
 
-The presence/absence of these signals is a coarse hint only — the authoritative web/non-web rule lives in `/bx:seo` Step 0; this skill just decides whether mentioning `/bx:seo` is worth the line in the report.
+Any output above = `is_web: true` (mention `/bx:seo` in the routing); no output = `is_web: false`. The presence/absence of these signals is a coarse hint only — the authoritative web/non-web rule lives in `/bx:seo` Step 0; this skill just decides whether mentioning `/bx:seo` is worth the line in the report.
 
 If any pre-injected field shows "(no ...)" or "(no remote)" or "(not a git repo)", note it briefly in the report and proceed with the available signals.
 
