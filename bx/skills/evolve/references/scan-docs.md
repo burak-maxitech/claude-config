@@ -198,9 +198,9 @@ pages_fetched: <n — count of allowlisted URLs that returned content successful
 pages_failed: [<url>: <error>, ...]   # empty list [] if all succeeded
 lane_status: ok | degraded | unavailable
 scan_note: <optional — used when scan ran cleanly but zero capability matches found, or other non-error observations>
-discarded_findings: <count of findings dropped by the 15-finding cap PLUS zero-hit discards from Step 5, or 0>
+discarded_findings: <count of findings dropped by the 15-finding cap PLUS zero-hit affected_files discards from Step 5, or 0>   # same semantics in all three lanes
 ```
 
-**Zero-findings-but-all-pages-checked case:** set `pages_fetched` to the count of allowlist rows fetched, `pages_failed: []`, `lane_status: ok`, and use `scan_note` to explain that no gaps were found. Never return an empty finding list without a `scan_note` — that is indistinguishable from a partial run.
+**Zero-findings-but-all-pages-checked case:** set `pages_fetched` to the count of allowlist rows successfully fetched, `pages_failed` to its real contents (empty list only if truly no fetches failed), `lane_status` to what actually happened (`ok` only if every allowlisted page fetched successfully; `degraded` if any page failed even though zero findings emerged from the pages that did succeed), and use `scan_note` to explain that no gaps were found. Never return an empty finding list without a `scan_note` — that is indistinguishable from a partial run.
 
 These power the report footer and the orchestrator's `docs_checked_at` advance decision.

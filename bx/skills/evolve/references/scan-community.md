@@ -13,7 +13,7 @@ You have these tools available: Read, Grep, Glob, WebSearch, WebFetch. Use WebSe
 - They are NEVER `--fix`-eligible (the orchestrator must not offer to apply them automatically).
 - `proposed_edit` must be phrased as "consider…" not "change X to Y".
 - **Severity caps at `medium` for all community findings** — community claims are uncorroborated by an official source; high severity is reserved for Tier-1 lanes where provenance is verified.
-- **Certainty band: 0.3–0.6** — never above 0.6 for any community finding, regardless of how confident the source sounds.
+- **Certainty band: 0.3–0.6** — never above 0.6 for any community finding, regardless of how confident the source sounds. Exception: the `lane-unavailable-community` sentinel is exempt (certainty 1.0, empty affected_files) — it reports lane health, not a community claim.
 
 A community pattern becomes actionable (and `--fix`-eligible) ONLY when a Tier-1 source (Anthropic docs or the claude-code changelog) independently corroborates it. In that case, the docs/changelog lane **owns** the finding — not this one. If you encounter an official Anthropic source while fetching community content, do NOT emit a `tier: community` finding for it — record it in `scan_note` so the orchestrator knows the docs or changelog lane should own it.
 
@@ -35,7 +35,7 @@ A community pattern becomes actionable (and `--fix`-eligible) ONLY when a Tier-1
 Derive at most **3** WebSearch queries per run. Use exactly this allocation — do not improvise additional slots:
 
 1. **Fixed slot 1:** `Claude Code skills best practices <current year>` — scans for general skill-authoring patterns and anti-patterns.
-2. **Fixed slot 2:** `Claude Code plugin <capability> pattern` — replace `<capability>` with the highest-priority bx capability area from `capability_inventory` (the one with the most open pain points or the most recently reworked area). If `capability_inventory` is empty, use the most prominent concept from `pain_point_list`.
+2. **Fixed slot 2:** `Claude Code plugin <capability> pattern` — replace `<capability>` with the capability from `capability_inventory` that has the most entries/files in the inventory (a proxy for surface area, derivable from the input itself; ties broken by pain-point count). If `capability_inventory` is empty, use the most prominent concept from `pain_point_list`. If both `capability_inventory` and `pain_point_list` are empty, run slot 1 only and record the omission in `scan_note`.
 3. **Variable slot 3:** Derived from the **highest-severity pain point** in `pain_point_list` — formulate a targeted query for that specific friction. If `pain_point_list` is empty, omit this query.
 
 **Why 3 is the hard cap:** this lane has the worst signal-to-noise ratio of the three lanes. Community posts mix outdated advice, paraphrased official docs, and SEO-shaped listicles. Beyond 3 queries the marginal finding quality drops sharply and the noise-filtering cost (Steps 3–5 below) exceeds the value. The cap is a quality gate, not a time constraint.
@@ -46,13 +46,15 @@ For each query from Step 1, call WebSearch. Collect all returned URLs and their 
 
 **Failure definition:** A WebSearch call fails if it returns an error or zero results. Record each failed query in the footer.
 
-**Recency filter (apply immediately):** discard any result whose publish or "last updated" date is older than 6 months before the current date. Exception: if a result is the ONLY source covering a claim that matches a pain point, retain it but flag it in `scan_note` as `stale_source` and cap certainty at 0.3.
+**Recency filter (apply immediately):** discard any result whose publish or "last updated" date is older than 6 months before the current date. Exception: if a result is the ONLY source covering a claim that matches a pain point, retain it but flag it in `scan_note` as `stale_source` — cap certainty at 0.3 and use it only for `best_practice`/`breakage` context. A stale-only source cannot support an `opportunity` finding (whose band floor is 0.4); discard `opportunity` candidates sourced exclusively from stale results.
 
 **Authority heuristics (apply before fetching):** from the search results, prefer:
 - Named engineering blogs from companies or individuals with Claude Code production experience
 - Conference talks or session write-ups
 - High-engagement community posts (significant upvotes/stars/reactions visible in the snippet)
 - GitHub Discussions, Issues, or Pull Requests on `anthropics/claude-code`
+
+**GitHub boundary rule:** posts by Anthropic maintainers in `anthropics/*` repos (Issues, PRs, Discussions, release notes) count as OFFICIAL sources — never emit them as `tier: community` findings. Hand them off via `scan_note` using the `official_source_found:` format, exactly as you would for any other Tier-1 source encountered during community fetching. Apply shortlist ranking in order: named engineering blog > maintainer/conference content > high-engagement community post; use recency as the tiebreaker. The 5-fetch budget is spent on the global top 5 across all queries.
 
 **Discard before fetching:**
 - SEO-shaped listicles ("10 best practices for…", "top X tips…") with no identifiable author
@@ -90,7 +92,7 @@ For each verified candidate: check whether it intersects the `capability_invento
 
 For each surviving candidate, identify the token, pattern, or capability area it claims bx uses. Run Grep over the repo with scope `bx/`, `README.md`, and `workflow.md` to find every file that contains that token. List every hit file in `affected_files`.
 
-**Zero-hit Grep rule:** zero Grep hits for a claims-about-bx-behavior finding → discard. (The verification gate in Step 4 should have caught this; Step 6 is the final check.) An empty `affected_files` is never legal in an emitted finding — if you cannot identify at least one file, discard.
+**Zero-hit Grep rule:** zero Grep hits for a `breakage` or `best_practice` finding → discard (the verification gate in Step 4 should have caught this; Step 6 is the final check). For `opportunity` findings there is no old token to grep for — set `affected_files` to the file(s) the proposed "consider" edit would touch, identified from the pain point's subject (e.g. the relevant skill's SKILL.md or references/ file). The zero-hit discard applies only to `breakage`/`best_practice` claims about existing bx behavior. An empty `affected_files` is never legal in any emitted finding — if you cannot identify at least one file for any class, discard.
 
 **Why Grep is mandatory:** the S45 rule — a rework isn't done until its echoes are swept from sibling files. `affected_files` must name every file the proposed edit would touch, including sibling-file echoes, not just the primary skill file.
 
@@ -104,7 +106,7 @@ For each surviving candidate, identify the token, pattern, or capability area it
 **Certainty band reminder:** 0.3–0.6 always. Never above 0.6 for any community finding.
 
 **Severity cap reminder:** never `high` for community findings. The maximum is `medium`. Assign:
-- `medium` — `best_practice` or `opportunity` findings on heavily-used bx capabilities or high-priority pain points.
+- `medium` — `breakage` claims from community sources (the cap; an uncorroborated breakage claim is exactly what the Tier-1 corroboration handoff exists for — also record it as a candidate for the changelog/docs lane via `scan_note: changelog_candidate:` or `scan_note: docs_candidate:` when the breakage is plausibly upstream-caused), OR `best_practice`/`opportunity` findings on heavily-used bx capabilities or high-priority pain points.
 - `low` — findings on rarely-invoked paths or low-priority pain points.
 
 **Cap: max 10 findings** (the lowest cap of the three lanes). Why: this lane's advisory-only, uncorroborated findings warrant a lower cap than Tier-1 lanes. Surfacing 15–20 advisory items would bury the actionable Tier-1 findings. Order by `severity_weight × certainty` descending. Severity weights: medium=2, low=1. If more than 10 qualify, include the 10 highest-weighted and record the discarded count in the footer.
@@ -117,9 +119,11 @@ For each surviving candidate, identify the token, pattern, or capability area it
 
 | Value | Meaning | `community_checked_at` advances? |
 |---|---|---|
-| `ok` | At least one query returned results AND every attempted fetch succeeded. | Yes — advances to today. |
-| `degraded` | At least one fetch succeeded but ≥1 search returned zero results or ≥1 fetch failed. Findings are trustworthy but coverage is partial. | Yes — advances to today. Failed searches/fetches are disclosed in the footer so the user knows which areas had partial coverage. |
-| `unavailable` | No search returned any results, OR every fetch failed. Only the degenerate finding is emitted. | No — the orchestrator MUST NOT advance `community_checked_at`. The missed check will be re-run next run because the watermark is unchanged. |
+| `ok` | At least one query returned results AND every attempted fetch succeeded AND no query failed with an error. Zero-result queries are not errors. Also `ok` when searches returned results but nothing survived pre-fetch triage (all stale/listicles) — the lane ran and found nothing worth fetching; the watermark advances. Use `scan_note` to explain the triage outcome. | Yes — advances to today. |
+| `degraded` | At least one fetch succeeded (or pre-fetch triage ran) but ≥1 query or fetch FAILED WITH AN ERROR. Findings are trustworthy but coverage is partial. | Yes — advances to today. Failed searches/fetches are disclosed in the footer so the user knows which areas had partial coverage. |
+| `unavailable` | Every query failed with an error, OR queries succeeded but every attempted fetch failed. Only the degenerate finding is emitted. | No — the orchestrator MUST NOT advance `community_checked_at`. The missed check will be re-run next run because the watermark is unchanged. |
+
+These states are mutually exclusive: `ok` requires zero errors; `degraded` requires at least one success AND at least one error; `unavailable` requires total failure.
 
 The orchestrator advances `community_checked_at` only on `ok` or `degraded`, per `bx/skills/evolve/references/state-schema.md` Rule 4.
 
@@ -188,9 +192,9 @@ Note: `severity: low` — a missing advisory lane is not urgent. This differs fr
 ## Hard rules
 
 - **Advisory-only, always.** `tier: community` findings are NEVER `--fix`-eligible. `proposed_edit` must use "consider…" phrasing. The orchestrator must not offer automatic application.
-- **Severity hard cap: medium.** Never assign `high` severity to a community finding. The reason is stated in the TIER RULE section: community claims are uncorroborated.
-- **Certainty hard band: 0.3–0.6.** Never above 0.6. Never below 0.3 in an emitted finding (below 0.3 means the evidence is too weak to surface at all — discard instead).
-- **Official sources encountered during fetching are NOT emitted here.** If you reach an Anthropic docs page, a GitHub release note, or any first-party source while fetching community content, record the URL and the relevant claim in `scan_note` (format: `official_source_found: <url> — <one-line description>`). The docs or changelog lane owns that finding.
+- **Severity hard cap: medium.** Never assign `high` severity to a community finding. The reason is stated in the TIER RULE section: community claims are uncorroborated. Exception: the `lane-unavailable-community` sentinel is exempt (severity `low` by design — a missing advisory lane is not urgent).
+- **Certainty hard band: 0.3–0.6.** Never above 0.6. Never below 0.3 in an emitted finding (below 0.3 means the evidence is too weak to surface at all — discard instead). Exception: the `lane-unavailable-community` sentinel is exempt (certainty 1.0, empty affected_files) — it reports lane health, not a community claim.
+- **Official sources encountered during fetching are NOT emitted here.** If you reach an Anthropic docs page, a GitHub release note, any first-party source, or a post by an Anthropic maintainer in an `anthropics/*` repo while fetching community content, record the URL and the relevant claim in `scan_note` (format: `official_source_found: <url> — <one-line description>`). The docs or changelog lane owns that finding. See the GitHub boundary rule in Step 2.
 - **Unconfirmable claims are discarded, not capped.** Unlike the docs lane (which caps at certainty 0.5), this lane discards without emitting. The noise floor is higher.
 - **Never report zero findings silently.** If all searches and fetches ran without error but no candidates survived the filters, append a note: `scan_note: <N> pages evaluated; no capability or pain-point matches survived verification`. This is distinct from `unavailable`.
 - **Include sibling-file echoes in `affected_files`.** Always populate via Step 6 Grep. Never infer from the capability string alone.
@@ -206,12 +210,13 @@ After all findings (or after the single `lane-unavailable-community` finding), a
 ```
 searches_run: <n>/3
 pages_fetched: <n>/5
-pages_failed: [<url>: <error>, ...]   # empty list [] if all fetches succeeded
+pages_failed: [<url>: <error>, ...]         # empty list [] if all fetches succeeded
+searches_failed: [<query>: <error>, ...]    # empty list [] if no query failed with an error
 lane_status: ok | degraded | unavailable
 scan_note: <optional — used for: zero findings despite clean run; stale_source flags; cap_reached note; official_source_found notices; other non-error observations>
-discarded_findings: <count of findings dropped by the 10-finding cap PLUS zero-hit discards from Step 6 PLUS unconfirmable discards from Step 4, or 0>
+discarded_findings: <count of findings dropped by the 10-finding cap PLUS zero-hit affected_files discards from Step 6 PLUS unconfirmable discards from Step 4, or 0>   # same semantics in all three lanes
 ```
 
-**Zero-findings-but-searches-ran case:** set `searches_run` to the count of queries issued, `pages_fetched` to the count of pages successfully fetched, `pages_failed: []`, `lane_status: ok`, and use `scan_note` to explain that no gaps were found. Never return an empty finding list without a `scan_note` — that is indistinguishable from a partial run.
+**Zero-findings-but-searches-ran case:** set `searches_run` to the count of queries issued, `pages_fetched` to the count of pages successfully fetched, `pages_failed` and `searches_failed` to their real contents (empty lists only if truly no failures occurred), `lane_status` to what actually happened (`ok` only if nothing failed with an error; `degraded` if any query or fetch failed with an error), and use `scan_note` to explain that no gaps were found. Never return an empty finding list without a `scan_note` — that is indistinguishable from a partial run.
 
 These power the report footer and the orchestrator's `community_checked_at` advance decision.

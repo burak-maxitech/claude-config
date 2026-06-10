@@ -195,7 +195,7 @@ releases_scanned: <n — 0 if lane_status is unavailable, since nothing was succ
 newest_version_seen: <unprefixed version string, or null if unavailable>
 lane_status: ok | degraded | unavailable
 scan_note: <optional — used when scan ran cleanly but zero capability matches found, when the --limit 50 window was exhausted, or when the watermark anchor was not found>
-discarded_findings: <count of findings dropped by the 20-finding cap, or 0>
+discarded_findings: <count of findings dropped by the 20-finding cap PLUS zero-hit affected_files discards from Step 7, or 0>   # same semantics in all three lanes
 ```
 
 **Zero-new-releases case:** when `last_changelog_version` equals the newest release tag in the window (i.e., no in-scope releases exist since the watermark), set `releases_scanned: 0`, `lane_status: ok`, and `newest_version_seen` to the incoming `last_changelog_version` value (a no-op advance). Never emit `null` for `newest_version_seen` on an `ok` run — the orchestrator advances the watermark to this value, and `null` would clobber the stored watermark and force a full rescan on the next run.
