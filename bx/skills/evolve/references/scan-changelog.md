@@ -1,0 +1,178 @@
+# Scan: Changelog (upstream claude-code releases)
+
+Loaded by the orchestrator and passed to the `upstream-changelog` subagent. You are that subagent. Detailed scanning instructions follow.
+
+You have these tools available: Read, Grep, Glob, Bash (gh commands only — pattern `gh *`), WebFetch. Use `gh` and WebFetch for all network access. No `curl`, no `git clone`, no shell HTTP commands.
+
+---
+
+## Inputs you receive in your task prompt
+
+- `last_changelog_version` — string (e.g. `"1.7.0"`) or null. The highest claude-code release tag processed on the last run. Null means this is the first run — scan ALL releases in the window.
+- `capability_inventory` — list of bx capability strings (e.g. `"bx:seo/allowed-tools"`, `"bx:save/agent-model"`). Only produce findings that intersect this list or a pain-point from the list below.
+- `pain_point_list` — list of short strings describing known friction areas in the bx toolkit (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). A release note addressing a pain point qualifies as a finding even without an exact capability match.
+- `tier_definitions` — the tier table from the orchestrator (currently only one tier for this lane: `tier: official`).
+
+---
+
+## Method
+
+### Step 1 — Enumerate releases (primary: gh)
+
+Run:
+
+```
+gh release list --repo anthropics/claude-code --limit 50
+```
+
+This returns releases newest-first. Collect the tag names in that order.
+
+**Watermark comparison rule:** iterate from newest to oldest. Stop at the FIRST release whose tag is `<= last_changelog_version` (using the release order returned by `gh release list`, not semver arithmetic — the order `gh` returns is authoritative). Do not fetch or evaluate that release or any older ones.
+
+If `last_changelog_version` is null, process ALL releases returned in the 50-release window. Note in the footer if the window was exhausted (i.e., you hit the `--limit 50` cap without finding a stopping point) — more than 50 releases may exist and the user may want to run with a larger limit.
+
+### Step 2 — Fetch each in-scope release body (primary: gh)
+
+For each in-scope tag, run:
+
+```
+gh release view <tag> --repo anthropics/claude-code --json body,tagName,publishedAt
+```
+
+Parse `body` (markdown), `tagName` (the tag string), and `publishedAt` (ISO timestamp).
+
+### Step 3 — Fallback when gh fails
+
+If `gh release list` or `gh release view` fails (no auth, network error, rate limit), fall back to:
+
+```
+WebFetch https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md
+```
+
+Slice the fetched markdown to include only sections whose version heading is NEWER than `last_changelog_version`. In the fallback path, version headings in the document are the ordering authority (document order, top = newest). If `last_changelog_version` is null, use the entire fetched document.
+
+In the fallback path, `citation` and `source_url` for each finding use the CHANGELOG.md raw URL (`https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md`), and `publishedAt` is not available — omit the date from citation prose.
+
+### Step 4 — Both paths fail: emit lane_unavailable
+
+If BOTH the primary (`gh`) and fallback (WebFetch) fail, emit a single `lane_unavailable` finding (degenerate form — see below) and stop. Do NOT report zero findings and return normally — that is indistinguishable from "everything is fine" and would silently advance the watermark past changes that were never checked. The S30/S35 rule: every fetch failure is explicit, named, and blocks the watermark advance.
+
+### Step 5 — Extract candidate deltas per release
+
+For each in-scope release body, extract these categories of change. Each is a candidate delta — proceed to Step 6 before emitting as a finding.
+
+- **Renames or deprecations** of commands, flags, or slash-command names (e.g. a built-in skill renamed, a flag removed or renamed).
+- **New or changed frontmatter keys** in skill YAML (e.g. a new required field, a renamed field, a changed allowed-values enum).
+- **New or changed hook events** (e.g. a new hook lifecycle point, a renamed event name, changed hook payload shape).
+- **Tool-permission syntax changes** (e.g. `allowed-tools` pattern syntax change, new permission categories, changed glob rules).
+- **New capabilities** that could replace existing bx workarounds (e.g. a new built-in command that does what a bx skill currently hand-implements).
+
+### Step 6 — Filter against capability inventory and pain points
+
+For each candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match.
+
+---
+
+## lane_status definitions
+
+`lane_status` must be one of these three values. It is declared in the footer addendum and governs watermark advancement.
+
+| Value | Meaning | Watermark advance? |
+|---|---|---|
+| `ok` | Primary method (`gh`) succeeded. Release bodies were fetched directly; `publishedAt` dates and release URLs are precise. | Yes — `last_changelog_version` advances to `newest_version_seen`. |
+| `degraded` | Primary (`gh`) failed; fallback (raw CHANGELOG.md fetch) succeeded. Findings are still trustworthy but `citation` URLs and dates are coarser (raw file URL instead of per-release URL; no `publishedAt`). | Yes — `last_changelog_version` still advances because the changelog content was successfully evaluated; the user is informed of the coarser citation quality via the `lane_status: degraded` disclosure. |
+| `unavailable` | Both primary and fallback failed. Only the `lane_unavailable` degenerate finding was emitted. | No — the orchestrator MUST NOT advance `last_changelog_version` when `lane_status` is `unavailable`. The missed range will be re-checked on the next run because the watermark is unchanged. |
+
+**Why this matters:** the orchestrator advances the watermark only on `ok` or `degraded`. Silent degradation is impossible — the report footer always discloses `lane_status`, so the user knows whether citations are precise or coarse, and knows when no advance occurred.
+
+---
+
+## Finding schema (use exactly these field names)
+
+```
+finding_id: <sha1 of canonicalized source_url + "|" + affected_capability>
+class: breakage | best_practice | opportunity
+tier: official
+severity: low | medium | high
+certainty: 0.0–1.0
+affected_files: [<every file needing the edit, including sibling-file echoes>]
+upstream_delta: <one-line: what changed upstream>
+proposed_edit: <prose + concrete old→new where possible>
+citation: <the release URL>
+source_url: <canonicalized release URL — same value used in finding_id>
+affected_capability: <capability string, e.g. "bx:*/allowed-tools">
+source_content_hash: <sha1 of the normalized cited section text>
+```
+
+**`finding_id` computation:** `sha1(source_url + "|" + affected_capability)`. Canonicalize `source_url` and normalize `affected_capability` per `references/state-schema.md` — do not restate the algorithms here.
+
+**`source_content_hash` computation:** NFC normalize → strip → collapse whitespace → UTF-8 encode → sha1. Algorithm is normative in `references/state-schema.md`.
+
+**`affected_capability` normalization:** lowercase, forward-slash separators, no trailing slash, no spaces. Example: `"bx:seo/allowed-tools"`.
+
+**`source_url` for the `ok` path:** the GitHub release URL for the specific tag, e.g. `https://github.com/anthropics/claude-code/releases/tag/1.8.0`. Apply canonicalization per `references/state-schema.md` before hashing and storing.
+
+**`source_url` for the `degraded` path:** `https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md` (canonicalized). All findings in a degraded run share this URL; `finding_id` differentiation comes from `affected_capability`.
+
+**`class` assignment guidance:**
+
+- `breakage` — the upstream change means existing bx config/syntax is now wrong or will stop working (e.g. a renamed flag bx currently uses, a removed frontmatter key bx emits).
+- `best_practice` — the change introduces a recommended pattern bx isn't yet using, or deprecates a pattern bx uses in favor of a better one.
+- `opportunity` — a new capability exists that could simplify or replace a bx workaround, but the current bx approach still works.
+
+**`severity` guidance:**
+
+- `high` — breakage findings, OR opportunity findings that address a pain point the user has explicitly called out.
+- `medium` — best_practice findings on heavily-used capabilities, or opportunity findings with clear benefit.
+- `low` — best_practice or opportunity findings on rarely-invoked paths.
+
+**`certainty` guidance:** 1.0 for breakages where the old syntax is confirmed removed; 0.7–0.9 for deprecations with a migration path; 0.5–0.7 for opportunity findings where the new capability MAY cover the use case but needs verification.
+
+---
+
+## lane_unavailable degenerate finding
+
+When both primary and fallback fail, emit ONLY this finding (no others):
+
+```
+finding_id: lane-unavailable-changelog
+class: breakage
+tier: official
+severity: high
+certainty: 1.0
+affected_files: []
+upstream_delta: "<verbatim error from gh> | <verbatim error from the fallback WebFetch>"
+proposed_edit: "Re-run /bx:evolve when network/gh auth is available. The changelog watermark was NOT advanced."
+citation: null
+source_url: null
+affected_capability: null
+source_content_hash: null
+```
+
+The orchestrator MUST NOT advance `last_changelog_version` when this finding is present. Set `lane_status: unavailable` in the footer addendum.
+
+---
+
+## Hard rules
+
+- **Never report zero findings silently.** If in-scope releases exist but none match the capability inventory or pain points, append a note in the footer: `scan_note: <N> releases evaluated; no capability or pain-point matches found`. This is different from `unavailable` — it means the scan ran cleanly but nothing was relevant.
+- **Include sibling-file echoes in `affected_files`.** If a rename or syntax change requires edits in multiple files (e.g. the skill SKILL.md AND a references/ file AND CLAUDE.md), list every file. The S45 lesson: a rework isn't done until its echoes are swept from sibling files.
+- **Imperative tone toward the agent:** You will receive inputs. You will run. You will emit. No passive voice in instructions.
+- **Order findings by `severity_weight × certainty` descending.** Severity weights: high=3, medium=2, low=1. Cap at 20 findings. If more than 20 qualify, include the 20 highest-weighted and note the count of discarded findings in the footer.
+- **Do not restate algorithms from `references/state-schema.md`.** Point to that file for `finding_id` computation, `source_url` canonicalization, and `source_content_hash` normalization. Duplication causes drift — the S45 lesson.
+
+---
+
+## Final output addendum
+
+After all findings (or after the single `lane_unavailable` finding), append:
+
+```
+releases_scanned: <n>
+newest_version_seen: <tag or null if unavailable>
+lane_status: ok | degraded | unavailable
+scan_note: <optional — used when scan ran cleanly but zero capability matches found, or when --limit 50 window was exhausted>
+discarded_findings: <count of findings dropped by the 20-finding cap, or 0>
+```
+
+These power the report footer and the orchestrator's watermark-advance decision.
