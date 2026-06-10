@@ -539,8 +539,10 @@ No flags. No arguments. Always read-only.
 
 **Usage:**
 ```bash
-/bx:evolve              # Research upstream changes since watermark → report with citations
-/bx:evolve --fix        # Apply approved findings behind per-finding diff gates
+/bx:evolve                 # Research upstream changes since watermark → report with citations
+/bx:evolve --fix           # Apply approved findings behind per-finding diff gates
+/bx:evolve --full          # Ignore the watermark — from-scratch audit (the S33 treatment)
+/bx:evolve --no-community  # Official-only fast pass (skips the advisory community lane)
 ```
 
 **Flow:**

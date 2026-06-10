@@ -39,7 +39,7 @@ The AI tooling space moves fast: Anthropic ships new Claude Code versions, renam
 
 ## Authority model (two-tier)
 
-- **Tier 1 (actionable):** official Anthropic surfaces only — claude-code CHANGELOG/releases, official Claude Code docs, Anthropic engineering blog. Every actionable finding carries a mandatory Tier-1 citation URL.
+- **Tier 1 (actionable):** official Anthropic surfaces only — claude-code CHANGELOG/releases and the pinned official Claude Code docs allowlist. (Other official surfaces like the Anthropic engineering blog reach the report only via the community lane's `official_source_found` handoff — no lane fetches them directly.) Every actionable finding carries a mandatory Tier-1 citation URL.
 - **Tier 2 (advisory):** community content via bounded WebSearch. Advisory findings are clearly badged, never actionable on their own, and never eligible for `--fix`. A Tier-2 pattern becomes actionable only when a Tier-1 source corroborates it.
 
 ## Step flow (orchestrator)
@@ -68,6 +68,8 @@ affected_files: [<every file needing the edit, including sibling-file echoes>]
 upstream_delta: <one-line: what changed upstream>
 proposed_edit: <prose + concrete old→new where possible>
 citation: <Tier-1 URL>                (mandatory for official tier)
+source_url: <canonicalized source URL — finding_id input>
+affected_capability: <normalized capability string — finding_id input>
 source_excerpt: <verbatim extract — orchestrator computes finding_id + source_content_hash at consolidation>
 ```
 
@@ -76,7 +78,7 @@ source_excerpt: <verbatim extract — orchestrator computes finding_id + source_
 ```json
 {
   "watermark": {
-    "last_changelog_version": "v2.1.x",
+    "last_changelog_version": "2.1.170",
     "docs_checked_at": "2026-06-09",
     "community_checked_at": "2026-06-09"
   },
@@ -88,8 +90,8 @@ source_excerpt: <verbatim extract — orchestrator computes finding_id + source_
       "source_url": "<canonicalized URL of the upstream source page>",
       "affected_capability": "<e.g. bx:seo/allowed-tools>",
       "source_content_hash": "<hash>",
-      "class": "breakage | best_practice | opportunity | null",
-      "title": "<one-line finding title at last surfacing, or null for sentinels>",
+      "class": "breakage | best_practice | opportunity",
+      "title": "<one-line finding title at last surfacing>",
       "note": "<optional one-liner>"
     }
   ]

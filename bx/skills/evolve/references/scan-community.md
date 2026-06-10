@@ -119,7 +119,7 @@ For each surviving candidate, identify the token, pattern, or capability area it
 
 | Value | Meaning | `community_checked_at` advances? |
 |---|---|---|
-| `ok` | At least one query returned results AND every attempted fetch succeeded AND no query failed with an error. Zero-result queries are not errors. Also `ok` when searches returned results but nothing survived pre-fetch triage (all stale/listicles) — the lane ran and found nothing worth fetching; the watermark advances. Use `scan_note` to explain the triage outcome. | Yes — advances to today. |
+| `ok` | All queries executed without error AND every attempted fetch succeeded. Zero-result queries are not errors — a run where every query returns zero results is still `ok` (the lane ran; there was nothing to find; use `scan_note`). Also `ok` when searches returned results but nothing survived pre-fetch triage (all stale/listicles) — the lane ran and found nothing worth fetching. Watermark advances in all these cases. | Yes — advances to today. |
 | `degraded` | At least one fetch succeeded (or pre-fetch triage ran) but ≥1 query or fetch FAILED WITH AN ERROR. Findings are trustworthy but coverage is partial. | Yes — advances to today. Failed searches/fetches are disclosed in the footer so the user knows which areas had partial coverage. |
 | `unavailable` | Every query failed with an error, OR queries succeeded but every attempted fetch failed. Only the degenerate finding is emitted. | No — the orchestrator MUST NOT advance `community_checked_at`. The missed check will be re-run next run because the watermark is unchanged. |
 

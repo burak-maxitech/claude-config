@@ -121,7 +121,7 @@ Sentinel findings (`lane-unavailable-changelog`, `lane-unavailable-docs`, `lane-
 
 ### 3.3 — Relevance spot-check
 
-The relevance gate is applied lane-side. Spot-check: drop any finding whose `affected_capability` intersects neither the capability inventory nor the pain-point list. This catches improvised lane output that slipped through.
+The relevance gate is applied lane-side. Spot-check: drop any **non-sentinel** finding whose `affected_capability` intersects neither the capability inventory nor the pain-point list (sentinels carry null capability by design and must survive to render in Section 1). This catches improvised lane output that slipped through.
 
 ### 3.4 — Decision-log filter
 
