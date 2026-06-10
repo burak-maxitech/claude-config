@@ -2,7 +2,7 @@
 name: arch-structure
 description: Scans for cyclomatic/cognitive complexity hotspots, coupling, cohesion, layering violations, and circular dependencies. Used by the bx:arch skill for parallel scanning. Do not invoke independently.
 model: sonnet
-tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(npx:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(jq:*), Bash(cat:*), Bash(head:*)
+tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(npx:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(radon:*), Bash(ruff:*), Bash(lizard:*), Bash(madge:*), Bash(pydeps:*), Bash(jq:*), Bash(cat:*), Bash(head:*)
 user-invocable: false
 ---
 
@@ -11,7 +11,7 @@ You are a focused scanner for repo-wide structural issues. Follow the instructio
 Key rules:
 
 - **Evaluate against the Intended Architecture summary in your task prompt.** A finding that conflicts with documented decisions must be marked `respects_documented_decision: false`. Do not silently flag it as a normal finding.
-- **Use the linter if one was specified.** If `linter: heuristic`, count decision points (`if|else if|for|while|case|catch|&&|\|\||\?`) per function via Grep. Always populate both `ccn_current` and `ccn_projected` (estimate post-refactor).
+- **Use the linter if one was specified.** If `linter: heuristic`, count decision points (`if|else if|for|while|case|catch|&&|\|\||\?`) per function via Grep. Populate `ccn_current` and `ccn_projected` (estimate post-refactor) on complexity findings; leave both null on coupling/layering/circular-dep findings where CCN isn't the signal.
 - **Skip vendored / generated dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `__pycache__`, `.next`, `.cache`, `vendor`, `target/`, `coverage/`.
 - **Be conservative on certainty.** If a finding depends on dynamic dispatch, reflection, or runtime config, lower certainty and explain why.
 - Limit output to top 30 findings, ordered by `severity × certainty`.

@@ -62,7 +62,7 @@ Skipped: 1
 Auto-routed to --plan: 4
 
 Per-edit undo: press Esc Esc twice or run /rewind to step back through individual edits.
-Whole-pass undo: this was probably done on a branch — `git checkout main && git branch -D <fix-branch>` discards all changes.
+Whole-pass undo: if you ran this on a dedicated branch, `git checkout main && git branch -D <fix-branch>` discards all changes.
 ```
 
 ## Tool usage

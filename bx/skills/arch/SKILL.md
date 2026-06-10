@@ -3,7 +3,7 @@ name: arch
 description: Repo-wide architecture audit. Surfaces structural debt, complexity hotspots, refactor opportunities, performance suspects, AND over-engineering/almost-dead code (single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config). Reports `lines_deletable` as a top-line metric.
 when_to_use: When user mentions architecture review, refactoring opportunities, technical debt at the repo level, "is this codebase over-engineered", "make the codebase smaller", or "where's the complexity in this codebase". Different from `/code-review` (diff-scoped, daily driver), `/bx:review` (thorough senior-engineer review), `/code-review ultra` (PR-scoped cloud review), and `/bx:clean` (file-level deletion only).
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(pip:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(cat:*), Bash(head:*), Task
+allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(sort:*), Bash(uniq:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(pip:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(cat:*), Bash(head:*), Task
 effort: high
 argument-hint: "[path] [--plan] [--fix] [--full-scan] [--map]"
 ---
@@ -42,9 +42,9 @@ Mirror `/bx:clean` Step 0: gather stack, workspaces, linter, and repo size befor
 | Stack | Tool | Detection |
 |-------|------|-----------|
 | JS/TS | `eslint` with `complexity` rule | `.eslintrc*` references `complexity` rule, or `eslint-plugin-sonarjs` present |
-| Python | `radon` | `radon` on `$PATH` or in `pyproject.toml` deps |
+| Python | `radon` | `radon` in `pyproject.toml`/requirements deps |
 | Python | `ruff` (mccabe `C901`) | `pyproject.toml` `[tool.ruff]` enables `C` rules |
-| Multi-lang | `lizard` | `lizard` on `$PATH` |
+| Multi-lang | `lizard` | `lizard` in deps (any stack) |
 | JVM | `pmd` / `checkstyle` config | `pmd-ruleset.xml`, `checkstyle.xml` |
 
 If none detected, fall back to **Grep heuristic** (count decision points: `if|else if|for|while|case|catch|&&|\|\||\?` per function). Record this as `linter: heuristic` so the report disclosure is accurate.
@@ -86,7 +86,7 @@ From these, write a 3-5 bullet **Intended Architecture summary**:
 
 If no architecture docs exist, say so and infer from top-level directory structure — but flag in the report that findings are evaluated against an *inferred* architecture.
 
-**Pass this summary verbatim to all three subagents** in their task prompts. Subagents must mark any finding that conflicts with the documented intent as `respects_documented_decision: false`. Those surface in a separate report section the user has to confirm before action — they are *not* automatically actioned, even in `--fix` mode.
+**Pass this summary verbatim to all four subagents** in their task prompts. Subagents must mark any finding that conflicts with the documented intent as `respects_documented_decision: false`. Those surface in a separate report section the user has to confirm before action — they are *not* automatically actioned, even in `--fix` mode.
 
 ---
 
@@ -125,7 +125,7 @@ Launch all four Task subagents in a single turn (one Task call per agent). Mirro
 
 For each subagent, **read its corresponding reference file** (it contains the detailed scan instructions) and pass the contents in the task prompt along with the shared context.
 
-### Shared context to pass to all three subagents:
+### Shared context to pass to all four subagents:
 
 ```
 Detected stack: <from Step 0>
@@ -193,7 +193,7 @@ Read `references/report-template.md` for exact formatting. The shape:
 1. **Architecture Map** (lightweight by default; full ASCII dep graph behind `--map`)
    - Detected layers (from Step 1) + observed file/dir tree alignment
    - Complexity heatmap: top 10 hotspots by current CCN with file:line and CCN value
-2. **Findings** — four subsections (Structure / Refactors / Performance / Simplification), each ordered by rank score. CCN delta column (`current → projected`, Δ) for refactors. `Lines Δ` column for simplification.
+2. **Findings** — four subsections in the template's order (Simplification first — deletion-first — then Structure / Refactors / Performance), each ordered by rank score. CCN delta column (`current → projected`, Δ) for refactors. `Lines Δ` column for simplification.
 3. **Documented-Decision Conflicts** — separate, prefixed with "**Confirm intent before action:**"
 4. **Suggested Next Actions**
    - Skill chains: e.g. "If many `Unused module` candidates appeared, run `/bx:clean` first and rerun this."
@@ -208,7 +208,7 @@ Read `references/report-template.md` for exact formatting. The shape:
 Read `references/plan-mode.md`. Transform the top quick-wins + strategic refactors into a phased brief. Each phase becomes a self-contained `/bx:plan <brief>` payload the user can drop directly into another session. Documented-decision conflicts become their own confirmation phase, ordered last.
 
 ### If `--fix` in $ARGUMENTS:
-Read `references/fix-mode.md`. Walk findings whose `recommended_refactor` qualifies as **single-file, non-API-breaking** (extract method within file, guard-clause flatten, dedupe local helper, hoist invariant, replace inline conditional with table lookup *if* table stays in same file, defensive-code removal S06, unread-config deletion S04 when key lives in one file). Anything cross-file or API-touching is auto-routed to `--plan` instead.
+Read `references/fix-mode.md`. Walk findings whose `recommended_refactor` qualifies as **single-file, non-API-breaking** (extract method within file R02, guard-clause flatten R01, hoist invariant R08, named predicate R09, table-lookup dispatch *if* the table stays in the same file R06, defensive-code removal S06, unread-config deletion S04 when the key lives in one file, single-file unused-export deletion S09). Anything cross-file or API-touching is auto-routed to `--plan` instead — fix-mode.md's eligibility rules are canonical.
 
 For each qualifying finding:
 1. Show the current snippet
@@ -218,7 +218,7 @@ For each qualifying finding:
 5. Move to next
 
 End with:
-> Done. Use `Esc Esc` or `/rewind` to undo any individual edit. Use `git branch -D <branch>` if you want to discard the whole pass.
+> Done. Use `Esc Esc` or `/rewind` to undo any individual edit. If you ran this on a dedicated branch, `git checkout main && git branch -D <branch>` discards the whole pass.
 
 ---
 
