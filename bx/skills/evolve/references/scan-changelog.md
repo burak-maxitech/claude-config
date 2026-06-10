@@ -106,9 +106,9 @@ source_content_hash: <sha1 of the normalized cited section text>
 
 **`finding_id` computation:** `sha1(source_url + "|" + affected_capability)`. Canonicalize `source_url` and normalize `affected_capability` per `references/state-schema.md` — do not restate the algorithms here.
 
-**`source_content_hash` computation:** NFC normalize → strip → collapse whitespace → UTF-8 encode → sha1. Algorithm is normative in `references/state-schema.md`.
+**`source_content_hash` computation:** normalize and hash per `references/state-schema.md`.
 
-**`affected_capability` normalization:** lowercase, forward-slash separators, no trailing slash, no spaces. Example: `"bx:seo/allowed-tools"`.
+**`affected_capability` normalization:** normalize per `references/state-schema.md`. Example: `"bx:seo/allowed-tools"`.
 
 **`source_url` for the `ok` path:** the GitHub release URL for the specific tag, e.g. `https://github.com/anthropics/claude-code/releases/tag/1.8.0`. Apply canonicalization per `references/state-schema.md` before hashing and storing.
 
@@ -136,7 +136,7 @@ When both primary and fallback fail, emit ONLY this finding (no others):
 
 ```
 finding_id: lane-unavailable-changelog
-class: breakage
+class: null
 tier: official
 severity: high
 certainty: 1.0
