@@ -25,8 +25,8 @@ The watermark records the furthest upstream point checked on the most recent com
 | Field | Type | Meaning |
 |---|---|---|
 | `last_changelog_version` | string or null | The claude-code release tag string (e.g. `"1.7.0"`) of the highest changelog entry processed in the last run. On the next run, only entries tagged AFTER this version are fetched. Null on first run → fetch the full changelog. |
-| `docs_checked_at` | ISO date string or null | The date (YYYY-MM-DD) the Anthropic docs pages were last fetched and scanned. On the next run, skip the docs fetch if `docs_checked_at >= today - 7d` (docs change slowly; weekly cadence avoids rate-limiting and respects the source). Null on first run → always fetch. |
-| `community_checked_at` | ISO date string or null | The date (YYYY-MM-DD) the community sources (Claude Code GitHub issues, Anthropic community forum) were last checked. Same weekly-cadence skip logic as `docs_checked_at`. Null on first run → always check. |
+| `docs_checked_at` | ISO date string or null | The date (YYYY-MM-DD) the Anthropic docs pages were last fetched and scanned. Recorded as a timestamp of the last successful check; used for the report's "delta since <date>" framing. Null on first run. |
+| `community_checked_at` | ISO date string or null | The date (YYYY-MM-DD) the community sources (Claude Code GitHub issues, Anthropic community forum) were last checked. Recorded as a timestamp of the last successful check; used for the report's "delta since <date>" framing. Null on first run. |
 
 ### Why the watermark matters
 
@@ -63,6 +63,13 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "date": "2026-06-09",
       "source_content_hash": "9e107d9d372bb6826bd81d3542a419d6a3b1c5d2",
       "note": null
+    },
+    {
+      "finding_id": "d2e6f0a4b8c2e6f0a4b8c2e6f0a4b8c2e6f0a4b8",
+      "decision": "deferred",
+      "date": "2026-06-09",
+      "source_content_hash": "1f8ac10f23c5b5bc1167bda84b833e5c057a77d7",
+      "note": "Hooks rework is high-effort; revisit after /bx:webdesign dogfood is complete."
     }
   ]
 }
@@ -76,7 +83,7 @@ Each entry in the `decisions` array represents one actionable finding that has b
 | `decision` | enum string | yes | Current verdict: `open` (surfaced, not yet acted on), `applied` (fix merged into the bx plugin), `rejected` (evaluated and deliberately skipped), or `deferred` (will apply later; re-raised on every run until changed). |
 | `date` | ISO date string (YYYY-MM-DD) | yes | Date the entry was last written or updated. Set to today on creation; updated to today when a verdict overwrites `open`. |
 | `source_content_hash` | string (40-char hex SHA-1) | yes | SHA-1 of the specific upstream section text that drove this finding (the cited paragraph or bullet, not the whole page). Used by the rejected-finding re-raise rule: if the source section changes, the old rejection no longer applies and the finding re-opens. |
-| `note` | string or null | no | Human-readable explanation of the verdict. Mandatory for `applied` and `rejected` (explains what was done or why it was skipped); optional for `open` and `deferred`; set to null when absent. |
+| `note` | string or null | no | Optional human-readable explanation of the verdict — a one-liner covering what was done or why it was skipped. Set to null when absent. |
 
 ### finding_id computation (normative)
 
@@ -97,7 +104,7 @@ These rules are invariants — the orchestrator must not deviate from them. Each
 
 ### Rule 1: New actionable findings are written as `open` at report time
 
-When the orchestrator identifies a finding that has no existing `finding_id` entry in `decisions`, it writes a new entry with `decision: "open"` before emitting the report. **Why:** if the run crashes after reporting but before writing state, re-running the skill would re-surface the finding as new. Writing `open` first means the finding survives even a partial run — it's in state and will appear in the next run's "pending" list rather than being re-announced.
+When the orchestrator identifies a finding that has no existing `finding_id` entry in `decisions`, it writes a new entry with `decision: "open"` before emitting the report. **Why:** findings survive watermark advances. Because every undecided finding persists as an `open` entry and re-surfaces in every report until the user reaches a verdict, the watermark can safely advance at the end of every run — there is no risk of a finding disappearing between runs just because the watermark moved past its source version. A secondary bonus: if the run crashes after reporting but before writing state, re-running re-surfaces the finding from state rather than re-announcing it as new.
 
 ### Rule 2: `--fix` verdicts overwrite the `open` entry in-place
 
@@ -109,7 +116,7 @@ On each run, the orchestrator fetches the source section for every `rejected` en
 
 ### Rule 4: The watermark advances at the end of EVERY run
 
-After all findings have been written to state (Rule 1) and any `--fix` verdicts applied (Rule 2), the orchestrator updates the watermark fields to reflect the current run's reach: `last_changelog_version` to the highest tag processed, `docs_checked_at` and `community_checked_at` to today's date (or left unchanged if the weekly-cadence skip fired for those sources). **Why:** advancing at the end, not the beginning, means a failed or partial run leaves the watermark at the last fully-completed run's value. The next run will re-check the same range rather than skipping it. This is the safe failure mode — slightly redundant work on retry, never missing entries.
+After all findings have been written to state (Rule 1) and any `--fix` verdicts applied (Rule 2), the orchestrator updates the watermark fields to reflect the current run's reach: `last_changelog_version` to the highest tag processed, `docs_checked_at` and `community_checked_at` to today's date. **Why:** advancing at the end, not the beginning, means a failed or partial run leaves the watermark at the last fully-completed run's value. The next run will re-check the same range rather than skipping it. This is the safe failure mode — slightly redundant work on retry, never missing entries.
 
 ---
 
