@@ -10,7 +10,7 @@ You have these tools available: Read, Grep, Glob, Bash (gh commands only — pat
 
 - `last_changelog_version` — string (e.g. `"2.1.170"`) or null. The highest claude-code release processed on the last run, stored as an **unprefixed version string** (no leading `v`). Null means this is the first run — scan ALL releases in the window.
 - `capability_inventory` — list of bx capability strings (e.g. `"bx:seo/allowed-tools"`, `"bx:save/agent-model"`). Only produce findings that intersect this list or a pain-point from the list below.
-- `pain_point_list` — list of short strings describing known friction areas in the bx toolkit (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). A release note addressing a pain point qualifies as a finding even without an exact capability match.
+- `pain_point_list` — list of short strings describing known friction areas in the bx toolkit (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). A release note addressing a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to the `bx:pain/<kebab-slug>` form — see `affected_capability` normalization under the Finding schema below.
 - `tier_definitions` — the tier table from the orchestrator (currently only one tier for this lane: `tier: official`). You only emit `tier: official`; the definitions are context for correctly NOT emitting community-style advisory findings.
 
 ---
@@ -77,7 +77,7 @@ For each in-scope release body, extract these categories of change. Each is a ca
 
 ### Step 6 — Filter against capability inventory and pain points
 
-For each candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match.
+For each candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point matches with no inventory capability produce a finding with `affected_capability` set to the `bx:pain/<kebab-slug>` form (see `affected_capability` normalization under the Finding schema below).
 
 ### Step 7 — Populate affected_files via Grep
 
@@ -89,7 +89,7 @@ Example: if a flag `--allowed-tools` is renamed, run `Grep pattern="--allowed-to
 
 ## Degraded-run deduplication
 
-If two releases in a degraded run produce the same `(source_url, affected_capability)` pair, merge them into one finding. The merged finding's `upstream_delta` names both versions (e.g. `"v2.1.160 + v2.1.161: ..."`), and `source_content_hash` covers the concatenated normalized sections, newest version first.
+If two releases in a degraded run produce the same `(source_url, affected_capability)` pair, merge them into one finding. The merged finding's `upstream_delta` names both versions (e.g. `"2.1.160 + 2.1.161: ..."`), and `source_content_hash` covers the concatenated normalized sections, newest version first.
 
 ---
 
@@ -130,7 +130,7 @@ If two releases in a degraded run produce the same `(source_url, affected_capabi
 
 **`source_content_hash` computation:** normalize and hash per `references/state-schema.md`.
 
-**`affected_capability` normalization:** normalize per `references/state-schema.md`. Example: `"bx:seo/allowed-tools"`.
+**`affected_capability` normalization:** normalize per `references/state-schema.md`. Example: `"bx:seo/allowed-tools"`. For pain-point-only findings (no inventory capability matched), use the form `bx:pain/<kebab-slug-of-the-pain-point>` (e.g. `bx:pain/seo-fetch-sa-subcommand`), derived from the pain-point's CLAUDE.md wording. This slug must be stable across runs — derive it deterministically from the pain-point text, not from the upstream release content. Stable `affected_capability` keeps `finding_id` recomputable and re-raise checks working for pain-point findings.
 
 **`source_url` for the `ok` path:** the GitHub release URL for the specific tag, e.g. `https://github.com/anthropics/claude-code/releases/tag/v2.1.170`. Apply canonicalization per `references/state-schema.md` before hashing and storing.
 
@@ -197,5 +197,7 @@ lane_status: ok | degraded | unavailable
 scan_note: <optional — used when scan ran cleanly but zero capability matches found, when the --limit 50 window was exhausted, or when the watermark anchor was not found>
 discarded_findings: <count of findings dropped by the 20-finding cap, or 0>
 ```
+
+**Zero-new-releases case:** when `last_changelog_version` equals the newest release tag in the window (i.e., no in-scope releases exist since the watermark), set `releases_scanned: 0`, `lane_status: ok`, and `newest_version_seen` to the incoming `last_changelog_version` value (a no-op advance). Never emit `null` for `newest_version_seen` on an `ok` run — the orchestrator advances the watermark to this value, and `null` would clobber the stored watermark and force a full rescan on the next run.
 
 These power the report footer and the orchestrator's watermark-advance decision.

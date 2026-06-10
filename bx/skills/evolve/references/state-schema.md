@@ -13,7 +13,7 @@ The watermark records the furthest upstream point checked on the most recent com
 ```json
 {
   "watermark": {
-    "last_changelog_version": "1.7.0",
+    "last_changelog_version": "2.1.170",
     "docs_checked_at": "2026-06-09",
     "community_checked_at": "2026-06-09"
   }
@@ -24,7 +24,7 @@ The watermark records the furthest upstream point checked on the most recent com
 
 | Field | Type | Meaning |
 |---|---|---|
-| `last_changelog_version` | string or null | The claude-code release tag string (e.g. `"1.7.0"`) of the highest changelog entry processed in the last run. On the next run, only entries tagged AFTER this version are fetched. "After" is defined as release order returned by `gh release list` (newest-first tag order); CHANGELOG.md document order is the fallback when `gh` is unavailable. Null on first run → fetch the full changelog. |
+| `last_changelog_version` | string or null | The **unprefixed** claude-code version string (e.g. `"2.1.170"`) of the highest changelog entry processed in the last run. Release tags carry a leading `v` (e.g. `v2.1.170`) which is stripped before storing or comparing — the normalization rule is defined in `references/scan-changelog.md`. On the next run, only entries tagged AFTER this version are fetched. "After" is defined as release order returned by `gh release list` (newest-first tag order); CHANGELOG.md document order is the fallback when `gh` is unavailable. Null on first run → fetch the full changelog. |
 | `docs_checked_at` | ISO date string or null | The date (YYYY-MM-DD) the Anthropic docs pages were last fetched and scanned. Advances ONLY if the docs lane ran this run (lane_status ok or degraded). A lane that was skipped or unavailable keeps its previous timestamp so the missed range is re-checked next run. Null on first run. |
 | `community_checked_at` | ISO date string or null | The date (YYYY-MM-DD) the community sources (Claude Code GitHub issues, Anthropic community forum) were last checked. Advances ONLY if the community lane ran this run (lane_status ok or degraded). Skipped via `--no-community` or unavailable → keeps its previous timestamp. Null on first run. |
 
