@@ -28,11 +28,11 @@ The task prompt will include:
 Score each source file in scope:
 
 ```
-priority = security_keyword_density × (1 + log(churn)) × (1 + log(import_fan_in))
+priority = security_keyword_density × (1 + log10(churn + 1)) × (1 + log10(fan_in + 1))
 ```
 
-- **`security_keyword_density`**: count of matches across `auth`, `password`, `token`, `session`, `crypto`, `permission`, `role`, `payment`, `charge`, `refund`, `secret`, `key`, `validate`, `sanitize` (case-insensitive, word boundary) ÷ file LOC. Cap at 1.0.
-- **`churn`**: `git log --since='1 year ago' --pretty=oneline -- <file> | wc -l` (commits touching the file in the last year). 0 → use 1 to avoid log(0).
+- **`security_keyword_density`**: count of matches across the security keyword list in your task prompt (auth/password/token/session/crypto/payment/... — the task-prompt version is canonical and longer than this sample) ÷ file LOC. Cap at 1.0.
+- **`churn`**: `git log --since='1 year ago' --pretty=oneline -- <file> | wc -l` (commits touching the file in the last year).
 - **`import_fan_in`**: count of files importing this file. Use `Grep` with the file's exported symbols or a path-relative import alternation. Cheap heuristic: grep the basename across `import`/`from`/`require`/`use` lines.
 
 Take the **top 50** files by priority. Drill down on those.

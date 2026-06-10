@@ -3,7 +3,7 @@ name: tests
 description: 'Repo-wide test suite audit. Surfaces missing coverage on critical code paths AND wasteful/redundant tests in a single report. Twin headline metric ("Coverage gaps in critical code: X lines | Tests we can delete: Y lines"). Three parallel Sonnet subagents (test-coverage / test-quality / test-economics).'
 when_to_use: When user mentions test coverage audit, test smell detection, test debt at the repo level, "are our tests any good", "what tests can we delete", or "what's untested that matters". Different from `/bx:review` §7 (diff-scoped checkbox) and `/bx:clean`'s `cleanup-styles-tests` (artifact-level cruft only).
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(python:*), Bash(python3:*), Bash(pytest:*), Bash(cargo:*), Bash(go:*), Bash(cat:*), Bash(head:*), Task
+allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(go:*), Bash(cat:*), Bash(head:*), Task
 effort: high
 argument-hint: "[path] [--plan] [--fix] [--coverage] [--full-scan]"
 ---
@@ -41,7 +41,7 @@ Mirror `/bx:arch` Step 0. Gather stack, test framework, coverage-tool availabili
 
 For monorepos, check `workspaces` (npm/yarn/pnpm), `pnpm-workspace.yaml`, `[workspace] members = [...]` (Cargo), `go.work`. Each workspace may have its own framework — handle per-workspace.
 
-**Coverage-tool availability** — record whether the tool is on `$PATH` or in deps. **Do NOT run it yet.** Default mode is heuristic-only; running coverage is opt-in via `--coverage`.
+**Coverage-tool availability** — record whether the tool appears in deps/devDependencies, the lockfile, or tool config (e.g. a `coverage` script, `pytest-cov` in requirements). Deps detection only — don't probe `$PATH` (not cross-platform, needs no extra permission). **Do NOT run it.** Default mode is heuristic-only; running coverage is opt-in via `--coverage`.
 
 **Repo size tier** (`git ls-files | wc -l` for source + test files):
 
@@ -49,7 +49,7 @@ For monorepos, check `workspaces` (npm/yarn/pnpm), `pnpm-workspace.yaml`, `[work
 |---|---|---|
 | <100 | full | Subagents read every file in scope |
 | 100-500 | bounded | Read all, cap deep-reads |
-| >500 | sample | Smart sampling (see `bx:arch/references/scale-strategy.md`) |
+| >500 | sample | Smart sampling (see the sibling arch skill's `scale-strategy.md` — resolve as `../arch/references/scale-strategy.md` relative to this skill's base directory) |
 
 Override with `--full-scan`.
 
@@ -134,7 +134,7 @@ If `--coverage` is **not** passed, default `coverage_mode: heuristic` and `cover
 - Else apply the tier from Step 0:
   - `full` → all source + test files
   - `bounded` → read all but cap deep-reads
-  - `sample` → read `bx:arch/references/scale-strategy.md` and apply smart sampling. For bx:tests specifically, weight test files by `import_fan_in` of the source they test, not just churn.
+  - `sample` → read the sibling arch skill's scale strategy (`../arch/references/scale-strategy.md` relative to this skill's base directory) and apply smart sampling. For bx:tests specifically, weight test files by `import_fan_in` of the source they test, not just churn.
 
 Compute file lists once and pass to all subagents.
 
@@ -211,7 +211,7 @@ After all three subagents return:
    - **Strategic rewrites** — `dimension == quality` AND `smell_id ∈ {T02, T03, T04}` AND effort ∈ {medium, large}.
    - **Coverage gaps** — `dimension == coverage`, ordered by `priority_score × certainty`.
    - **Cost reductions** — `dimension == economics` AND `economic_signal == snapshot_heavy`.
-   - **Suspects to measure** — flakiness findings, framed as "investigate, don't delete blindly."
+   - **Suspects to measure** — flakiness findings + ratio extremes (`ratio_over` and any `ratio_under` that survived dedup), framed as "investigate, don't delete blindly."
    - **Documented-decision conflicts** — `respects_documented_decision == false`. Separate section, requires user confirmation.
 
 ---
@@ -228,7 +228,7 @@ This dual signal makes both directions (under-tested + over-invested) equally vi
 
 **Sections 1-5** as in `references/report-template.md`:
 
-1. Testing-Intent Summary echo + framework heatmap
+1. Testing-Intent Summary echo + detected framework(s) + scope counts
 2. Findings — three subsections (Coverage / Quality / Economics) ordered by rank score
 3. Documented-Decision Conflicts (separate, "**Confirm intent before action:**")
 4. Suggested Next Actions — skill chains (`/bx:clean` for orphans, `/code-review` or `/bx:review` for diff-scoped follow-up); copy-pasteable `/bx:plan <brief>` snippets for top 3 strategic rewrites
@@ -239,7 +239,7 @@ This dual signal makes both directions (under-tested + over-invested) equally vi
 ## Step 7 — Mode-Specific Tail
 
 ### If `--plan` in $ARGUMENTS:
-Read `references/plan-mode-test.md` if it exists; otherwise read `bx:arch/references/plan-mode.md` and adapt phase labels mentally (Quick wins → Phase 1, Strategic rewrites → Phase 2, Coverage gaps → Phase 3, Cost reductions → Phase 4, Documented-decision conflicts → Phase 5 confirmation). Transform top findings into a phased brief. Each phase emits a self-contained `/bx:plan <brief>` payload the user can drop into another session.
+Read `references/plan-mode-test.md` (the test-specific port of `/bx:arch`'s plan mode — the phase mapping lives there). Transform top findings into a phased brief. Each phase emits a self-contained `/bx:plan <brief>` payload the user can drop into another session.
 
 ### If `--fix` in $ARGUMENTS:
 Read `references/fix-mode-test.md`. **Walk only findings where `smell_id == "T01"`** — assertion-free tests are the one provably-safe deletion. Everything else auto-routes to `--plan`.
@@ -256,7 +256,7 @@ If user invoked `--fix` and no T01 findings surfaced, output:
 > No T01 (assertion-free) findings. Other test smells require human judgment — re-run with `--plan` for a phased rewrite brief.
 
 End with:
-> Done. Use `Esc Esc` or `/rewind` to undo any individual edit. Use `git branch -D <branch>` to discard the whole pass.
+> Done. Use `Esc Esc` or `/rewind` to undo any individual edit. If you ran this on a dedicated branch, `git checkout main && git branch -D <branch>` discards the whole pass.
 
 ---
 

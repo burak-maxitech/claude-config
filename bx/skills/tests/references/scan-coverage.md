@@ -76,6 +76,8 @@ Read the coverage report at the orchestrator-provided path:
   `coverage_gap_lines = len(missing_lines)`.
 - **cargo-tarpaulin** — `tarpaulin-report.json`.
 - **go test -coverprofile** — parse `coverage.out` lines `<file>:<start>.<col>,<end>.<col> <stmts> <count>`; sum `stmts` where `count == 0` per file.
+- **phpunit (Clover XML)** — `coverage/coverage.xml`: per `<file>` element, `coverage_gap_lines = statements - coveredstatements` from its `<metrics>` attributes (or count `<line ... count="0">` entries).
+- **JaCoCo XML** — `target/site/jacoco/jacoco.xml`: per `<sourcefile>`, read `<counter type="LINE" missed="M" covered="C"/>`; `coverage_gap_lines = M`.
 
 In `report` mode, do **not** mix heuristic gaps — would double-count. The numbers come straight from the report.
 

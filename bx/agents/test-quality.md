@@ -18,7 +18,7 @@ The orchestrator passes you the T01-T05 catalog in `references/test-smell-catalo
 
 Brief refresher (full schema lives in the catalog file you receive):
 
-- **T01 — Assertion-free test.** Body has zero `expect(*)` / `assert*` / matcher calls. Only T-entry that is `--fix-eligible`. `lines_deletable` = test body LOC.
+- **T01 — Assertion-free test.** Body has zero `expect(*)` / `assert*` / matcher calls. Only T-entry that is `--fix-eligible`. `deletable_lines` = test body LOC.
 - **T02 — Weak assertion.** Only assertions are `toBeTruthy` / `toBeFalsy` / `not.toBeNull` / `not.toBeUndefined` / `>= 0` / `!= null` / `is not None` with no value/shape check. Rewritable, not deletable.
 - **T03 — Implementation-coupled / mock-heavy.** Mock-setup-and-spy-assertion line ratio vs functional-assertion line ratio > 2:1. Rewritable.
 - **T04 — Mystery guest.** Test depends on fixture/file/env-var not defined locally or in visible setup. Rewritable.
