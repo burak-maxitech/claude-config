@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-06-09 (Session 44)
+Last Updated: 2026-06-09 (Session 45)
 
 ## Project Overview
 
@@ -40,7 +40,7 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 ## Next Steps
 
 1. **Dogfood `/bx:webdesign`** — plugin cache is current (S44); install the Stitch MCP + `stitch-skills` once, then run against a real web project using the dogfood checklist (confirm the `mcp__stitch__*` tool prefix, dev-server port, `stitch::code-to-design` arg convention; verify the S42 `app_runnable:false` project-ID recovery path end-to-end).
-2. **Real `/bx:seo` run against burakarik.com** — first genuinely-working end-to-end (auth fixed S39, live sitemap discovery). Now fully unblocked.
+2. **Real `/bx:seo` run against burakarik.com** — first genuinely-working end-to-end (auth fixed S39, live sitemap discovery, content-review-hardened S45). Run `/plugin update bx` first so the S45 fixes (`1d6698a`) are live in the cache.
 3. **Remaining `/bx:seo` code-review items (non-blocking, S39):** #5 redundant per-call token mints; #6 `_read_skill_config` CWD assumption; #7 `fetch-sa` subcommand so Search Analytics never exposes a token.
 4. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — built but never run end-to-end.
 5. **Address `/bx:seo` deferred refactors** (S25/S27/S29): batched-Grep alternation; fix-mode + plan-mode scaffolding extraction.
@@ -73,6 +73,7 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 | `/bx:clean` Step 1 dispatches dedicated Sonnet `cleanup-*` agents (S43) | Step 1 said "spawn a Task subagent" → a generic subagent on the orchestrator's Opus model, so the `cleanup-files-code`/`-deps-config`/`-styles-tests` agents (`model: sonnet`, least-privilege tools) were dead code and every scan ran on Opus. Now dispatches them by name, matching the `/bx:arch` + `/bx:tests` idiom — restoring Sonnet routing + tool scoping. (commit 65179cd) |
 | `/bx:clean` eval suite + measured skill value (S43) | skill-creator full eval loop (with-skill vs no-skill baseline, 2 iterations): the skill is 100% but raw Claude **ties it on report-mode detection** even with precision traps (dynamic import, config-only dep, obscure PyPI name mismatch); the skill's measurable edge is **fix-mode discipline** (defers Safe-to-Delete, never auto-removes deps) + **prompt-independent category coverage**. Committed `bx/skills/clean/evals/` as a regression suite. (commit 65179cd) |
 | `/bx:save --silent` — zero-prompt runs (S44) | The Part 8 commit ask was the only unavoidable prompt; end-of-session saves want zero questions. `--silent` auto-commits with the suggested message (no push) and resolves every `--full` consent prompt to its safe default: first-run rollup consents (5.2/6.2) decline without writing the sentinel, the 7.4 shrinker gate is skip-all. Named over `--yes` because the flag never answers "yes" on the user's behalf except the commit itself. (commit b82162d) |
+| `/bx:seo` content-review hardening — doc-drift sweep rule (S45) | skill-creator qualitative review of all 15 skill files before the first real burakarik.com run found 3 high + 9 medium findings, all fixed in `1d6698a`. Pattern: every rework generation (CSV→API S29, helper-dispatch S35, auth S39) left stale echoes in sibling files that bait orchestrator improvisation — the canonical-paths table still mandated N-parallel-curl after S35 shipped `inspect-batch`, and Step 1.6.14 assumed env vars persist across Bash calls (same class as the pre-S39 token bug). Rules: a rework isn't done until its echoes are swept from sibling files; `allowed-tools` must enumerate every command a skill invokes, including plugin `bin/` helpers (2nd instance of the S42 lesson). |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -116,7 +117,7 @@ claude-config/                         # marketplace repo
 
 **The S37 `/bx:seo` "messed up" breakage is RESOLVED (S39).** Root-caused to the `${CLAUDE_SKILL_DIR}` path bug (not a real Claude Code variable → the helper was never found → GSC silently fell back to heuristic-only) + an impossible "mint token once, reuse across Bash calls" auth model (shell state does not persist across Bash tool calls). Both fixed and verified against live GSC. See Session History S39 + Key Decisions.
 
-**Activation gap CLOSED on this machine (S44).** `/plugin update bx` + `/reload-plugins` brought the cache to `b82162d` (= HEAD): the S41–S43 work and the new `/bx:save --silent` flag are live here. Other machines still need a one-time `/plugin update bx` (or `cc` relaunch). `/bx:webdesign` additionally needs the Stitch MCP + `stitch-skills` plugin installed once before dogfood.
+**Activation gap REOPENED (S45).** Plugin cache is at `b82162d`; the S45 `/bx:seo` content-review fixes (`1d6698a`) need `/plugin update bx` + `/reload-plugins` (or a `cc` relaunch) before the next `/bx:seo` run — important because the fixes include the `allowed-tools` declarations the GSC path needs to run without permission prompts. `/bx:webdesign` additionally needs the Stitch MCP + `stitch-skills` plugin installed once before dogfood.
 
 ## Environment Variables
 
@@ -126,10 +127,10 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 44) - 2026-06-09
-- **Added `--silent` flag to `/bx:save`** (commit `b82162d`, pushed): zero-prompt runs — the Part 8 commit checkpoint auto-commits with the suggested message (no push), and every `--full` consent prompt (first-run rollups 5.2/6.2, section-shrinker gate 7.4) resolves to its safe default (decline/skip-all) without asking.
-- Named `--silent` over `--yes`: `--yes` would imply consenting to first-time rollups; `--silent` never answers "yes" on the user's behalf except for the commit itself.
-- **Activation gap closed on this machine:** `/plugin update bx` + `/reload-plugins` → plugin cache at `b82162d` (= HEAD), making S41–S43 + `--silent` live.
-- First live `--full --silent` run was this session's own save.
+### Last Session (Session 45) - 2026-06-09
+- **skill-creator qualitative content review of `/bx:seo`** (S42 treatment, prep for the burakarik.com run): all 15 files / 7,305 lines cross-checked — 3 high + 9 medium + cosmetic findings.
+- Top finds: `allowed-tools` missing `gsc-parse-helper` + 12 other invoked commands (the S42 `/bx:save` lesson, 2nd instance); Step 1.6.14 relied on env-var persistence across Bash calls (same class as the pre-S39 token bug — every watchpoint would silently report `no_data`); the canonical-paths table still mandated the forbidden N-parallel-curl Turn 2b dispatch.
+- **All fixes applied + verified**: helper compiles; 18/18 `coverageState` classifications now match the lookup table (new info-only `indexed_info` bucket). 12 files +106/−82, commit `1d6698a`, pushed.
+- Plugin cache NOT yet updated — run `/plugin update bx` before the next `/bx:seo` run.
 
-> Full session detail: [docs/session-history.md](docs/session-history.md) S44
+> Full session detail: [docs/session-history.md](docs/session-history.md) S45

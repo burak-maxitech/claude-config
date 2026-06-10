@@ -89,20 +89,7 @@
 
 ### Session 39 - 2026-05-29: `/bx:seo` GSC path+auth+sitemap repair — `${CLAUDE_SKILL_DIR}` isn't a real variable → `bin/gsc-parse-helper` PATH launcher + LF `.gitattributes`; auth re-architected to in-call stdlib refresh-token minting as the user via ADC (NOT a service account — Google SA-add bug); typed `CredentialError` reason codes + `inspect_batch_error` Turn-2b guard; live sitemap discovery (`sitemaps.list` → robots.txt → conventional; new `sitemaps-list`/`sitemap-urls` subcommands) validated on burakarik.com (2,892 URLs, 100 orphans). (commits: cabec2a, 79e2ebe, 0aab230, e12c52c)
 
-### Session 40 - 2026-05-30
-**What happened:**
-- Ran `/bx:resume`; flagged and disproved CLAUDE.md's stale "main 3 commits ahead / not pushed" claim — `git fetch` + `rev-list --left-right` showed `main` == `origin/main` (0 ahead / 0 behind), and the installed plugin cache is `e12c52c` (= HEAD), so S38 + S39 were already active on this machine. Marked the activation task complete.
-- User reported the `cc` launcher's "Project synced." felt untrustworthy. Root-caused two bugs: (1) PowerShell `try/catch` cannot catch a native `git pull` failure (native exes report via `$LASTEXITCODE`, not exceptions) — proved empirically the catch is dead code, so "synced" printed unconditionally; (2) both scripts hid all pull output behind `--quiet` (plus `2>/dev/null` on bash), so even successful pulls gave no evidence of what moved.
-- Fixed both launchers: `start-claude.ps1` now gates the success/failure message on `$LASTEXITCODE` in all 3 spots (config-clone pull, project pull, `claude update`); both scripts swap `--quiet`/`2>/dev/null` for `--stat`. Verified: PS parses clean, success path → "Project synced.", failure path → correctly detected; `bash -n` OK.
-
-**Files created/modified:**
-- `.claude/scripts/start-claude.ps1` — exit-code gating in Steps 1a/3/4; `--stat` instead of `--quiet`
-- `.claude/scripts/start-claude.sh` — `--stat` + dropped `2>/dev/null` in Steps 1a/3
-- `CLAUDE.md` + `docs/*.md` — S40 save
-
-**Next session should:**
-- Run the real `/bx:seo` dogfood against burakarik.com (now genuinely unblocked)
-- Pick up the `/bx:seo` code-review items #5-#7
+### Session 40 - 2026-05-30: `cc` launcher trust fix — PowerShell `try/catch` can't catch native `git pull` failures, so "Project synced." printed unconditionally; gated on `$LASTEXITCODE` in all 3 spots (`start-claude.ps1`) + both scripts swap `--quiet`/`2>/dev/null` for `--stat`. Also disproved CLAUDE.md's stale "3 commits ahead" claim (main == origin/main; plugin cache already at HEAD). (commit: 03fa75a)
 
 ### Session 41 - 2026-06-06
 **What happened:**
@@ -173,3 +160,19 @@
 **Next session should:**
 - Dogfood `/bx:webdesign` (install Stitch MCP + `stitch-skills` first)
 - Run `/bx:seo` end-to-end against burakarik.com
+
+### Session 45 - 2026-06-09
+**What happened:**
+- Ran skill-creator's qualitative content review on `/bx:seo` (scope chosen over the full eval loop — the skill's live WebSearch/WebFetch + GSC dependence makes fixture evals flaky): all 15 files (7,305 lines) read against each other + the S31–S39 decision log.
+- 3 high findings: `allowed-tools` gaps (`gsc-parse-helper` + 12 other invoked commands → permission prompts on every GSC turn); Step 1.6.14's `${LOOKBACK_DAYS:-90}` env default can't survive across Bash calls → Q2 cache-hash mismatch → all watchpoints silently `no_data`; canonical-paths table + 3 other spots still mandated the "N parallel curl" Turn 2b dispatch that gsc-cache.md forbids (stale since S35 shipped `inspect-batch`).
+- 9 medium: 20-vs-6 worker drift (SKILL.md + helper's own docstring), unpinned cache-key serialization, `cluster_for` diverging from the lookup table (alternate-page → canonical_conflict; indexed-with-caveat → blocked_access), stale no-retry 429 docs vs the helper's actual 3×-backoff, pre-S39 auth text in gsc-api-schema.md, "gcloud installed" still gating in 2 spots, CSV-era language in rubric/plan-mode, URL Inspection cap 100→200 stragglers.
+- Applied all fixes + cosmetic sweep (split-TTL wording ×5, Step 3.2 renumbering, dead `.claude/agents/` path, `CACHE_STATUS` age-field drift); verified helper compile + 18/18 classification test; gitignored `__pycache__`. Commit `1d6698a` (12 files, +106/−82), pushed.
+- Lesson recorded as a Key Decision: every `/bx:seo` rework generation (CSV→API S29, helper-dispatch S35, auth S39) left stale echoes in sibling files that bait orchestrator improvisation — a rework isn't done until its echoes are swept.
+
+**Files created/modified:**
+- `bx/skills/seo/SKILL.md` + 10 `references/` files — all review fixes (see commit `1d6698a`)
+- `.gitignore` — added `__pycache__/`
+
+**Next session should:**
+- `/plugin update bx` + `/reload-plugins` to activate `1d6698a`
+- Dogfood `/bx:webdesign` (one-time Stitch MCP + `stitch-skills` setup) or run `/bx:seo` against burakarik.com
