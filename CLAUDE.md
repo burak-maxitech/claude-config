@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-06-08 (Session 43)
+Last Updated: 2026-06-09 (Session 44)
 
 ## Project Overview
 
@@ -33,13 +33,13 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 ## In Progress
 
-**`/bx:webdesign` shipped + review-hardened (S41–S42), pending activation.** The 10th skill is built, merged, pushed, and now **review-hardened** (S42: skill-creator content review + `/code-review` xhigh, 16 fixes — including the S41 `app_runnable:false` Phase-2 dead-end, now **closed** with a project-ID recovery path, plus a Phase-3 git-safety invariant). Not yet live: the installed plugin cache is **behind `main`**, so a real run needs **`/plugin update bx`** (or `cc`) + the **Stitch MCP + `stitch-skills` plugin** installed once. Dogfood checklist: `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
+**`/bx:webdesign` shipped + review-hardened (S41–S42), pending activation.** The 10th skill is built, merged, pushed, and now **review-hardened** (S42: skill-creator content review + `/code-review` xhigh, 16 fixes — including the S41 `app_runnable:false` Phase-2 dead-end, now **closed** with a project-ID recovery path, plus a Phase-3 git-safety invariant). Now **live in the plugin cache on this machine** (S44: `/plugin update bx` + `/reload-plugins` → `b82162d` = HEAD); remaining one-time setup before dogfood: install the **Stitch MCP + `stitch-skills` plugin**. Dogfood checklist: `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
 
 **S37 plugin packaging — remaining:** install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement. (GSC MCP migration #1 declined; Playwright #2 deferred.)
 
 ## Next Steps
 
-1. **Activate + dogfood `/bx:webdesign`** — `/plugin update bx` (or `cc`) to pull the now-hardened skill into the plugin cache, install the Stitch MCP + `stitch-skills`, then run it against a real web project using the dogfood checklist (confirm the `mcp__stitch__*` tool prefix, dev-server port, `stitch::code-to-design` arg convention). The S41 `app_runnable:false` dead-end is **fixed** (S42, project-ID recovery path) — verify it end-to-end during dogfood.
+1. **Dogfood `/bx:webdesign`** — plugin cache is current (S44); install the Stitch MCP + `stitch-skills` once, then run against a real web project using the dogfood checklist (confirm the `mcp__stitch__*` tool prefix, dev-server port, `stitch::code-to-design` arg convention; verify the S42 `app_runnable:false` project-ID recovery path end-to-end).
 2. **Real `/bx:seo` run against burakarik.com** — first genuinely-working end-to-end (auth fixed S39, live sitemap discovery). Now fully unblocked.
 3. **Remaining `/bx:seo` code-review items (non-blocking, S39):** #5 redundant per-call token mints; #6 `_read_skill_config` CWD assumption; #7 `fetch-sa` subcommand so Search Analytics never exposes a token.
 4. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — built but never run end-to-end.
@@ -72,6 +72,7 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 | Pre-dogfood review-hardening of `/bx:webdesign` + `/bx:save` (S42, 2026-06-06) | Both freshly-built skills were content-reviewed (skill-creator's quantitative eval loop is infeasible for them — MCP/session-state-dependent inputs + subjective outputs) and hardened before any real run. **`/bx:webdesign`** (16 fixes, `d6681e8`): closed the S41 `app_runnable:false` Phase-2 dead-end (capture+persist a user-supplied `stitch_project_id`); Phase-3 git-safety as a **general invariant** — *every root artifact the skill or Google's `stitch-skills` create must be gitignored (`.stitch/`, `.webdesign/SITE.md`) or staged (`DESIGN.md`) before `git add -A`/`git clean -fd`*, else the clean-tree guard self-trips and `clean -fd` can delete files; the top `/code-review` catch was a literal `git add … DESIGN.md` that aborts the token commit when no root file exists. **`/bx:save`**: plugin skills must declare every Bash helper in `allowed-tools` (the fast path called `wc`/`awk` unpermitted → a prompt every run); the packet now carries multiple `decision_rows` + `## Known Issues`/`## Completed` deltas; `save-writer` skips+`warnings:` on a non-matching delta (no silent partial save); and `disable-model-invocation` flipped to `true` (explicit-only, matching `/bx:resume` and 9/10 `bx` skills). |
 | `/bx:clean` Step 1 dispatches dedicated Sonnet `cleanup-*` agents (S43) | Step 1 said "spawn a Task subagent" → a generic subagent on the orchestrator's Opus model, so the `cleanup-files-code`/`-deps-config`/`-styles-tests` agents (`model: sonnet`, least-privilege tools) were dead code and every scan ran on Opus. Now dispatches them by name, matching the `/bx:arch` + `/bx:tests` idiom — restoring Sonnet routing + tool scoping. (commit 65179cd) |
 | `/bx:clean` eval suite + measured skill value (S43) | skill-creator full eval loop (with-skill vs no-skill baseline, 2 iterations): the skill is 100% but raw Claude **ties it on report-mode detection** even with precision traps (dynamic import, config-only dep, obscure PyPI name mismatch); the skill's measurable edge is **fix-mode discipline** (defers Safe-to-Delete, never auto-removes deps) + **prompt-independent category coverage**. Committed `bx/skills/clean/evals/` as a regression suite. (commit 65179cd) |
+| `/bx:save --silent` — zero-prompt runs (S44) | The Part 8 commit ask was the only unavoidable prompt; end-of-session saves want zero questions. `--silent` auto-commits with the suggested message (no push) and resolves every `--full` consent prompt to its safe default: first-run rollup consents (5.2/6.2) decline without writing the sentinel, the 7.4 shrinker gate is skip-all. Named over `--yes` because the flag never answers "yes" on the user's behalf except the commit itself. (commit b82162d) |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -115,7 +116,7 @@ claude-config/                         # marketplace repo
 
 **The S37 `/bx:seo` "messed up" breakage is RESOLVED (S39).** Root-caused to the `${CLAUDE_SKILL_DIR}` path bug (not a real Claude Code variable → the helper was never found → GSC silently fell back to heuristic-only) + an impossible "mint token once, reuse across Bash calls" auth model (shell state does not persist across Bash tool calls). Both fixed and verified against live GSC. See Session History S39 + Key Decisions.
 
-**Activation gap re-opened (S41–S43).** `main` has advanced (the `/bx:webdesign` skill + S42 review-hardening + the S43 `/bx:clean` Sonnet-dispatch fix, tightened description, and committed eval suite), but the installed plugin cache on this machine is **behind HEAD**. The newest `/bx:*` skills run from that cache, so **`/plugin update bx` (or a `cc` relaunch) is required** to make S41–S43 live — here and on every other machine. Nothing is broken; it's just not yet activated.
+**Activation gap CLOSED on this machine (S44).** `/plugin update bx` + `/reload-plugins` brought the cache to `b82162d` (= HEAD): the S41–S43 work and the new `/bx:save --silent` flag are live here. Other machines still need a one-time `/plugin update bx` (or `cc` relaunch). `/bx:webdesign` additionally needs the Stitch MCP + `stitch-skills` plugin installed once before dogfood.
 
 ## Environment Variables
 
@@ -125,10 +126,10 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 43) - 2026-06-08
-- **Ran the skill-creator full eval loop on `/bx:clean`** (2 iterations, 12 graded runs + 2 benchmarks, with-skill vs no-skill baseline). The skill scores 100%, but raw Claude **ties it on report-mode detection** — even on dynamic-import / config-only-dep / obscure-name-mismatch traps. The skill's measurable edge is **fix-mode discipline** (defers Safe-to-Delete, never auto-removes deps; eval-2 10/10 vs 7/10) + **prompt-independent category coverage** (caught `datetime.utcnow()` the baseline skipped).
-- **Shipped 2 commits (pushed):** `65179cd` — `/bx:clean` Step 1 now dispatches its dedicated **Sonnet** `cleanup-*` agents by name (was generic `Task` → Opus; the agents were dead code), matching the `/bx:arch`+`/bx:tests` idiom; **+ committed eval suite** under `bx/skills/clean/evals/`. `1e5a455` — tightened the skill `description` (scoped coverage + motivation triggers + negative boundaries).
-- **Found 2 Windows breakages in skill-creator tooling** → saved to auto-memory (`skill-creator-windows-gotchas`): the eval viewer needs `PYTHONUTF8=1`; the description auto-optimizer (`run_loop.py`) is unusable (`WinError 10038`), so the description was hand-tuned.
-- **Activation still pending:** these S43 changes are behind the installed plugin cache — `/plugin update bx` (or `cc`) to make live.
+### Last Session (Session 44) - 2026-06-09
+- **Added `--silent` flag to `/bx:save`** (commit `b82162d`, pushed): zero-prompt runs — the Part 8 commit checkpoint auto-commits with the suggested message (no push), and every `--full` consent prompt (first-run rollups 5.2/6.2, section-shrinker gate 7.4) resolves to its safe default (decline/skip-all) without asking.
+- Named `--silent` over `--yes`: `--yes` would imply consenting to first-time rollups; `--silent` never answers "yes" on the user's behalf except for the commit itself.
+- **Activation gap closed on this machine:** `/plugin update bx` + `/reload-plugins` → plugin cache at `b82162d` (= HEAD), making S41–S43 + `--silent` live.
+- First live `--full --silent` run was this session's own save.
 
-> Full session detail: [docs/session-history.md](docs/session-history.md) S43
+> Full session detail: [docs/session-history.md](docs/session-history.md) S44

@@ -205,3 +205,6 @@
 - [x] /bx:clean Step 1 Sonnet-dispatch fix — route to dedicated cleanup-* agents (bx/skills/clean/SKILL.md, 65179cd)
 - [x] /bx:clean committed regression eval suite — de-hinted fixtures + precision traps (bx/skills/clean/evals/, 65179cd)
 - [x] /bx:clean description tightened — scope + motivation + negative boundaries (bx/skills/clean/SKILL.md, 1e5a455)
+
+## Session 44 (2026-06-09) — /bx:save --silent flag
+- [x] `/bx:save --silent` flag — zero-prompt runs (auto-commit + safe-default consents) - `bx/skills/save/SKILL.md`, `bx/skills/save/references/mode-update.md`, `bx/skills/save/references/verification-checklists.md` (commit b82162d, S44)

@@ -87,23 +87,7 @@
 
 ### Session 38 - 2026-05-29: Reworked `/bx:docs` → `/bx:save` — fast-by-default (`--full` opt-in for the README/docs sweep + rollups), tight prose caps on new entries, and a new `save-writer` Sonnet subagent that reads the big append-only archives & applies all doc edits off the main thread (Opus orchestrator composes a small update packet: `claude_md_deltas`/`session_block`/`session_history_entry`/`completed_items`/`decision_rows`). Diagnosed the >10-min slowness (Step 0 read ~60k of docs every run incl. archives the update never reads *from*; full-file echo in verification). Built brainstorm→spec→subagent-driven; final review caught a runtime blocker (`Task` missing from `allowed-tools`). Merged `--no-ff` (8 commits). (commits: 7432b87, 890fe06, f49d4ac, 77c8601)
 
-### Session 39 - 2026-05-29
-**What happened:**
-- Root-caused + fixed `/bx:seo`'s broken GSC path (user: "we messed up and left it broken"): `${CLAUDE_SKILL_DIR}` is not a real Claude Code variable → every helper call expanded to an empty path → file-not-found → GSC silently heuristic-only. Fixed via a `bin/gsc-parse-helper` launcher on PATH (resolves its own dir, picks a real Python 3 preferring `python` over the Windows `python3` Store stub) + `.gitattributes` forcing LF on shell scripts.
-- Fixed GSC authentication: the "mint once / reuse across Bash calls" model was impossible (shell state doesn't persist; the probe only emitted TOKEN_LEN). Now every API-hitting call mints in-place via stdlib refresh-token grant (no `google-auth`, no per-call gcloud), authenticating as the user via ADC (authorized_user) — NOT a service account (open Google "email not found" bug blocks adding SAs to GSC; domain-wide delegation needs Workspace, which personal @gmail lacks). Multi-machine via `adc_credentials_path`/`quota_project`/`site_base_url`/`sitemap_url` config.yaml keys.
-- Hardened via high-effort `/code-review` (7 finder angles → fixed top 3+1): typed `CredentialError` reason codes (no_credentials/unreadable/wrong_type/mint_failed/quota_missing) so the probe reports the right remediation; an explicitly-configured bad credential file raises instead of silently using gcloud's default identity; inspect-batch emits `inspect_batch_error:<reason>`+exit4 and Turn-2b guards on it so a cred failure isn't read as zero findings; `_refresh_user_token` validates fields up front.
-- (A) Confirmed + (B) closed the sitemap-discovery gap: the skill only globbed a repo-local sitemap.xml → empty for generated/dynamic sitemaps. Added live discovery (GSC `sitemaps.list` → robots.txt `Sitemap:` → `<base>/sitemap.xml`; base auto-derived from `site_url`) + two helper subcommands (`sitemaps-list`, `sitemap-urls` with sitemapindex/.gz/relative handling + bounded orphan output). Validated live on burakarik.com: 2,892-URL generated sitemap fetched, 100 orphans emitted (was 0).
-- Merged to `main` with `--no-ff` (cabec2a auth+path, 79e2ebe sitemap, 0aab230 merge); not pushed. First real dogfood of `/bx:save` (this save ran the S38 fast UPDATE path).
-
-**Files created/modified:**
-- `bx/bin/gsc-parse-helper` (new — PATH launcher, mode 100755), `.gitattributes` (new — LF for `*.sh`/`bx/bin/*`)
-- `bx/skills/seo/references/gsc-parse-helper.py` (+~477 — CredentialError + resolve_credentials + stdlib token mint + sitemaps-list/sitemap-urls subcommands)
-- `bx/skills/seo/SKILL.md` (probe, config keys, mode resolution, reason-coded errors, sitemap discovery 1.6.6a, Turn-2b guard)
-- `bx/skills/seo/references/`: `gsc-cache.md`, `gsc-api-queries.md`, `gsc-api-schema.md`, `gsc-ingestion.md`, `gsc-setup-readme-template.md`
-
-**Next session should:**
-- Push `main` + `/plugin update bx` to activate, then run `/bx:seo` against burakarik.com (now genuinely functional).
-- Address remaining review items (#5 redundant per-call mints, #6 CWD assumption, #7 token-stdout hardening).
+### Session 39 - 2026-05-29: `/bx:seo` GSC path+auth+sitemap repair — `${CLAUDE_SKILL_DIR}` isn't a real variable → `bin/gsc-parse-helper` PATH launcher + LF `.gitattributes`; auth re-architected to in-call stdlib refresh-token minting as the user via ADC (NOT a service account — Google SA-add bug); typed `CredentialError` reason codes + `inspect_batch_error` Turn-2b guard; live sitemap discovery (`sitemaps.list` → robots.txt → conventional; new `sitemaps-list`/`sitemap-urls` subcommands) validated on burakarik.com (2,892 URLs, 100 orphans). (commits: cabec2a, 79e2ebe, 0aab230, e12c52c)
 
 ### Session 40 - 2026-05-30
 **What happened:**
@@ -173,3 +157,19 @@
 **Next session should:**
 - `/plugin update bx` (or `cc`) to activate S41–S43 in the plugin cache, then dogfood `/bx:webdesign`.
 - Consider applying the committed-eval-suite pattern to other never-dogfooded skills (`/bx:tests`, `/bx:arch`, `/bx:health`).
+
+### Session 44 - 2026-06-09
+**What happened:**
+- Resumed via `/bx:resume` (6 tasks hydrated, all pending; clean tree at `4cf02ad`). Noted CLAUDE.md at 29k chars (target 17k) with Key Decisions carrying full S31–S35 narratives — candidate for a future trim.
+- Designed + shipped the `/bx:save --silent` flag (commit `b82162d`, pushed): Part 8 auto-commits with the suggested conventional message (no push); first-run rollup consents (Parts 5.2/6.2) are treated as declined without writing the sentinel note; Part 7.4 consent gate is treated as skip-all. The flag never answers "yes" for the user except the commit — which is why `--silent` was chosen over `--yes`.
+- User ran `/plugin update bx` + `/reload-plugins`: plugin cache moved `ec10b71` → `b82162d` (= HEAD), closing the S41–S43 activation gap on this machine.
+- Ran the first live `/bx:save --full --silent` (this save).
+
+**Files created/modified:**
+- `bx/skills/save/SKILL.md` - `--silent` added to argument-hint + intro
+- `bx/skills/save/references/mode-update.md` - flag definition + gates at Parts 5.2, 6.2, 7.4, 8 and Save Path step 5
+- `bx/skills/save/references/verification-checklists.md` - commit-checkpoint checklist line
+
+**Next session should:**
+- Dogfood `/bx:webdesign` (install Stitch MCP + `stitch-skills` first)
+- Run `/bx:seo` end-to-end against burakarik.com
