@@ -85,6 +85,8 @@ source_content_hash: <hash of the cited section, for decision-log re-raise check
       "finding_id": "<hash>",
       "decision": "open | applied | rejected | deferred",
       "date": "2026-06-09",
+      "source_url": "<canonicalized URL of the upstream source page>",
+      "affected_capability": "<e.g. bx:seo/allowed-tools>",
       "source_content_hash": "<hash>",
       "note": "<optional one-liner>"
     }
@@ -92,7 +94,7 @@ source_content_hash: <hash of the cited section, for decision-log re-raise check
 }
 ```
 
-Committed to the repo (multi-machine sync, like everything else here). Rejected findings re-raise only when `source_content_hash` changes. This mirrors the proven `/bx:seo` finding-history pattern (S35), minus the run-count escalation (not needed — decisions are explicit here).
+Committed to the repo (multi-machine sync, like everything else here). Rejected findings re-raise only when a current run re-surfaces the same `finding_id` with a changed `source_content_hash` (trigger-based — the orchestrator never proactively re-fetches stored URLs). This mirrors the proven `/bx:seo` finding-history pattern (S35), minus the run-count escalation (not needed — decisions are explicit here).
 
 ## Orchestrator allowed-tools
 

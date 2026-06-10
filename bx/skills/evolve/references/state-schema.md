@@ -1,8 +1,8 @@
 # Upstream Watch State — Schema + Update Mechanics
 
-Loaded by the orchestrator at the start of every `/bx:evolve` run. Defines the canonical shape of `docs/upstream/state.json`, the lifecycle rules governing each field, and the exact procedure for reading and writing the file. All examples below are normative — the orchestrator compares live state against these shapes when validating a read.
+Loaded by the orchestrator at the start of every `/bx:evolve` run. Defines the canonical shape of `docs/upstream/state.json`, the lifecycle rules governing each field, and the exact procedure for reading and writing the file. **This file owns the read/write procedure — `SKILL.md` must reference this file rather than restate the mechanics.** All examples below are normative — the orchestrator compares live state against these shapes when validating a read.
 
-For the watermark advance and decision-write procedures, see `SKILL.md` Steps 1 and 5.
+All dates and timestamps in this schema are UTC ISO format: `YYYY-MM-DD`.
 
 ---
 
@@ -24,9 +24,9 @@ The watermark records the furthest upstream point checked on the most recent com
 
 | Field | Type | Meaning |
 |---|---|---|
-| `last_changelog_version` | string or null | The claude-code release tag string (e.g. `"1.7.0"`) of the highest changelog entry processed in the last run. On the next run, only entries tagged AFTER this version are fetched. Null on first run → fetch the full changelog. |
-| `docs_checked_at` | ISO date string or null | The date (YYYY-MM-DD) the Anthropic docs pages were last fetched and scanned. Recorded as a timestamp of the last successful check; used for the report's "delta since <date>" framing. Null on first run. |
-| `community_checked_at` | ISO date string or null | The date (YYYY-MM-DD) the community sources (Claude Code GitHub issues, Anthropic community forum) were last checked. Recorded as a timestamp of the last successful check; used for the report's "delta since <date>" framing. Null on first run. |
+| `last_changelog_version` | string or null | The claude-code release tag string (e.g. `"1.7.0"`) of the highest changelog entry processed in the last run. On the next run, only entries tagged AFTER this version are fetched. "After" is defined as release order returned by `gh release list` (newest-first tag order); CHANGELOG.md document order is the fallback when `gh` is unavailable. Null on first run → fetch the full changelog. |
+| `docs_checked_at` | ISO date string or null | The date (YYYY-MM-DD) the Anthropic docs pages were last fetched and scanned. Advances ONLY if the docs lane ran this run (lane_status ok or degraded). A lane that was skipped or unavailable keeps its previous timestamp so the missed range is re-checked next run. Null on first run. |
+| `community_checked_at` | ISO date string or null | The date (YYYY-MM-DD) the community sources (Claude Code GitHub issues, Anthropic community forum) were last checked. Advances ONLY if the community lane ran this run (lane_status ok or degraded). Skipped via `--no-community` or unavailable → keeps its previous timestamp. Null on first run. |
 
 ### Why the watermark matters
 
@@ -34,11 +34,13 @@ Without it, every run would re-evaluate the entire changelog from the beginning.
 
 The watermark advances at the END of every run (Step 5), not the beginning. Advancing at the start would mean a partial failure (network error mid-run, skill crash) marks entries as checked when they were never fully evaluated.
 
+Each `*_checked_at` field advances ONLY if that source class was actually checked this run (lane_status ok or degraded). A lane that was skipped (`--no-community`) or unavailable keeps its previous timestamp so the missed range is re-checked next run.
+
 ---
 
 ## Decision entry schema
 
-Each entry in the `decisions` array represents one actionable finding that has been evaluated. An entry is created when a finding is first surfaced (as `open`) and updated in-place when a verdict is reached. The `decisions` array never has duplicate `finding_id` values — a later verdict overwrites the existing entry.
+Each entry in the `decisions` array represents one actionable finding that has been evaluated. An entry is created when a finding is first surfaced (as `open`) and updated in-place when a verdict is reached. The `decisions` array never has duplicate `finding_id` values — every verdict (applied/rejected/deferred) overwrites the existing entry in place; a second entry for the same `finding_id` is never appended.
 
 ```json
 {
@@ -47,6 +49,8 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "finding_id": "a3f2c1b9e4d07f8a6c2e1b3d5f7a9c0e12345678",
       "decision": "applied",
       "date": "2026-06-09",
+      "source_url": "https://docs.anthropic.com/en/docs/claude-code/skills-authoring",
+      "affected_capability": "bx:seo/allowed-tools",
       "source_content_hash": "7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1d",
       "note": "Added allowed-tools entry for new Bash helper per claude-code 1.7.0 release notes."
     },
@@ -54,6 +58,8 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "finding_id": "b9c4e2f1a0d5b7c3e6f8a2d4b6c8e0f2a4b6c8e0",
       "decision": "rejected",
       "date": "2026-06-08",
+      "source_url": "https://docs.anthropic.com/en/docs/claude-code/hooks",
+      "affected_capability": "bx:save/session-start",
       "source_content_hash": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
       "note": "The suggested hook runs on every session-start; bx already handles this via session-start-context scripts."
     },
@@ -61,6 +67,8 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "finding_id": "c1d5e9f3b7a2c6d0e4f8a3b7c1d5e9f3b7a2c6d0",
       "decision": "open",
       "date": "2026-06-09",
+      "source_url": "https://docs.anthropic.com/en/docs/claude-code/settings",
+      "affected_capability": "bx:clean/allowed-tools",
       "source_content_hash": "9e107d9d372bb6826bd81d3542a419d6a3b1c5d2",
       "note": null
     },
@@ -68,6 +76,8 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "finding_id": "d2e6f0a4b8c2e6f0a4b8c2e6f0a4b8c2e6f0a4b8",
       "decision": "deferred",
       "date": "2026-06-09",
+      "source_url": "https://docs.anthropic.com/en/docs/claude-code/hooks",
+      "affected_capability": "bx:health/hooks-rework",
       "source_content_hash": "1f8ac10f23c5b5bc1167bda84b833e5c057a77d7",
       "note": "Hooks rework is high-effort; revisit after /bx:webdesign dogfood is complete."
     }
@@ -79,11 +89,13 @@ Each entry in the `decisions` array represents one actionable finding that has b
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
-| `finding_id` | string (40-char hex SHA-1) | yes | Stable identifier for this finding. Computed as `sha1(source_url + "\|" + affected_capability)` where `source_url` is the canonical URL of the upstream source page and `affected_capability` is a short normalized string identifying the bx feature area (e.g. `"bx:seo/allowed-tools"`, `"bx:save/agent-model"`). The same finding_id is produced on every run from the same source + capability pair — this is what prevents duplicates and lets the orchestrator match a live finding to its stored verdict. |
+| `finding_id` | string (40-char hex SHA-1) | yes | Stable identifier for this finding. Computed as `sha1(source_url + "\|" + affected_capability)` where `source_url` is the canonicalized URL of the upstream source page (see canonicalization rule below) and `affected_capability` is a short normalized string identifying the bx feature area (e.g. `"bx:seo/allowed-tools"`, `"bx:save/agent-model"`). The same finding_id is produced on every run from the same source + capability pair — this is what prevents duplicates and lets the orchestrator match a live finding to its stored verdict. |
 | `decision` | enum string | yes | Current verdict: `open` (surfaced, not yet acted on), `applied` (fix merged into the bx plugin), `rejected` (evaluated and deliberately skipped), or `deferred` (will apply later; re-raised on every run until changed). |
-| `date` | ISO date string (YYYY-MM-DD) | yes | Date the entry was last written or updated. Set to today on creation; updated to today when a verdict overwrites `open`. |
-| `source_content_hash` | string (40-char hex SHA-1) | yes | SHA-1 of the specific upstream section text that drove this finding (the cited paragraph or bullet, not the whole page). Used by the rejected-finding re-raise rule: if the source section changes, the old rejection no longer applies and the finding re-opens. |
-| `note` | string or null | no | Optional human-readable explanation of the verdict — a one-liner covering what was done or why it was skipped. Set to null when absent. |
+| `date` | ISO date string (YYYY-MM-DD) | yes | Date the entry was created or last transitioned to a new verdict. Set to today on creation; updated to today when any verdict (applied/rejected) overwrites `open`. Exception: deferred re-surfacing (Rule 5) keeps the original deferral date — `date` is NOT updated on re-surface, only on a subsequent verdict change. |
+| `source_url` | string | yes | The canonicalized URL of the upstream source page that drove this finding (see canonicalization rule below). Makes `finding_id` recomputable from stored state and makes the log self-describing. |
+| `affected_capability` | string | yes | The capability string used in the `finding_id` computation (e.g. `"bx:seo/allowed-tools"`). Makes `finding_id` recomputable from stored state without re-running the hash logic over free-text fields. |
+| `source_content_hash` | string (40-char hex SHA-1) | yes | Normalized SHA-1 of the specific upstream section text that drove this finding (the cited paragraph or bullet, not the whole page). Used by the trigger-based re-raise rules for `rejected` and `deferred` entries — see Rules 3 and 5. |
+| `note` | string or null | yes (nullable) | Human-readable explanation of the verdict — a one-liner covering what was done or why it was skipped. The key must always be present; the value may be null (use null, not absent key). |
 
 ### finding_id computation (normative)
 
@@ -96,6 +108,29 @@ finding_id = hashlib.sha1(
 
 The `affected_capability` string must be normalized before hashing: lowercase, forward-slash separators, no trailing slash, no spaces. Example: `"bx:seo/allowed-tools"` not `"bx:seo / Allowed Tools"`.
 
+### source_url canonicalization (normative)
+
+Applied to `source_url` before hashing into `finding_id` and before storing the field:
+
+- Lowercase the scheme and host (e.g. `HTTPS://Docs.Anthropic.com` → `https://docs.anthropic.com`).
+- Strip any `#fragment` component.
+- Strip a single trailing slash from the path (e.g. `/en/docs/claude-code/hooks/` → `/en/docs/claude-code/hooks`).
+- Drop any `utm_*` query parameters; keep all other query parameters verbatim.
+
+### source_content_hash normalization (normative)
+
+Applied to the fetched section text before computing the hash. Without normalization, CRLF/wrapping/rendering differences between fetches would spuriously re-raise every rejected finding on re-check.
+
+```python
+import hashlib, unicodedata, re
+
+def source_content_hash(text: str) -> str:
+    normalized = unicodedata.normalize("NFC", text)
+    stripped = normalized.strip()
+    collapsed = re.sub(r"[ \t\n\r]+", " ", stripped)
+    return hashlib.sha1(collapsed.encode("utf-8")).hexdigest()
+```
+
 ---
 
 ## Lifecycle rules
@@ -106,29 +141,52 @@ These rules are invariants — the orchestrator must not deviate from them. Each
 
 When the orchestrator identifies a finding that has no existing `finding_id` entry in `decisions`, it writes a new entry with `decision: "open"` before emitting the report. **Why:** findings survive watermark advances. Because every undecided finding persists as an `open` entry and re-surfaces in every report until the user reaches a verdict, the watermark can safely advance at the end of every run — there is no risk of a finding disappearing between runs just because the watermark moved past its source version. A secondary bonus: if the run crashes after reporting but before writing state, re-running re-surfaces the finding from state rather than re-announcing it as new.
 
-### Rule 2: `--fix` verdicts overwrite the `open` entry in-place
+### Rule 2: Every verdict overwrites the entry in place
 
-When the user approves a fix and `--fix` mode is active, the orchestrator updates the existing entry: sets `decision` to `applied`, `date` to today, and `note` to a description of what was changed. It does NOT append a new entry. **Why:** one `finding_id` → one entry is a hard invariant. Appending would create duplicates that the dedup logic would have to resolve at read time, making the schema order-dependent and fragile. Overwriting in-place keeps the array flat and lookup O(n) with a simple find-by-id.
+Every verdict — `applied`, `rejected`, or `deferred` — overwrites the existing entry in place. The orchestrator updates `decision`, `date` (to today, except deferred re-surfacing per Rule 5), `source_content_hash` if the content was re-fetched, and `note`. It does NOT append a new entry. **Why:** one `finding_id` → one entry is a hard invariant. Appending would create duplicates that the dedup logic would have to resolve at read time, making the schema order-dependent and fragile. Overwriting in-place keeps the array flat and lookup O(n) with a simple find-by-id.
 
-### Rule 3: A `rejected` finding is re-raised only when its `source_content_hash` no longer matches the live source
+When `--fix` mode is active and the user approves a fix: `decision` → `applied`, `date` → today, `note` → description of what was changed.
 
-On each run, the orchestrator fetches the source section for every `rejected` entry and recomputes its SHA-1. If the hash matches the stored `source_content_hash`, the rejection stands and the finding is suppressed from the report. If the hash differs, the source has changed — the old rejection no longer applies — so the orchestrator resets `decision` to `open` and updates `source_content_hash` to the new hash. **Why:** a "rejected" verdict is a claim that a specific piece of upstream guidance was evaluated and found inapplicable to bx. If Anthropic rewrites that guidance, the old verdict is stale. Re-raising on hash change ensures the user re-evaluates changed guidance without being spammed by unchanged rejected findings.
+When the user rejects a finding: `decision` → `rejected`, `date` → today, `note` → reason.
 
-### Rule 4: The watermark advances at the end of EVERY run
+When the user defers a finding: `decision` → `deferred`, `date` → today (the original deferral date, preserved by Rule 5 on subsequent re-surfaces), `note` → reason.
 
-After all findings have been written to state (Rule 1) and any `--fix` verdicts applied (Rule 2), the orchestrator updates the watermark fields to reflect the current run's reach: `last_changelog_version` to the highest tag processed, `docs_checked_at` and `community_checked_at` to today's date. **Why:** advancing at the end, not the beginning, means a failed or partial run leaves the watermark at the last fully-completed run's value. The next run will re-check the same range rather than skipping it. This is the safe failure mode — slightly redundant work on retry, never missing entries.
+### Rule 3: `rejected` findings use trigger-based re-raise — never proactive re-fetch
+
+A `rejected` finding is re-raised ONLY when a current run's lane emits a finding whose `finding_id` matches the stored `rejected` entry. The orchestrator does NOT proactively fetch stored `source_url` values to check whether rejected entries have changed. Sources behind the watermark that no lane re-surfaces are never re-checked — if the source never reappears in a run's output, there is nothing to re-litigate.
+
+**Trigger mechanics:** when a live finding matches a `rejected` entry's `finding_id`, compare the live finding's `source_content_hash` (computed from the freshly fetched content using the normalization function above) to the stored `source_content_hash`:
+
+- **Hash unchanged:** the source section is the same as when rejected. Suppress the finding from the report; count it in the report footer as "N rejected (unchanged, suppressed)".
+- **Hash changed:** the source section has been rewritten — the old rejection no longer applies. Surface the finding badged `[re-raised — source changed since rejection]`. Update the stored entry: `decision` → `open`, `source_content_hash` → new hash, `date` → today.
+
+**Why trigger-based:** proactive re-fetching every rejected URL on every run would consume tokens and quota proportional to the decision log size, not the delta since the last run. The whole point of the decision log is to make runs incremental. A rejection is a claim about a specific piece of guidance; if the guidance never reappears in the current scan, the rejection still stands.
+
+### Rule 4: Each watermark timestamp advances only if its lane ran this run
+
+After all findings have been written to state (Rule 1) and any `--fix` verdicts applied (Rule 2), the orchestrator updates the watermark fields: `last_changelog_version` to the highest tag processed. `docs_checked_at` advances to today ONLY if the docs lane ran this run (lane_status ok or degraded). `community_checked_at` advances to today ONLY if the community lane ran this run. A lane that was skipped (`--no-community`) or unavailable keeps its previous timestamp, ensuring the missed range is re-checked on the next run.
+
+**Why:** advancing at the end, not the beginning, means a failed or partial run leaves the watermark at the last fully-completed run's value. Per-lane tracking means a `--no-community` run does not falsely claim community sources were checked.
+
+### Rule 5: `deferred` findings re-surface on every run until explicitly decided
+
+A `deferred` entry re-surfaces in every report badged `[deferred <original date>]`. The stored `date` keeps the original deferral date and is NOT updated on re-surfacing. **Why:** deferred entries are the user's "I'll handle this later" signal; hiding them would lose track of pending work.
+
+**Trigger mechanics for content change:** if a current run's lane emits a live finding whose `finding_id` matches a `deferred` entry AND the live finding's `source_content_hash` differs from the stored one, update the stored `source_content_hash` to the new hash and note "source changed since deferral" in the report alongside the `[deferred <original date>]` badge. The `date` field still keeps the original deferral date.
+
+Any later verdict (applied/rejected) overwrites the `deferred` entry per Rule 2 — the entry transitions fully to the new verdict.
 
 ---
 
 ## Update mechanics
 
-The orchestrator rewrites the entire file on every run that changes state. No appending, no shell-based in-place edits, no `jq` streaming writes that assume a particular shell environment.
+The orchestrator rewrites the entire file on every run that changes state. No appending, no shell-based in-place edits, no `jq` streaming writes that assume a particular shell environment. This file owns this procedure — `SKILL.md` must reference here rather than restate it.
 
 **Canonical procedure:**
 
 1. **Read** `docs/upstream/state.json` via the Read tool at the start of the run (Step 1). Deserialize into an in-context object.
 2. **Modify** the in-context object as findings are evaluated and verdicts recorded throughout the run. Do not write intermediate states.
-3. **Validate** the modified object before writing: confirm the `decisions` array has no duplicate `finding_id` values; confirm all required fields are present; confirm `decision` values are in the allowed enum set.
+3. **Validate** the modified object before writing: confirm the `decisions` array has no duplicate `finding_id` values; confirm all required fields are present on every entry; confirm `decision` values are in the allowed enum set. **On ANY validation failure, do NOT write the file.** Report the validation failure in the run output and leave `state.json` untouched so the previous valid state is preserved.
 4. **Write** the validated object back to `docs/upstream/state.json` via the Write tool at the end of the run (Step 5), serialized as pretty-printed JSON (2-space indent, keys in schema order). The Write tool is an atomic overwrite — no temp file needed.
 
 **Why no shell-based writes:** shell state does not persist across Bash tool calls in Claude Code. A `jq` command that reads from a file in one Bash call and writes in another has no guaranteed consistency if the run interleaves tool calls. The Read-modify-in-context-Write pattern keeps the entire state transition inside a single logical unit the orchestrator controls, with no shell state assumptions.
@@ -147,6 +205,8 @@ state.json root:
     finding_id
     decision
     date
+    source_url
+    affected_capability
     source_content_hash
     note
   ]
