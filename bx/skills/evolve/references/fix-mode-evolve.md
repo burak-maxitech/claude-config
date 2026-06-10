@@ -12,9 +12,11 @@ A finding is fix-eligible only if **all** of the following hold. Check each in o
 
 2. **Current decision-log state is `open` or re-raised** — the finding has `decision: "open"` in `docs/upstream/state.json`, including entries re-raised from `rejected` because their `source_content_hash` changed. `deferred` findings re-surface in the report (Section 4) but are not offered to `--fix` — they are deferred deliberately. `applied` findings are not surfaced at all. `rejected`-and-unchanged findings are suppressed from the report entirely. Why: acting on a deferred or rejected finding without explicit re-evaluation bypasses the decision log.
 
-3. **The proposed edit is a text change to files inside this repo** — the `affected_files` list contains only paths within the `bx/` tree (skills, agents, scripts, hooks) or `docs/upstream/`. Changes that require external actions (updating a dependency, running a CLI, adding a new file not yet in the repo) are not mechanically applyable via Edit and are display-only. Why: the Edit tool requires an existing file with a unique old_string — non-text or out-of-repo changes cannot be expressed as Edit operations.
+3. **The proposed edit is a text change to files inside this repo** — the `affected_files` list contains only paths within this repo, excluding: historical archives (`docs/key-decisions.md`, `docs/session-history.md`, CLAUDE.md history sections) and `docs/upstream/state.json` (state writes are owned by the decision-log mechanics, not by finding edits). `README.md` and `workflow.md` ARE fix-eligible — they are operational docs and the lanes' Grep scope includes them deliberately (S45 sibling-echo rule). Changes that require external actions (updating a dependency, running a CLI, adding a new file not yet in the repo) are not mechanically applyable via Edit and are display-only. Why: the Edit tool requires an existing file with a unique old_string — non-text or out-of-repo changes cannot be expressed as Edit operations.
 
 If all three hold, the finding is fix-eligible and joins the ordered gate flow below.
+
+**Eligible set scope:** only findings consolidated THIS RUN (Section 2 of the report) are gated. Section 4 carried-forward entries are display-only — `state.json` lacks the diff-able `source_excerpt` field for them (they were never re-emitted this run). To act on a carried-forward entry, re-run `/bx:evolve` so a lane re-emits it and Section 2 picks it up.
 
 ---
 
@@ -79,8 +81,10 @@ The combined diff covers ALL files in `affected_files`. Partial application rein
 
 ## Edit-tool edge cases
 
-- **Non-unique `old_string`:** if the Edit tool cannot locate a unique match for the proposed change in a given file, mark that finding as "skipped (could not apply mechanically)" — do NOT write `applied` to the decision log. Advance to the next finding. Surface in the post-pass summary.
-- **Multiple findings in the same file:** because this mode groups all affected files into one combined diff per finding, and findings are distinct upstream deltas, two findings are unlikely to target the same line. If they do, present them sequentially and apply from the bottom of the file upward (higher line numbers first) so earlier line-number offsets remain valid.
+- **Non-unique `old_string` (partial-application failure):** if an Edit fails mid-finding (e.g. non-unique old_string) after some of the finding's files were already edited:
+  - **(a) If none of the already-edited files were touched by a previously APPLIED finding this pass:** revert them with `git checkout -- <those files>` and mark the finding "skipped (could not apply mechanically)" — do NOT write `applied` to the decision log. Advance to the next finding. Surface in the post-pass summary.
+  - **(b) If any of the already-edited files WERE touched by an earlier applied finding:** do NOT revert (you would destroy the other finding's edits). Disclose loudly which files are now partially edited, set this finding's decision to `deferred` with note "partial application — manual reconciliation needed", and continue. **Why:** silent partial application reintroduces exactly the sibling-echo drift this mode exists to prevent.
+- **Multiple findings in the same file:** because this mode groups all affected files into one combined diff per finding, and findings are distinct upstream deltas, two findings are unlikely to target the same line. If they do, present them sequentially — the Edit tool matches `old_string` so line offsets are irrelevant.
 - **Finding touches a references/ file alongside a SKILL.md:** include both in the same combined diff and the same `y`/`n` gate. The user approves the whole finding, not individual files.
 
 ---

@@ -59,7 +59,7 @@ The AI tooling space moves fast: Anthropic ships new Claude Code versions, renam
 ## Finding schema
 
 ```
-finding_id: <stable hash of (source_url + affected_capability)>
+finding_id: null                      (set by lane agents; orchestrator computes finding_id + source_content_hash at consolidation)
 class: breakage | best_practice | opportunity
 tier: official | community            (community ⇒ advisory, never fix-eligible)
 severity: low | medium | high
@@ -68,7 +68,7 @@ affected_files: [<every file needing the edit, including sibling-file echoes>]
 upstream_delta: <one-line: what changed upstream>
 proposed_edit: <prose + concrete old→new where possible>
 citation: <Tier-1 URL>                (mandatory for official tier)
-source_content_hash: <hash of the cited section, for decision-log re-raise checks>
+source_excerpt: <verbatim extract — orchestrator computes finding_id + source_content_hash at consolidation>
 ```
 
 ## State: `docs/upstream/state.json` (committed)
@@ -88,6 +88,8 @@ source_content_hash: <hash of the cited section, for decision-log re-raise check
       "source_url": "<canonicalized URL of the upstream source page>",
       "affected_capability": "<e.g. bx:seo/allowed-tools>",
       "source_content_hash": "<hash>",
+      "class": "breakage | best_practice | opportunity | null",
+      "title": "<one-line finding title at last surfacing, or null for sentinels>",
       "note": "<optional one-liner>"
     }
   ]
@@ -98,7 +100,7 @@ Committed to the repo (multi-machine sync, like everything else here). Rejected 
 
 ## Orchestrator allowed-tools
 
-`Read, Grep, Glob, Edit, Write, Bash(git:*), Bash(gh:*), Bash(wc:*), Bash(jq:*), Bash(cat:*), Bash(head:*), WebFetch, Task`
+`Read, Grep, Glob, Edit, Write, Bash(git:*), Bash(gh:*), Bash(wc:*), Bash(jq:*), Bash(cat:*), Bash(head:*), Bash(python:*), Bash(python3:*), WebFetch, Task`
 (Write is for state.json; Edit for `--fix`; WebFetch for orchestrator-side citation spot-checks. The S42/S45 rule applies: this list must be re-verified against the final body before ship.)
 
 ## Validation plan

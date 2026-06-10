@@ -69,7 +69,7 @@ Apply both filters to produce a ranked shortlist for Step 3. Never fetch a resul
 
 For each shortlisted URL (in rank order, up to 5):
 - Call WebFetch using the bx capability area most relevant to that URL as the fetch focus.
-- **Verbatim-extract requirement (hash stability):** for each claim that becomes a candidate finding, capture the **verbatim page text** of the smallest heading-bounded section containing that claim — from its own heading to the next same-or-higher-level heading. That verbatim extract (NOT WebFetch's summary prose) is what gets normalized and hashed into `source_content_hash`. Hashing WebFetch's model-processed summary would produce an unstable hash that changes between calls even when the underlying content is unchanged — which re-raises every rejected finding on every run (state-schema Rule 3). The verbatim extract is the only stable hash input.
+- **Verbatim-extract requirement (hash stability):** for each claim that becomes a candidate finding, capture the **verbatim page text** of the smallest heading-bounded section containing that claim — from its own heading to the next same-or-higher-level heading. That verbatim extract (NOT WebFetch's summary prose) is what gets returned as `source_excerpt`. Hashing WebFetch's model-processed summary would produce an unstable hash that changes between calls even when the underlying content is unchanged — which re-raises every rejected finding on every run (state-schema Rule 3). The verbatim extract is the only stable hash input; the orchestrator normalizes and hashes it.
 - **Failure definition:** A fetch fails if WebFetch returns an error, a redirect to an unrelated page, or empty content where content is expected. Record each failed URL in `pages_failed` for the footer. Continue with remaining URLs.
 
 If 5 fetches have been used and shortlisted URLs remain, stop fetching and record the count of unfetched URLs in `scan_note` as `cap_reached`.
@@ -133,7 +133,7 @@ The orchestrator advances `community_checked_at` only on `ok` or `degraded`, per
 
 ```json
 {
-  "finding_id": "<sha1 of canonicalized source_url + | + affected_capability>",
+  "finding_id": null,
   "class": "breakage | best_practice | opportunity",
   "tier": "community",
   "severity": "low | medium",
@@ -144,13 +144,13 @@ The orchestrator advances `community_checked_at` only on `ok` or `degraded`, per
   "citation": "<the community page URL — same as source_url for this lane>",
   "source_url": "<canonicalized community page URL — same value used in finding_id>",
   "affected_capability": "<capability string, e.g. bx:*/allowed-tools, or bx:pain/<kebab-slug>>",
-  "source_content_hash": "<sha1 of the normalized cited section text>"
+  "source_excerpt": "<verbatim heading-bounded section from the fetched page — the exact text the orchestrator will normalize and hash>"
 }
 ```
 
-**`finding_id` computation:** `sha1(source_url + "|" + affected_capability)`. Canonicalize `source_url` and normalize `affected_capability` per `bx/skills/evolve/references/state-schema.md` — do not restate the algorithms here.
+**`finding_id`:** set to `null` — computed by the orchestrator at consolidation from `source_url + "|" + affected_capability`. Do not attempt to compute it here. Exception: the `lane-unavailable-community` sentinel keeps its literal string ID (see degenerate finding below).
 
-**`source_content_hash` computation:** hash the verbatim heading-bounded section extract (per the verbatim-extract requirement in Step 3), normalized per `bx/skills/evolve/references/state-schema.md`. Never hash WebFetch's summary prose — see Step 3 for why.
+**`source_excerpt`:** the verbatim heading-bounded section extract (per the verbatim-extract requirement in Step 3) — never WebFetch's summary prose (see Step 3 for why). The orchestrator normalizes and hashes your `source_excerpt` per `bx/skills/evolve/references/state-schema.md` to produce `source_content_hash`. Return the raw extract; do not attempt to hash.
 
 **`affected_capability` normalization:** normalize per `bx/skills/evolve/references/state-schema.md`. For pain-point-only findings, use the `bx:pain/<kebab-slug>` form — the slug convention is defined in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
 
@@ -181,9 +181,11 @@ When no search returned results or every fetch failed, emit ONLY this finding (n
   "citation": null,
   "source_url": null,
   "affected_capability": null,
-  "source_content_hash": null
+  "source_excerpt": null
 }
 ```
+
+This sentinel keeps its literal `finding_id` string — no hashing involved. It has no `source_excerpt` (null) because there is no upstream section to extract.
 
 Note: `severity: low` — a missing advisory lane is not urgent. This differs from the `lane-unavailable-changelog` and `lane-unavailable-docs` findings, which use `severity: high` because those lanes carry Tier-1 findings. Set `lane_status: unavailable` in the footer addendum.
 

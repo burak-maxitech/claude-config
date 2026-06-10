@@ -54,7 +54,7 @@ For each URL in the pinned allowlist above, call `WebFetch` using that URL's "Ca
 
 **One-hop rule:** you may follow a `#fragment` anchor on the same page to read a specific section. Never follow links to other pages or domains.
 
-**Verbatim-extract requirement (hash stability):** for each guidance item that becomes a candidate delta, capture the **verbatim page text** of the smallest heading-bounded section containing that guidance — from its own heading to the next same-or-higher-level heading. That verbatim extract (not WebFetch's summary prose) is what gets normalized and hashed into `source_content_hash`. Hashing a summary hashes noise: WebFetch's model-processed output varies between calls, causing the hash to change even when the underlying guidance is unchanged — which re-raises every rejected finding on every run (state-schema Rule 3). The verbatim extract is the only stable hash input.
+**Verbatim-extract requirement (hash stability):** for each guidance item that becomes a candidate delta, capture the **verbatim page text** of the smallest heading-bounded section containing that guidance — from its own heading to the next same-or-higher-level heading. That verbatim extract (not WebFetch's summary prose) is what gets returned as `source_excerpt`. Hashing a summary hashes noise: WebFetch's model-processed output varies between calls, causing the hash to change even when the underlying guidance is unchanged — which re-raises every rejected finding on every run (state-schema Rule 3). The verbatim extract is the only stable hash input; the orchestrator normalizes and hashes it.
 
 **Order:** fetch every allowlisted URL. Do not stop early on a failure — fetch all, then tally `lane_status`.
 
@@ -122,7 +122,7 @@ The orchestrator advances `docs_checked_at` only on `ok` or `degraded`, per `bx/
 
 ```json
 {
-  "finding_id": "<sha1 of canonicalized source_url + | + affected_capability>",
+  "finding_id": null,
   "class": "breakage | best_practice | opportunity",
   "tier": "official",
   "severity": "low | medium | high",
@@ -133,13 +133,13 @@ The orchestrator advances `docs_checked_at` only on `ok` or `degraded`, per `bx/
   "citation": "<the allowlisted doc URL — same as source_url for this lane>",
   "source_url": "<canonicalized allowlisted URL — same value used in finding_id>",
   "affected_capability": "<capability string, e.g. bx:*/allowed-tools>",
-  "source_content_hash": "<sha1 of the normalized cited section text>"
+  "source_excerpt": "<verbatim heading-bounded section from the fetched page — the exact text the orchestrator will normalize and hash>"
 }
 ```
 
-**`finding_id` computation:** `sha1(source_url + "|" + affected_capability)`. Canonicalize `source_url` and normalize `affected_capability` per `bx/skills/evolve/references/state-schema.md` — do not restate the algorithms here.
+**`finding_id`:** set to `null` — computed by the orchestrator at consolidation from `source_url + "|" + affected_capability`. Do not attempt to compute it here. Exception: the `lane-unavailable-docs` sentinel keeps its literal string ID (see degenerate finding below).
 
-**`source_content_hash` computation:** hash the verbatim heading-bounded section extract (per the verbatim-extract requirement in Step 1), normalized per `bx/skills/evolve/references/state-schema.md`. Never hash WebFetch's summary prose — see Step 1 for why.
+**`source_excerpt`:** the verbatim heading-bounded section extract (per the verbatim-extract requirement in Step 1) — never WebFetch's summary prose (summaries are unstable across calls; see Step 1 for why). The orchestrator normalizes and hashes your `source_excerpt` per `bx/skills/evolve/references/state-schema.md` to produce `source_content_hash`. Return the raw extract; do not attempt to hash.
 
 **`affected_capability` normalization:** normalize per `bx/skills/evolve/references/state-schema.md`. For pain-point-only findings (no inventory capability matched), use the `bx:pain/<kebab-slug>` form — the slug convention is defined in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
 
@@ -171,9 +171,11 @@ When every allowlisted URL fails, emit ONLY this finding (no others):
   "citation": null,
   "source_url": null,
   "affected_capability": null,
-  "source_content_hash": null
+  "source_excerpt": null
 }
 ```
+
+This sentinel keeps its literal `finding_id` string — no hashing involved. It has no `source_excerpt` (null) because there is no upstream section to extract.
 
 Set `lane_status: unavailable` in the footer addendum. The orchestrator MUST NOT advance `docs_checked_at` when this finding is present.
 

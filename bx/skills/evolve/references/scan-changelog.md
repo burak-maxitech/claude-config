@@ -89,7 +89,7 @@ Example: if a flag `--allowed-tools` is renamed, run `Grep pattern="--allowed-to
 
 ## Degraded-run deduplication
 
-If two releases in a degraded run produce the same `(source_url, affected_capability)` pair, merge them into one finding. The merged finding's `upstream_delta` names both versions (e.g. `"2.1.160 + 2.1.161: ..."`), and `source_content_hash` covers the concatenated normalized sections, newest version first.
+If two releases in a degraded run produce the same `(source_url, affected_capability)` pair, merge them into one finding. The merged finding's `upstream_delta` names both versions (e.g. `"2.1.160 + 2.1.161: ..."`), and `source_excerpt` concatenates the two verbatim sections (newest version first, separated by a blank line) for the orchestrator to normalize and hash.
 
 ---
 
@@ -111,7 +111,7 @@ If two releases in a degraded run produce the same `(source_url, affected_capabi
 
 ```json
 {
-  "finding_id": "<sha1 of canonicalized source_url + | + affected_capability>",
+  "finding_id": null,
   "class": "breakage | best_practice | opportunity",
   "tier": "official",
   "severity": "low | medium | high",
@@ -122,13 +122,13 @@ If two releases in a degraded run produce the same `(source_url, affected_capabi
   "citation": "<the release URL>",
   "source_url": "<canonicalized release URL — same value used in finding_id>",
   "affected_capability": "<capability string, e.g. bx:*/allowed-tools>",
-  "source_content_hash": "<sha1 of the normalized cited section text>"
+  "source_excerpt": "<verbatim heading-bounded section from the release body — the exact text the orchestrator will normalize and hash>"
 }
 ```
 
-**`finding_id` computation:** `sha1(source_url + "|" + affected_capability)`. Canonicalize `source_url` and normalize `affected_capability` per `bx/skills/evolve/references/state-schema.md` — do not restate the algorithms here.
+**`finding_id`:** set to `null` — computed by the orchestrator at consolidation from `source_url + "|" + affected_capability`. Do not attempt to compute it here. Exception: the `lane-unavailable-changelog` sentinel keeps its literal string ID (see degenerate finding below).
 
-**`source_content_hash` computation:** normalize and hash per `bx/skills/evolve/references/state-schema.md`.
+**`source_excerpt`:** the verbatim heading-bounded extract (or release-body section) that is the hash input — not your own summary prose. The orchestrator normalizes and hashes your `source_excerpt` per `bx/skills/evolve/references/state-schema.md` to produce `source_content_hash`. Return the raw extract; do not attempt to hash.
 
 **`affected_capability` normalization:** normalize per `bx/skills/evolve/references/state-schema.md`. Example: `"bx:seo/allowed-tools"`. For pain-point-only findings (no inventory capability matched), use the `bx:pain/<kebab-slug>` form — the slug derivation convention (form, example, stability requirement) is defined in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
 
@@ -169,9 +169,11 @@ When both primary and fallback fail, emit ONLY this finding (no others):
   "citation": null,
   "source_url": null,
   "affected_capability": null,
-  "source_content_hash": null
+  "source_excerpt": null
 }
 ```
+
+This sentinel keeps its literal `finding_id` string — no hashing involved. It has no `source_excerpt` (null) because there is no upstream section to extract.
 
 The orchestrator MUST NOT advance `last_changelog_version` when this finding is present. Set `lane_status: unavailable` in the footer addendum.
 

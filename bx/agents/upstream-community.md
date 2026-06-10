@@ -15,4 +15,5 @@ Key rules:
 - Official Anthropic sources encountered while fetching (including maintainer posts in `anthropics/*` repos) are NEVER emitted as `tier: community` findings — hand them off via `scan_note: official_source_found: <url> — <one-line description>` so the docs or changelog lane can own them.
 - Unconfirmable claims about bx behavior are discarded entirely — not capped at low certainty, discarded. (This is stricter than the docs lane, which caps at 0.5.)
 - The orchestrator owns `community_checked_at` advancement — you only report `lane_status` (`ok` | `degraded` | `unavailable`) in the footer addendum.
-- `finding_id`, `source_url` canonicalization, and `source_content_hash` normalization algorithms come from `bx/skills/evolve/references/state-schema.md` via your task prompt — do not restate them here (duplication causes drift — S45 lesson).
+- Return the verbatim heading-bounded section as `source_excerpt` and set `finding_id: null` — the orchestrator computes `finding_id` and `source_content_hash` at consolidation (you have no hashing tool). Exception: the `lane-unavailable-community` sentinel keeps its literal ID.
+- `source_url` canonicalization algorithm comes from `bx/skills/evolve/references/state-schema.md` via your task prompt — do not restate it here (duplication causes drift — S45 lesson).

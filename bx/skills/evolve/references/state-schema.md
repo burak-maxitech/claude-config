@@ -52,6 +52,8 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "source_url": "https://code.claude.com/docs/en/skills",
       "affected_capability": "bx:seo/allowed-tools",
       "source_content_hash": "7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1d",
+      "class": "breakage",
+      "title": "`allowed-tools` entry missing for Bash helper",
       "note": "Added allowed-tools entry for new Bash helper per claude-code 1.7.0 release notes."
     },
     {
@@ -61,6 +63,8 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "source_url": "https://code.claude.com/docs/en/hooks",
       "affected_capability": "bx:save/session-start",
       "source_content_hash": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+      "class": "best_practice",
+      "title": "Session-start hook pattern differs from bx approach",
       "note": "The suggested hook runs on every session-start; bx already handles this via session-start-context scripts."
     },
     {
@@ -70,6 +74,8 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "source_url": "https://code.claude.com/docs/en/settings",
       "affected_capability": "bx:clean/allowed-tools",
       "source_content_hash": "9e107d9d372bb6826bd81d3542a419d6a3b1c5d2",
+      "class": "best_practice",
+      "title": "allowed-tools pattern syntax update for /bx:clean",
       "note": null
     },
     {
@@ -79,6 +85,8 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "source_url": "https://code.claude.com/docs/en/hooks",
       "affected_capability": "bx:health/hooks-rework",
       "source_content_hash": "1f8ac10f23c5b5bc1167bda84b833e5c057a77d7",
+      "class": "opportunity",
+      "title": "Hooks rework could simplify /bx:health session orientation",
       "note": "Hooks rework is high-effort; revisit after /bx:webdesign dogfood is complete."
     }
   ]
@@ -95,9 +103,13 @@ Each entry in the `decisions` array represents one actionable finding that has b
 | `source_url` | string | yes | The canonicalized URL of the upstream source page that drove this finding (see canonicalization rule below). Makes `finding_id` recomputable from stored state and makes the log self-describing. |
 | `affected_capability` | string | yes | The capability string used in the `finding_id` computation (e.g. `"bx:seo/allowed-tools"`). Makes `finding_id` recomputable from stored state without re-running the hash logic over free-text fields. |
 | `source_content_hash` | string (40-char hex SHA-1) | yes | Normalized SHA-1 of the specific upstream section text that drove this finding (the cited paragraph or bullet, not the whole page). Used by the trigger-based re-raise rules for `rejected` and `deferred` entries — see Rules 3 and 5. |
+| `class` | enum string or null | yes | The finding's class at its last surfacing: `breakage`, `best_practice`, or `opportunity`. Null for sentinel/degenerate entries. **Why stored:** carried-forward findings must be renderable in the report's Section 4 from state alone — without a stored class the orchestrator cannot label entries no lane re-emitted this run. |
+| `title` | string or null | yes | The finding's one-line title at its last surfacing (e.g. `` "`allowed-tools` glob syntax changed" ``). Null for sentinel/degenerate entries. **Why stored:** same reason as `class` — Section 4 rendering requires it without a live lane re-emit. |
 | `note` | string or null | yes (nullable) | Human-readable explanation of the verdict — a one-liner covering what was done or why it was skipped. The key must always be present; the value may be null (use null, not absent key). |
 
 ### finding_id computation (normative)
+
+Computed by the ORCHESTRATOR at consolidation time, not by lane agents. Lane agents return `source_excerpt` (the verbatim heading-bounded extract), `source_url`, and `affected_capability`, and set `finding_id: null`. The orchestrator runs the snippet below via `Bash(python:*)` to produce the final `finding_id`.
 
 ```python
 import hashlib
@@ -121,7 +133,9 @@ Applied to `source_url` before hashing into `finding_id` and before storing the 
 
 ### source_content_hash normalization (normative)
 
-Applied to the fetched section text before computing the hash. Without normalization, CRLF/wrapping/rendering differences between fetches would spuriously re-raise every rejected finding on re-check.
+Computed by the ORCHESTRATOR at consolidation time by applying the function below to the lane agent's `source_excerpt` field. Lane agents return the raw verbatim extract as `source_excerpt` and do not compute hashes (they have no hashing tool). The orchestrator runs this snippet via `Bash(python:*)`.
+
+Without normalization, CRLF/wrapping/rendering differences between fetches would spuriously re-raise every rejected finding on re-check.
 
 ```python
 import hashlib, unicodedata, re
@@ -210,6 +224,8 @@ state.json root:
     source_url
     affected_capability
     source_content_hash
+    class
+    title
     note
   ]
 ```
