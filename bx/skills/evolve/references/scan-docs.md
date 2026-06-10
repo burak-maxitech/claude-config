@@ -182,7 +182,7 @@ Set `lane_status: unavailable` in the footer addendum. The orchestrator MUST NOT
 ## Hard rules
 
 - **Never report zero findings silently.** If all pages were fetched but none of the guidance contradicts bx or addresses a pain point, append a note in the footer: `scan_note: <N> pages evaluated; no capability or pain-point matches found`. This is different from `unavailable` — it means the scan ran cleanly but nothing was relevant.
-- **Include sibling-file echoes in `affected_files`.** Always populate via Step 4 Grep — never infer from the capability string alone. If official guidance changes a key used in multiple files (e.g. a SKILL.md frontmatter key used in 7 skills + README), list every file.
+- **Include sibling-file echoes in `affected_files`.** Always populate via Step 5 Grep — never infer from the capability string alone. If official guidance changes a key used in multiple files (e.g. a SKILL.md frontmatter key used in 7 skills + README), list every file.
 - **Per-URL failure is explicit.** Every failed fetch is named in `pages_failed` in the footer. A partial success (some pages ok, some failed) → `lane_status: degraded`, not `ok`.
 - **Do not restate algorithms from `bx/skills/evolve/references/state-schema.md`.** Point to that file for `finding_id` computation, `source_url` canonicalization, and `source_content_hash` normalization. Duplication causes drift — the S45 lesson.
 - **Do not follow links beyond one hop to a same-page anchor.** The pinned allowlist is the full scope of this lane.
@@ -198,7 +198,7 @@ pages_fetched: <n — count of allowlisted URLs that returned content successful
 pages_failed: [<url>: <error>, ...]   # empty list [] if all succeeded
 lane_status: ok | degraded | unavailable
 scan_note: <optional — used when scan ran cleanly but zero capability matches found, or other non-error observations>
-discarded_findings: <count of findings dropped by the 15-finding cap, or 0>
+discarded_findings: <count of findings dropped by the 15-finding cap PLUS zero-hit discards from Step 5, or 0>
 ```
 
 **Zero-findings-but-all-pages-checked case:** set `pages_fetched` to the count of allowlist rows fetched, `pages_failed: []`, `lane_status: ok`, and use `scan_note` to explain that no gaps were found. Never return an empty finding list without a `scan_note` — that is indistinguishable from a partial run.

@@ -139,8 +139,8 @@ If two releases in a degraded run produce the same `(source_url, affected_capabi
 **`class` assignment guidance:**
 
 - `breakage` — the upstream change means existing bx config/syntax is now wrong or will stop working (e.g. a renamed flag bx currently uses, a removed frontmatter key bx emits).
-- `best_practice` — the change introduces a recommended pattern bx isn't yet using, or deprecates a pattern bx uses in favor of a better one.
-- `opportunity` — a new capability exists that could simplify or replace a bx workaround, but the current bx approach still works.
+- `best_practice` — the change deprecates or explicitly recommends against a pattern bx currently uses, while the current approach still works. NOT for "a recommended pattern bx isn't using" in general — that fails the relevance gate unless it matches a pain point.
+- `opportunity` — a new capability directly addresses a recorded pain point from `pain_point_list` and bx does not yet use it. The pain-point match is mandatory — a new capability with no pain-point match is discarded (same rule as the docs lane).
 
 **`severity` guidance:**
 
