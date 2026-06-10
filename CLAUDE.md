@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-06-09 (Session 45)
+Last Updated: 2026-06-09 (Session 46)
 
 ## Project Overview
 
@@ -15,8 +15,8 @@ Last Updated: 2026-06-09 (Session 45)
 
 | Area | Status |
 |------|--------|
-| Skills (10) | Complete |
-| Subagents (15) | Complete |
+| Skills (11) | Complete |
+| Subagents (18) | Complete |
 | Plugin packaging (`bx`) | Core complete (S37) — pending install smoke-test + symlink retirement |
 | Startup scripts | Complete |
 | Cross-platform setup | Complete |
@@ -25,7 +25,7 @@ Last Updated: 2026-06-09 (Session 45)
 
 ## Completed
 
-All 10 skills, 15 subagents, cross-platform setup, and documentation system are complete.
+All 11 skills, 18 subagents, cross-platform setup, and documentation system are complete.
 
 See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
@@ -39,12 +39,14 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 ## Next Steps
 
-1. **Dogfood `/bx:webdesign`** — plugin cache is current (S44); install the Stitch MCP + `stitch-skills` once, then run against a real web project using the dogfood checklist (confirm the `mcp__stitch__*` tool prefix, dev-server port, `stitch::code-to-design` arg convention; verify the S42 `app_runnable:false` project-ID recovery path end-to-end).
-2. **Real `/bx:seo` run against burakarik.com** — first genuinely-working end-to-end (auth fixed S39, live sitemap discovery, content-review-hardened S45). Run `/plugin update bx` first so the S45 fixes (`1d6698a`) are live in the cache.
-3. **Remaining `/bx:seo` code-review items (non-blocking, S39):** #5 redundant per-call token mints; #6 `_read_skill_config` CWD assumption; #7 `fetch-sa` subcommand so Search Analytics never exposes a token.
-4. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — built but never run end-to-end.
-5. **Address `/bx:seo` deferred refactors** (S25/S27/S29): batched-Grep alternation; fix-mode + plan-mode scaffolding extraction.
-6. Improve skill reference files based on usage; consider pre-commit hooks.
+1. **Dogfood `/bx:evolve`** — first real run (in this repo) after `/plugin update bx` + `/reload-plugins`. Smoke criteria in the spec's Validation plan: already-applied S33/S39 changes → zero findings; immediate re-run → only carried-forward `open` findings, fast; a rejected finding stays rejected. Give it the S42 content-review treatment first.
+2. **Dogfood `/bx:webdesign`** — install the Stitch MCP + `stitch-skills` plugin once, then run per `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
+3. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
+4. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — all content-review-hardened in S46, never run end-to-end.
+5. **S37 plugin-packaging leftovers** — install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement.
+6. **`/bx:evolve` v2: extract shared `references/lane-contract.md`** — the three scan files share ~50% of their mass (inputs, filter, affected_files discipline, schema, addendum); flagged by all four `/simplify` agents, deferred for a fresh review cycle.
+7. **Remaining `/bx:seo` code-review items (S39, non-blocking)** — #5 redundant per-call token mints; #6 `_read_skill_config` CWD assumption; #7 `fetch-sa` subcommand.
+8. **`/bx:seo` deferred refactors (S25/S27/S29)** — batched-Grep alternation; fix-mode + plan-mode scaffolding extraction.
 
 ## Key Decisions
 
@@ -74,6 +76,8 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 | `/bx:clean` eval suite + measured skill value (S43) | skill-creator full eval loop (with-skill vs no-skill baseline, 2 iterations): the skill is 100% but raw Claude **ties it on report-mode detection** even with precision traps (dynamic import, config-only dep, obscure PyPI name mismatch); the skill's measurable edge is **fix-mode discipline** (defers Safe-to-Delete, never auto-removes deps) + **prompt-independent category coverage**. Committed `bx/skills/clean/evals/` as a regression suite. (commit 65179cd) |
 | `/bx:save --silent` — zero-prompt runs (S44) | The Part 8 commit ask was the only unavoidable prompt; end-of-session saves want zero questions. `--silent` auto-commits with the suggested message (no push) and resolves every `--full` consent prompt to its safe default: first-run rollup consents (5.2/6.2) decline without writing the sentinel, the 7.4 shrinker gate is skip-all. Named over `--yes` because the flag never answers "yes" on the user's behalf except the commit itself. (commit b82162d) |
 | `/bx:seo` content-review hardening — doc-drift sweep rule (S45) | skill-creator qualitative review of all 15 skill files before the first real burakarik.com run found 3 high + 9 medium findings, all fixed in `1d6698a`. Pattern: every rework generation (CSV→API S29, helper-dispatch S35, auth S39) left stale echoes in sibling files that bait orchestrator improvisation — the canonical-paths table still mandated N-parallel-curl after S35 shipped `inspect-batch`, and Step 1.6.14 assumed env vars persist across Bash calls (same class as the pre-S39 token bug). Rules: a rework isn't done until its echoes are swept from sibling files; `allowed-tools` must enumerate every command a skill invokes, including plugin `bin/` helpers (2nd instance of the S42 lesson). |
+| `/bx:evolve` upstream-watch skill — design contract (S46) | 11th skill: audits the bx toolkit against upstream Anthropic changes. Two-tier authority (official = actionable with mandatory citations; community = advisory-only, never fix-eligible). Committed watermark + decision log at `docs/upstream/state.json` (open/applied/rejected/deferred; trigger-based re-raise only when a re-emitted finding's source hash changed). Capability-inventory relevance gate: "new capability exists" alone is never a finding. Orchestrator computes ALL hashes — lane agents return `source_excerpt` (LLMs can't SHA-1; centralizing the algorithm prevents per-lane drift). Spec: `docs/superpowers/specs/2026-06-09-bx-evolve-design.md`. |
+| Sentinel exit-point principle for /bx:evolve (S46) | `lane-unavailable-*` sentinels are lane-health reports, not findings: they exit the pipeline at consolidation Step 3.1 (lane_status set, errors stashed for the report's Section 1, removed from the finding set). All downstream exemptions (hashing, decision log, fix eligibility, certainty bands) are entailed by the single principle instead of 7 scattered carve-outs — the /simplify pass (`21b41bb`) collapsed the scatter the review iterations had accumulated. |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -117,7 +121,7 @@ claude-config/                         # marketplace repo
 
 **The S37 `/bx:seo` "messed up" breakage is RESOLVED (S39).** Root-caused to the `${CLAUDE_SKILL_DIR}` path bug (not a real Claude Code variable → the helper was never found → GSC silently fell back to heuristic-only) + an impossible "mint token once, reuse across Bash calls" auth model (shell state does not persist across Bash tool calls). Both fixed and verified against live GSC. See Session History S39 + Key Decisions.
 
-**Activation gap REOPENED (S45).** Plugin cache is at `b82162d`; the S45 `/bx:seo` content-review fixes (`1d6698a`) need `/plugin update bx` + `/reload-plugins` (or a `cc` relaunch) before the next `/bx:seo` run — important because the fixes include the `allowed-tools` declarations the GSC path needs to run without permission prompts. `/bx:webdesign` additionally needs the Stitch MCP + `stitch-skills` plugin installed once before dogfood.
+**Activation gap REOPENED (S46).** Plugin cache is at `9a80c20`; ALL of this session's commits (`c659025`..`21b41bb`) are missing from it — the four audit-skill content-review hardenings AND the entire `/bx:evolve` skill. Run `/plugin update bx` + `/reload-plugins` (or a `cc` relaunch) before dogfooding anything. `/bx:webdesign` additionally needs the Stitch MCP + `stitch-skills` plugin installed once before dogfood.
 
 ## Environment Variables
 
@@ -127,10 +131,11 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 45) - 2026-06-09
-- **skill-creator qualitative content review of `/bx:seo`** (S42 treatment, prep for the burakarik.com run): all 15 files / 7,305 lines cross-checked — 3 high + 9 medium + cosmetic findings.
-- Top finds: `allowed-tools` missing `gsc-parse-helper` + 12 other invoked commands (the S42 `/bx:save` lesson, 2nd instance); Step 1.6.14 relied on env-var persistence across Bash calls (same class as the pre-S39 token bug — every watchpoint would silently report `no_data`); the canonical-paths table still mandated the forbidden N-parallel-curl Turn 2b dispatch.
-- **All fixes applied + verified**: helper compiles; 18/18 `coverageState` classifications now match the lookup table (new info-only `indexed_info` bucket). 12 files +106/−82, commit `1d6698a`, pushed.
-- Plugin cache NOT yet updated — run `/plugin update bx` before the next `/bx:seo` run.
+### Last Session (Session 46) - 2026-06-09
+- **Content-reviewed all four dogfood-pending audit skills** (S42/S45 treatment): `/bx:clean` (dry-run left staged deletions on main, `--vulns` filter contradiction), `/bx:health` (backtick command-substitution bug in pre-injection, awk section-gobbling), `/bx:tests` (unresolvable `bx:arch/...` pseudo-paths — S39 class), `/bx:arch` ("all three subagents" drift, linter commands missing from agent tools). Commits `c659025`, `e1802e6`, `26ea1c3`, `17e518a`; `/bx:health` also gained `/bx:webdesign` routing (`0a81f86`).
+- **Built `/bx:evolve` — 11th skill + 3 Sonnet agents (15→18)** via brainstorm → spec → plan → subagent-driven (9 tasks, two-stage review per task): upstream-watch audit with two-tier authority (official actionable / community advisory), committed watermark + decision log (`docs/upstream/state.json`), capability-inventory relevance gate, per-finding combined-diff `--fix`. Merged `7805d75`.
+- Mid-build architecture catch: lane agents cannot compute SHA-1 → orchestrator computes all hashes at consolidation; lanes return `source_excerpt`.
+- **`/simplify` pass on the build** (`21b41bb`): agent-body restatements deleted, ~24k tokens/run of prompt copy-piping removed, sentinel carve-out scatter collapsed to a single Step-3.1 exit point, one `gh api` call replaces up to 50 `gh release view` calls.
+- Plugin cache updated to `9a80c20` early in the session — now stale again by 26 commits (see Known Issues).
 
-> Full session detail: [docs/session-history.md](docs/session-history.md) S45
+> Full session detail: [docs/session-history.md](docs/session-history.md) S46

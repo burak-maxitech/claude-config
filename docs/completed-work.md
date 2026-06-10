@@ -212,3 +212,12 @@
 ## Session 45 (2026-06-09) — /bx:seo content review hardening
 - [x] skill-creator qualitative content review of `/bx:seo` (S45) — 15 files / 7,305 lines; 3 high + 9 medium + cosmetic findings
 - [x] Applied all `/bx:seo` content-review fixes — 12 files +106/−82, verified (helper compile + 18/18 cluster classifications), commit `1d6698a` pushed
+
+## Session 46 (2026-06-09) — audit-skill content-review hardenings + /bx:evolve (11th skill)
+- [x] S46: Content-review hardening of /bx:clean (dry-run git-safety, --vulns contradiction, allowed-tools) - bx/skills/clean/, commit c659025
+- [x] S46: Content-review hardening of /bx:health (pre-injection shell bugs, awk fix, allowed-tools) + /bx:webdesign Bucket-E routing - bx/skills/health/, commits e1802e6 + 0a81f86
+- [x] S46: Content-review hardening of /bx:tests (pseudo-path resolution, stale scaffolding, agent drift) - bx/skills/tests/, bx/agents/test-*.md, commit 26ea1c3
+- [x] S46: Content-review hardening of /bx:arch (4th-agent drift, linter permissions, sort/uniq gap back-propagated to tests) - bx/skills/arch/, commit 17e518a
+- [x] S46: Built /bx:evolve — 11th skill + 3 upstream-* agents, spec→plan→subagent-driven, 9 tasks with two-stage review - bx/skills/evolve/, bx/agents/upstream-*.md, docs/upstream/state.json, merge 7805d75
+- [x] S46: /simplify pass on the evolve build (dedupe, sentinel exit-point, prompt/call efficiency) - commit 21b41bb
+- [x] S46: Plugin cache updated to 9a80c20 + operational-docs sweep to 11 skills / 18 agents - README.md, workflow.md, commit 045efda

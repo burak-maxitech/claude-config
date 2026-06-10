@@ -91,26 +91,7 @@
 
 ### Session 40 - 2026-05-30: `cc` launcher trust fix — PowerShell `try/catch` can't catch native `git pull` failures, so "Project synced." printed unconditionally; gated on `$LASTEXITCODE` in all 3 spots (`start-claude.ps1`) + both scripts swap `--quiet`/`2>/dev/null` for `--stat`. Also disproved CLAUDE.md's stale "3 commits ahead" claim (main == origin/main; plugin cache already at HEAD). (commit: 03fa75a)
 
-### Session 41 - 2026-06-06
-**What happened:**
-- Built `/bx:webdesign`, the 10th `bx` skill: web-only, refactor-only re-skin of an existing web project's visual design via Google Stitch, driven through the Stitch MCP + Google's official `stitch-skills` plugin (Model A — reuse Google's skills, detect-and-guide setup; NOT re-implement). Thin orchestrator owning the layer Google lacks: web/styling/runnability detection, preserve-aware page briefs, tokens-first + per-page safe restyle (preserve logic/content/assets, restyle within existing breakpoints, `git restore .` + `git clean -fd` rollback on failure), and build/test + Playwright + before/after verification. 3 resumable phases (Extract & Stage → Design & Review → Inject & Verify) on a dedicated `webdesign/<date>` branch; state in `.webdesign/state.json`.
-- Ran the full superpowers flow: brainstorm (11 decisions incl. MCP-driven over manual handoff, Model A reuse of Google's skills, flexible vibe-setting) → spec → plan (12 tasks) → subagent-driven execution with two-stage review per task → final holistic review → merge (`d5e98ab`).
-- Researched Google's `google-labs-code/stitch-skills` repo for canonical formats (DESIGN.md YAML schema, layout/content-only per-screen prompt, `update_design_system` knob enums, MCP tool surface) — bundled into `references/stitch-formats.md` + runtime fresh-fetch of the official prompting doc.
-- Two-stage reviews caught real bugs before merge: multi-file rollback/commit leakage in the injection core (`git restore <one-file>` → `git restore .` + `git clean -fd`; `git add <one-file>` → `git add -A`), `pages[].states` array→object schema drift across phases, 7 phase-number errors, an unguarded `page <name>` override (would inject with no design / null screen_id), a missing `pages[]` state writer in Phase 1, and hallucinated docs (invented `--phase` flag, false "CSS-only / never HTML structure" claim, fake `webdesign-brief.md` artifact, made-up guardrails).
-- Merged 26 commits to `main` via `--no-ff` (`d5e98ab`); deleted `feat/bx-webdesign`. NOT pushed (local merge per request).
-- Ran `/simplify` on the new skill (`429f63a`, +84/−116): deduped canonical content to single-source pointers (per-screen prompt template, no-colors rule, and the `phase3` "Canonical State Shape" block → SKILL.md Step B; slimmed SKILL.md Step A + the `review_pending` route to delegation; de-duped the doubled EXISTING-signals list + the over-repeated "states is an object" reminder), batched runtime tool calls (dev-server started **once** before the per-page loop instead of per-page; parallel `get_screen`+`curl`; parallel source-reads/brief-writes; quota count from `state.json`), and made `verification.md` read `serve_cmd`/`port` from `state.json` (Hugo/Jekyll-correct rather than hardcoding `npm run dev`). **Skipped (behavior change, flagged for dogfood):** the `app_runnable:false` path completes Phase 1 but dead-ends in Phase 2 — no mechanism feeds a user-supplied `stitch_project_id` back to unblock generation. At session end, `main` was pushed to `origin` (in sync); the plugin cache still needs `/plugin update bx` to pick up the skill.
-
-**Files created/modified:**
-- `bx/skills/webdesign/SKILL.md` + 8 `references/*.md` (setup-stitch-mcp, web-stack-detection, stitch-formats, brief-format, phase1-extract, phase2-design-review, phase3-inject, verification) - the new skill
-- `docs/superpowers/specs/2026-06-06-bx-webdesign-design.md` - design spec (11 decisions)
-- `docs/superpowers/plans/2026-06-06-bx-webdesign.md` - 12-task implementation plan
-- `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md` - first-run dogfood checklist
-- `README.md`, `workflow.md` - added `/bx:webdesign` (10th skill)
-
-**Next session should:**
-- `/plugin update bx` (or `cc`) to pull the pushed skill into the plugin cache and activate `/bx:webdesign` (`main` is already pushed + in sync with origin).
-- Install the Stitch MCP + `stitch-skills` plugin, then dogfood `/bx:webdesign` against a real web project (burakarik.com?) using the dogfood checklist — confirm the `mcp__stitch__*` prefix, dev-server port, and `stitch::code-to-design` arg convention.
-- Still pending: real `/bx:seo` run; dogfood `/bx:tests` / `/bx:arch` / `/bx:health`.
+### Session 41 - 2026-06-06: Built `/bx:webdesign` (10th skill) — Stitch-MCP re-skin via brainstorm→spec→12-task subagent-driven flow; two-stage reviews caught rollback leakage, `pages[].states` schema drift, hallucinated docs; `/simplify` pass deduped canonical content + batched runtime calls; known dead-end: `app_runnable:false` Phase-2 path (fixed S42) (commits: d5e98ab, 429f63a, c029ac5)
 
 ### Session 42 - 2026-06-06
 **What happened:** Two skill-creator-driven content-review passes on freshly-built skills, both hardened before any real dogfood. The skill-creator quantitative eval loop was judged infeasible for both (MCP/session-state-dependent inputs + subjective outputs), so both were review-driven rather than benchmarked.
@@ -176,3 +157,21 @@
 **Next session should:**
 - `/plugin update bx` + `/reload-plugins` to activate `1d6698a`
 - Dogfood `/bx:webdesign` (one-time Stitch MCP + `stitch-skills` setup) or run `/bx:seo` against burakarik.com
+
+### Session 46 - 2026-06-09
+**What happened:**
+- Content-reviewed all four dogfood-pending audit skills (S42/S45 treatment): `/bx:clean` (`c659025` — dry-run `git checkout main` carried staged deletions onto main, `--vulns` listed as a single-category filter contradicting the scope table, allowed-tools gaps incl. Edit/md5sum); `/bx:health` (`e1802e6` — backticks inside a double-quoted `!` injection echo tried to EXECUTE `/bx:seo`, awk `^## [^C]` swallowed the Completed section, grep/head/awk/tr missing from allowed-tools); `/bx:tests` (`26ea1c3` — `bx:arch/references/...` pseudo-paths unresolvable, pre-ship "if it exists" scaffolding, phpunit/JaCoCo parsing gap); `/bx:arch` (`17e518a` — "all three subagents" predated the 4th agent, radon/ruff/lizard/madge/pydeps missing from arch-structure tools, scale-strategy's sort/uniq missing from BOTH arch and tests allowed-tools). `/bx:health` also gained `/bx:webdesign` Bucket-E routing (`0a81f86`).
+- Built `/bx:evolve` (11th skill, 3 new Sonnet agents → 18) via brainstorm → spec (`4d88c92`) → plan (`0b94553`) → subagent-driven execution (9 tasks, implementer + spec-reviewer + quality-reviewer per task, 19 commits on `feature/bx-evolve`, merged `7805d75`). Two-tier authority; watermark + decision log with open/applied/rejected/deferred lifecycle and trigger-based re-raise; capability-inventory relevance gate; report template + per-finding combined-diff fix mode.
+- Review loops caught real defects pre-ship: invented "weekly cadence" semantics; live-verified v-prefix tag vs CHANGELOG-heading mismatch that would break the watermark; a fabricated URL-verification claim (`/hooks-reference` 404s); WebFetch-summary hashing instability that would re-litigate every rejected finding forever → settled contract: lanes emit `source_excerpt`, orchestrator computes finding_id + source_content_hash via one batched python call.
+- `/simplify` over the merge (4 parallel agents → `21b41bb`, +52/−102): deleted two-live-copies agent-body restatements, lanes now Read their own refs instead of ~24k tokens/run of prompt inlining, checkpoints live only in state-schema (fixed a live CP1 drift), sentinel exit-point principle, gh api batching, affected_files Grep batching, dead `tier_definitions` input removed. Deferred to v2: shared lane-contract.md extraction.
+- Session ops: plugin cache → `9a80c20`; task tracker drained (6 completed); one mid-build session-limit stall recovered cleanly.
+
+**Files created/modified:**
+- `bx/skills/evolve/` (SKILL.md + 6 references) + `bx/agents/upstream-{changelog,docs,community}.md` + `docs/upstream/state.json` — the new skill
+- `bx/skills/{clean,health,tests,arch}/` + `bx/agents/{arch-structure,test-coverage,test-quality}.md` — content-review hardenings
+- `README.md`, `workflow.md`, `bx/skills/health/references/state-buckets.md` — 11/18 counts, /bx:evolve docs, routing
+- `docs/superpowers/specs/2026-06-09-bx-evolve-design.md`, `docs/superpowers/plans/2026-06-09-bx-evolve.md`
+
+**Next session should:**
+- Run `/plugin update bx` + `/reload-plugins`, then dogfood `/bx:evolve` (smoke criteria in the spec) after giving it the S42 content-review treatment.
+- Continue the dogfood queue: webdesign (Stitch MCP install first), seo vs burakarik.com, tests/arch/health.
