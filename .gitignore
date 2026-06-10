@@ -1,6 +1,7 @@
 .DS_Store
 *.swp
 *~
+__pycache__/
 
 # Machine-local Claude Code settings (permissions, etc.) — each machine keeps its own
 .claude/settings.local.json

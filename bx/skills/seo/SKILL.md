@@ -3,9 +3,9 @@ name: seo
 description: Audits a web project for SEO and Generative Engine Optimization (GEO). Fetches current best practices every run, probes sitemap URL health, and optionally ingests Google Search Console data via API. Score `/100` headline + top-3 priorities, tracked in `docs/seo-history.md`.
 when_to_use: When user mentions SEO audit, GEO audit, Generative Engine Optimization, AI search optimization, llms.txt, structured data / JSON-LD, sitemap health, Google Search Console, GSC, search performance, AI citability, or "make this site rank better". Web projects only — rejects non-web repos silently. Distinct from generic code-review skills (no SEO awareness) and from `/bx:arch` (code structure, not SEO).
 disable-model-invocation: true
-allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(grep:*), Bash(sed:*), Bash(cat:*), Bash(head:*), Bash(gcloud:*), Bash(curl:*), Task
+allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(grep:*), Bash(sed:*), Bash(cat:*), Bash(head:*), Bash(gcloud:*), Bash(curl:*), Bash(gsc-parse-helper:*), Bash(mkdir:*), Bash(ls:*), Bash(mktemp:*), Bash(printf:*), Bash(rm:*), Bash(echo:*), Bash(date:*), Bash(sha1sum:*), Bash(shasum:*), Bash(cut:*), Bash(sort:*), Bash(tail:*), Bash(python:*), Task
 effort: high
-argument-hint: "[path] [--plan] [--fix] [--url <deployed-url>] [--no-cache]"
+argument-hint: "[path] [--plan] [--fix] [--url <deployed-url>] [--no-cache] [--force-dispatch]"
 ---
 
 # SEO Review — Repo-Wide SEO + Generative Engine Optimization Audit
@@ -144,7 +144,7 @@ Only the **post-tool aggregation** (parsing git log, parsing config.yaml, resolv
 
 **Turn 2 — Data ingestion** (only fires when API is active; skipped in heuristic-only mode):
 - **Turn 2a — Performance**: 3 parallel `Bash: curl ...` calls for Q1+Q2+Q3 from `gsc-api-queries.md`
-- **Turn 2b — Indexing**: up to 200 parallel `Bash: curl ...` calls for URL Inspection. URL selection algorithm (per `gsc-api-queries.md`): top 80 by impressions from Q3's `url_impressions_map` + 20 git-changed paths from Step 1.5 + 100 sitemap-orphan URLs (sitemap entries NOT in `url_impressions_map`, sorted document order; deterministic for snapshot regression diff). Dedup precedence: impressions > git > sitemap. Turn 2b runs after Turn 2a since URL selection depends on Q3's `url_impressions_map`.
+- **Turn 2b — Indexing**: a **single `Bash: gsc-parse-helper inspect-batch ...` invocation** inspecting up to 200 URLs (the helper parallelizes internally — see Step 1.6.6 Turn 2b). URL selection algorithm (per `gsc-api-queries.md`): top 80 by impressions from Q3's `url_impressions_map` + 20 git-changed paths from Step 1.5 + the shared 100-slot bucket (user-supplied `known-bad-urls.txt` + sitemap-orphan URLs not in `url_impressions_map`, sorted document order; deterministic for snapshot regression diff). Dedup precedence: impressions > git > user-supplied > sitemap-orphan. Turn 2b runs after Turn 2a since URL selection depends on Q3's `url_impressions_map`.
 
 Without explicit batching, the orchestrator would run ~15+ sequential tool turns for Steps 1.5+1.6. With batching: 3 turns total (Turn 1 detection + Turn 2a Performance + Turn 2b Inspection).
 
@@ -308,8 +308,8 @@ Four reference files cover the implementation:
 
 | Mode | Condition | User-facing |
 |---|---|---|
-| **API enabled** | `config.yaml.site_url` set + `gcloud` installed + ADC authenticated + sites.list probe returns 200 with `site_url` in `siteEntry` | Step 0 line shows API mode. Findings include `[gsc]`-prefixed traffic-weighted priorities. |
-| **Heuristic-only** | any of: config.yaml missing / `site_url` empty / gcloud not installed / ADC not authenticated / probe fails | Step 0 line shows heuristic mode. Section 1 banner if it's a first encounter. |
+| **API enabled** | `config.yaml.site_url` set + a credential resolves (helper mints a token — gcloud NOT required) + sites.list probe returns 200 with `site_url` in `siteEntry` | Step 0 line shows API mode. Findings include `[gsc]`-prefixed traffic-weighted priorities. |
+| **Heuristic-only** | any of: config.yaml missing / `site_url` empty / no credential resolves / probe fails | Step 0 line shows heuristic mode. Section 1 banner if it's a first encounter. |
 
 When API is configured but a runtime call fails: **NO silent CSV fallback** — print the error to footer, skip that signal, never block. Indexing and Performance signals fail independently (e.g., URL Inspection quota exhaustion doesn't disable Search Analytics).
 
@@ -453,7 +453,7 @@ Both resolve the same credential (env → `config.yaml adc_credentials_path` →
 
 **Every Turn 2 curl call MUST include both headers:** `Authorization: Bearer $TOKEN` AND `x-goog-user-project: $QUOTA_PROJECT`. Omitting the quota-project header returns 403 SERVICE_DISABLED even when auth is otherwise valid.
 
-**Cache-aware dispatch.** Each curl call wraps in the cache pattern from `references/gsc-cache.md` "Cache wrapper" — 24h TTL, atomic write, skip-cache-on-non-200. The wrapper checks `.seo-data/gsc/cache/<prefix>-<hash>.json` and returns the cached body on hit (printing `CACHE_STATUS:HIT age=<N>s` as first line), else issues a fresh curl and writes the response atomically on HTTP 200 (printing `CACHE_STATUS:MISS http=<code>`). The orchestrator parses the first line for footer stats and treats the rest of stdout as the JSON body. **Cache bypass:** when `$ARGUMENTS` includes `--no-cache`, set `NO_CACHE=1` in the per-call environment before invocation — the wrapper skips the lookup but still writes fresh responses to cache.
+**Cache-aware dispatch.** Each curl call wraps in the cache pattern from `references/gsc-cache.md` "Cache wrapper" — 24h TTL, atomic write, skip-cache-on-non-200. The wrapper checks `.seo-data/gsc/cache/<prefix>-<hash>.json` and returns the cached body on hit (printing `CACHE_STATUS:HIT` as first line), else issues a fresh curl and writes the response atomically on HTTP 200 (printing `CACHE_STATUS:MISS http=<code>`). The orchestrator parses the first line for footer stats and treats the rest of stdout as the JSON body. **Cache bypass:** when `$ARGUMENTS` includes `--no-cache`, set `NO_CACHE=1` in the per-call environment before invocation — the wrapper skips the lookup but still writes fresh responses to cache.
 
 **Turn 2a — Performance (3 parallel cache-or-curl calls)** for Q1 (queries digest) + Q2 (pages digest) + Q3 (`url_impressions_map`), using templates from `references/gsc-api-queries.md`. Per-call substitutions: `<<LOOKBACK_DAYS>>`, URL-encoded `site_url` (`:` → `%3A`, `/` → `%2F` per `gsc-api-schema.md`), and the per-Q cache filename prefix (`sa-q1`/`sa-q2`/`sa-q3`). Each call uses the `references/gsc-cache.md` "Cache wrapper" bash block — fully shown there, NOT inlined here. The fresh-path curl inside the wrapper is:
 
@@ -468,7 +468,7 @@ curl -s -w '%{http_code}' -o "$TMP" -X POST \
 
 **Turn 2b — URL Inspection (single helper invocation, internally parallel)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (top 80 by impressions from Q3 + 20 git-changed paths from Step 1.5 resolved via `page_type_map` + shared 100-slot bucket of user-supplied URLs from `.seo-data/gsc/known-bad-urls.txt` (up to 100) + **sitemap-orphan URLs from the `--- orphans ---` list emitted by Step 1.6.6a's `sitemap-urls` call** (already filtered to sitemap entries not in `url_impressions_map`, in document order; filling whatever the user-supplied slice doesn't claim); dedup precedence impressions > git > user-supplied > sitemap-orphan; hard cap 200). The orphan list is now computed by the helper from the LIVE sitemap (Step 1.6.6a) — not from a repo-local file — so it is non-empty for generated/dynamic sitemaps.
 
-**Canonical dispatch path: single Bash invocation of `gsc-parse-helper inspect-batch`.** The helper handles parallel HTTP via `ThreadPoolExecutor` (20 workers — empirically balanced against the API's per-property rate limit), per-URL cache check (7d TTL on `ui-*.json` files since `coverageState` is weeks-stable — see `gsc-cache.md` "TTL policy" for the split-TTL rationale), atomic write via `.tmp` + `os.replace`, and never-cache-non-200. Per-URL cache files match `gsc-cache.md`'s key strategy exactly (`ui-<sha1(site_url|inspection_url)>.json`) — so partial cache hits across runs interoperate cleanly.
+**Canonical dispatch path: single Bash invocation of `gsc-parse-helper inspect-batch`.** The helper handles parallel HTTP via `ThreadPoolExecutor` (6 workers + 3-retry exponential backoff on 429/5xx — lowered from 20 after the S35 code-review found 20 workers burst well past GSC's per-property rate limit), per-URL cache check (7d TTL on `ui-*.json` files since `coverageState` is weeks-stable — see `gsc-cache.md` "TTL policy" for the split-TTL rationale), atomic write via `.tmp` + `os.replace`, and never-cache-non-200. Per-URL cache files match `gsc-cache.md`'s key strategy exactly (`ui-<sha1(site_url|inspection_url)>.json`) — so partial cache hits across runs interoperate cleanly.
 
 ```bash
 # 1. Write the resolved URL list to system temp — NEVER under .seo-data/gsc/
@@ -517,7 +517,7 @@ The full per-URL cluster classification (with `pageFetchState` joint key per `gs
 
 **Note:** `siteUrl` in the URL Inspection request body is a **raw field** (no URL encoding) — distinct from Search Analytics where it's a path param. The helper handles this internally; orchestrator just passes `$CONFIG_SITE_URL` as the second argument.
 
-**Per-call cache stats capture (Turn 2a Search Analytics only).** For each Q1/Q2/Q3 call, record `cache_status: hit | miss` and `age_seconds` (when hit) from the cache wrapper's first-line output. Aggregate into `{cache_hits, cache_misses, miss_call_tags: [<q-tag>...]}` for the Step 1.6.12 footer line.
+**Per-call cache stats capture (Turn 2a Search Analytics only).** For each Q1/Q2/Q3 call, record `cache_status: hit | miss` from the cache wrapper's first-line output (the wrapper emits no age field — `CACHE_STATUS:HIT` or `CACHE_STATUS:MISS http=<code>`; see `gsc-cache.md` "Cache wrapper"). Aggregate into `{cache_hits, cache_misses, miss_call_tags: [<q-tag>...]}` for the Step 1.6.12 footer line.
 
 **Aggregate cache stats capture (Turn 2b URL Inspection).** The `inspect-batch` helper emits batch-aggregate stats only — no per-URL CACHE_STATUS markers — because per-URL cache decisions happen inside the helper's `ThreadPoolExecutor` workers and aren't surfaced individually (a deliberate trade-off when the helper replaced the prior N-parallel-Bash-curl dispatch — see SKILL.md Step 1.6.6 Turn 2b for the rationale). Parse `cache_hits:N / cache_misses:M / http_errors:E / total_attempted:T` from the helper's stdout and feed those four scalars into the same Step 1.6.12 footer line. `miss_call_tags` is **N/A for URL Inspection** — the footer renders the aggregate count without per-URL tags for this signal (a `miss_call_tags` line for URL Inspection would have to list potentially hundreds of URLs and isn't useful at that scale). _code-review finding #13._
 
@@ -542,7 +542,7 @@ After Turn 2 returns, walk results per `references/gsc-ingestion.md` "API ingest
 
 **Failure modes** (all log to footer, never block):
 - API call returns 4xx/5xx → parse `error.code` + `error.status` per `gsc-api-schema.md`; that signal skipped
-- URL Inspection batch returns 429 mid-batch → graceful degrade: stop sending, surface count succeeded vs skipped in footer
+- URL Inspection 429/5xx → `inspect-batch` retries each affected URL up to 3× with exponential backoff internally; URLs that exhaust retries surface under the helper's `--- errors ---` section — count succeeded vs errored in footer (no global batch abort)
 - API schema drift (unmapped `coverageState`) → "Other" bucket, footer note
 
 Track `total_count` per cluster source. API path: `total_count` = inspected-URL-count (not site-wide). Sub-dim 1 (`indexing_coverage` site-wide aggregate) is NOT emitted in API-only mode — surface as info-only footer instead.
@@ -614,7 +614,7 @@ GSC mode: <enabled | disabled>. <source detail when enabled>
 **Cache stats line — canonical example** (full variant set in `references/gsc-cache.md` "Footer line" — full-hit / partial-hit / full-miss / bypass forms):
 
 ```
-GSC API cache: 83/103 hits (24h TTL; 20 fresh calls — typically new URLs from this run's git scan). Use --no-cache to force refresh.
+GSC API cache: 83/103 hits (split TTL: 24h on sa-*, 7d on ui-*; 20 fresh calls — typically new URLs from this run's git scan). Use --no-cache to force refresh.
 ```
 
 **Search Analytics row line — examples:**
@@ -759,7 +759,15 @@ RUN_DATE=$(date -u +%Y-%m-%d)
 # (cache key includes endDate, shifts daily; sa-* eviction at 7d) and `ls`
 # sorts by sha1 filename, picking a random old file rather than today's.
 # _code-review finding #1._
-LOOKBACK_DAYS="${LOOKBACK_DAYS:-90}"
+#
+# LOOKBACK_DAYS: the orchestrator MUST substitute the literal value parsed
+# from config.yaml in Step 1.6.2 (default 90) before invoking this block.
+# Do NOT rely on a `${LOOKBACK_DAYS:-90}` env default — shell state does not
+# persist across Bash tool calls (the same impossibility that broke token
+# reuse pre-S39), so an env var exported in Turn 2a is gone here. A literal
+# mismatch with Turn 2a's value makes the recomputed hash miss Turn 2a's
+# actual cache file and every watchpoint silently resolves as no_data.
+LOOKBACK_DAYS=<literal lookback_days from Step 1.6.2 config parse, e.g. 90>
 END_DATE=$(date -u +%Y-%m-%d)
 START_DATE=$(date -u -d "${LOOKBACK_DAYS} days ago" +%Y-%m-%d 2>/dev/null || \
              python -c "import datetime; print((datetime.date.today() - datetime.timedelta(days=${LOOKBACK_DAYS})).isoformat())")
@@ -876,10 +884,10 @@ Same class of bug as the S30 `jq`-missing fix — the spec under-specified a pla
 | Need | Canonical path | NOT this |
 |---|---|---|
 | GSC JSON parsing (Q1/Q2/Q3, clusters, CTR, brand, snapshot, regression) | `gsc-parse-helper` command subcommands (see invocation block below) | Inline Python heredocs, `_parse_*.py` scripts in `.seo-data/gsc/` |
-| URL Inspection dispatch (Turn 2b) | N parallel `Bash: curl ...` calls in one tool-use block, each wrapped in the `gsc-cache.md` cache pattern | `_inspect_batch.py` or similar orchestrator-written dispatch script |
+| URL Inspection dispatch (Turn 2b) | Single Bash invocation of `gsc-parse-helper inspect-batch` (internally parallel; see Step 1.6.6 Turn 2b) | Per-URL `Bash: curl` loops, `_inspect_batch.py`, or any other orchestrator-written dispatch script |
 | Ephemeral scratch parsing (>200KB JSON that doesn't belong in cache) | `mktemp`-style system temp (`mktemp -t gsc-XXXXXX.json`) | Any file under `.seo-data/gsc/` |
 
-**If the helper script doesn't have a subcommand you need (e.g., URL Inspection batch dispatch isn't there as of 2026-05-26):** treat that as a skill-improvement signal, not a license to inline. Surface in the report footer (`gsc-parse-helper.py missing subcommand <X> — used <fallback approach>; file follow-up to extend the helper`) and proceed with the closest approximation that respects the boundary (typically: parallel Bash curl calls). Future helper extension is preferable to repeated boundary violations.
+**If the helper script doesn't have a subcommand you need:** treat that as a skill-improvement signal, not a license to inline. Surface in the report footer (`gsc-parse-helper.py missing subcommand <X> — used <fallback approach>; file follow-up to extend the helper`) and proceed with the closest approximation that respects the boundary. Future helper extension is preferable to repeated boundary violations. (URL Inspection batch dispatch is NOT an example of this anymore — `inspect-batch` shipped in S35 and is the only sanctioned Turn 2b path; never fall back to per-URL curl loops for it.)
 
 **Helper invocation:** GSC JSON parsing MUST go through the shipped helper, invoked as the bare `gsc-parse-helper` command (the plugin's `bin/` directory is auto-added to PATH while `bx` is enabled). Invoke with subcommand args:
 
@@ -898,7 +906,7 @@ If the helper script itself is missing (skill install integrity issue): emit a f
 
 ### Budget utilization expectation
 
-When the spec defines a budget (URL Inspection cap = 100, sitemap probe cap = 100), the orchestrator **MUST attempt to fill the budget** when candidates are available. The cap is the ceiling, not the target.
+When the spec defines a budget (URL Inspection cap = 200, sitemap probe cap = 100), the orchestrator **MUST attempt to fill the budget** when candidates are available. The cap is the ceiling, not the target.
 
 **Common failure mode (S30 dogfood):** orchestrator used 40 URLs for URL Inspection and 13 URLs for sitemap probe despite having 1,304 URLs in the impressions map and 2,895 URLs in the sitemap. The under-utilization wasted ~60% of the diagnostic value of the run.
 
@@ -910,7 +918,7 @@ Rules:
 
 Footer must include actual / budget counts:
 ```
-URL Inspection: 97/100 attempted (top 80 by impressions + 17 git-resolved; dedup removed 3); 96/97 succeeded; quota remaining ~1904/2000.
+URL Inspection: 194/200 attempted (top 80 by impressions + 17 git-resolved + 100 sitemap-orphan; dedup removed 3); 193/194 succeeded; quota remaining ~1807/2000.
 Sitemap URL probe: 100/100 attempted (top 100 by document order from 2,895 total sitemap entries); 98/100 succeeded (2 timeouts).
 ```
 
@@ -956,11 +964,11 @@ Runs whenever a sitemap URL list is available (live-discovered or repo-local) wi
    - **Repo-local fallback** (no base, static site): legacy path — `Glob`/`Read` a local `sitemap.xml` (`public/`, `static/`, `dist/`, `out/`, `_site/`); follow `sitemap_index.xml` children (cap 5). Use only when no live source resolves.
 2. **URL list resolution:**
    - Live-fetched URLs are already absolute. For the repo-local fallback: absolute → use as-is; relative AND `--url <base>` → synthesize `<base>` + path; relative AND no base → **skip the probe**, footer-note "URL probe skipped — repo sitemap has relative URLs; re-run with `--url <base>` or set `site_base_url`."
-4. **Cap at top 100 URLs** by document order (or by `<priority>` descending if present). The cap is the ceiling, not the target — **take the literal top 100** (or all available if fewer). Do not under-sample to a "representative subset" or skip URLs based on perceived non-importance. See "Ingestion conventions → Budget utilization" for the contract.
-5. **Probe each URL in a single parallel turn** — multiple `WebFetch` calls in one tool-use block with a minimal prompt:
+3. **Cap at top 100 URLs** by document order (or by `<priority>` descending if present). The cap is the ceiling, not the target — **take the literal top 100** (or all available if fewer). Do not under-sample to a "representative subset" or skip URLs based on perceived non-importance. See "Ingestion conventions → Budget utilization" for the contract.
+4. **Probe each URL in a single parallel turn** — multiple `WebFetch` calls in one tool-use block with a minimal prompt:
    > "Report the HTTP status code, final URL after any redirects, redirect chain hop count, and response time in seconds. Do not return page content."
-6. **Collect results** into structured records: `{url, status, redirect_hops, response_seconds}`. Classify response time into buckets: `fast` (<1s), `medium` (1-3s), `slow` (>3s).
-7. **Pass results to `seo-technical`** as shared context.
+5. **Collect results** into structured records: `{url, status, redirect_hops, response_seconds}`. Classify response time into buckets: `fast` (<1s), `medium` (1-3s), `slow` (>3s).
+6. **Pass results to `seo-technical`** as shared context.
 
 **Score-impact rules** (enforced by `seo-technical` per its hard rules):
 

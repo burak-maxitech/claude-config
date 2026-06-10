@@ -185,11 +185,11 @@ want to commit anyway (e.g., team-shared config), remove the
 ├── README.md            (this file)
 ├── config.yaml          (API configuration — site_url + optional lookback_days)
 ├── known-bad-urls.txt   (optional, user-authored — paste problem URLs from GSC export)
-├── cache/               (auto-managed API response cache; 24h TTL — safe to delete)
+├── cache/               (auto-managed API response cache; split TTL 24h/7d — safe to delete)
 └── snapshots/           (auto-managed coverage-state history; 30d retention — needed for regression detection)
 ```
 
-The `cache/` and `snapshots/` subdirectories are created by the skill on first GSC-enabled run. **Cache** holds JSON responses from `searchanalytics.query` (Q1/Q2/Q3) and `urlInspection.index.inspect` so reruns within 24 hours don't burn API quota; pruned at 7 days. **Snapshots** record `{url → coverageState}` per run for sub-dim 14 regression detection; pruned at 30 days. You don't need to manage either — both are skill-managed and reproducible from the API on demand (snapshots regenerate from cache on the same run; cache regenerates from API on next run).
+The `cache/` and `snapshots/` subdirectories are created by the skill on first GSC-enabled run. **Cache** holds JSON responses from `searchanalytics.query` (Q1/Q2/Q3) and `urlInspection.index.inspect` so reruns within the TTL window (24 hours for Search Analytics, 7 days for URL Inspection) don't burn API quota; pruned at 7/14 days respectively. **Snapshots** record `{url → coverageState}` per run for sub-dim 14 regression detection; pruned at 30 days. You don't need to manage either — both are skill-managed and reproducible from the API on demand (snapshots regenerate from cache on the same run; cache regenerates from API on next run).
 
 ### Optional: `known-bad-urls.txt` — fallback for URLs the algorithmic slices can't see
 
@@ -306,7 +306,7 @@ Once you've fixed an issue (added a redirect, restored a page, updated content, 
 
 The 2,000-calls/day URL Inspection quota is the scarce resource. To preserve it across iterative runs:
 
-- **Default behavior:** Every API call is wrapped in a 24h disk cache. Same-day reruns hit cache → zero quota consumed.
+- **Default behavior:** Every API call is wrapped in a disk cache (24h TTL for Search Analytics, 7 days for URL Inspection — the quota-heavy one). Reruns within the window hit cache → zero quota consumed.
 - **Force refresh:** `/bx:seo --no-cache` bypasses the cache lookup and refetches everything. Fresh responses still get written to cache for the next run. Use when you've pushed a fix and want Google's current view, or when you suspect cached data is wrong.
 - **Manual cache reset:** `rm -rf .seo-data/gsc/cache/` — safe; the cache is reproducible from the API on demand.
 - **Inspect cache:** `ls -la .seo-data/gsc/cache/` — shows per-call files with timestamps.

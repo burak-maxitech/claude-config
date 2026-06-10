@@ -186,7 +186,7 @@ For each bot with `Disallow: /` or `Disallow: <broad pattern>`:
 
 ## Per-finding output shape
 
-See `.claude/agents/geo-generative.md` for the canonical JSON shape. Same shape applies here; do not duplicate.
+See the `geo-generative` agent definition (`bx/agents/geo-generative.md` in the plugin — your own system prompt when dispatched as that agent) for the canonical JSON shape. Same shape applies here; do not duplicate.
 
 ---
 

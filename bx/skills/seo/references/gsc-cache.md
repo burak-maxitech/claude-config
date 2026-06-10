@@ -73,6 +73,12 @@ hash      = sha1(key_input)
 filename  = "sa-<q_tag>-<hash>.json"     # q_tag ∈ {q1, q2, q3}
 ```
 
+**Exact serialization (normative — Turn 2a and Step 1.6.14's watchpoint-check recomputation MUST produce byte-identical strings, or the recomputed hash misses the cache file):** `<dimensions>` is the **bare dimension string** (`query` for Q1, `page` for Q2/Q3 — NOT the JSON-array form `["page"]`); `<rowLimit>` is the bare integer (`25000`); `<type>` is the bare string (`web`); dates are `YYYY-MM-DD`; `site_url` is the raw un-encoded config value. Literal example for Q2 on 2026-06-09 with the default 90-day lookback:
+
+```
+key_input = "sc-domain:example.com|2026-06-09|2026-03-11|page|25000|web"
+```
+
 - `site_url` distinguishes properties when a user audits multiple repos.
 - `endDate` (today) and `startDate` (today − lookback_days) shift daily — the hash naturally invalidates day-over-day even within a 7-day cache window. Same-day reruns produce the same hash → cache hit.
 - `dimensions` / `rowLimit` / `type` are constants per Q-call but included for forward-compat if the templates change.

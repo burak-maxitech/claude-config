@@ -100,7 +100,7 @@ Always 0-100.
 
 ## GSC findings — info-only
 
-When `.seo-data/gsc/` contains Google Search Console CSV exports, the `seo-gsc-insights` subagent (4th parallel subagent) emits **info-only findings**: they appear in the report and rank alongside heuristic findings for headline top-3, but **never deduct from the /100 score**. The score stays purely heuristic so `docs/seo-history.md` remains apples-to-apples comparable across runs with or without CSVs present.
+When GSC API mode is enabled (`.seo-data/gsc/config.yaml` `site_url` + a resolvable credential — see `gsc-ingestion.md` "Activation"), the `seo-gsc-insights` subagent (4th parallel subagent) emits **info-only findings**: they appear in the report and rank alongside heuristic findings for headline top-3, but **never deduct from the /100 score**. The score stays purely heuristic so `docs/seo-history.md` remains apples-to-apples comparable across runs whether or not GSC is configured.
 
 ### Score-impact invariant
 
@@ -159,13 +159,13 @@ The orchestrator's existing ranking formula gains a `traffic_weight` multiplier 
 effective_impact (heuristic) = score_impact
 effective_impact (gsc)       = log10(impressions + 1)        # 0–~5 range
 
-traffic_weight (URL in pages.csv)  = max(1.0, log10(page_impressions + 1))
-traffic_weight (URL not in pages)  = 1.0                     # heuristic-only fallback
+traffic_weight (URL in url_impressions_map)  = max(1.0, log10(url_impressions + 1))
+traffic_weight (URL not in map)              = 1.0           # heuristic-only fallback
 
 rank_score = effective_impact × certainty × traffic_weight / effort_weight
 ```
 
-- No GSC CSVs present: `effective_impact == score_impact`, `traffic_weight == 1.0` everywhere — formula reduces to the existing `score_impact × certainty / effort_weight`. Behavior unchanged.
+- GSC disabled: `effective_impact == score_impact`, `traffic_weight == 1.0` everywhere — formula reduces to the existing `score_impact × certainty / effort_weight`. Behavior unchanged.
 - With GSC: heuristic findings on high-traffic pages float up; GSC findings rank by their own impression-based effective_impact.
 
 Magnitude calibration may be tuned after dogfood — adjust `effective_impact (gsc)` exponent or `traffic_weight` cap if heuristic findings consistently swamp GSC findings or vice versa.

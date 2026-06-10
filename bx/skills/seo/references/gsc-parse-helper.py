@@ -32,7 +32,8 @@ Subcommands:
                       path_clusters + count_deltas (machine-parseable lines).
     inspect-batch <cache_dir> <site_url> <urls_file>
                       Turn 2b URL Inspection dispatch — parallel HTTP via
-                      ThreadPoolExecutor (20 workers), per-URL cache check
+                      ThreadPoolExecutor (6 workers + 429/5xx retry with
+                      exponential backoff), per-URL cache check
                       (7d TTL on ui-* — coverageState is weeks-stable), atomic
                       write via .tmp + os.replace, never caches non-200.
                       Mints its own token via resolve_credentials() (token never
@@ -637,13 +638,29 @@ def parse_ctr_opportunities(path):
 def cluster_for(coverage, fetch):
     """coverageState + pageFetchState -> sub-dim cluster (see gsc-api-queries.md
     lookup table). Returns one of:
-    submitted_indexed, crawled_not_indexed, discovered_not_indexed,
-    not_found_404, redirect_hygiene, canonical_conflict, blocked_access,
-    soft_404, server_errors, unknown_to_google, other"""
+    submitted_indexed, indexed_info, crawled_not_indexed,
+    discovered_not_indexed, not_found_404, redirect_hygiene,
+    canonical_conflict, blocked_access, soft_404, server_errors,
+    unknown_to_google, other
+
+    indexed_info covers the indexed-with-caveat states ("Indexed, not
+    submitted in sitemap", "Indexed, though blocked by robots.txt") —
+    info-only footer counts, never sub-dim findings."""
     c = (coverage or '').strip().lower()
     f = (fetch or '').strip().upper()
     if 'submitted and indexed' in c:
         return 'submitted_indexed'
+    # Indexed-with-caveat states ("Indexed, not submitted in sitemap",
+    # "Indexed, though blocked by robots.txt") are info-only per the
+    # gsc-api-queries.md lookup table — NOT sub-dim findings. Must check
+    # before the 'blocked' substring match below claims the robots variant.
+    if c.startswith('indexed'):
+        return 'indexed_info'
+    # "Alternate page with proper canonical tag" is sub-dim 7 blocked_access
+    # (alt-canonical variant) per the lookup table — must check before the
+    # 'canonical' substring match below misroutes it to canonical_conflict.
+    if 'alternate page' in c:
+        return 'blocked_access'
     if 'crawled' in c and 'not indexed' in c:
         return 'crawled_not_indexed'
     if 'discovered' in c and 'not indexed' in c:
@@ -714,8 +731,8 @@ def parse_clusters(cache_dir):
     # Emit cluster details for findings (sample top 10 by last_crawl_time)
     print("--- cluster_details ---")
     for cluster, urls in clusters.items():
-        if cluster == 'submitted_indexed':
-            continue  # Healthy state; no finding
+        if cluster in ('submitted_indexed', 'indexed_info'):
+            continue  # Healthy / info-only states; no finding
         # Sort by last_crawl_time desc (most recent first)
         urls_sorted = sorted(urls, key=lambda u: u.get('last_crawl_time', ''), reverse=True)
         top = urls_sorted[:10]

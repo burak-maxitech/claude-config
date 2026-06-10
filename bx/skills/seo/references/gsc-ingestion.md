@@ -30,11 +30,11 @@ Otherwise → **heuristic-only mode**. The skill runs normally; subagents get an
 When GSC mode is enabled, ingest data from the Search Console API per `gsc-api-queries.md`:
 
 - **Performance**: 3 parallel `searchanalytics.query` calls (Q1 queries digest, Q2 pages digest, Q3 `url_impressions_map`)
-- **Indexing**: up to 200 parallel `urlInspection.index.inspect` calls (per-URL; 4-slice URL selection algorithm: top 80 by impressions + 20 git-changed + up to 100 user-supplied (`known-bad-urls.txt`) + sitemap-orphan URLs not in `url_impressions_map` filling whatever the user-supplied slice doesn't claim of the shared 100-slot bucket)
+- **Indexing**: up to 200 `urlInspection.index.inspect` calls via a single `gsc-parse-helper inspect-batch` invocation (per-URL; 4-slice URL selection algorithm: top 80 by impressions + 20 git-changed + up to 100 user-supplied (`known-bad-urls.txt`) + sitemap-orphan URLs not in `url_impressions_map` filling whatever the user-supplied slice doesn't claim of the shared 100-slot bucket)
 
 ### Query execution
 
-All Performance calls dispatch in one parallel Bash turn. URL Inspection calls dispatch in a second parallel turn after Performance (URL selection uses Q3's `url_impressions_map`).
+All Performance calls dispatch in one parallel Bash turn. URL Inspection dispatches as a single `gsc-parse-helper inspect-batch` Bash call after Performance (URL selection uses Q3's `url_impressions_map`; the helper parallelizes internally — 6 workers + 429/5xx retry).
 
 **Token + quota-project (minted in-call, not reused)**: tokens are NOT carried between Bash calls (shell state doesn't persist). Each API-hitting call mints its own via `gsc-parse-helper`: the Search Analytics curl path calls `gsc-parse-helper auth-token` in its cache-miss branch (captures token + quota into shell vars, never echoed); `gsc-parse-helper inspect-batch` mints internally. Every curl includes `Authorization: Bearer $TOKEN` AND `x-goog-user-project: $QUOTA_PROJECT`. Minting is a free, fast refresh-token grant, so per-call minting costs nothing against API quota.
 
@@ -174,15 +174,14 @@ The ~2-day lag is Google's pipeline delay, not the skill's. Recommendations may 
 
 | Stage | Failure | Effect |
 |---|---|---|
-| Pre-query | `gcloud` not installed | Activation condition 2 fails → heuristic-only. Footer: install link |
-| Pre-query | ADC not authenticated | Activation condition 3 fails → heuristic-only. Footer: `gcloud auth application-default login` remediation |
-| Pre-query | ADC quota project not set | Activation condition 4 fails → heuristic-only. Footer: run `gcloud auth application-default set-quota-project <id>` + `gcloud services enable searchconsole.googleapis.com --project=<id>` |
 | Pre-query | `site_url` empty in config.yaml | Activation condition 1 fails → heuristic-only |
-| Pre-query | Active probe returns 401 | Activation condition 5 fails. Footer: `--scopes` remediation (per gsc-api-schema.md "Authentication") |
-| Pre-query | Active probe returns 403 with `SERVICE_DISABLED` | Activation condition 5 fails. Footer: enable Search Console API on quota project — `gcloud services enable searchconsole.googleapis.com --project=<adc_quota_project>` |
-| Pre-query | Active probe returns 200 but `site_url` not in list | Activation condition 6 fails. Footer: verify site_url is owned by your Google account |
+| Pre-query | No credential resolves (`AUTH_ERROR:no_credentials` / `unreadable` / `wrong_type` / `mint_failed` — gcloud install is NOT required, only a fallback) | Activation condition 2 fails → heuristic-only. Footer: per-reason remediation from SKILL.md Step 1.6.3 |
+| Pre-query | Quota project not resolvable (`AUTH_ERROR:quota_missing`) | Activation condition 3 fails → heuristic-only. Footer: add `quota_project:` to config.yaml OR `gcloud auth application-default set-quota-project <id>` + `gcloud services enable searchconsole.googleapis.com --project=<id>` |
+| Pre-query | Active probe returns 401 | Activation condition 4 fails. Footer: `--scopes` remediation (per gsc-api-schema.md "Authentication") |
+| Pre-query | Active probe returns 403 with `SERVICE_DISABLED` | Activation condition 4 fails. Footer: enable Search Console API on quota project — `gcloud services enable searchconsole.googleapis.com --project=<adc_quota_project>` |
+| Pre-query | Active probe returns 200 but `site_url` not in list (or `siteUnverifiedUser`) | Activation condition 5 fails. Footer: verify site_url is owned by your Google account |
 | Query runtime | `searchanalytics.query` returns 429 | Print error + skip Performance signal |
-| Query runtime | `urlInspection` returns 429 mid-batch | Graceful degrade: surface count succeeded/skipped in footer |
+| Query runtime | `urlInspection` returns 429 mid-batch | `inspect-batch` retries per URL (3×, backoff); exhausted URLs surface in `--- errors ---`; footer counts succeeded/errored |
 | Query runtime | Single `urlInspection` returns 404 | URL unknown to Google — exclude from cluster, footer count |
 | Per-query partial | Q1 fails but Q2 + Q3 succeed | Empty queries digest + footer note. Pages + url_impressions_map still produced. |
 
@@ -429,7 +428,7 @@ No score-headline finding emitted (the site-wide rate isn't reliably computable 
 - `title`: `"Query '<query>' ranks at position <X.Y> with <N> impressions — position-band opportunity"`
 - `recommended_action`: `"Identify which page ranks for this query (use GSC's Pages tab filtered by query). Improve on-page signals: H1/title alignment, content depth, internal links from related pages, schema markup. Moving from position 10 → 5 typically 3-5x's clicks."`
 
-### 12. `traffic_orphan` (Q2 pages digest ∩ sitemap)
+### 12. `traffic_orphan` (sitemap minus Q3 `url_impressions_map`)
 
 **Trigger:** URLs in sitemap.xml that **do not appear** in Q3's `url_impressions_map` (i.e., 0 impressions in the lookback window).
 

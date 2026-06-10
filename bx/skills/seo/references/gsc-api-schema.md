@@ -71,8 +71,8 @@ x-goog-user-project: <ADC quota project ID>
 
 | Header | Required? | Source |
 |---|---|---|
-| `Authorization: Bearer <token>` | Always | `gcloud auth application-default print-access-token` |
-| `x-goog-user-project: <project_id>` | Always | `grep -oE '"quota_project_id"[[:space:]]*:[[:space:]]*"[^"]+"' "$ADC_DIR/application_default_credentials.json" \| head -1 \| sed -E 's/.*"([^"]+)"$/\1/'` where `ADC_DIR` comes from `gcloud info --format="value(config.paths.global_config_dir)"`. (grep+sed used instead of `jq` since `jq` is not on PATH in many bash environments including claude-code's on Windows.) |
+| `Authorization: Bearer <token>` | Always | Minted in-call by `gsc-parse-helper` (stdlib refresh-token grant from the resolved ADC file — `auth-token` subcommand line 1 for the Search Analytics curl path; minted internally by `inspect-batch` for URL Inspection). `gcloud ... print-access-token` is only the helper's internal fallback. |
+| `x-goog-user-project: <project_id>` | Always | Resolved by `gsc-parse-helper` (`config.yaml quota_project` → credential file's `quota_project_id`) — `auth-token` subcommand line 2 for the curl path; internal for `inspect-batch`. |
 | `Content-Type: application/json` | POST only | static |
 
 **Omitting `x-goog-user-project`** returns HTTP 403 with `error.status: PERMISSION_DENIED` and `details[*].reason: SERVICE_DISABLED`, even when the token is otherwise valid. The error message references the default consumer project (e.g., `projects/764086051850` — gcloud's shared client project) rather than the user's project. Diagnosis: this header is missing.
@@ -81,14 +81,9 @@ No alternative auth (API keys, service-account inline auth) supported — ADC on
 
 ### Quota project resolution
 
-The orchestrator reads the ADC quota project from `application_default_credentials.json` cross-platform via `gcloud info`:
+The helper resolves the quota project — the orchestrator never parses the credential file itself. `gsc-parse-helper` resolution order: `GCLOUD_QUOTA_PROJECT` env → `config.yaml quota_project` → the resolved credential file's `quota_project_id` (the credential file itself resolves via `GOOGLE_APPLICATION_CREDENTIALS` → `config.yaml adc_credentials_path` → gcloud's default ADC path — Windows `%APPDATA%\gcloud\`, macOS/Linux `~/.config/gcloud/`).
 
-```
-ADC_DIR=$(gcloud info --format="value(config.paths.global_config_dir)")
-QUOTA_PROJECT=$(grep -oE '"quota_project_id"[[:space:]]*:[[:space:]]*"[^"]+"' "$ADC_DIR/application_default_credentials.json" 2>/dev/null | head -1 | sed -E 's/.*"([^"]+)"$/\1/')
-```
-
-`gcloud info` resolves the platform-specific config dir (Windows: `%APPDATA%\gcloud\`; macOS/Linux: `~/.config/gcloud/`). If the field is absent (i.e., user hasn't run `set-quota-project`), grep returns no match → `QUOTA_PROJECT` ends up empty → Step 1.6.3 catches this and surfaces remediation in the footer. Using `grep -oE` + `sed -E` instead of `jq` since `jq` is not on PATH in many bash environments — `application_default_credentials.json` is flat JSON where the field is a top-level string, so regex extraction is safe here.
+If nothing resolves, `auth-token` fails with `AUTH_ERROR:quota_missing` → Step 1.6.3 surfaces the specific remediation (`quota_project:` config key OR `gcloud auth application-default set-quota-project`) in the footer.
 
 ---
 
@@ -396,10 +391,10 @@ The 600 QPM on URL Inspection per-project is the binding constraint, not 1,200 Q
 
 **Usage profile per `/bx:seo` run:**
 - Search Analytics: 3 calls (Q1, Q2, Q3) — well under any limit
-- URL Inspection: ≤100 calls in a single parallel batch — burst fits in <1 minute (100 / 600 QPM ≈ 10 seconds wall time worst case)
-- Sites list: 1 call (auth probe)
+- URL Inspection: ≤200 calls via `gsc-parse-helper inspect-batch` (6 workers ≈ 10-15 req/sec, deliberately under the per-property rate; ~15-25 seconds wall time worst case on a fresh run)
+- Sites list: 1 call (auth probe) + 1 `sitemaps.list` call (sitemap discovery, Step 1.6.6a)
 
-Total: ≤104 calls per run. Multiple runs per day on the same property: still well under 2,000/day. Multi-property concerns deferred to future.
+Total: ≤205 calls per run. Multiple runs per day on the same property: still well under 2,000/day (and reruns are mostly cache hits). Multi-property concerns deferred to future.
 
 ---
 
@@ -437,8 +432,8 @@ All endpoints return errors via a consistent envelope:
 | 403 | `PERMISSION_DENIED` | `SERVICE_DISABLED` | Search Console API not enabled on quota project, OR `x-goog-user-project` header missing | Surface remediation: run `gcloud services enable searchconsole.googleapis.com --project=<id>` + `gcloud auth application-default set-quota-project <id>`. Skill bug if header is missing — file a bug. |
 | 403 | `PERMISSION_DENIED` | (other) | Property ACL — user lacks access to the configured `site_url` | Surface property-verification check; skip signal |
 | 404 | `NOT_FOUND` | — | URL/property not found | URL Inspection: log "unknown to Google" + skip from cluster. Sites list: surface verify-property remediation. |
-| 429 | `RESOURCE_EXHAUSTED` | — | Quota exhausted (per-minute or per-day) | Graceful degrade (decision 10): stop sending, surface footer |
-| 5xx | (varies) | — | Transient server error | Print error + skip signal + DON'T retry (re-run skill) |
+| 429 | `RESOURCE_EXHAUSTED` | — | Quota exhausted (per-minute or per-day) | URL Inspection: helper retries 3× with backoff per URL, exhausted URLs surface in `--- errors ---`. Search Analytics: skip that signal, surface footer. Never block the run. |
+| 5xx | (varies) | — | Transient server error | URL Inspection: helper retries 3× with backoff per URL. Search Analytics curl path: print error + skip signal, no retry (re-run skill). |
 
 ---
 
@@ -469,4 +464,4 @@ DO NOT auto-retry with different params. DO NOT mark run partial-success silentl
 | `dataState: "final"` vs `"all"` toggle | the skill uses default (`all` — includes fresh partial data). future may expose as config option. |
 | Custom date range (vs `lookback_days`) | the skill uses `lookback_days` (default 90) from config.yaml. Custom date range = future. |
 | Pagination beyond rowLimit=25000 | Accept silent truncation on >25k-URL sites; `traffic_weight` falls through to 1.0 for URLs not in the top-25k. |
-| `sitemaps.list` / `sitemaps.get` (sitemap submission status) | Tier 2 — sitemap probe in Step 3.2 already covers URL health. future for submission-status integration. |
+| Submission-status *findings* from `sitemaps.list` / `sitemaps.get` (errors/warnings/isPending) | `sitemaps.list` is already called for sitemap *discovery* (Step 1.6.6a, S39 — see the endpoint table above); emitting findings from its submission-status fields is the deferred part. |

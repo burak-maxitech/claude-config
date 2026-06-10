@@ -37,13 +37,13 @@ Per finding emit a `/bx:plan` snippet:
 
 Hand-off:
 \`\`\`
-/bx:plan "Investigate the 404 on https://example.com/products/v1 listed in public/sitemap.xml. Google also reports this URL as 'Not found (404)' in indexing/not-found-404.csv. Check (a) whether the page should still exist — review git history for src/app/products/v1/ or equivalent route, (b) whether it was renamed — search for similar paths like /products/version-1 or /products/v2, (c) whether a redirect should be added. If page was deliberately removed, also remove the URL from sitemap.xml. If renamed, add a 301 in next.config.js redirects() and update the sitemap. Verify with curl -I https://example.com/products/v1 after."
+/bx:plan "Investigate the 404 on https://example.com/products/v1 listed in public/sitemap.xml. Google also reports this URL as 'Not found (404)' via GSC URL Inspection (not_found_404 cluster). Check (a) whether the page should still exist — review git history for src/app/products/v1/ or equivalent route, (b) whether it was renamed — search for similar paths like /products/version-1 or /products/v2, (c) whether a redirect should be added. If page was deliberately removed, also remove the URL from sitemap.xml. If renamed, add a 301 in next.config.js redirects() and update the sitemap. Verify with curl -I https://example.com/products/v1 after."
 \`\`\`
 ```
 
 ### 1.2 — Bulk-cluster + routing-rename detection (the highest-leverage signal)
 
-When a GSC `not_found_404` cluster carries `routing_rename_match: true` (Phase 4 subagent detected the cluster's URL pattern overlaps a rename in the 35-day git-history window), emit a **bulk-redirect snippet** that names the rename + asks the user to confirm the mapping before any 301 is written. **The snippet does NOT fabricate target URLs** — that's the hard rule from `fix-allowlist.md` (never fabricate content). The skill surfaces the cluster + likely cause; the user specifies the mapping.
+When a GSC `not_found_404` cluster carries `routing_rename_match: true` (the `seo-gsc-insights` subagent detected the cluster's URL pattern overlaps a rename in the 35-day git-history window), emit a **bulk-redirect snippet** that names the rename + asks the user to confirm the mapping before any 301 is written. **The snippet does NOT fabricate target URLs** — that's the hard rule from `fix-allowlist.md` (never fabricate content). The skill surfaces the cluster + likely cause; the user specifies the mapping.
 
 ```
 **1.2** Bulk 404 cluster: /blog/2023/* (12 URLs) — matches recent routing rename

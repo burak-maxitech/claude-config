@@ -8,7 +8,7 @@ Loaded by the orchestrator (Step 1.6) when the Search Console API is the active 
 - `coverageState` + `pageFetchState` → 9-reason **lookup table** (full)
 - Quota degradation rules
 
-For endpoint inventory, auth, quota model, and enum reference, see `gsc-api-schema.md`. For digest field translation and integration with the **14 sub-dim catalog**, see `gsc-ingestion.md` "API ingestion" subsection. **For the disk-cache wrapper that wraps every Q1/Q2/Q3/URL-Inspection call (24h TTL, atomic write, skip-on-non-200), see `gsc-cache.md` — the curl shapes in this file are the fresh-path body inside the wrapper, not standalone invocations.**
+For endpoint inventory, auth, quota model, and enum reference, see `gsc-api-schema.md`. For digest field translation and integration with the **14 sub-dim catalog**, see `gsc-ingestion.md` "API ingestion" subsection. **For the disk-cache contract (split TTL: 24h on sa-*, 7d on ui-*; atomic write; skip-on-non-200), see `gsc-cache.md`. The Search Analytics curl shapes in this file are the fresh-path body inside that file's bash cache wrapper; the URL Inspection cache logic is helper-resident in `gsc-parse-helper inspect-batch` (same key + TTL contract).**
 
 
 ---
@@ -67,8 +67,8 @@ Cache filename uses the `ui-<sha1(site_url|inspection_url)>` prefix — one slot
 ### Parameter substitution
 
 Templates use placeholders:
-- `<<TOKEN>>` — ADC access token from `gcloud auth application-default print-access-token`
-- `<<QUOTA_PROJECT>>` — ADC quota project (parsed from `application_default_credentials.json:quota_project_id`)
+- `<<TOKEN>>` — ADC access token minted in-call via `gsc-parse-helper auth-token` (stdlib refresh-token grant; line 1 of its output — see "Token + quota-project acquisition" above; NOT `gcloud ... print-access-token`, which is only the helper's internal fallback)
+- `<<QUOTA_PROJECT>>` — quota project (line 2 of `gsc-parse-helper auth-token` output — resolved from `config.yaml quota_project` or the credential file's `quota_project_id`)
 - `<<LOOKBACK_DAYS>>` — from `config.yaml.lookback_days` (default 90)
 - `<<SITE_URL_ENCODED>>` — `site_url` URL-encoded for path
 - `<<SITE_URL_RAW>>` — raw `site_url` for request body
@@ -238,7 +238,7 @@ URLs not in the map → `traffic_weight = 1.0` (formula collapses to legacy `sco
 
 ## URL Inspection — per-URL call template
 
-One call per URL inspected. The orchestrator dispatches N parallel calls in a single tool-use block (N capped at 200 — see selection algorithm below).
+One API call per URL inspected, but the orchestrator does NOT issue these as individual Bash curl calls — the canonical dispatch is a **single invocation of `gsc-parse-helper inspect-batch`**, which parallelizes internally (6 workers + 429/5xx retry) and applies the request shape below per URL (N capped at 200 — see selection algorithm below). The template documents the wire format the helper sends.
 
 ### Request body
 
@@ -271,7 +271,7 @@ Extract from `inspectionResult.indexStatusResult`:
 
 ## URL Inspection — selection algorithm
 
-Hard budget: **200 URLs per run**. Well under the 2,000/day per-property quota; same-day reruns are mostly cache hits (24h TTL).
+Hard budget: **200 URLs per run**. Well under the 2,000/day per-property quota; reruns within the 7-day `ui-*` TTL are mostly cache hits.
 
 ### Source allocation (4 slices)
 
@@ -425,11 +425,11 @@ Per locked decision 10 — never block runs.
 
 ### Mid-batch URL Inspection 429
 
-If an `urlInspection` call returns HTTP 429:
-1. Stop sending further inspection calls (drop the remaining batch)
-2. Aggregate findings from URLs that did succeed
-3. Footer captures: `URL Inspection: N/M succeeded, M-N skipped (quota exhausted at HH:MM). Re-run tomorrow for remaining.`
-4. Indexing findings emit from the inspected subset only; `total_count` reflects N
+429s are handled **inside `gsc-parse-helper inspect-batch`**, per URL — there is no orchestrator-side batch abort:
+1. The helper retries each 429/5xx-failing URL up to 3× with exponential backoff (2s/4s/8s + jitter); other URLs in the pool continue unaffected
+2. URLs that exhaust retries surface under the helper's `--- errors ---` section with their HTTP code
+3. The orchestrator aggregates findings from URLs that succeeded; footer captures: `URL Inspection: N/M succeeded, M-N errored (429 after retries — likely daily quota exhausted). Re-run tomorrow for remaining.`
+4. Indexing findings emit from the succeeded subset only; `total_count` reflects N
 
 ### Search Analytics 429
 
@@ -448,21 +448,19 @@ Highly unlikely on a 1-call probe. If it happens: surface "GSC API quota exhaust
 
 ## Parallel dispatch
 
-All Q1-Q3 fire in a **single parallel Bash turn**. URL Inspection batch fires in a **second parallel Bash turn** after Q3 returns (since Q3's output feeds the URL Inspection selection algorithm). Total wall time: ~5-15 seconds typical (3 fast searchanalytics + 100 parallel inspections). Cache-hit responses are served from disk synchronously inside each Bash invocation — there's no special "cache-aware" turn structure; every call goes through the same cache-wrapped Bash block in `gsc-cache.md`. A full-cache-hit rerun completes Turn 2 in ~1-2 seconds (no network).
+All Q1-Q3 fire in a **single parallel Bash turn** (each call cache-wrapped per `gsc-cache.md`). URL Inspection fires as a **single `gsc-parse-helper inspect-batch` Bash invocation** after Q3 returns (since Q3's output feeds the URL Inspection selection algorithm); the helper parallelizes the up-to-200 calls internally (6 workers + retry). Total wall time: ~15-25 seconds typical on a fresh run. Cache hits are served from disk inside each path — a full-cache-hit rerun completes Turn 2 in ~1-2 seconds (no network).
 
 Schematically:
 
 ```
-Turn 2a (single parallel batch):
-  - curl Q1 (queries digest)
-  - curl Q2 (pages digest)
-  - curl Q3 (url_impressions_map)
+Turn 2a (single parallel Bash batch):
+  - curl Q1 (queries digest)        [cache-wrapped]
+  - curl Q2 (pages digest)          [cache-wrapped]
+  - curl Q3 (url_impressions_map)   [cache-wrapped]
 
-Turn 2b (single parallel batch, after Turn 2a):
-  - curl inspect URL_1
-  - curl inspect URL_2
-  - ...
-  - curl inspect URL_100
+Turn 2b (single Bash call, after Turn 2a):
+  - gsc-parse-helper inspect-batch .seo-data/gsc/cache "$SITE_URL" "$TMPFILE_URLS"
+    (helper inspects up to 200 URLs internally — 6 workers, per-URL 7d cache)
 ```
 
 (Turn 1 detection batch covered in `SKILL.md` Step 1.6.1 + parallel-batch note.)
@@ -482,4 +480,4 @@ If both Performance + Indexing signals are needed, the Step 1.6 dispatcher fires
 | `mobileUsabilityResult` aggregation | Same — new sub-dim category. future. |
 | Custom inspection URL list (user-supplied via config) | Skill uses algorithmic selection only. May add `inspection_urls:` config key later. |
 | Per-day time-series (`dimensions: ["date"]`) | Trend findings need separate digest shape. future. |
-| Sitemap submission status (`sitemaps.list`) | Sitemap probe in Step 3.2 covers URL health. future for submission-status integration. |
+| Sitemap submission-status *findings* from `sitemaps.list` (errors/warnings/isPending per submitted sitemap) | `sitemaps.list` IS already called for sitemap *discovery* (Step 1.6.6a via `gsc-parse-helper sitemaps-list`, S39); emitting findings from its submission-status fields is the deferred part. |
