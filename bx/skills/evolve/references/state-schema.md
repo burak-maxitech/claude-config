@@ -49,7 +49,7 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "finding_id": "a3f2c1b9e4d07f8a6c2e1b3d5f7a9c0e12345678",
       "decision": "applied",
       "date": "2026-06-09",
-      "source_url": "https://docs.anthropic.com/en/docs/claude-code/skills-authoring",
+      "source_url": "https://code.claude.com/docs/en/skills",
       "affected_capability": "bx:seo/allowed-tools",
       "source_content_hash": "7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1d",
       "note": "Added allowed-tools entry for new Bash helper per claude-code 1.7.0 release notes."
@@ -58,7 +58,7 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "finding_id": "b9c4e2f1a0d5b7c3e6f8a2d4b6c8e0f2a4b6c8e0",
       "decision": "rejected",
       "date": "2026-06-08",
-      "source_url": "https://docs.anthropic.com/en/docs/claude-code/hooks",
+      "source_url": "https://code.claude.com/docs/en/hooks",
       "affected_capability": "bx:save/session-start",
       "source_content_hash": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
       "note": "The suggested hook runs on every session-start; bx already handles this via session-start-context scripts."
@@ -67,7 +67,7 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "finding_id": "c1d5e9f3b7a2c6d0e4f8a3b7c1d5e9f3b7a2c6d0",
       "decision": "open",
       "date": "2026-06-09",
-      "source_url": "https://docs.anthropic.com/en/docs/claude-code/settings",
+      "source_url": "https://code.claude.com/docs/en/settings",
       "affected_capability": "bx:clean/allowed-tools",
       "source_content_hash": "9e107d9d372bb6826bd81d3542a419d6a3b1c5d2",
       "note": null
@@ -76,7 +76,7 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "finding_id": "d2e6f0a4b8c2e6f0a4b8c2e6f0a4b8c2e6f0a4b8",
       "decision": "deferred",
       "date": "2026-06-09",
-      "source_url": "https://docs.anthropic.com/en/docs/claude-code/hooks",
+      "source_url": "https://code.claude.com/docs/en/hooks",
       "affected_capability": "bx:health/hooks-rework",
       "source_content_hash": "1f8ac10f23c5b5bc1167bda84b833e5c057a77d7",
       "note": "Hooks rework is high-effort; revisit after /bx:webdesign dogfood is complete."
@@ -108,13 +108,15 @@ finding_id = hashlib.sha1(
 
 The `affected_capability` string must be normalized before hashing: lowercase, forward-slash separators, no trailing slash, no spaces. Example: `"bx:seo/allowed-tools"` not `"bx:seo / Allowed Tools"`.
 
+**Pain-point findings — `bx:pain/<kebab-slug>` convention:** when a finding addresses a known pain point from the `pain_point_list` rather than a specific capability in the `capability_inventory`, set `affected_capability` to `bx:pain/<kebab-slug>`. The slug form is `bx:pain/` followed by the pain-point text converted to lowercase kebab-case (spaces → hyphens, punctuation stripped). Example: pain point `"permission prompts on every run"` → `bx:pain/permission-prompts-on-every-run`. The slug MUST be derived deterministically from the canonical pain-point text — never from the upstream release content — so that `finding_id` is stable across runs and re-raise checks work correctly. Apply the same normalization (lowercase, no trailing slash, no spaces) before hashing.
+
 ### source_url canonicalization (normative)
 
 Applied to `source_url` before hashing into `finding_id` and before storing the field:
 
-- Lowercase the scheme and host (e.g. `HTTPS://Docs.Anthropic.com` → `https://docs.anthropic.com`).
+- Lowercase the scheme and host (e.g. `HTTPS://Code.Claude.com` → `https://code.claude.com`).
 - Strip any `#fragment` component.
-- Strip a single trailing slash from the path (e.g. `/en/docs/claude-code/hooks/` → `/en/docs/claude-code/hooks`).
+- Strip a single trailing slash from the path (e.g. `/docs/en/hooks/` → `/docs/en/hooks`).
 - Drop any `utm_*` query parameters; keep all other query parameters verbatim.
 
 ### source_content_hash normalization (normative)

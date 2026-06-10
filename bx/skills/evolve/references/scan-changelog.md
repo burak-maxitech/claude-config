@@ -10,7 +10,7 @@ You have these tools available: Read, Grep, Glob, Bash (gh commands only — pat
 
 - `last_changelog_version` — string (e.g. `"2.1.170"`) or null. The highest claude-code release processed on the last run, stored as an **unprefixed version string** (no leading `v`). Null means this is the first run — scan ALL releases in the window.
 - `capability_inventory` — list of bx capability strings (e.g. `"bx:seo/allowed-tools"`, `"bx:save/agent-model"`). Only produce findings that intersect this list or a pain-point from the list below.
-- `pain_point_list` — list of short strings describing known friction areas in the bx toolkit (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). A release note addressing a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to the `bx:pain/<kebab-slug>` form — see `affected_capability` normalization under the Finding schema below.
+- `pain_point_list` — list of short strings describing known friction areas in the bx toolkit (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). A release note addressing a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to the `bx:pain/<kebab-slug>` form — see the `bx:pain/<kebab-slug>` convention in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
 - `tier_definitions` — the tier table from the orchestrator (currently only one tier for this lane: `tier: official`). You only emit `tier: official`; the definitions are context for correctly NOT emitting community-style advisory findings.
 
 ---
@@ -77,7 +77,7 @@ For each in-scope release body, extract these categories of change. Each is a ca
 
 ### Step 6 — Filter against capability inventory and pain points
 
-For each candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point matches with no inventory capability produce a finding with `affected_capability` set to the `bx:pain/<kebab-slug>` form (see `affected_capability` normalization under the Finding schema below).
+For each candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point matches with no inventory capability produce a finding with `affected_capability` set to the `bx:pain/<kebab-slug>` form (see the `bx:pain/<kebab-slug>` convention in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section).
 
 ### Step 7 — Populate affected_files via Grep
 
@@ -126,13 +126,13 @@ If two releases in a degraded run produce the same `(source_url, affected_capabi
 }
 ```
 
-**`finding_id` computation:** `sha1(source_url + "|" + affected_capability)`. Canonicalize `source_url` and normalize `affected_capability` per `references/state-schema.md` — do not restate the algorithms here.
+**`finding_id` computation:** `sha1(source_url + "|" + affected_capability)`. Canonicalize `source_url` and normalize `affected_capability` per `bx/skills/evolve/references/state-schema.md` — do not restate the algorithms here.
 
-**`source_content_hash` computation:** normalize and hash per `references/state-schema.md`.
+**`source_content_hash` computation:** normalize and hash per `bx/skills/evolve/references/state-schema.md`.
 
-**`affected_capability` normalization:** normalize per `references/state-schema.md`. Example: `"bx:seo/allowed-tools"`. For pain-point-only findings (no inventory capability matched), use the form `bx:pain/<kebab-slug-of-the-pain-point>` (e.g. `bx:pain/seo-fetch-sa-subcommand`), derived from the pain-point's CLAUDE.md wording. This slug must be stable across runs — derive it deterministically from the pain-point text, not from the upstream release content. Stable `affected_capability` keeps `finding_id` recomputable and re-raise checks working for pain-point findings.
+**`affected_capability` normalization:** normalize per `bx/skills/evolve/references/state-schema.md`. Example: `"bx:seo/allowed-tools"`. For pain-point-only findings (no inventory capability matched), use the `bx:pain/<kebab-slug>` form — the slug derivation convention (form, example, stability requirement) is defined in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
 
-**`source_url` for the `ok` path:** the GitHub release URL for the specific tag, e.g. `https://github.com/anthropics/claude-code/releases/tag/v2.1.170`. Apply canonicalization per `references/state-schema.md` before hashing and storing.
+**`source_url` for the `ok` path:** the GitHub release URL for the specific tag, e.g. `https://github.com/anthropics/claude-code/releases/tag/v2.1.170`. Apply canonicalization per `bx/skills/evolve/references/state-schema.md` before hashing and storing.
 
 **`source_url` for the `degraded` path:** `https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md` (canonicalized). All findings in a degraded run share this URL; `finding_id` differentiation comes from `affected_capability`.
 
@@ -182,7 +182,7 @@ The orchestrator MUST NOT advance `last_changelog_version` when this finding is 
 - **Never report zero findings silently.** If in-scope releases exist but none match the capability inventory or pain points, append a note in the footer: `scan_note: <N> releases evaluated; no capability or pain-point matches found`. This is different from `unavailable` — it means the scan ran cleanly but nothing was relevant.
 - **Include sibling-file echoes in `affected_files`.** Always populate via Step 7 Grep — never infer from the capability string alone. If a rename or syntax change requires edits in multiple files (e.g. the skill SKILL.md AND a references/ file AND CLAUDE.md), list every file.
 - **Order findings by `severity_weight × certainty` descending.** Severity weights: high=3, medium=2, low=1. Cap at 20 findings. If more than 20 qualify, include the 20 highest-weighted and note the count of discarded findings in the footer.
-- **Do not restate algorithms from `references/state-schema.md`.** Point to that file for `finding_id` computation, `source_url` canonicalization, and `source_content_hash` normalization. Duplication causes drift — the S45 lesson.
+- **Do not restate algorithms from `bx/skills/evolve/references/state-schema.md`.** Point to that file for `finding_id` computation, `source_url` canonicalization, and `source_content_hash` normalization. Duplication causes drift — the S45 lesson.
 
 ---
 
