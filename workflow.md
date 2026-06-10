@@ -533,6 +533,32 @@ No flags. No arguments. Always read-only.
 
 ---
 
+### /bx:evolve
+
+**When:** After Anthropic ships a notable Claude Code release, or monthly — keeps the bx plugin aligned with upstream changes. **Run in the claude-config repo** (this skill is claude-config maintenance, not a target-repo code-health pass).
+
+**Usage:**
+```bash
+/bx:evolve                 # Research upstream changes since watermark → report with citations
+/bx:evolve --fix           # Apply approved findings behind per-finding diff gates
+/bx:evolve --full          # Ignore the watermark — from-scratch audit (the S33 treatment)
+/bx:evolve --no-community  # Official-only fast pass (skips the advisory community lane)
+```
+
+**Flow:**
+1. Reads `docs/upstream/state.json` for the committed watermark date.
+2. Dispatches three parallel Sonnet subagents (`upstream-changelog`, `upstream-docs`, `upstream-community`) to research Anthropic changes since the watermark.
+3. Gates each finding against the bx plugin's capability inventory — surfaces gaps, not noise.
+4. Renders a cited report of actionable findings (new features to adopt, deprecated patterns to retire, docs drift to fix).
+5. `--fix` walks you through each finding with a per-finding diff preview before applying.
+6. Updates the watermark in `docs/upstream/state.json` on completion.
+
+**Output:** Cited findings report (new capabilities / deprecated patterns / doc drift) → recommended actions → watermark update.
+
+**Cadence:** Run after any Anthropic Claude Code release that looks non-trivial, or monthly at minimum. Pair with `/bx:save` afterward to record what was applied.
+
+---
+
 ## Workflow Scenarios
 
 ### Scenario 1: Starting a New Project

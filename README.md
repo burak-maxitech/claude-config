@@ -10,7 +10,7 @@ claude-config/                         # marketplace repo
 ├── bx/                                # the installable `bx` plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json                # plugin manifest (skills invoke as /bx:<name>)
-│   ├── agents/                        # 15 subagents (Sonnet-routed) → bx:<agent>
+│   ├── agents/                        # 18 subagents (Sonnet-routed) → bx:<agent>
 │   │   ├── arch-performance.md
 │   │   ├── arch-refactors.md
 │   │   ├── arch-simplification.md
@@ -25,15 +25,19 @@ claude-config/                         # marketplace repo
 │   │   ├── seo-technical.md
 │   │   ├── test-coverage.md
 │   │   ├── test-economics.md
-│   │   └── test-quality.md
+│   │   ├── test-quality.md
+│   │   ├── upstream-changelog.md
+│   │   ├── upstream-community.md
+│   │   └── upstream-docs.md
 │   ├── hooks/
 │   │   └── hooks.json                 # SessionStart project-orientation injection
 │   ├── scripts/
 │   │   ├── session-start-context.sh   # SessionStart hook (Mac/Linux)
 │   │   └── session-start-context.ps1  # SessionStart hook (Windows)
-│   └── skills/                        # 10 skills → /bx:<name> (each: SKILL.md + references/)
+│   └── skills/                        # 11 skills → /bx:<name> (each: SKILL.md + references/)
 │       ├── arch/                      # /bx:arch      — repo-wide architecture audit
 │       ├── clean/                     # /bx:clean     — codebase cleanup audit
+│       ├── evolve/                    # /bx:evolve    — upstream-watch: audit toolkit against latest Anthropic changes
 │       ├── health/                    # /bx:health    — skill-routing advisor
 │       ├── plan/                      # /bx:plan      — feature planning interview
 │       ├── resume/                    # /bx:resume    — resume a dev session
@@ -51,7 +55,8 @@ claude-config/                         # marketplace repo
 │   ├── completed-work.md
 │   ├── key-decisions.md
 │   ├── modernization-roadmap.md
-│   └── session-history.md
+│   ├── session-history.md
+│   └── upstream/                      # /bx:evolve watermark + decision log
 ├── .gitignore
 ├── CLAUDE.md                          # AI session context
 ├── README.md                          # This file
@@ -191,6 +196,7 @@ git pull
 | `/bx:tests` | Repo-wide test suite audit — missing coverage on critical paths AND wasteful/redundant tests, in a single report. **Twin headline metric** (`Coverage gaps in critical code: X lines | Tests we can delete: Y lines`). 3 parallel subagents (`test-coverage` / `test-quality` / `test-economics`), T01-T05 smell catalog, with `--plan`/`--fix` (T01-only safe deletion)/`--coverage` (opt-in report reading)/`--full-scan`. Defers entirely to `/bx:clean` for orphans / stale snapshots / >3mo skips. | Skill |
 | `/bx:seo` | Repo-wide SEO + Generative Engine Optimization audit for **web projects only** (rejects non-web repos silently). **Fetches current best practices fresh every run** via WebSearch + WebFetch (4 source categories: Google Search Central+web.dev, Schema.org+JSON-LD, GEO sources, third-party authority blogs). **Discovers + probes the live sitemap** (GSC `sitemaps.list` → robots.txt → `<base>/sitemap.xml` — not a repo-local file, so framework-generated sitemaps are covered) for 4xx/5xx/redirect-chains/slow-responses (cap 100 URLs; score-impact capped at 8 points). **Optional GSC integration via Search Console API** — auth **as yourself** via gcloud ADC (`webmasters.readonly` scope; **not** a service account) + `.seo-data/gsc/config.yaml` (`site_url:` required; optional `lookback_days`, `quota_project`, `adc_credentials_path` for multi-machine, `site_base_url`/`sitemap_url`) + three endpoints (`searchanalytics.query` Performance + `urlInspection.index.inspect` per-URL Indexing + `sitemaps.list` discovery). Binary mode: API-enabled or heuristic-only fallback (see [Enabling GSC](#enabling-gsc-for-bxseo-optional) below). 35-day git-history overlap flags "may already be fixed" findings against the GSC reporting lag. **Score stays /100** (purely heuristic) so `docs/seo-history.md` is comparable across runs regardless of GSC availability. 3 parallel subagents (4 when GSC API enabled: `seo-technical` / `seo-content` / `geo-generative` / `seo-gsc-insights`). Single headline: **score /100 (Δ since last run) + top-3 highest-impact opportunities**. Score tracked over time in `docs/seo-history.md`. Flags: `--plan` / `--fix` (strict allowlist, never fabricates content — only inserts TODO placeholders) / `--url <deployed-url>` (live HTML diff). | Skill |
 | `/bx:webdesign` | Re-skin an existing web project's visual design via Google Stitch (MCP), preserving functionality (refactor; web-only). Drives 3 resumable phases — Extract & Stage (palette/typography/component inventory), Design & Review (Stitch-generated proposals, user approval), Inject & Verify (restyle markup in place preserving logic + content, verify no behavior breakage). Requires one-time setup: Stitch MCP server + Google's `stitch-skills` plugin. Works on a dedicated `webdesign/<date>` branch so the main branch is never destabilized. **Refactor-only (v1):** restyles each page's markup and classes in place — never raw-replaces working components or business logic. Web projects only. | Skill |
+| `/bx:evolve` | Upstream-watch audit for the **claude-config repo itself** — researches Anthropic changes (Claude Code releases, official docs, community) since a committed watermark, gates findings against the bx plugin's capability inventory, and reports with citations. `--fix` applies approved findings behind per-finding diff gates. Run after Anthropic ships a notable Claude Code release, or monthly. | Skill |
 | `/bx:health` | Routing advisor — looks at `git status`, branch, recent commits, `CLAUDE.md`, open PR, then suggests which skills to run in what order. **Read-only, never invokes anything.** Use when unsure where to start. | Skill |
 | `/bx:save` | End session - save progress. Fast by default (task drain + CLAUDE.md/session-history update via the `save-writer` subagent + commit); `--full` adds the README/docs sync + rollups; `--silent` runs zero-prompt (auto-commits with the suggested message, safe-default on all consents). | Skill |
 
@@ -216,6 +222,7 @@ git pull
 > | `/bx:tests` | whole repo, test suite focus | test suite audit — coverage gaps on critical paths + test smells (T01-T05) + suite economics (snapshot bloat, flakiness, LOC ratio extremes). Reports twin headline (coverage gap LOC + deletable LOC). |
 > | `/bx:seo` | whole web repo, SEO + GEO focus | SEO + Generative Engine Optimization audit. Fetches current best practices each run. Discovers + probes the live sitemap (GSC `sitemaps.list` → robots.txt → conventional). **Optional GSC integration via Search Console API** — authenticate **as yourself** with gcloud ADC (not a service account), set `site_url:` in `.seo-data/gsc/config.yaml` (+ optional `adc_credentials_path` for multi-machine). Three endpoints (Search Analytics + URL Inspection + `sitemaps.list`) cover Performance, Indexing, and sitemap discovery. Binary mode: API-enabled or heuristic-only. See [Enabling GSC for `/bx:seo`](#enabling-gsc-for-bxseo-optional) below. 35-day git-history overlap to flag "may already be fixed" findings against the GSC reporting lag. Single score `/100` headline + top-3 priorities. Tracked over time in `docs/seo-history.md` (comparable across runs whether GSC API is configured or not — score stays purely heuristic). Web projects only — rejects others silently. |
 > | `/bx:webdesign` | whole web repo, visual layer only | Re-skin an existing web project's visual design via Google Stitch (MCP). Refactor-only — restyles each page's markup and classes in place (preserving handlers, routes, state, real content/assets), never raw-replaces working components or business logic. 3 resumable phases (Extract & Stage → Design & Review → Inject & Verify) on a dedicated `webdesign/<date>` branch. Requires one-time Stitch MCP + `stitch-skills` plugin setup. Web projects only. |
+> | `/bx:evolve` | claude-config repo only | Upstream-watch audit — researches Anthropic changes since a committed watermark, gates findings against the bx plugin inventory, reports with citations. `--fix` applies behind per-finding diff gates. Run in the claude-config repo after notable Claude Code releases or monthly. |
 >
 > Useful chain on an unfamiliar repo: `/bx:clean` → `/bx:arch` → `/bx:tests` → (if web) `/bx:seo` → `/bx:arch --plan` → `/bx:plan` per phase.
 >
@@ -245,7 +252,7 @@ git pull
 
 ## Subagents
 
-The `bx/agents/` folder contains 15 subagent definitions used by skills (namespaced `bx:<agent>` once installed). These run on Sonnet for cost efficiency and have scoped tool permissions. Skills dispatch them automatically via the Task tool, and you can also reference them by name in `@`-mention typeahead inside the REPL (added in Claude Code 2.1.89).
+The `bx/agents/` folder contains 18 subagent definitions used by skills (namespaced `bx:<agent>` once installed). These run on Sonnet for cost efficiency and have scoped tool permissions. Skills dispatch them automatically via the Task tool, and you can also reference them by name in `@`-mention typeahead inside the REPL (added in Claude Code 2.1.89).
 
 | Agent | Used By | Purpose |
 |-------|---------|---------|
@@ -264,6 +271,9 @@ The `bx/agents/` folder contains 15 subagent definitions used by skills (namespa
 | `geo-generative` | `/bx:seo` | Structured Data (20 pts) + Generative Engine readiness (20 pts): Schema.org JSON-LD coverage + rich-result eligibility, llms.txt presence + format, E-E-A-T signals (author bios, dates, citations), semantic content patterns (topic sentences, list/table structure, question-headings), AI-bot crawl access (GPTBot/ClaudeBot/PerplexityBot/etc.). Fetched best-practices brief is primary source of truth (GEO evolves fast); `brief_divergence` field surfaces when heuristic disagrees. |
 | `seo-gsc-insights` | `/bx:seo` (only when GSC API mode enabled) | Ingests orchestrator-parsed Google Search Console **API** digests (Search Analytics queries/pages + per-URL Inspection coverage clusters) + 35-day git-history change digest. Emits **13** sub-dim info-only findings (`indexing_coverage`, `crawled_not_indexed`, `discovered_not_indexed`, `not_found_404` with routing-rename match for bulk-redirect detection, `redirect_hygiene`, `canonical_conflict`, `blocked_access`, `soft_404`, `server_errors`, `ctr_opportunity`, `position_band_opportunity`, `traffic_orphan`, `brand_query_anomaly`); a **14th** (`deindex_regression`) is orchestrator-emitted from run-over-run sitemap-coverage snapshot diffs. `score_impact: 0` enforced agent-side AND orchestrator-side — GSC enriches recommendations, never the /100 score. Annotates each finding with `code_changed_since_gsc_window` (lowers certainty to 0.4 + rewrites recommendation when matched commit detected). |
 | `save-writer` | `/bx:save` | Applies session-save documentation edits off the main thread — reads the large append-only archives and writes CLAUDE.md / `docs/session-history.md` / `docs/completed-work.md` / `docs/key-decisions.md` from a structured update packet composed by the orchestrator. Not a scanner. |
+| `upstream-changelog` | `/bx:evolve` | Researches claude-code releases/CHANGELOG since the committed watermark version. Extracts new built-in commands, tool changes, hook additions, permission-model updates, and deprecations relevant to the bx plugin. |
+| `upstream-community` | `/bx:evolve` | Bounded community sweep (max 3 searches / 5 fetches) for Claude Code usage patterns and emerging practices not yet in official docs. Advisory-only findings, never fix-eligible. |
+| `upstream-docs` | `/bx:evolve` | Fetches a pinned allowlist of official Claude Code doc pages (code.claude.com) every run and compares guidance against the plugin's capability inventory. Extracts changed defaults and updated guidance on skills, agents, hooks, settings. |
 
 ## Optional: SessionStart hook for auto-orientation
 

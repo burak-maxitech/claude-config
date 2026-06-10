@@ -179,5 +179,6 @@ When two buckets match the signal pattern roughly equally:
 - **Greenfield / new feature work.** That's `/bx:plan` directly. The advisor will route there from Bucket E if `Next Steps` lists it, but it doesn't try to be a feature router.
 - **Doc-only sessions.** That's `/bx:save` directly. The advisor will mention it as part of every flow but never as the standalone recommendation — if the user already knows it's a doc session, they don't need routing.
 - **Visual redesign execution inside audit chains.** The advisor *can* route to `/bx:webdesign` (Bucket E, web projects, visual appetite) but never sequences it as a step inside an audit flow — it's a self-contained pipeline on its own branch, not a code-health pass that feeds findings downstream.
+- **Toolkit maintenance.** Keeping the bx plugin current with upstream Anthropic changes is `/bx:evolve`, run in the claude-config repo — never part of a target repo's code-health flow.
 
 The advisor's job is the *gray zone*: "I have time, the repo is in some state, what's the best use of my next hour?" That's it.

@@ -39,7 +39,7 @@ The AI tooling space moves fast: Anthropic ships new Claude Code versions, renam
 
 ## Authority model (two-tier)
 
-- **Tier 1 (actionable):** official Anthropic surfaces only — claude-code CHANGELOG/releases, official Claude Code docs, Anthropic engineering blog. Every actionable finding carries a mandatory Tier-1 citation URL.
+- **Tier 1 (actionable):** official Anthropic surfaces only — claude-code CHANGELOG/releases and the pinned official Claude Code docs allowlist. (Other official surfaces like the Anthropic engineering blog reach the report only via the community lane's `official_source_found` handoff — no lane fetches them directly.) Every actionable finding carries a mandatory Tier-1 citation URL.
 - **Tier 2 (advisory):** community content via bounded WebSearch. Advisory findings are clearly badged, never actionable on their own, and never eligible for `--fix`. A Tier-2 pattern becomes actionable only when a Tier-1 source corroborates it.
 
 ## Step flow (orchestrator)
@@ -51,7 +51,7 @@ The AI tooling space moves fast: Anthropic ships new Claude Code versions, renam
    - `best_practice` — official guidance changed for something the plugin does.
    - `opportunity` — new capability that maps to a recorded pain point.
    - Tier-2 findings are always `advisory` regardless of class.
-3. **Decision-log filter.** Drop findings whose `finding_id` has a `rejected` decision AND whose source content hash is unchanged since that decision. Surface previously-`deferred` findings with a `[deferred <date>]` badge.
+3. **Decision-log filter.** Drop findings whose `finding_id` has a `rejected` decision AND whose source content hash is unchanged since that decision. Cross-lane corroboration matches on `affected_capability` (not `finding_id` — URL spaces are disjoint across lanes so `finding_id` can never collide cross-lane): when two lanes emit findings for the same capability, keep the higher-authority lane's finding and append the other's citation. Surface previously-`deferred` findings that were re-emitted this run with a `[deferred <date>]` badge in Section 2; entries not re-emitted carry forward to Section 4.
 4. **Report.** Headline: `Breakage: N · Best-practice: M · Opportunities: K · Advisory: J`. Per finding: classification, severity, certainty, **all affected files** (the S45 doc-drift rule is baked into the finding schema — a proposed edit that doesn't enumerate every sibling-file echo is incomplete), proposed edit, Tier-1 citation. Footer disclosure: sources fetched + versions, watermark old → new, decision-log filters applied, community fetch count vs cap. **Every new actionable finding is written to the decision log as `open`** — findings survive the watermark advance until explicitly decided.
 5. **`--fix` tail.** Per-finding diff preview gate (y / n / skip / abort). Every verdict overwrites the finding's `open` entry in the decision log. Advisory findings are never offered. After the pass: remind `/plugin update bx` + `/reload-plugins`, and recommend the S42 content-review treatment for any skill that received non-trivial edits.
 6. **Closing + watermark.** The watermark advances at the end of **every** run (default or `--fix`) — safe because undecided findings persist as `open` in the decision log and re-surface in every report until decided. Default-mode closing line: how to apply (`--fix`) and the count of `open` findings carried forward.
@@ -59,7 +59,7 @@ The AI tooling space moves fast: Anthropic ships new Claude Code versions, renam
 ## Finding schema
 
 ```
-finding_id: <stable hash of (source_url + affected_capability)>
+finding_id: null                      (set by lane agents; orchestrator computes finding_id + source_content_hash at consolidation)
 class: breakage | best_practice | opportunity
 tier: official | community            (community ⇒ advisory, never fix-eligible)
 severity: low | medium | high
@@ -68,7 +68,9 @@ affected_files: [<every file needing the edit, including sibling-file echoes>]
 upstream_delta: <one-line: what changed upstream>
 proposed_edit: <prose + concrete old→new where possible>
 citation: <Tier-1 URL>                (mandatory for official tier)
-source_content_hash: <hash of the cited section, for decision-log re-raise checks>
+source_url: <canonicalized source URL — finding_id input>
+affected_capability: <normalized capability string — finding_id input>
+source_excerpt: <verbatim extract — orchestrator computes finding_id + source_content_hash at consolidation>
 ```
 
 ## State: `docs/upstream/state.json` (committed)
@@ -76,7 +78,7 @@ source_content_hash: <hash of the cited section, for decision-log re-raise check
 ```json
 {
   "watermark": {
-    "last_changelog_version": "v2.1.x",
+    "last_changelog_version": "2.1.170",
     "docs_checked_at": "2026-06-09",
     "community_checked_at": "2026-06-09"
   },
@@ -85,19 +87,23 @@ source_content_hash: <hash of the cited section, for decision-log re-raise check
       "finding_id": "<hash>",
       "decision": "open | applied | rejected | deferred",
       "date": "2026-06-09",
+      "source_url": "<canonicalized URL of the upstream source page>",
+      "affected_capability": "<e.g. bx:seo/allowed-tools>",
       "source_content_hash": "<hash>",
+      "class": "breakage | best_practice | opportunity",
+      "title": "<one-line finding title at last surfacing>",
       "note": "<optional one-liner>"
     }
   ]
 }
 ```
 
-Committed to the repo (multi-machine sync, like everything else here). Rejected findings re-raise only when `source_content_hash` changes. This mirrors the proven `/bx:seo` finding-history pattern (S35), minus the run-count escalation (not needed — decisions are explicit here).
+Committed to the repo (multi-machine sync, like everything else here). Rejected findings re-raise only when a current run re-surfaces the same `finding_id` with a changed `source_content_hash` (trigger-based — the orchestrator never proactively re-fetches stored URLs). This mirrors the proven `/bx:seo` finding-history pattern (S35), minus the run-count escalation (not needed — decisions are explicit here).
 
 ## Orchestrator allowed-tools
 
-`Read, Grep, Glob, Edit, Write, Bash(git:*), Bash(gh:*), Bash(wc:*), Bash(jq:*), Bash(cat:*), Bash(head:*), WebFetch, Task`
-(Write is for state.json; Edit for `--fix`; WebFetch for orchestrator-side citation spot-checks. The S42/S45 rule applies: this list must be re-verified against the final body before ship.)
+`Read, Grep, Glob, Edit, Write, Bash(git:*), Bash(python:*), Bash(python3:*), Task`
+(Write is for state.json; Edit for `--fix`; gh/WebFetch/wc/jq/cat/head are lane tools — lanes carry their own network/CLI tools and jq is forbidden for state writes; orchestrator needs only python for hashing.)
 
 ## Validation plan
 
