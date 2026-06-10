@@ -111,7 +111,7 @@ For UPDATE mode the change report is assembled from the `save-writer` subagent's
 - [ ] Task list drained — completed/in-progress/pending tasks synced back
 - [ ] Session-history rollup considered (unless --skip-rollup) — older entries compressed when count > 5
 - [ ] Key Decisions rollup considered (unless --skip-decisions-rollup) — oldest rows moved to docs/key-decisions.md when CLAUDE.md table > 20
-- [ ] Commit checkpoint offered LAST (unless --skip-commit) — runs after both rollups so their changes land in the same commit
+- [ ] Commit checkpoint offered LAST (unless --skip-commit; auto-committed without prompt on --silent) — runs after both rollups so their changes land in the same commit
 - [ ] Project-specific files preserved
 
 ## Post-Verification Note

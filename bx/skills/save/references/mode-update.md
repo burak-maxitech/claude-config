@@ -40,6 +40,8 @@ After Step 0:
 
 The old behavior (full sweep by default) is inverted: the daily save is fast; the heavy sweep is opt-in. Drift warnings (emitted at the end of the Save Path) tell the user when a `--full` is due.
 
+**`--silent` (combinable with any path):** zero user prompts for the entire run. Part 8 auto-commits with the suggested message instead of asking; every consent prompt in Parts 5/6/7 resolves to its safe default — first-run rollup consent (5.2, 6.2) is treated as *declined* (the Part is skipped and no sentinel note is written, so the next interactive run asks as usual), and the Part 7.4 consent gate is treated as *skip-all*. `--silent` never answers "yes" on the user's behalf to anything except the commit, which is the one prompt the flag exists to bypass.
+
 ## Prose Caps (apply when composing any new entry)
 
 New entries are capped — this keeps writing fast and keeps `/bx:resume` lean. Existing entries are never rewritten to fit.
@@ -59,7 +61,7 @@ The orchestrator owns everything that needs conversation context or user input; 
 2. **Compose the update packet** (see "Update Packet" below) from: the conversation (what happened this session — only the orchestrator knows this), the filtered commit list, the diff file list, and the drained task state. Apply the Prose Caps.
 3. **Dispatch the `save-writer` subagent** (see "Dispatch" below) and await its change report.
 4. **Drift probes** (cheap, on already-gathered data — no new reads): emit the drift warning block if anything fired. Do NOT enforce.
-5. **Commit checkpoint (Part 8).** Run Part 8 as written; respects `--skip-commit`. The git diff is the user's review surface.
+5. **Commit checkpoint (Part 8).** Run Part 8 as written; respects `--skip-commit` and `--silent` (auto-commit, no prompt). The git diff is the user's review surface.
 6. **Report** using the Change Report format from `verification-checklists.md` — assembled from the subagent's report + drift warnings. Never echo file contents.
 
 **Skipped on the Save Path** (these are `--full` only): Part 0.5 (migration), Part 2 (README), Part 3 (`docs/*.md`), Part 4 (auto-memory), Parts 5/6/7 (rollups), Part 1.10 cap enforcement (replaced by drift warnings).
@@ -485,7 +487,7 @@ The presence of the rollup-format note (see Step 5.4) acts as a "this project ha
 
 1. **Check if the rollup note exists** in `session-history.md`'s header (search for the literal substring `Sessions older than the 5 most recent are compressed`)
 2. **If the note IS present** → proceed silently to Step 5.3 (this project has been rolled up before)
-3. **If the note is MISSING and there are entries to compress** → this is the first rollup pass on this project. Ask the user:
+3. **If the note is MISSING and there are entries to compress** → this is the first rollup pass on this project. **If `--silent` is in `$ARGUMENTS`, treat as declined without asking** (skip the rest of Part 5, do NOT add the rollup note — the next interactive run asks as usual). Otherwise ask the user:
    > "First-time rollup detected for this project: `docs/session-history.md` has [N] sessions in full-prose format, [M] of which are older than the 5 most recent and would be compressed to one-line summaries with commit hashes. Full prose stays preserved in git history. Compress now? (y/n)"
    - **If user declines** → skip the rest of Part 5 entirely. Do NOT add the rollup note (so the user is asked again next run).
    - **If user accepts** → proceed to Step 5.3.
@@ -547,7 +549,7 @@ The presence of the rollup-format note in `docs/key-decisions.md` (see Step 6.4)
 
 1. **Check if the rollup note exists** in `docs/key-decisions.md`'s header (search for the literal substring `Entries older than the 20 most recent in CLAUDE.md are rolled up`)
 2. **If the note IS present** → proceed silently to Step 6.3
-3. **If the note is MISSING and there are rows to roll up** → this is the first decisions rollup pass on this project. Ask the user via `AskUserQuestion` (or numbered Q&A fallback):
+3. **If the note is MISSING and there are rows to roll up** → this is the first decisions rollup pass on this project. **If `--silent` is in `$ARGUMENTS`, treat as declined without asking** (skip the rest of Part 6, do NOT add the rollup note — the next interactive run asks as usual). Otherwise ask the user via `AskUserQuestion` (or numbered Q&A fallback):
    > "First-time Key Decisions rollup: CLAUDE.md has [N] rows (target ≤20). The oldest [M] rows would move to `docs/key-decisions.md`. Full content is preserved — just relocated. Proceed? (y/n)"
    - **If user declines** → skip the rest of Part 6 entirely. Do NOT add the rollup note (re-asks next run).
    - **If user accepts** → proceed to Step 6.3.
@@ -630,6 +632,8 @@ Sections not in this table (project-specific like `## Quick Commands`, `## Don't
 
 ### 7.4 Per-section consent gate
 
+**If `--silent` is in `$ARGUMENTS`, treat as `skip-all` without asking** — exit Part 7 after the 7.2 diagnostic report; no shrinkers run.
+
 For each over-threshold section, ask via `AskUserQuestion` (or numbered fallback):
 
 > "Section `## [name]` is [N] chars (threshold [T]). Proposed shrinker: [one-line action description]. Apply? (yes / no / skip-all)"
@@ -676,6 +680,7 @@ After all documentation updates **and rollups** are complete, remind the user to
    - Show the list of modified/untracked files
    - Suggest a conventional commit message based on what was done this session, e.g.:
      > Suggested commit: `docs: update session progress and documentation`
-   - **Ask the user:** "Would you like to commit these changes?"
-   - **Never auto-commit** — always wait for user confirmation
+   - **If `--silent` is in `$ARGUMENTS`:** commit immediately with the suggested message — no prompt. This is the only path that commits without confirmation; the user opted in explicitly via the flag. Do NOT push.
+   - **Otherwise, ask the user:** "Would you like to commit these changes?"
+   - **Never auto-commit without `--silent`** — always wait for user confirmation
 3. **If there are no uncommitted changes**, skip silently

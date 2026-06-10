@@ -4,12 +4,12 @@ description: "Saves session state for the next /bx:resume — drains the task tr
 disable-model-invocation: true
 effort: low
 allowed-tools: Read, Edit, Write, Grep, Glob, Bash(git:*), Bash(ls:*), Bash(find:*), Bash(wc:*), Bash(awk:*), Bash(sort:*), TaskList, TaskGet, AskUserQuestion, Task
-argument-hint: "[scope] [--full] [--fast] [--skip-memory] [--skip-tasks] [--skip-commit] [--skip-rollup] [--skip-decisions-rollup] [--skip-caps]"
+argument-hint: "[scope] [--full] [--fast] [--silent] [--skip-memory] [--skip-tasks] [--skip-commit] [--skip-rollup] [--skip-decisions-rollup] [--skip-caps]"
 ---
 
 # /bx:save - Session Save & Documentation Skill
 
-Save the current session's state so the next `/bx:resume` picks up cleanly, and keep project documentation current. Act as a senior engineer who values clear, maintainable documentation. The common case (UPDATE mode, no flags) is **fast by default**: it drains the task tracker, updates CLAUDE.md + `docs/session-history.md` via the `save-writer` subagent, and commits — without the heavy README/docs sweep. Use `--full` for the periodic deep sweep (README + `docs/*.md` sync + rollups).
+Save the current session's state so the next `/bx:resume` picks up cleanly, and keep project documentation current. Act as a senior engineer who values clear, maintainable documentation. The common case (UPDATE mode, no flags) is **fast by default**: it drains the task tracker, updates CLAUDE.md + `docs/session-history.md` via the `save-writer` subagent, and commits — without the heavy README/docs sweep. Use `--full` for the periodic deep sweep (README + `docs/*.md` sync + rollups). Use `--silent` for a zero-prompt run: the commit checkpoint auto-commits with the suggested message, and every consent prompt resolves to its safe default (decline/skip) without asking.
 
 **Companion command:** `/bx:resume` - Use at the start of sessions to get up to speed.
 
