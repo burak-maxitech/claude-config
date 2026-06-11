@@ -49,7 +49,7 @@ Proceed with generation? [yes / no / edit briefs first]
 - **"yes"** — continue to Step 2.
 - **"no"** — stop cleanly; remind the user they can trim states in the briefs, then re-run.
 - **"edit briefs first"** — pause; proceed only when the user says to continue.
-- **Explicit override** (e.g. `--skip-quota-check` or "skip the pre-flight"): skip this step and proceed directly to Step 2.
+- **Explicit user override** (the user says to skip the pre-flight, e.g. "skip the quota check"): skip this step and proceed directly to Step 2. There is no dedicated flag for this — it is a natural-language override only; do not invent or advertise one.
 
 ---
 
@@ -105,7 +105,7 @@ Generate pages **sequentially** (Stitch screen generation is stateful and rate-s
 
 ### 2.3 — Record results in `state.json`
 
-After each successful generation, update `state.json` — merge, do not overwrite. Set `pages[].states.<name>.screen_id` and `pages[].states.<name>.status` on each generated state; set the page-level `pages[].status` once all of a page's states are generated:
+After each successful generation, update `state.json` — merge, do not overwrite. Set `pages[].states.<name>.screen_id` and `pages[].states.<name>.status` on each generated state; set the page-level `pages[].status` once all of a page's states have been attempted:
 
 ```json
 {
@@ -121,7 +121,7 @@ After each successful generation, update `state.json` — merge, do not overwrit
 }
 ```
 
-`pages[].states` is an **object keyed by state name** (initialized by Phase 1 with `screen_id: null, status: "pending"`). Phase 2 fills in the `screen_id` and sets `status` to `"generated"` (or `"failed"` on error). The page-level `pages[].status` is set to `"generated"` only once every state for that page has been attempted. If a single call fails, mark that state `"status": "failed"` and continue with remaining pages — do not abort the whole run.
+`pages[].states` is an **object keyed by state name** (initialized by Phase 1 with `screen_id: null, status: "pending"`). Phase 2 fills in the `screen_id` and sets `status` to `"generated"` (or `"failed"` on error). The page-level `pages[].status` is set only once every state for that page has been attempted: `"generated"` if **at least one** state generated, `"failed"` if **every** state failed. If a single call fails, mark that state `"status": "failed"` and continue with remaining pages — do not abort the whole run. (Phase 3 Step 1 skips null-`screen_id` states, so a partially-generated page still gets restyled from its successful states.)
 
 Print a one-line progress note after each page completes:
 ```

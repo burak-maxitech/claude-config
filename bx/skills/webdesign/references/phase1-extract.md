@@ -30,13 +30,13 @@ Check `.webdesign/state.json` for an existing `branch` key:
 
 - **First run (no `branch` key):** create a new branch using today's date from the environment:
   ```
-  git checkout -b webdesign/<YYYY-MM-DD>
+  git -C <project-root> checkout -b webdesign/<YYYY-MM-DD>
   ```
-  Write `{ "branch": "webdesign/<YYYY-MM-DD>" }` to `.webdesign/state.json`.
+  If the branch already exists (a prior run created it but `state.json` didn't survive), check it out instead of failing. Write `{ "branch": "webdesign/<YYYY-MM-DD>" }` to `.webdesign/state.json`.
 
 - **Resumed run (`branch` key present):** check out the recorded branch:
   ```
-  git checkout <state.json["branch"]>
+  git -C <project-root> checkout <state.json["branch"]>
   ```
 
 ### 1.3 — Create `.webdesign/` and manage `.gitignore` (idempotent)
@@ -70,7 +70,7 @@ This covers `.webdesign/state.json`, `.webdesign/.setup-shown`, `.webdesign/SITE
 
 ### 2.1 — Stack-aware route enumeration
 
-Enumerate the project's page routes using the same stack-specific pathspec overlays that `/bx:seo` uses (see `bx/skills/seo/SKILL.md` Step 1.5.2 for the full table). Apply the overlay matching the framework detected in Step 1.1. For each discovered route file, extract:
+Enumerate the project's page routes using the same stack-specific pathspec overlays that `/bx:seo` uses — the full table is in the **sibling seo skill's SKILL.md, Step 1.5.2**. Read it at `../seo/SKILL.md` resolved against **this skill's base directory** (the path Claude Code announces when the skill loads), NOT against the target project's CWD — a repo-rooted `bx/skills/seo/SKILL.md` path exists in neither the installed plugin layout nor the project being restyled. Apply the overlay matching the framework detected in Step 1.1. For each discovered route file, extract:
 
 - The URL path (inferred from file position, e.g. `app/about/page.tsx` → `/about`)
 - The source file path
@@ -170,7 +170,7 @@ Use desktop viewport (1280 × 800 minimum). Screenshot sequentially (Playwright 
 
 ### 3.3 — Confirm, stop the server, or warn
 
-After all screenshots: **stop the background dev server** (the task/shell handle from Step 3.1) — it is not needed for Step 4's build or the rest of Phase 1, and leaving it running leaks a background process for the session. Then print `Captured N before/ screenshots in .webdesign/before/.`
+After all screenshots: **stop the background dev server** — use the `KillShell` tool with the background-shell ID returned when the server was started in Step 3.1. Do not improvise `kill`/`taskkill` shell commands (unpermitted, and process-name kills can hit unrelated processes). The server is not needed for Step 4's build or the rest of Phase 1, and leaving it running leaks a background process for the session. Then print `Captured N before/ screenshots in .webdesign/before/.`
 
 **Condition: `app_runnable == false`.** Skip this step entirely. Print:
 

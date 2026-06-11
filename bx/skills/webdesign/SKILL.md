@@ -3,7 +3,7 @@ name: webdesign
 description: "Totally re-skins an existing web project's visual design via Google Stitch (driven through the Stitch MCP + Google's stitch-skills), while preserving all functionality. Extracts the current design, applies a new design language, and safely injects it page-by-page with verification."
 when_to_use: When the user wants to redesign, re-skin, restyle, or totally change the UI/UX / look-and-feel / design language of an existing web project using Google Stitch. Web projects only (rejects non-web repos). Refactor of an existing project only in v1 — greenfield/new projects exit with a 'not yet supported' note. Distinct from /bx:arch (code structure) and /bx:seo (search). NOT for fixing bugs or behavior.
 disable-model-invocation: true
-allowed-tools: Read, Write, Edit, Glob, Grep, Skill, Agent, WebFetch, Bash(git:*), Bash(npm:*), Bash(npx:*), Bash(curl:*), Bash(mkdir:*), Bash(hugo:*), Bash(bundle:*), mcp__stitch__*, mcp__plugin_playwright_playwright__browser_navigate, mcp__plugin_playwright_playwright__browser_take_screenshot, mcp__plugin_playwright_playwright__browser_snapshot, mcp__plugin_playwright_playwright__browser_click, mcp__plugin_playwright_playwright__browser_fill_form, mcp__plugin_playwright_playwright__browser_console_messages, mcp__plugin_playwright_playwright__browser_wait_for, mcp__plugin_playwright_playwright__browser_close
+allowed-tools: Read, Write, Edit, Glob, Grep, Skill, Agent, WebFetch, KillShell, Bash(git:*), Bash(npm:*), Bash(npx:*), Bash(curl:*), Bash(mkdir:*), Bash(hugo:*), Bash(bundle:*), mcp__stitch__*, mcp__plugin_playwright_playwright__browser_navigate, mcp__plugin_playwright_playwright__browser_take_screenshot, mcp__plugin_playwright_playwright__browser_snapshot, mcp__plugin_playwright_playwright__browser_click, mcp__plugin_playwright_playwright__browser_fill_form, mcp__plugin_playwright_playwright__browser_console_messages, mcp__plugin_playwright_playwright__browser_wait_for, mcp__plugin_playwright_playwright__browser_close
 effort: high
 argument-hint: "[status | page <name>] [--force-setup]"
 ---
@@ -96,7 +96,7 @@ There is **no `approved` phase** — Phase 2 transitions directly into Phase 3 i
 
 `port` (integer, written by `web-stack-detection.md` Pass 4) is the dev-server port used for screenshots and Playwright verification. On a page failure, Phase 3 also adds `pages[].failure_reason` (string) to the failing page entry — it is not present until something fails.
 
-`pages[].states` is an **object keyed by state name** (not an array). Phase 1 initializes it with `screen_id: null, status: "pending"` for each state. Phase 2 fills in `screen_id` and sets `status: "generated"`. Phase 3 sets `status` to `"injected"` → `"verified"` (or `"failed"` / `"manual"`).
+`pages[].states` is an **object keyed by state name** (not an array). Phase 1 initializes it with `screen_id: null, status: "pending"` for each state. Phase 2 fills in `screen_id` and sets `status: "generated"` (or `"failed"`). Per-state `status` is **terminal after Phase 2** — Phase 3 tracks injection/verification on the page-level `status` only and never rewrites per-state `status`.
 
 Per-page `status` lifecycle: `pending → generated → injected → verified`, terminal: `failed` / `manual`.
 
@@ -171,4 +171,4 @@ All pages processed. Options:
 - **Never delegate behavior to Stitch.** Stitch produces static visuals only. No event handlers, API calls, routes, or state variables are sourced from Stitch output.
 - **Never auto-inject unreviewed designs.** Phase 2 always ends with `phase = review_pending` and stops. Phase 3 starts only after the user explicitly approves in the next invocation (or same-session continuation after the approval prompt in Step C above).
 - **All commits on the `webdesign/<date>` branch.** No commits to `main` or any other branch. The branch is created by Phase 1 Step 1.2 and recorded in `state.json["branch"]`; all subsequent phases check it out before writing.
-- **On any Stitch / MCP error, surface it and stop.** Never silently continue past a failed `get_screen`, `generate_screen_from_text`, or `edit_screens` call. Print the error response and instruct the user to re-run once the issue is resolved.
+- **On any Stitch / MCP error, surface it — never silently continue.** Print the error response and stop, **unless** the active phase file defines a recorded-failure path for that call: Phase 2 marks a failed `generate_screen_from_text` state `"failed"` and continues with remaining pages; Phase 3 Step 1 skips null-screen states with a printed warning. Any error not covered by such a path stops the run with instructions to re-run once the issue is resolved.

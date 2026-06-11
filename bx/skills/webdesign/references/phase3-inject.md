@@ -51,6 +51,8 @@ For every page in `pages[]` and every state under `pages[].states`, call `get_sc
 ```
 get_screen(screen_id = pages[page].states[state].screen_id)
 ```
+
+**Skip any state whose `screen_id` is `null`** (its Phase-2 generation failed) — print `⚠ <page>/<state>: no screen generated in Phase 2 — skipped.` instead of calling `get_screen` with a null ID. If **every** state of a page is null, set that page's `status = "failed"` with `failure_reason: "screen generation failed in Phase 2"` and exclude it from the Step 3 loop — one failed generation must not brick the run for the healthy pages (the page stays retryable via `/bx:webdesign page <name>` after its screens are regenerated).
 Each response contains:
 - `htmlCode.downloadUrl` — a **signed URL** (short-lived; fetch immediately with `curl`, not WebFetch)
 - `screenshot.downloadUrl` — a signed URL for the rendered PNG
@@ -128,7 +130,7 @@ After writing the tokens:
    ```
    This ensures a mid-loop interruption resumes into the page loop correctly. `phase` stays `injecting_pages` until Step 4 sets it to `done`.
 
-2. **Start the dev server once (if `app_runnable == true`).** Using `state.json["serve_cmd"]`, start the dev server in the background and wait for it to be ready (poll up to 30 s). Note the port it reports at startup; if it differs from `state.json["port"]`, update `state.json["port"]`. Keep the server running for the entire loop; stop it after Step 4 (or on early exit). Do not restart it per-page. Verification (`references/verification.md`) assumes the server is already running.
+2. **Start the dev server once (if `app_runnable == true`).** Using `state.json["serve_cmd"]`, start the dev server in the background and wait for it to be ready (poll up to 30 s). Note the port it reports at startup; if it differs from `state.json["port"]`, update `state.json["port"]`. Keep the server running for the entire loop; stop it after Step 4 (or on early exit) with the `KillShell` tool using the background-shell ID from startup — do not improvise `kill`/`taskkill` shell commands. Do not restart it per-page. Verification (`references/verification.md`) assumes the server is already running.
 
    If `app_runnable == false`, skip this sub-step.
 
@@ -199,11 +201,12 @@ If all checks pass: go to Step 3d. If any check fails: go to Step 3e.
 
 ### 3d — On green: commit and continue
 
-Commit ALL files changed by the restyle (page file + any co-changed components, CSS modules, or new files — restyles are multi-file; `git add <pages[].file>` alone makes an incomplete commit that fails on fresh checkout):
-```bash
-git -C <project-root> add -A
-git -C <project-root> commit -m "webdesign: restyle <page>"
-```
+1. Commit ALL files changed by the restyle (page file + any co-changed components, CSS modules, or new files — restyles are multi-file; `git add <pages[].file>` alone makes an incomplete commit that fails on fresh checkout):
+   ```bash
+   git -C <project-root> add -A
+   git -C <project-root> commit -m "webdesign: restyle <page>"
+   ```
+   When `app_runnable == false`, append the degradation note from `references/verification.md` Step 4 as a second `-m` body paragraph (runtime behavior was not auto-verified).
 
 2. Update `.webdesign/SITE.md` — add or update the live-sitemap entry for this page with its new route/status (create it if absent). It lives inside the gitignored `.webdesign/` dir, so it is **not** part of this page's restyle commit (and `git add -A` will not pick it up).
 
@@ -213,11 +216,11 @@ git -C <project-root> commit -m "webdesign: restyle <page>"
 
 ### 3e — On failure: rollback and continue
 
-Clean ALL uncommitted changes since the last commit (a restyle may have touched shared components, CSS modules, or created new files; restoring only `pages[].file` leaks dirty files into the next page's iteration):
-```bash
-git -C <project-root> restore .
-git -C <project-root> clean -fd
-```
+1. Clean ALL uncommitted changes since the last commit (a restyle may have touched shared components, CSS modules, or created new files; restoring only `pages[].file` leaks dirty files into the next page's iteration):
+   ```bash
+   git -C <project-root> restore .
+   git -C <project-root> clean -fd
+   ```
 
 `git clean -fd` (no `-x`) removes only untracked files that are **not** gitignored — so it leaves `.webdesign/`, `.stitch/`, and the project's gitignored build output (`.next/`, `dist/`, `node_modules/`) untouched, and only ever deletes files born *during* this iteration's restyle. This is safe **because** the start-of-iteration clean-tree assertion already guaranteed the tree held nothing untracked before the restyle began: anything `clean -fd` now removes was created by the restyle itself. (Corollary: if the project does **not** gitignore its build output, that output is untracked and the start-of-iteration assertion will have halted the run *before* any `clean -fd` ran — never silently deleting it.)
 
@@ -283,9 +286,8 @@ When all pages have been processed (every page is `verified`, `manual`, or `fail
 |-----|------|-----------|-----------|
 | `tokens_applied` | boolean | Step 2 | `true` after token commit |
 | `phase` | string | Step 2 / Step 3 (loop start) / Step 4 | `tokens_injected` → `injecting_pages` → `done` |
-| `pages[].status` | string | Step 3b / 3d / 3e / 3f | `injected` → `verified` / `failed` / `manual` |
-| `pages[].failure_reason` | string | Step 3e | error description on failure |
-| `pages[].states.<name>.status` | string | Step 1 (fetch confirmed) | updated as each state is fetched |
+| `pages[].status` | string | Step 1 (all states null) / 3b / 3d / 3e / 3f | `injected` → `verified` / `failed` / `manual` |
+| `pages[].failure_reason` | string | Step 1 / 3e | error description on failure |
 
 ### Artefact paths written in Phase 3
 

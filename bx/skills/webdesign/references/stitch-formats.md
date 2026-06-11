@@ -86,7 +86,7 @@ spacing:           # 4px baseline
 
 ## Vibe → design-system-knob mapping (starter table — tune per project)
 
-Used by Phase-1 decision-9 path (a) to translate the user's vibe words into knobs.
+Used by Phase 1 Step 5a (the Claude-led interview path) to translate the user's vibe words into knobs.
 
 | Vibe words | colorVariant | roundness | headline/body font feel |
 |---|---|---|---|

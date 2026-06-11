@@ -173,7 +173,7 @@ Set `build_cmd`/`serve_cmd` to `null` (not omitted) when a value cannot be resol
 
 When `app_runnable: false`:
 - The skill **degrades to build-only verification** — it still injects styles and applies Stitch tokens, but skips all Playwright steps and screenshot comparisons.
-- Print a warning at the end of Step 0 and again at the start of Phase 3.
+- Print a warning with the detected-stack summary line (end of this file's passes) and again at the start of Phase 3.
 - **Never hard-fail** on `app_runnable: false` — degrade gracefully.
 
 ---
