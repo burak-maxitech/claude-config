@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-06-10 (Session 47)
+Last Updated: 2026-06-10 (Session 48)
 
 ## Project Overview
 
@@ -33,14 +33,14 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 ## In Progress
 
-**`/bx:webdesign` shipped + review-hardened (S41–S42), pending activation.** The 10th skill is built, merged, pushed, and now **review-hardened** (S42: skill-creator content review + `/code-review` xhigh, 16 fixes — including the S41 `app_runnable:false` Phase-2 dead-end, now **closed** with a project-ID recovery path, plus a Phase-3 git-safety invariant). Now **live in the plugin cache on this machine** (S44: `/plugin update bx` + `/reload-plugins` → `b82162d` = HEAD); remaining one-time setup before dogfood: install the **Stitch MCP + `stitch-skills` plugin**. Dogfood checklist: `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
+**`/bx:webdesign` shipped + twice review-hardened (S42, S48), pending activation.** The 10th skill is built, merged, pushed, and review-hardened twice: S42 (skill-creator content review + `/code-review` xhigh, 16 fixes — incl. the `app_runnable:false` Phase-2 dead-end closure + Phase-3 git-safety invariant) and S48 (fresh skill-creator pass, 13 findings / 12 fixed in `9b9c703` — incl. a repo-rooted sibling-skill path bug and a Phase-3 null-screen brick). Plugin cache is at `15295d8` — refresh to pick up `9b9c703`, then install the **Stitch MCP + `stitch-skills` plugin** (one-time) before dogfood. Dogfood checklist: `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
 
 **S37 plugin packaging — remaining:** install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement. (GSC MCP migration #1 declined; Playwright #2 deferred.)
 
 ## Next Steps
 
 1. **`/bx:evolve` follow-ups** — give it the S42 content-review treatment (skipped before the S47 dogfood); act on the 6 `open` findings in `docs/upstream/state.json` (top: evaluate `.claude/skills` auto-load, which may close the activation gap for local clones); smoke-check the new `CLAUDE_ENV_FILE` UTF-8 persistence next session before retiring per-call prefixes; v2 ideas: re-arm carried-forward findings for `--fix` from state, and treat lane digest one-liners as non-citation-grade (v2.1.145 misattribution caught in S47).
-2. **Dogfood `/bx:webdesign`** — install the Stitch MCP + `stitch-skills` plugin once, then run per `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
+2. **Dogfood `/bx:webdesign`** — refresh the plugin cache to ≥`9b9c703`, install the Stitch MCP + `stitch-skills` plugin once, then run per `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
 3. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
 4. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — all content-review-hardened in S46, never run end-to-end.
 5. **S37 plugin-packaging leftovers** — install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement.
@@ -52,8 +52,6 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 | Decision | Rationale |
 |----------|-----------|
-
-| `/seo-review` — 6 spec gaps codified from burakarik6 dogfood (S31 cont.²) | 4th `/seo-review` run of the day on burakarik.com surfaced 6 distinct issues + 1 design problem the orchestrator improvised around at runtime. Categorized 2 critical bugs / 2 spec ambiguities / 1 design issue / 1 emergent capability. All 6 fixes shipped same-session in commit `7109213` (5 files / +474 / -18 LOC). **Fix #1 — UTF-8 enforcement on Python**: Windows charmap default crashes on Turkish + GSC prompt-injection queries; codify `PYTHONIOENCODING=utf-8 PYTHONUTF8=1` env vars on every invocation + `encoding='utf-8'` on every `open()`. **Fix #2 — Same-commit history dedup**: score swung 60→48→40→55 across 4 runs with last commit being docs-only (methodology variance, not codebase change); embed `<!-- commit:abc1234 -->` HTML comment + skip append when commit_sha already has an entry. **Fix #3 — Ship `references/gsc-parse-helper.py`** (~250 lines, 6 subcommands `q1`/`q2`/`q3`/`ctr`/`clusters`/`brand`): retires inline Python heredocs; helper script is the canonical parser. **Fix #4 — New sub-dim 13 `brand_query_anomaly`** (catalog now 12→13): codifies emergent capability — orchestrator caught `"burak arık"` at pos 7.91 / 1.93% CTR as entity-recognition deficit. **Fix #5 — CTR opportunity dual trigger**: high-volume override (imp>=10000 AND ctr<0.5% regardless of position). **Fix #6 — Probe-skipped redistribution rendering** mandatory in report footer. |
 
 | Renamed custom `/code-review` → `/review-deep` after Anthropic naming collision (S32) | On 2026-05-23 Anthropic renamed built-in `/simplify` → `/code-review`, colliding with the custom code-review skill in this repo. The two skills are genuinely different — built-in is a lightweight diff scan with effort levels + `--comment` PR-comment posting; custom is a senior-engineer review with codebase-convention scanning + `--security` (OWASP) / `--verify` (run tests/lint, parallel-backgrounded since S19) / `--fix` / `--last-commit` modes. Solution: rename the custom skill to `/review-deep` and position the review tooling as a **3-tier ladder**: `/code-review` (built-in, fast, daily driver) → `/review-deep` (custom, thorough) → `/ultrareview` (built-in, cloud, 5+ verifying agents, high-risk pre-merge). Scope expanded to also updating `/simplify` references throughout operational docs to `/code-review` (since `/simplify` no longer exists by that name). 16 operational files modified + 1 directory rename via `git mv`; historical files deliberately left untouched as records of past state. README "Three review tiers" blockquote restructured to lead with the rename context + 2026-05-23 date. |
 
@@ -78,6 +76,7 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 | Sentinel exit-point principle for /bx:evolve (S46) | `lane-unavailable-*` sentinels are lane-health reports, not findings: they exit the pipeline at consolidation Step 3.1 (lane_status set, errors stashed for the report's Section 1, removed from the finding set). All downstream exemptions (hashing, decision log, fix eligibility, certainty bands) are entailed by the single principle instead of 7 scattered carve-outs — the /simplify pass (`21b41bb`) collapsed the scatter the review iterations had accumulated. |
 | `/bx:evolve` relevance gate confirmed + user-directed registration path (S47) | First dogfood validated the S46 gate: opportunity findings require a pain-point match, so per-skill "new capability" items are filtered by design. When the user wants them anyway, the orchestrator registers them as proper `open` findings with re-fetched verbatim excerpts + caveat notes. Lane digest one-liners are NOT citation-grade — verify against release bodies (wildcard fix: v2.1.139, not v2.1.145; v2.1.143 dependency enforcement: enable/disable-time only). |
 | `CLAUDE_ENV_FILE` session env persistence (S47) | SessionStart scripts now write `PYTHONIOENCODING=utf-8` + `PYTHONUTF8=1` exports to the harness-provided `$CLAUDE_ENV_FILE` (CC 2.1.152+), persisting to every Bash call in the session — the principled fix for the recurring Windows-charmap class (S31/S33). Per-call prefixes in /bx:seo stay until a smoke-check passes. |
+| Cross-skill references must resolve against the skill base directory, not repo-rooted paths (S48) | /bx:webdesign phase1 pointed at `bx/skills/seo/SKILL.md` for the route-enumeration table — a path that exists in neither the installed plugin-cache layout (no `bx/` prefix) nor the target project's CWD where the skill actually runs; same class as the S39 `${CLAUDE_SKILL_DIR}` bug. Rule: sibling-skill reads use `../<skill>/...` resolved against the base directory Claude Code announces at skill load. Corollary from the same review: every background process a skill starts needs its stop mechanism named and permitted (`KillShell`), or orchestrators improvise `kill`/`taskkill`. |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -121,7 +120,7 @@ claude-config/                         # marketplace repo
 
 **The S37 `/bx:seo` "messed up" breakage is RESOLVED (S39).** Root-caused to the `${CLAUDE_SKILL_DIR}` path bug (not a real Claude Code variable → the helper was never found → GSC silently fell back to heuristic-only) + an impossible "mint token once, reuse across Bash calls" auth model (shell state does not persist across Bash tool calls). Both fixed and verified against live GSC. See Session History S39 + Key Decisions.
 
-**Activation gap closed for S46 content (S47):** plugin cache updated to `21b41bb` and `/bx:evolve` ran from it. BUT this session's `--fix` edits (13 files) are uncommitted — after commit+push, refresh again via `/plugin update bx` + `/reload-plugins` (or try the lighter `/reload-skills`, v2.1.152 — open finding `0e4083ea`). `/bx:webdesign` still needs the Stitch MCP + `stitch-skills` plugin installed once before dogfood. 6 open upstream findings live in `docs/upstream/state.json`.
+**Plugin cache one commit behind (S48):** refreshed to `15295d8` at session start (S47 `--fix` content live), but the S48 webdesign review fixes (`9b9c703`, committed + pushed) landed after — run `/plugin update bx` + `/reload-plugins` (or try the lighter `/reload-skills`, v2.1.152 — open finding `0e4083ea`) before the webdesign dogfood. `/bx:webdesign` still needs the Stitch MCP + `stitch-skills` plugin installed once. 6 open upstream findings live in `docs/upstream/state.json`.
 
 ## Environment Variables
 
@@ -131,11 +130,10 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 47) - 2026-06-10
-- **Dogfooded `/bx:evolve` end-to-end (first real runs):** full first audit (3 lanes, 50 releases, 3 opportunity findings on recorded pain points), immediate re-run (clean changelog no-op at watermark 2.1.172 — spec smoke criterion passed), then a `--fix` pass applying 3 findings across 13 files.
-- **Applied via `--fix`:** Task→Agent rename (allowed-tools in 7 SKILL.md + tool-name prose; alias-safe), `CLAUDE_ENV_FILE` UTF-8 env persistence in both SessionStart scripts (smoke-check before retiring per-call prefixes), `/fewer-permission-prompts` documented in workflow.md.
-- **User-directed finding registration:** 4 per-skill opportunities the pain-point gate had (by design) filtered were registered as proper `open` findings with re-fetched verbatim excerpts; caught a lane misattribution (Skill-wildcard fix is v2.1.139, not v2.1.145) and a v2.1.143 scope caveat (enable/disable-time only).
-- Decision log now 9 entries (3 applied / 6 open); watermark changelog 2.1.172 · docs+community 2026-06-10.
-- v2 observations: carried-forward findings are display-only for `--fix` (consider a re-arm-from-state path); lane `affected_files` repeatedly needed orchestrator sibling-sweep catches (webdesign frontmatter, mode-update.md, .ps1).
+### Last Session (Session 48) - 2026-06-10
+- Fresh skill-creator content review of `/bx:webdesign` (second pass; S42 was the first): 13 findings — 1 high / 4 medium / 8 low — 12 fixed in `9b9c703` (6 files, +29/−27), pushed.
+- High: phase1 referenced the seo skill by repo-rooted path `bx/skills/seo/SKILL.md` — unresolvable from the plugin cache layout and the target project's CWD (S39 path-bug class); now resolves `../seo/SKILL.md` against the announced skill base directory.
+- Medium: stop-on-error guardrail vs Phase-2 continue-on-failure contradiction reconciled ("never *silently* continue" + recorded-failure carve-outs); Phase 3 now skips null-`screen_id` states so one failed generation can't brick the run; per-state `status` made terminal after Phase 2; dev-server stop mechanism named (`KillShell` + allowed-tools grant).
+- Plugin cache refreshed to `15295d8` at session start; `9b9c703` landed after — refresh again before the webdesign dogfood.
 
-> Full session detail: [docs/session-history.md](docs/session-history.md) S47
+> Full session detail: [docs/session-history.md](docs/session-history.md) S48

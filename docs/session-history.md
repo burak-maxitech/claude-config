@@ -95,23 +95,7 @@
 
 ### Session 42 - 2026-06-06: Pre-dogfood content-review hardening — `/bx:webdesign` (16 fixes: `app_runnable:false` dead-end closed via persisted `stitch_project_id`, Phase-3 git-safety gitignore/stage invariant, conditional `DESIGN.md` token-commit) + `/bx:save` (7 findings A–G: allowed-tools `wc`/`awk`/`sort` gap, `decision_rows` list, save-writer skip+`warnings:` failure contract, `disable-model-invocation`→true). (commits: d6681e8, ec10b71)
 
-### Session 43 - 2026-06-08
-**What happened:**
-- Ran the **skill-creator full eval loop** on `/bx:clean`: built 2 fixture repos (TS/React/Vite + FastAPI) with planted cleanup targets AND precision traps, dispatched with-skill vs no-skill baseline runs across 3 evals (node report, python report, node `--fix`), graded against the assertion set, and built 2 benchmarks. Iteration 1 used self-labeling fixtures (non-discriminating — both 100%); iteration 2 de-hinted them + added precision traps (config-only dep `autoprefixer`, dynamic-`import()` `analytics.ts`, obscure `pycryptodome`→`Crypto`). Result: with-skill 100% vs baseline 87.6%; the skill's real edge is **fix-mode discipline** (eval-2 10/10 vs 7/10 — baseline auto-deleted Safe-to-Delete files + deps) and **prompt-independent category coverage** (eval-1 caught `datetime.utcnow()` the baseline skipped). Raw detection ties the baseline.
-- **Fixed the skill's core dispatch bug** (`65179cd`): Step 1 said "spawn a Task subagent" → a generic Opus subagent, so the dedicated `cleanup-files-code`/`-deps-config`/`-styles-tests` agents (`model: sonnet`, least-privilege) were dead code. Now dispatches them by name, matching `/bx:arch`+`/bx:tests`.
-- **Committed a regression eval suite** under `bx/skills/clean/evals/` (de-hinted fixtures + traps + ground-truth + README), promoted from the gitignored skill-creator workspace.
-- **Tightened the skill description** (`1e5a455`) with scoped coverage, motivation triggers, and negative boundaries — hand-tuned because the auto-optimizer is Windows-broken.
-- **Two skill-creator Windows tooling breakages** found + worked around: viewer UTF-8 console crash (`PYTHONUTF8=1`) and `run_loop.py` asyncio `WinError 10038` (every triggering probe fails → unusable). Saved to auto-memory.
-
-**Files created/modified:**
-- `bx/skills/clean/SKILL.md` — Step 1 dispatch → named Sonnet agents; tightened `description:`
-- `bx/skills/clean/evals/**` — new committed eval suite (evals.json, GROUND-TRUTH.md, README.md, node-react-app + python-api fixtures)
-- `.gitignore` — ignore `.skill-creator-workspace/`
-- auto-memory `skill-creator-windows-gotchas.md` — new
-
-**Next session should:**
-- `/plugin update bx` (or `cc`) to activate S41–S43 in the plugin cache, then dogfood `/bx:webdesign`.
-- Consider applying the committed-eval-suite pattern to other never-dogfooded skills (`/bx:tests`, `/bx:arch`, `/bx:health`).
+### Session 43 - 2026-06-08: skill-creator full eval loop on `/bx:clean` (2 fixture repos + precision traps; with-skill 100% vs baseline 87.6% — measurable edge is fix-mode discipline + prompt-independent category coverage); fixed Step-1 dispatch bug (generic Opus subagent → named Sonnet `cleanup-*` agents); committed regression eval suite `bx/skills/clean/evals/`; description hand-tuned (run_loop.py Windows-broken, saved to auto-memory). (commits: 65179cd, 1e5a455)
 
 ### Session 44 - 2026-06-09
 **What happened:**
@@ -182,3 +166,22 @@
 - Commit+push, then `/plugin update bx` + `/reload-plugins` (or try `/reload-skills`)
 - Smoke-check CLAUDE_ENV_FILE UTF-8 persistence (`python -c "import sys; print(sys.stdout.encoding)"` without prefixes)
 - Give `/bx:evolve` the S42 content-review treatment; act on the 6 open upstream findings
+
+### Session 48 - 2026-06-10
+**What happened:**
+- Fresh skill-creator content review of `/bx:webdesign` (second pass; S42 was the first) — all 9 skill files, 13 findings: 1 high / 4 medium / 8 low; 12 fixed, 1 no-action (unused `Agent` grant in allowed-tools, revisit after dogfood). Commit `9b9c703` (6 files, +29/−27), pushed.
+- High: phase1 Step 2.1 referenced `bx/skills/seo/SKILL.md` by repo-rooted path — unresolvable from both the installed plugin-cache layout (no `bx/` prefix) and the target project's CWD where the skill runs (S39 `${CLAUDE_SKILL_DIR}` class); now resolves `../seo/SKILL.md` against the skill base directory announced at skill load.
+- Medium: SKILL.md stop-on-any-Stitch-error guardrail contradicted phase2's mark-failed-and-continue → reworded to "never *silently* continue" with phase-defined recorded-failure carve-outs; phase3 Step 1 now skips null-`screen_id` states (one failed Phase-2 generation no longer bricks Phase 3 for healthy pages); per-state `status` made terminal after Phase 2 (page-level status owns the Phase-3 lifecycle); dev-server stop mechanism named — `KillShell` added to `allowed-tools` and cited at both stop sites.
+- Low: `app_runnable:false` degradation note appended to restyle commit messages; phantom `--skip-quota-check` flag demoted to a natural-language override; stale spec jargon fixed ("decision-9" → Step 5a, "Step 0" warning anchor); phase1 git commands normalized to `git -C`; `checkout -b` falls back to checkout when the branch already exists; 3d/3e list renumbering.
+- Plugin cache refreshed to `15295d8` at session start (S47 content live); `9b9c703` landed after — needs another `/plugin update bx` + `/reload-plugins` before dogfood.
+
+**Files created/modified:**
+- `bx/skills/webdesign/SKILL.md` — KillShell grant; per-state-status-terminal wording; guardrail carve-outs
+- `bx/skills/webdesign/references/phase1-extract.md` — sibling-skill path fix; `git -C`; branch-exists fallback; KillShell stop
+- `bx/skills/webdesign/references/phase2-design-review.md` — page-level failed rule; quota-override wording
+- `bx/skills/webdesign/references/phase3-inject.md` — null-screen skip; KillShell; degradation commit note; renumbering; state-table fix
+- `bx/skills/webdesign/references/stitch-formats.md`, `references/web-stack-detection.md` — stale jargon anchors
+
+**Next session should:**
+- Refresh plugin cache, then dogfood `/bx:webdesign` (Stitch MCP + `stitch-skills` install first)
+- `/bx:evolve` follow-ups: `CLAUDE_ENV_FILE` smoke-check + content review + 6 open findings in `docs/upstream/state.json`
