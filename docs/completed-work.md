@@ -221,3 +221,5 @@
 - [x] S46: Built /bx:evolve — 11th skill + 3 upstream-* agents, spec→plan→subagent-driven, 9 tasks with two-stage review - bx/skills/evolve/, bx/agents/upstream-*.md, docs/upstream/state.json, merge 7805d75
 - [x] S46: /simplify pass on the evolve build (dedupe, sentinel exit-point, prompt/call efficiency) - commit 21b41bb
 - [x] S46: Plugin cache updated to 9a80c20 + operational-docs sweep to 11 skills / 18 agents - README.md, workflow.md, commit 045efda
+- [x] Update plugin cache to `21b41bb` via /plugin update bx + /reload-plugins — unblocked /bx:evolve dogfood (S47)
+- [x] Dogfood /bx:evolve — first real run + immediate re-run + --fix pass (3 findings applied across 13 files; decision log at docs/upstream/state.json) (S47)

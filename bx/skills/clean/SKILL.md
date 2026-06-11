@@ -3,7 +3,7 @@ name: clean
 description: Codebase-wide cleanup audit that finds dead code, unused files, stale dependencies, unused CSS, and technical debt that's safe to remove. Use whenever the user wants to find what can be deleted — dead code, unused files or components, a dependency audit, leftover CSS, stale imports, backup/old files, or general pruning — whether whole-repo or scoped to a module ("any dead code in src/payments?"), phrased formally or casually ("this repo is messy", "let's clean things up"), or by motivation (shrinking the bundle, clearing leftovers after a migration or rewrite). Different from /code-review (which reviews recent changes for quality) — this audits the entire existing codebase for things that can be removed. Not for trivial one-offs like deleting a couple of known lines, fixing broken imports, or configuring a linter.
 disable-model-invocation: true
 effort: high
-allowed-tools: Read, Grep, Glob, Edit, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(sort:*), Bash(uniq:*), Bash(sed:*), Bash(awk:*), Bash(md5sum:*), Bash(git:*), Bash(jq:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(pip:*), Bash(pip-audit:*), Bash(safety:*), Bash(cargo:*), Bash(composer:*), Bash(govulncheck:*), Bash(bundle:*), Bash(gh:*), Task
+allowed-tools: Read, Grep, Glob, Edit, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(cat:*), Bash(head:*), Bash(tail:*), Bash(sort:*), Bash(uniq:*), Bash(sed:*), Bash(awk:*), Bash(md5sum:*), Bash(git:*), Bash(jq:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(pip:*), Bash(pip-audit:*), Bash(safety:*), Bash(cargo:*), Bash(composer:*), Bash(govulncheck:*), Bash(bundle:*), Bash(gh:*), Agent
 ---
 
 # Code Cleanup — Codebase Cleanup Audit
@@ -34,10 +34,10 @@ Store the detected stack info and use it to skip irrelevant scan categories auto
 
 ## Step 1 — Parallel Scan
 
-Launch the three dedicated scanner subagents in parallel using the Task tool. They run on **Sonnet** for cost efficiency with least-privilege tool scopes; the detailed scan instructions live in this skill's `references/` files and are passed to each agent as its task prompt. Each agent handles an independent domain.
+Launch the three dedicated scanner subagents in parallel using the Agent tool. They run on **Sonnet** for cost efficiency with least-privilege tool scopes; the detailed scan instructions live in this skill's `references/` files and are passed to each agent as its task prompt. Each agent handles an independent domain.
 
 **Important orchestration rules:**
-- Launch ALL agents in a single turn (one Task call per agent), setting each call's `subagent_type` to the agent named in its section below (`cleanup-files-code` / `cleanup-deps-config` / `cleanup-styles-tests`)
+- Launch ALL agents in a single turn (one Agent call per agent), setting each call's `subagent_type` to the agent named in its section below (`cleanup-files-code` / `cleanup-deps-config` / `cleanup-styles-tests`)
 - Each agent returns structured findings — do NOT ask agents to format final output
 - If `$ARGUMENTS` contains a filter flag (`--files`, `--code`, `--css`, `--deps`, `--tests`), skip parallelization and scan that single category directly in the main context. **`--vulns` is NOT a filter flag** — it *adds* Section 4.5 on top of whatever else runs; on its own it means full parallel scan + vuln scan (see Scope Handling)
 - If a category is irrelevant to the detected stack (e.g., CSS for a Python CLI tool), skip it entirely

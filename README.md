@@ -252,7 +252,7 @@ git pull
 
 ## Subagents
 
-The `bx/agents/` folder contains 18 subagent definitions used by skills (namespaced `bx:<agent>` once installed). These run on Sonnet for cost efficiency and have scoped tool permissions. Skills dispatch them automatically via the Task tool, and you can also reference them by name in `@`-mention typeahead inside the REPL (added in Claude Code 2.1.89).
+The `bx/agents/` folder contains 18 subagent definitions used by skills (namespaced `bx:<agent>` once installed). These run on Sonnet for cost efficiency and have scoped tool permissions. Skills dispatch them automatically via the Agent tool (renamed from Task in 2.1.63), and you can also reference them by name in `@`-mention typeahead inside the REPL (added in Claude Code 2.1.89).
 
 | Agent | Used By | Purpose |
 |-------|---------|---------|

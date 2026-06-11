@@ -80,7 +80,7 @@ Compose this structure and pass it to `save-writer` as the task prompt (fill eve
 
 ### Dispatch
 
-Dispatch one `save-writer` subagent via the Task tool with `subagent_type: "bx:save-writer"`, passing the packet as the prompt (serialize as labeled sections). Await its change report.
+Dispatch one `save-writer` subagent via the Agent tool with `subagent_type: "bx:save-writer"`, passing the packet as the prompt (serialize as labeled sections). Await its change report.
 
 Handling its `warnings:` line:
 - **Density-cap warning** (a field exceeded the prose caps) → tighten the offending field, note it in your report, do NOT re-dispatch.

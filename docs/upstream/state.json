@@ -1,8 +1,108 @@
 {
   "watermark": {
-    "last_changelog_version": null,
-    "docs_checked_at": null,
-    "community_checked_at": null
+    "last_changelog_version": "2.1.172",
+    "docs_checked_at": "2026-06-10",
+    "community_checked_at": "2026-06-10"
   },
-  "decisions": []
+  "decisions": [
+    {
+      "finding_id": "19758d30cc26fa685165dd097016e14db07d1390",
+      "decision": "open",
+      "date": "2026-06-10",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.157",
+      "affected_capability": "bx:pain/plugin-cache-staleness-after-every-push-activation-gap",
+      "source_content_hash": "785424ad5b68f0760468190381a317b46bd386b2",
+      "class": "opportunity",
+      "title": "Plugins in `.claude/skills` auto-load (no marketplace) — could eliminate the activation gap",
+      "note": null
+    },
+    {
+      "finding_id": "0e4083ea819b9600c8026a07bb67d2f31d16cea5",
+      "decision": "open",
+      "date": "2026-06-10",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.152",
+      "affected_capability": "bx:pain/plugin-cache-staleness-after-every-push-activation-gap",
+      "source_content_hash": "abba11c823427c5701e96bd1c442233dd5152cfb",
+      "class": "opportunity",
+      "title": "`/reload-skills` — lighter alternative to `/reload-plugins` for skills-only updates",
+      "note": null
+    },
+    {
+      "finding_id": "4a3fa09531e53c27eb9c10cd0c086cbf7896109f",
+      "decision": "applied",
+      "date": "2026-06-10",
+      "source_url": "https://code.claude.com/docs/en/commands",
+      "affected_capability": "bx:pain/permission-prompts-when-allowed-tools-misses-a-command",
+      "source_content_hash": "42a117810085bb27e6eab6d0ff0ff7dc1e8ca418",
+      "class": "opportunity",
+      "title": "`/fewer-permission-prompts` bundled skill — auto-generate allowed-tools allowlist",
+      "note": "Added a 'Reducing permission prompts' subsection to workflow.md Tips & Best Practices recommending the built-in /fewer-permission-prompts as first diagnostic, with the fix-allowed-tools-for-the-long-term caveat."
+    },
+    {
+      "finding_id": "10294db5bf2e4be2976331555836059fe41b1419",
+      "decision": "open",
+      "date": "2026-06-10",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.152",
+      "affected_capability": "bx:health/allowed-tools",
+      "source_content_hash": "2385b9613aa4e922e0c4a751f706df6ea61eb90e",
+      "class": "opportunity",
+      "title": "Enforce /bx:health read-only invariant via `disallowed-tools` frontmatter (v2.1.152)",
+      "note": "User-directed registration after first dogfood run: per-skill opportunity surfaced outside the pain-point gate. Proposed: add `disallowed-tools: Edit, Write, Task` to bx/skills/health/SKILL.md frontmatter."
+    },
+    {
+      "finding_id": "1c627424253f182a2c65f252d9636b16f1a8b487",
+      "decision": "open",
+      "date": "2026-06-10",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.143",
+      "affected_capability": "bx:pain/stitch-mcp-stitch-skills-plugin-not-yet-installed",
+      "source_content_hash": "e88154859f9976681c693a3dff0e2a823f747adc",
+      "class": "opportunity",
+      "title": "Declare `stitch-skills` as a plugin dependency in bx plugin.json (v2.1.143 dependency enforcement)",
+      "note": "User-directed registration. CAVEAT verified against release notes: v2.1.143 enforcement is enable/disable-time only (`plugin disable` refuses when depended-on; `plugin enable` force-enables transitive deps) — install-time resolution NOT confirmed; check code.claude.com/docs/en/plugins-reference before applying."
+    },
+    {
+      "finding_id": "83031ba59adfe9baf77b82c7ed7d4974e2b43186",
+      "decision": "open",
+      "date": "2026-06-10",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.163",
+      "affected_capability": "bx:save/end-of-session-reminder",
+      "source_content_hash": "34d5d92778546baac12592a79620cc50973ad08c",
+      "class": "opportunity",
+      "title": "Stop-hook `additionalContext` could automate the end-of-session /bx:save reminder (v2.1.163)",
+      "note": "User-directed registration. Stop/SubagentStop hooks can return hookSpecificOutput.additionalContext without being labeled a hook error — a Stop hook in bx/hooks/hooks.json could inject the '/bx:save before you go' reminder that workflow.md currently leaves to convention."
+    },
+    {
+      "finding_id": "79708ccf0f8708f45131697305b2977c05ed465d",
+      "decision": "open",
+      "date": "2026-06-10",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.139",
+      "affected_capability": "bx:pain/s37-leftovers-install-smoke-test-symlink-retirement-settings-skillbx-to-skillbx",
+      "source_content_hash": "0ae0879f90feb85711d74b594cdbcb102e44f4ed",
+      "class": "opportunity",
+      "title": "`Skill(name *)` wildcard prefix-match fixed (v2.1.139) — unblocks the Skill(bx-*)→Skill(bx:*) settings migration",
+      "note": "User-directed registration. NOTE: changelog lane's digest also attributed this fix to v2.1.145 — verified against release bodies, it ships in v2.1.139 only. Also: .claude/settings.local.json is absent in this clone, so the migration may be moot — verify ~/.claude/settings.json on this machine before applying."
+    },
+    {
+      "finding_id": "f2751a1406a1bf98b04526922a99a070b77e2705",
+      "decision": "applied",
+      "date": "2026-06-10",
+      "source_url": "https://code.claude.com/docs/en/hooks",
+      "affected_capability": "bx:harness/no-env-var-persistence",
+      "source_content_hash": "574f2ccce96a19b2f3a21f43c4f8712c51913fd3",
+      "class": "opportunity",
+      "title": "SessionStart `CLAUDE_ENV_FILE` — persist env vars to all Bash calls (addresses no-env-var-persistence)",
+      "note": "Added CLAUDE_ENV_FILE blocks to session-start-context.sh + .ps1 persisting PYTHONIOENCODING=utf-8 + PYTHONUTF8=1 session-wide (guarded no-op when unset); updated both scripts' read-only design-rule comments. Smoke-check next session before retiring per-call UTF-8 prefixes in /bx:seo."
+    },
+    {
+      "finding_id": "9ee52ef30490f4df98bda5571df5f36b11ad87db",
+      "decision": "applied",
+      "date": "2026-06-10",
+      "source_url": "https://code.claude.com/docs/en/sub-agents",
+      "affected_capability": "bx:skills/task-dispatch-subagent-type",
+      "source_content_hash": "794f385fb6b77771d7971d90a0d4af5fd90b0b2a",
+      "class": "best_practice",
+      "title": "Task tool renamed to Agent (v2.1.63, alias retained) — bx frontmatter and prose still say Task",
+      "note": "Renamed bare `Task` to `Agent` in allowed-tools of 7 SKILL.md files (arch/clean/evolve/save/seo/tests/webdesign — webdesign + save/references/mode-update.md were orchestrator completeness catches beyond the lane's list) and updated tool-name prose in 5 skill bodies + README.md. TaskCreate/TaskList/TaskGet/TaskUpdate (task-tracker tools) deliberately untouched."
+    }
+  ]
 }

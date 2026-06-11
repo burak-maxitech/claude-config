@@ -3,7 +3,7 @@ name: evolve
 description: Audits the bx toolkit against upstream Anthropic changes — new Claude Code releases, official-docs best practices, and community patterns — since the last run's watermark. Reports breakage/best-practice/opportunity findings with citations; --fix applies them behind a per-finding diff gate. Use when Anthropic ships a new Claude Code version, when built-ins change or collide, periodically (monthly) to keep skills current, or when asking "are my skills up to date with the latest capabilities".
 disable-model-invocation: true
 effort: high
-allowed-tools: Read, Grep, Glob, Edit, Write, Bash(git:*), Bash(python:*), Bash(python3:*), Task
+allowed-tools: Read, Grep, Glob, Edit, Write, Bash(git:*), Bash(python:*), Bash(python3:*), Agent
 argument-hint: "[--full] [--fix] [--no-community]"
 ---
 
@@ -66,13 +66,13 @@ Interpret `$ARGUMENTS`:
 
 ## Step 2 — Parallel Lane Dispatch
 
-Launch all three lane agents in a single turn (three Task calls in one message). Set `subagent_type` to the dedicated agent name for each — **never generic subagents** (the S43 rule: skill-specific agents carry the least-privilege tool lists and baked-in scanning instructions; a generic subagent runs on the orchestrator's model and bypasses tool scoping):
+Launch all three lane agents in a single turn (three Agent calls in one message). Set `subagent_type` to the dedicated agent name for each — **never generic subagents** (the S43 rule: skill-specific agents carry the least-privilege tool lists and baked-in scanning instructions; a generic subagent runs on the orchestrator's model and bypasses tool scoping):
 
-- Task 1: `subagent_type: upstream-changelog`
-- Task 2: `subagent_type: upstream-docs`
-- Task 3: `subagent_type: upstream-community` (omit when `--no-community`)
+- Agent call 1: `subagent_type: upstream-changelog`
+- Agent call 2: `subagent_type: upstream-docs`
+- Agent call 3: `subagent_type: upstream-community` (omit when `--no-community`)
 
-For each Task call, include the following shared context block verbatim, then instruct the agent as described below:
+For each Agent call, include the following shared context block verbatim, then instruct the agent as described below:
 
 ```
 Watermark: last_changelog_version=<value|null> · docs_checked_at=<value|null> · community_checked_at=<value|null>
@@ -84,7 +84,7 @@ Output: structured JSON-shaped findings per the schema in your scan instructions
 
 Instruct each agent to **first Read** its own scan reference file (`upstream-changelog` → `bx/skills/evolve/references/scan-changelog.md`; `upstream-docs` → `bx/skills/evolve/references/scan-docs.md`; `upstream-community` → `bx/skills/evolve/references/scan-community.md`) and then Read the following named sections of `bx/skills/evolve/references/state-schema.md`: "source_url canonicalization (normative)", "affected_capability normalization" (within the finding_id computation section), and the "`bx:pain/<kebab-slug>` convention" paragraph. These files live at repo-root-relative paths; the run-in-repo precondition guarantees CWD = repo root. The agent follows the scan file exactly — it is canonical. Do NOT inline the content of these files in the task prompt.
 
-**`--no-community`:** omit the Task call for `upstream-community` entirely. Record `lane_status: skipped` for that lane in the report footer.
+**`--no-community`:** omit the Agent call for `upstream-community` entirely. Record `lane_status: skipped` for that lane in the report footer.
 
 **`--full`:** pass `last_changelog_version=null`, `docs_checked_at=null`, `community_checked_at=null` in the shared context block, overriding the stored values. The stored `state.json` is untouched at this point.
 
@@ -94,7 +94,7 @@ Instruct each agent to **first Read** its own scan reference file (`upstream-cha
 
 ## Step 3 — Consolidate + Compute Hashes + Gate
 
-After all lane agents return (wait for all three Task calls to complete):
+After all lane agents return (wait for all three Agent calls to complete):
 
 ### 3.1 — Collect lane outputs
 

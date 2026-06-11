@@ -3,7 +3,7 @@ name: arch
 description: Repo-wide architecture audit. Surfaces structural debt, complexity hotspots, refactor opportunities, performance suspects, AND over-engineering/almost-dead code (single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config). Reports `lines_deletable` as a top-line metric.
 when_to_use: When user mentions architecture review, refactoring opportunities, technical debt at the repo level, "is this codebase over-engineered", "make the codebase smaller", or "where's the complexity in this codebase". Different from `/code-review` (diff-scoped, daily driver), `/bx:review` (thorough senior-engineer review), `/code-review ultra` (PR-scoped cloud review), and `/bx:clean` (file-level deletion only).
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(sort:*), Bash(uniq:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(pip:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(cat:*), Bash(head:*), Task
+allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(sort:*), Bash(uniq:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(pip:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(cat:*), Bash(head:*), Agent
 effort: high
 argument-hint: "[path] [--plan] [--fix] [--full-scan] [--map]"
 ---
@@ -121,7 +121,7 @@ Compute the file lists once and pass them to subagents so all three see the same
 
 ## Step 4 — Parallel Subagent Dispatch
 
-Launch all four Task subagents in a single turn (one Task call per agent). Mirror `/bx:clean` Step 1.
+Launch all four subagents in a single turn (one Agent tool call per agent). Mirror `/bx:clean` Step 1.
 
 For each subagent, **read its corresponding reference file** (it contains the detailed scan instructions) and pass the contents in the task prompt along with the shared context.
 

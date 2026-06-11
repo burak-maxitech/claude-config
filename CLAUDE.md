@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-06-09 (Session 46)
+Last Updated: 2026-06-10 (Session 47)
 
 ## Project Overview
 
@@ -39,7 +39,7 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 ## Next Steps
 
-1. **Dogfood `/bx:evolve`** — first real run (in this repo) after `/plugin update bx` + `/reload-plugins`. Smoke criteria in the spec's Validation plan: already-applied S33/S39 changes → zero findings; immediate re-run → only carried-forward `open` findings, fast; a rejected finding stays rejected. Give it the S42 content-review treatment first.
+1. **`/bx:evolve` follow-ups** — give it the S42 content-review treatment (skipped before the S47 dogfood); act on the 6 `open` findings in `docs/upstream/state.json` (top: evaluate `.claude/skills` auto-load, which may close the activation gap for local clones); smoke-check the new `CLAUDE_ENV_FILE` UTF-8 persistence next session before retiring per-call prefixes; v2 ideas: re-arm carried-forward findings for `--fix` from state, and treat lane digest one-liners as non-citation-grade (v2.1.145 misattribution caught in S47).
 2. **Dogfood `/bx:webdesign`** — install the Stitch MCP + `stitch-skills` plugin once, then run per `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
 3. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
 4. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — all content-review-hardened in S46, never run end-to-end.
@@ -52,8 +52,6 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 | Decision | Rationale |
 |----------|-----------|
-
-| `/seo-review` GSC API response cache — 24h TTL + `--no-cache` bypass flag (S31) | Motivated by the user's hesitation to consume GSC API quota during iterative `burakarik6` dogfood ("very precious to not consume usage limits of the API"). Wraps `searchanalytics.query` (Q1/Q2/Q3, 3 calls/run) + `urlInspection.index.inspect` (up to 100 calls/run, against the strict 2,000/day quota). Auth probe (sites.list) deliberately NOT cached — it's the live mode-detection check, must stay live. **TTL = 24h**, settled via brief design discussion: matches GSC's own ~2-day finalization lag. **`--no-cache` flag** forces fresh refetch but still writes responses to cache for next run. **Cache layout:** `.seo-data/gsc/cache/<prefix>-<sha1-hash>.json`. Per-Q-call prefixes (`sa-q1`/`sa-q2`/`sa-q3`) + per-URL prefix (`ui-`). **Wrapper invariants (5):** atomic write via `$CACHE_FILE.tmp.$$` + `mv` on HTTP 200; never cache non-200; TTL check via `find -mmin -$TTL_MIN`; cache dir pre-created in Step 1.6.1; first-stdout-line status marker. **Eviction:** `find -mtime +7 -delete` at Turn 1. **Disk-write boundary updated** to add `cache/` as a 3rd allowed entry under `.seo-data/gsc/`. **S35 update:** TTL split by call-type — sa-* stays 24h, ui-* becomes 7d (coverageState is weeks-stable). |
 
 | `/seo-review` — 6 spec gaps codified from burakarik6 dogfood (S31 cont.²) | 4th `/seo-review` run of the day on burakarik.com surfaced 6 distinct issues + 1 design problem the orchestrator improvised around at runtime. Categorized 2 critical bugs / 2 spec ambiguities / 1 design issue / 1 emergent capability. All 6 fixes shipped same-session in commit `7109213` (5 files / +474 / -18 LOC). **Fix #1 — UTF-8 enforcement on Python**: Windows charmap default crashes on Turkish + GSC prompt-injection queries; codify `PYTHONIOENCODING=utf-8 PYTHONUTF8=1` env vars on every invocation + `encoding='utf-8'` on every `open()`. **Fix #2 — Same-commit history dedup**: score swung 60→48→40→55 across 4 runs with last commit being docs-only (methodology variance, not codebase change); embed `<!-- commit:abc1234 -->` HTML comment + skip append when commit_sha already has an entry. **Fix #3 — Ship `references/gsc-parse-helper.py`** (~250 lines, 6 subcommands `q1`/`q2`/`q3`/`ctr`/`clusters`/`brand`): retires inline Python heredocs; helper script is the canonical parser. **Fix #4 — New sub-dim 13 `brand_query_anomaly`** (catalog now 12→13): codifies emergent capability — orchestrator caught `"burak arık"` at pos 7.91 / 1.93% CTR as entity-recognition deficit. **Fix #5 — CTR opportunity dual trigger**: high-volume override (imp>=10000 AND ctr<0.5% regardless of position). **Fix #6 — Probe-skipped redistribution rendering** mandatory in report footer. |
 
@@ -78,6 +76,8 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 | `/bx:seo` content-review hardening — doc-drift sweep rule (S45) | skill-creator qualitative review of all 15 skill files before the first real burakarik.com run found 3 high + 9 medium findings, all fixed in `1d6698a`. Pattern: every rework generation (CSV→API S29, helper-dispatch S35, auth S39) left stale echoes in sibling files that bait orchestrator improvisation — the canonical-paths table still mandated N-parallel-curl after S35 shipped `inspect-batch`, and Step 1.6.14 assumed env vars persist across Bash calls (same class as the pre-S39 token bug). Rules: a rework isn't done until its echoes are swept from sibling files; `allowed-tools` must enumerate every command a skill invokes, including plugin `bin/` helpers (2nd instance of the S42 lesson). |
 | `/bx:evolve` upstream-watch skill — design contract (S46) | 11th skill: audits the bx toolkit against upstream Anthropic changes. Two-tier authority (official = actionable with mandatory citations; community = advisory-only, never fix-eligible). Committed watermark + decision log at `docs/upstream/state.json` (open/applied/rejected/deferred; trigger-based re-raise only when a re-emitted finding's source hash changed). Capability-inventory relevance gate: "new capability exists" alone is never a finding. Orchestrator computes ALL hashes — lane agents return `source_excerpt` (LLMs can't SHA-1; centralizing the algorithm prevents per-lane drift). Spec: `docs/superpowers/specs/2026-06-09-bx-evolve-design.md`. |
 | Sentinel exit-point principle for /bx:evolve (S46) | `lane-unavailable-*` sentinels are lane-health reports, not findings: they exit the pipeline at consolidation Step 3.1 (lane_status set, errors stashed for the report's Section 1, removed from the finding set). All downstream exemptions (hashing, decision log, fix eligibility, certainty bands) are entailed by the single principle instead of 7 scattered carve-outs — the /simplify pass (`21b41bb`) collapsed the scatter the review iterations had accumulated. |
+| `/bx:evolve` relevance gate confirmed + user-directed registration path (S47) | First dogfood validated the S46 gate: opportunity findings require a pain-point match, so per-skill "new capability" items are filtered by design. When the user wants them anyway, the orchestrator registers them as proper `open` findings with re-fetched verbatim excerpts + caveat notes. Lane digest one-liners are NOT citation-grade — verify against release bodies (wildcard fix: v2.1.139, not v2.1.145; v2.1.143 dependency enforcement: enable/disable-time only). |
+| `CLAUDE_ENV_FILE` session env persistence (S47) | SessionStart scripts now write `PYTHONIOENCODING=utf-8` + `PYTHONUTF8=1` exports to the harness-provided `$CLAUDE_ENV_FILE` (CC 2.1.152+), persisting to every Bash call in the session — the principled fix for the recurring Windows-charmap class (S31/S33). Per-call prefixes in /bx:seo stay until a smoke-check passes. |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -121,7 +121,7 @@ claude-config/                         # marketplace repo
 
 **The S37 `/bx:seo` "messed up" breakage is RESOLVED (S39).** Root-caused to the `${CLAUDE_SKILL_DIR}` path bug (not a real Claude Code variable → the helper was never found → GSC silently fell back to heuristic-only) + an impossible "mint token once, reuse across Bash calls" auth model (shell state does not persist across Bash tool calls). Both fixed and verified against live GSC. See Session History S39 + Key Decisions.
 
-**Activation gap REOPENED (S46).** Plugin cache is at `9a80c20`; ALL of this session's commits (`c659025`..`21b41bb`) are missing from it — the four audit-skill content-review hardenings AND the entire `/bx:evolve` skill. Run `/plugin update bx` + `/reload-plugins` (or a `cc` relaunch) before dogfooding anything. `/bx:webdesign` additionally needs the Stitch MCP + `stitch-skills` plugin installed once before dogfood.
+**Activation gap closed for S46 content (S47):** plugin cache updated to `21b41bb` and `/bx:evolve` ran from it. BUT this session's `--fix` edits (13 files) are uncommitted — after commit+push, refresh again via `/plugin update bx` + `/reload-plugins` (or try the lighter `/reload-skills`, v2.1.152 — open finding `0e4083ea`). `/bx:webdesign` still needs the Stitch MCP + `stitch-skills` plugin installed once before dogfood. 6 open upstream findings live in `docs/upstream/state.json`.
 
 ## Environment Variables
 
@@ -131,11 +131,11 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 46) - 2026-06-09
-- **Content-reviewed all four dogfood-pending audit skills** (S42/S45 treatment): `/bx:clean` (dry-run left staged deletions on main, `--vulns` filter contradiction), `/bx:health` (backtick command-substitution bug in pre-injection, awk section-gobbling), `/bx:tests` (unresolvable `bx:arch/...` pseudo-paths — S39 class), `/bx:arch` ("all three subagents" drift, linter commands missing from agent tools). Commits `c659025`, `e1802e6`, `26ea1c3`, `17e518a`; `/bx:health` also gained `/bx:webdesign` routing (`0a81f86`).
-- **Built `/bx:evolve` — 11th skill + 3 Sonnet agents (15→18)** via brainstorm → spec → plan → subagent-driven (9 tasks, two-stage review per task): upstream-watch audit with two-tier authority (official actionable / community advisory), committed watermark + decision log (`docs/upstream/state.json`), capability-inventory relevance gate, per-finding combined-diff `--fix`. Merged `7805d75`.
-- Mid-build architecture catch: lane agents cannot compute SHA-1 → orchestrator computes all hashes at consolidation; lanes return `source_excerpt`.
-- **`/simplify` pass on the build** (`21b41bb`): agent-body restatements deleted, ~24k tokens/run of prompt copy-piping removed, sentinel carve-out scatter collapsed to a single Step-3.1 exit point, one `gh api` call replaces up to 50 `gh release view` calls.
-- Plugin cache updated to `9a80c20` early in the session — now stale again by 26 commits (see Known Issues).
+### Last Session (Session 47) - 2026-06-10
+- **Dogfooded `/bx:evolve` end-to-end (first real runs):** full first audit (3 lanes, 50 releases, 3 opportunity findings on recorded pain points), immediate re-run (clean changelog no-op at watermark 2.1.172 — spec smoke criterion passed), then a `--fix` pass applying 3 findings across 13 files.
+- **Applied via `--fix`:** Task→Agent rename (allowed-tools in 7 SKILL.md + tool-name prose; alias-safe), `CLAUDE_ENV_FILE` UTF-8 env persistence in both SessionStart scripts (smoke-check before retiring per-call prefixes), `/fewer-permission-prompts` documented in workflow.md.
+- **User-directed finding registration:** 4 per-skill opportunities the pain-point gate had (by design) filtered were registered as proper `open` findings with re-fetched verbatim excerpts; caught a lane misattribution (Skill-wildcard fix is v2.1.139, not v2.1.145) and a v2.1.143 scope caveat (enable/disable-time only).
+- Decision log now 9 entries (3 applied / 6 open); watermark changelog 2.1.172 · docs+community 2026-06-10.
+- v2 observations: carried-forward findings are display-only for `--fix` (consider a re-arm-from-state path); lane `affected_files` repeatedly needed orchestrator sibling-sweep catches (webdesign frontmatter, mode-update.md, .ps1).
 
-> Full session detail: [docs/session-history.md](docs/session-history.md) S46
+> Full session detail: [docs/session-history.md](docs/session-history.md) S47

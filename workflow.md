@@ -779,6 +779,10 @@ Two important caveats: `/loop` is **session-scoped** — it dies when the Claude
 
 **Do not build a custom `/loop` skill in this repo.** The built-in already covers this use case; re-implementing it in the `bx` plugin would be waste.
 
+### Reducing permission prompts: `/fewer-permission-prompts`
+
+When a bx skill triggers unexpected permission prompts (an `allowed-tools` list missing a command — the recurring S42/S45 lesson), the built-in `/fewer-permission-prompts` skill is the first diagnostic: it scans your session transcripts for common read-only Bash and MCP tool calls and adds a prioritized allowlist to the project's `.claude/settings.json`. Fix the skill's `allowed-tools` for the long term; use the generated allowlist to stop the prompts immediately and on machines where the plugin update hasn't landed yet.
+
 ---
 
 ## New Machine Setup
@@ -887,4 +891,4 @@ Installed as the `bx` plugin via the `burak-tools` marketplace (`/plugin install
 
 ---
 
-*Last updated: May 2026*
+*Last updated: June 2026*

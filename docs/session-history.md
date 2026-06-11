@@ -93,20 +93,7 @@
 
 ### Session 41 - 2026-06-06: Built `/bx:webdesign` (10th skill) — Stitch-MCP re-skin via brainstorm→spec→12-task subagent-driven flow; two-stage reviews caught rollback leakage, `pages[].states` schema drift, hallucinated docs; `/simplify` pass deduped canonical content + batched runtime calls; known dead-end: `app_runnable:false` Phase-2 path (fixed S42) (commits: d5e98ab, 429f63a, c029ac5)
 
-### Session 42 - 2026-06-06
-**What happened:** Two skill-creator-driven content-review passes on freshly-built skills, both hardened before any real dogfood. The skill-creator quantitative eval loop was judged infeasible for both (MCP/session-state-dependent inputs + subjective outputs), so both were review-driven rather than benchmarked.
-- **`/bx:webdesign` reviewed + hardened** (committed `d6681e8`, merged to `main`, pushed). Content review found 7 issues; a follow-up `/code-review` xhigh (5 finder angles → verify → sweep) found 9 more — all on the just-made edits — 16 fixes total. Headlines: the S41 `app_runnable:false` Phase-2 **dead-end is closed** (Phase 1 4b/5b + a Phase 2 recovery now capture+persist a user-supplied `stitch_project_id`); **Phase-3 git-safety** — gitignore Google's `.stitch/` scratch dir, relocate `SITE.md` into gitignored `.webdesign/`, stage `DESIGN.md` in the token commit (fixes a clean-tree self-trip + a `git clean -fd` deletion risk); `page <name>` now re-fetches its short-lived screen. The xhigh review's top catch: a literal `git add … DESIGN.md` that aborts the token commit when no root `DESIGN.md` exists (made conditional).
-- **`/bx:save` reviewed + hardened** (committed this session). 7 findings (A–G): `allowed-tools` was missing `wc`/`awk`/`sort` so the "fast by default" path would hit a permission prompt on `wc` **every run** (the headline fix); the packet carried only a single `decision_row` → `decision_rows` list; `## Known Issues` + the `## Completed` count had no packet channel → expanded `claude_md_deltas` scope; `save-writer` had no failure contract for a non-matching delta → skip + `warnings:` + orchestrator re-dispatch; `today` resolution + session-block `old_string` derivation clarified; and `disable-model-invocation` flipped **false → true** (explicit-only, matching `/bx:resume` and 9/10 `bx` skills).
-- **Reconciled the open-work notes** — the now-fixed `app_runnable:false` gap was removed from CLAUDE.md "Next Steps #1" and the dogfood checklist.
-
-**Files created/modified:**
-- `bx/skills/webdesign/SKILL.md` + `references/{phase1-extract,phase2-design-review,phase3-inject}.md` + `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md` — webdesign hardening (commit `d6681e8`)
-- `bx/skills/save/SKILL.md` + `references/{mode-update,verification-checklists}.md` + `bx/agents/save-writer.md` — save hardening (this session's commit)
-- `CLAUDE.md` + `docs/*.md` — S42 `--full` save (incl. Part 5 rollup of S36 + S37)
-
-**Next session should:**
-- `/plugin update bx` (or `cc`) to activate S41–S42 (the webdesign skill + both hardening passes) in the plugin cache, then dogfood `/bx:webdesign` against a real web project — verify the `app_runnable:false` recovery path — plus the real `/bx:seo` run.
-- Dogfood `/bx:tests` / `/bx:arch` / `/bx:health` (still never run end-to-end).
+### Session 42 - 2026-06-06: Pre-dogfood content-review hardening — `/bx:webdesign` (16 fixes: `app_runnable:false` dead-end closed via persisted `stitch_project_id`, Phase-3 git-safety gitignore/stage invariant, conditional `DESIGN.md` token-commit) + `/bx:save` (7 findings A–G: allowed-tools `wc`/`awk`/`sort` gap, `decision_rows` list, save-writer skip+`warnings:` failure contract, `disable-model-invocation`→true). (commits: d6681e8, ec10b71)
 
 ### Session 43 - 2026-06-08
 **What happened:**
@@ -175,3 +162,23 @@
 **Next session should:**
 - Run `/plugin update bx` + `/reload-plugins`, then dogfood `/bx:evolve` (smoke criteria in the spec) after giving it the S42 content-review treatment.
 - Continue the dogfood queue: webdesign (Stitch MCP install first), seo vs burakarik.com, tests/arch/health.
+
+### Session 47 - 2026-06-10
+**What happened:**
+- Updated plugin cache to `21b41bb` (closing the S46 activation gap) and dogfooded `/bx:evolve` end-to-end: first full audit (3 lanes parallel; changelog 50 releases → 2.1.172; docs 8/8 pages; community degraded 3/5) yielding 3 pain-point opportunities; immediate re-run passed the spec smoke criterion (changelog clean no-op, carried-forward findings only).
+- Mid-session user redirect: the report's findings were all plugin-meta — per-skill "new capability" items are filtered by the relevance gate by design. Produced a per-skill supplement from lane digests, then registered 4 items as proper `open` findings (health `disallowed-tools`, stitch-skills plugin dependency, Stop-hook save reminder, Skill-wildcard settings migration) with re-fetched verbatim release bodies for hashing.
+- Verification during registration caught two lane-accuracy issues: the Skill(name *) wildcard fix ships in v2.1.139 (digest had also claimed v2.1.145), and v2.1.143 dependency enforcement is enable/disable-time only (install-time unconfirmed).
+- `/bx:evolve --fix` walked 3 eligible findings (y on all): Task→Agent rename across 10 files (7 SKILL.md allowed-tools + prose + README + save/references/mode-update.md; TaskCreate/TaskList tracker tools untouched); CLAUDE_ENV_FILE UTF-8 persistence blocks in session-start-context.sh/.ps1; /fewer-permission-prompts subsection in workflow.md. Single CP2+CP3 state write; decision log 9 entries (3 applied / 6 open).
+- Dogfood observations for v2: carried-forward findings are display-only in fix mode (re-arm-from-state path?); orchestrator completeness spot-checks repeatedly extended lane `affected_files` (webdesign frontmatter, mode-update.md, .ps1 sibling).
+
+**Files created/modified:**
+- `docs/upstream/state.json` — watermark 2.1.172/2026-06-10 + 9-entry decision log (3 applied, 6 open)
+- `bx/skills/{arch,clean,evolve,save,seo,tests,webdesign}/SKILL.md` — allowed-tools `Task`→`Agent` + tool-name prose
+- `bx/skills/save/references/mode-update.md`, `README.md` — Agent-tool prose
+- `bx/scripts/session-start-context.{sh,ps1}` — CLAUDE_ENV_FILE UTF-8 persistence blocks
+- `workflow.md` — `/fewer-permission-prompts` subsection in Tips & Best Practices
+
+**Next session should:**
+- Commit+push, then `/plugin update bx` + `/reload-plugins` (or try `/reload-skills`)
+- Smoke-check CLAUDE_ENV_FILE UTF-8 persistence (`python -c "import sys; print(sys.stdout.encoding)"` without prefixes)
+- Give `/bx:evolve` the S42 content-review treatment; act on the 6 open upstream findings

@@ -6,12 +6,23 @@
 #
 # Design rules:
 #   - Cheap: must complete in < 1 second on a typical repo
-#   - Read-only: no writes anywhere
+#   - Read-only on the repo: no writes anywhere except the harness-provided
+#     $CLAUDE_ENV_FILE side-channel (session env persistence, CC 2.1.152+)
 #   - Silent on non-repo dirs: emit nothing rather than errors
 #   - Bounded: never emit more than ~50 lines (Claude reads this on every start)
 #   - Manual /bx:resume still works for deep orientation (deliberate dual-path)
 
 set -e
+
+# Persist session-wide env vars (CC 2.1.152+): UTF-8 Python defaults retire the
+# per-call PYTHONIOENCODING/PYTHONUTF8 prefixes (the S31 Windows-charmap lesson).
+# No-op on older Claude Code versions where CLAUDE_ENV_FILE is unset.
+if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
+  {
+    echo 'export PYTHONIOENCODING=utf-8'
+    echo 'export PYTHONUTF8=1'
+  } >> "$CLAUDE_ENV_FILE"
+fi
 
 # Only emit context inside a git repo. If we're not in one, the user is probably
 # in their home dir or a one-off chat — no project orientation to emit.

@@ -3,7 +3,7 @@ name: tests
 description: 'Repo-wide test suite audit. Surfaces missing coverage on critical code paths AND wasteful/redundant tests in a single report. Twin headline metric ("Coverage gaps in critical code: X lines | Tests we can delete: Y lines"). Three parallel Sonnet subagents (test-coverage / test-quality / test-economics).'
 when_to_use: When user mentions test coverage audit, test smell detection, test debt at the repo level, "are our tests any good", "what tests can we delete", or "what's untested that matters". Different from `/bx:review` §7 (diff-scoped checkbox) and `/bx:clean`'s `cleanup-styles-tests` (artifact-level cruft only).
 disable-model-invocation: true
-allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(sort:*), Bash(uniq:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(go:*), Bash(cat:*), Bash(head:*), Task
+allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(sort:*), Bash(uniq:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(go:*), Bash(cat:*), Bash(head:*), Agent
 effort: high
 argument-hint: "[path] [--plan] [--fix] [--coverage] [--full-scan]"
 ---
@@ -142,7 +142,7 @@ Compute file lists once and pass to all subagents.
 
 ## Step 4 — Parallel Subagent Dispatch
 
-Launch all three Task subagents in a single turn (three Task tool calls in one message). Mirror `/bx:arch` Step 4.
+Launch all three subagents in a single turn (three Agent tool calls in one message). Mirror `/bx:arch` Step 4.
 
 For each subagent, **read its corresponding reference file** (it contains the detailed scan instructions) and pass the contents in the task prompt along with shared context.
 

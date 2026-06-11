@@ -5,12 +5,19 @@
 #
 # Design rules (mirror session-start-context.sh):
 #   - Cheap: must complete in < 1 second on a typical repo
-#   - Read-only: no writes anywhere
+#   - Read-only on the repo: no writes anywhere except the harness-provided
+#     $env:CLAUDE_ENV_FILE side-channel (session env persistence, CC 2.1.152+)
 #   - Silent on non-repo dirs: emit nothing rather than errors
 #   - Bounded: never emit more than ~50 lines (Claude reads this on every start)
 #   - Manual /bx:resume still works for deep orientation (deliberate dual-path)
 
 $ErrorActionPreference = 'SilentlyContinue'
+
+# Persist session-wide env vars (CC 2.1.152+) — see .sh sibling for rationale
+if ($env:CLAUDE_ENV_FILE) {
+    Add-Content -Path $env:CLAUDE_ENV_FILE -Value 'export PYTHONIOENCODING=utf-8'
+    Add-Content -Path $env:CLAUDE_ENV_FILE -Value 'export PYTHONUTF8=1'
+}
 
 # Only emit context inside a git repo
 $null = git rev-parse --is-inside-work-tree 2>$null

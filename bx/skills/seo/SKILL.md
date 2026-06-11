@@ -3,7 +3,7 @@ name: seo
 description: Audits a web project for SEO and Generative Engine Optimization (GEO). Fetches current best practices every run, probes sitemap URL health, and optionally ingests Google Search Console data via API. Score `/100` headline + top-3 priorities, tracked in `docs/seo-history.md`.
 when_to_use: When user mentions SEO audit, GEO audit, Generative Engine Optimization, AI search optimization, llms.txt, structured data / JSON-LD, sitemap health, Google Search Console, GSC, search performance, AI citability, or "make this site rank better". Web projects only — rejects non-web repos silently. Distinct from generic code-review skills (no SEO awareness) and from `/bx:arch` (code structure, not SEO).
 disable-model-invocation: true
-allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(grep:*), Bash(sed:*), Bash(cat:*), Bash(head:*), Bash(gcloud:*), Bash(curl:*), Bash(gsc-parse-helper:*), Bash(mkdir:*), Bash(ls:*), Bash(mktemp:*), Bash(printf:*), Bash(rm:*), Bash(echo:*), Bash(date:*), Bash(sha1sum:*), Bash(shasum:*), Bash(cut:*), Bash(sort:*), Bash(tail:*), Bash(python:*), Task
+allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(grep:*), Bash(sed:*), Bash(cat:*), Bash(head:*), Bash(gcloud:*), Bash(curl:*), Bash(gsc-parse-helper:*), Bash(mkdir:*), Bash(ls:*), Bash(mktemp:*), Bash(printf:*), Bash(rm:*), Bash(echo:*), Bash(date:*), Bash(sha1sum:*), Bash(shasum:*), Bash(cut:*), Bash(sort:*), Bash(tail:*), Bash(python:*), Agent
 effort: high
 argument-hint: "[path] [--plan] [--fix] [--url <deployed-url>] [--no-cache] [--force-dispatch]"
 ---
@@ -596,7 +596,7 @@ When gsc_mode == "disabled":
 - (no further fields — subagents have no action to take on the specific blocker; the audit reason lives in Step 1.6.12 footer instead)
 ```
 
-**Primary consumer:** `seo-gsc-insights` subagent (dispatched as 4th parallel Task in Step 5 when `gsc_mode: enabled`). Other 3 subagents use `url_impressions_map` for traffic_weight when ranking their own findings.
+**Primary consumer:** `seo-gsc-insights` subagent (dispatched as 4th parallel Agent call in Step 5 when `gsc_mode: enabled`). Other 3 subagents use `url_impressions_map` for traffic_weight when ranking their own findings.
 
 ### 1.6.12 — Footer addition
 
@@ -1091,7 +1091,7 @@ Launch subagents in a **single turn**. The dispatch count depends on `dispatch_m
 | `skip_codebase_subagents` | `enabled` | seo-gsc-insights only | 1 |
 | `skip_codebase_subagents` | `disabled` | (never reached — Step 4.5 gating requires `gsc_mode: enabled`) | — |
 
-Mirror `/bx:tests` Step 4 for the parallel-Task dispatch pattern. When `dispatch_mode == "skip_codebase_subagents"`, fire only the single `seo-gsc-insights` Task call — there's nothing to parallelize with.
+Mirror `/bx:tests` Step 4 for the parallel-Agent dispatch pattern. When `dispatch_mode == "skip_codebase_subagents"`, fire only the single `seo-gsc-insights` Agent call — there's nothing to parallelize with.
 
 For each subagent, read its corresponding reference file (`references/scan-technical.md`, `references/scan-content.md`, `references/scan-geo.md`, and `references/gsc-ingestion.md` for the 4th when enabled) and pass the contents in the task prompt along with shared context.
 
