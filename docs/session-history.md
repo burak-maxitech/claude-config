@@ -97,21 +97,7 @@
 
 ### Session 43 - 2026-06-08: skill-creator full eval loop on `/bx:clean` (2 fixture repos + precision traps; with-skill 100% vs baseline 87.6% — measurable edge is fix-mode discipline + prompt-independent category coverage); fixed Step-1 dispatch bug (generic Opus subagent → named Sonnet `cleanup-*` agents); committed regression eval suite `bx/skills/clean/evals/`; description hand-tuned (run_loop.py Windows-broken, saved to auto-memory). (commits: 65179cd, 1e5a455)
 
-### Session 44 - 2026-06-09
-**What happened:**
-- Resumed via `/bx:resume` (6 tasks hydrated, all pending; clean tree at `4cf02ad`). Noted CLAUDE.md at 29k chars (target 17k) with Key Decisions carrying full S31–S35 narratives — candidate for a future trim.
-- Designed + shipped the `/bx:save --silent` flag (commit `b82162d`, pushed): Part 8 auto-commits with the suggested conventional message (no push); first-run rollup consents (Parts 5.2/6.2) are treated as declined without writing the sentinel note; Part 7.4 consent gate is treated as skip-all. The flag never answers "yes" for the user except the commit — which is why `--silent` was chosen over `--yes`.
-- User ran `/plugin update bx` + `/reload-plugins`: plugin cache moved `ec10b71` → `b82162d` (= HEAD), closing the S41–S43 activation gap on this machine.
-- Ran the first live `/bx:save --full --silent` (this save).
-
-**Files created/modified:**
-- `bx/skills/save/SKILL.md` - `--silent` added to argument-hint + intro
-- `bx/skills/save/references/mode-update.md` - flag definition + gates at Parts 5.2, 6.2, 7.4, 8 and Save Path step 5
-- `bx/skills/save/references/verification-checklists.md` - commit-checkpoint checklist line
-
-**Next session should:**
-- Dogfood `/bx:webdesign` (install Stitch MCP + `stitch-skills` first)
-- Run `/bx:seo` end-to-end against burakarik.com
+### Session 44 - 2026-06-09: Shipped `/bx:save --silent` — zero-prompt saves (auto-commit suggested msg, no push; first-run rollup consents declined-without-sentinel; Part 7.4 skip-all); never answers "yes" except the commit, hence `--silent` over `--yes`. Plugin cache → `b82162d`. (commit: b82162d)
 
 ### Session 45 - 2026-06-09
 **What happened:**
@@ -185,3 +171,21 @@
 **Next session should:**
 - Refresh plugin cache, then dogfood `/bx:webdesign` (Stitch MCP + `stitch-skills` install first)
 - `/bx:evolve` follow-ups: `CLAUDE_ENV_FILE` smoke-check + content review + 6 open findings in `docs/upstream/state.json`
+
+### Session 49 - 2026-06-12
+**What happened:**
+- Resumed via `/bx:resume` (clean tree at `8d206df`; plugin cache still one commit behind per the S48 blocker).
+- User switched the claude-config repo from **private → public** (done on GitHub before the session) to make teammate plugin-install easier, and asked whether it was necessary, how teammates install, and to simplify README.
+- Clarified the install model with on-disk evidence: `/plugin marketplace add burak-maxitech/claude-config` auto-clones the repo into `~/.claude/plugins/marketplaces/` (and `/plugin install` caches `bx` under `~/.claude/plugins/cache/`) — teammates never `git clone` manually; the manual clone (README Step 2) only powers the `cc` launcher / skill editing. Public wasn't strictly required (private works for anyone with repo read access) but removes per-teammate access management; flagged that `docs/` session notes are now world-readable (no secrets, but internal narrative).
+- Simplified README for teammates: moved the "you only need Step 1" callout to the top of Setup, rewrote Step 1's private→public note, split "Updating" into Everyone vs Contributors, collapsed the symlink-migration block into a `<details>`, and renamed "Syncing Changes" → "Editing the skills (contributors only)".
+- Swept stale `(private)` → `(public)` across CLAUDE.md, workflow.md, and auto-memory `MEMORY.md`.
+
+**Files created/modified:**
+- `README.md` - teammate-facing setup simplification + public-install note
+- `CLAUDE.md` - repo line private→public (+ /bx:save session block, Last Updated)
+- `workflow.md` - repo visibility line
+- `~/.claude/projects/-Users-burakarik-Development-projects-claude-config/memory/MEMORY.md` - repo visibility fact (auto-memory)
+
+**Next session should:**
+- Decide whether to keep the repo public or revert to private + add teammates as collaborators (docs/ session notes are now world-readable).
+- Dogfood `/bx:webdesign` (refresh plugin cache ≥`9b9c703`, install Stitch MCP + `stitch-skills` first).

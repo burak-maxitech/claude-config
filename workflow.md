@@ -853,7 +853,7 @@ Commands are stored in:
 └── README.md
 ```
 
-GitHub repo: `burak-maxitech/claude-config` (private)
+GitHub repo: `burak-maxitech/claude-config` (public)
 
 Installed as the `bx` plugin via the `burak-tools` marketplace (`/plugin install bx@burak-tools`). Skills invoke as `/bx:<name>`.
 

@@ -1,12 +1,12 @@
 # CLAUDE.md
 
-Last Updated: 2026-06-10 (Session 48)
+Last Updated: 2026-06-12 (Session 49)
 
 ## Project Overview
 
 **claude-config** — Personal Claude Code configuration repo containing custom skills, subagents, and workflow documentation.
 
-- **Repo:** [burak-maxitech/claude-config](https://github.com/burak-maxitech/claude-config) (private)
+- **Repo:** [burak-maxitech/claude-config](https://github.com/burak-maxitech/claude-config) (public — went public S49 for easier teammate plugin install)
 - **README.md** — Public overview, setup instructions, command reference
 - **Workflow.md** — Detailed personal workflow guide (daily workflow, scenarios, tips)
 - **docs/** — Reference files (session history, key decisions, completed work)
@@ -130,10 +130,10 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 48) - 2026-06-10
-- Fresh skill-creator content review of `/bx:webdesign` (second pass; S42 was the first): 13 findings — 1 high / 4 medium / 8 low — 12 fixed in `9b9c703` (6 files, +29/−27), pushed.
-- High: phase1 referenced the seo skill by repo-rooted path `bx/skills/seo/SKILL.md` — unresolvable from the plugin cache layout and the target project's CWD (S39 path-bug class); now resolves `../seo/SKILL.md` against the announced skill base directory.
-- Medium: stop-on-error guardrail vs Phase-2 continue-on-failure contradiction reconciled ("never *silently* continue" + recorded-failure carve-outs); Phase 3 now skips null-`screen_id` states so one failed generation can't brick the run; per-state `status` made terminal after Phase 2; dev-server stop mechanism named (`KillShell` + allowed-tools grant).
-- Plugin cache refreshed to `15295d8` at session start; `9b9c703` landed after — refresh again before the webdesign dogfood.
+### Last Session (Session 49) - 2026-06-12
+- Made the claude-config repo **public** (was private) so teammates install the `bx` plugin without an access grant; updated README, CLAUDE.md, workflow.md, and auto-memory accordingly.
+- Confirmed (on-disk) that `/plugin marketplace add` auto-clones the repo into `~/.claude/plugins/marketplaces/` — teammates never clone manually; README Step 2's manual clone only powers the `cc` launcher / skill editing.
+- Simplified README for teammates: "you only need Step 1" callout moved to top of Setup, "Updating" split Everyone-vs-Contributors, symlink-migration collapsed into a `<details>`, "Syncing Changes" → "Editing the skills (contributors only)".
+- Privacy note flagged: `docs/` session history + decisions are now world-readable (no secrets, but internal narrative) — open question whether to keep public or revert + add collaborators.
 
-> Full session detail: [docs/session-history.md](docs/session-history.md) S48
+> Full session detail: [docs/session-history.md](docs/session-history.md) S49

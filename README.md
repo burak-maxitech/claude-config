@@ -65,6 +65,8 @@ claude-config/                         # marketplace repo
 
 ## Setup on a New Machine
 
+> **Joining a team that uses `bx`? You only need Step 1.** The repo is public, so there's no GitHub access grant to request — run the three commands below in Claude Code and every `/bx:*` skill is available in all sessions, on any repo, with no local clone. Steps 2–3 (clone + `cc` launcher) are only for people who want to *edit* the skills or use the project picker.
+
 The toolkit is a Claude Code **plugin** (`bx`) installed from this repo's GitHub marketplace — no symlinks, cross-platform, skills namespaced `/bx:<name>`. The optional `cc` launcher (numbered project picker → plugin refresh → launch) lives *inside* the repo, so **clone the repo if you want `cc`** (steps 2–3).
 
 ### 1. Install the plugin (required)
@@ -74,10 +76,10 @@ Inside Claude Code:
 ```
 /plugin marketplace add burak-maxitech/claude-config
 /plugin install bx@burak-tools
-/bx:health
+/bx:health      # verify — should list every /bx:* skill
 ```
 
-The repo is private; the marketplace clones with your existing GitHub auth (same as `git push`). This alone gives you every `/bx:*` skill in all sessions — no local clone needed.
+The repo is **public**, so the marketplace clones with no auth or access grant — anyone with these commands gets every `/bx:*` skill in all sessions, no local clone needed. (If it's ever switched back to private, the same commands still work for anyone with read access — the marketplace clones using your existing GitHub auth, same as `git push`.)
 
 ### 2. Clone the repo (only if you want the `cc` launcher or to edit skills)
 
@@ -114,18 +116,23 @@ cc my-project    # launch a project directly
 
 `cc` refreshes the `bx` plugin from the marketplace, opens (and pulls) your chosen project, checks for Claude Code updates, and launches Claude Code.
 
-### Updating
+### Updating to the latest version
 
-Edit skills in your clone → `git commit` → `git push`, then refresh your install:
+**Everyone** — to pull the latest skills after they change, run inside Claude Code:
 
 ```
 /plugin marketplace update burak-tools
 /plugin update bx
 ```
 
-`cc` runs this refresh automatically on every launch. Otherwise updates are on-demand; because the plugin omits an explicit `version`, every pushed commit counts as a new version.
+Updates are on-demand; because the plugin omits an explicit `version`, every pushed commit counts as a new version. (If you use the `cc` launcher, it runs this refresh automatically on every launch — so you can skip these two commands.)
 
-### Migrating an existing machine (from the old symlink setup)
+**Contributors only** — if you edited skills in a local clone, `git commit` → `git push` first, then run the two commands above to pick up your own change.
+
+<details>
+<summary><strong>Migrating an existing machine from the old symlink setup</strong> — click to expand. <em>Only relevant if you used this repo before it became a plugin (you have <code>~/.claude/skills</code> symlinked into a clone). New teammates: skip this entirely.</em></summary>
+
+<br>
 
 If a machine already has the old symlinked skills (`~/.claude/skills` + `~/.claude/agents` pointing into this repo) **and** an existing clone, migrate **in this order** — not the fresh-machine steps above:
 
@@ -168,21 +175,27 @@ foreach ($p in "$env:USERPROFILE\.claude\skills","$env:USERPROFILE\.claude\agent
 
 **4. Restart Claude Code.** Verify with `/bx:health`; the old `/bx-*` names should be gone, leaving only the namespaced `/bx:*` skills.
 
-## Syncing Changes
+</details>
 
-After Claude or you edit any files:
+## Editing the skills (contributors only)
+
+> **Just using the `/bx:*` skills? You can ignore this section** — you never need a clone or push access. To get newer skills, see [Updating to the latest version](#updating-to-the-latest-version) above.
+
+If you cloned the repo (Step 2) and changed a skill, publish it:
 ```bash
-cd ~/Development/projects/claude-config
+cd ~/Development/projects/claude-config   # wherever you cloned it
 git add .
 git commit -m "Updated [what changed]"
 git push
 ```
 
-On other machines:
+On other machines, pull the latest source:
 ```bash
 cd ~/Development/projects/claude-config
 git pull
 ```
+
+Then refresh your install with the two `/plugin …` commands from [Updating](#updating-to-the-latest-version).
 
 ## Commands
 
