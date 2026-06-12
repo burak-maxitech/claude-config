@@ -1,67 +1,15 @@
 # Claude Config
 
-My personal Claude Code configuration: custom commands, skills, subagents, and workflow guide.
+**Burak's personal Claude Code toolkit**, packaged as the **`bx` plugin** — 11 custom skills, 18 subagents, cross-platform startup scripts, and a workflow guide, installed from this repo's own `burak-tools` marketplace.
 
-## Contents
-```
-claude-config/                         # marketplace repo
-├── .claude-plugin/
-│   └── marketplace.json               # "burak-tools" marketplace catalog
-├── bx/                                # the installable `bx` plugin
-│   ├── .claude-plugin/
-│   │   └── plugin.json                # plugin manifest (skills invoke as /bx:<name>)
-│   ├── agents/                        # 18 subagents (Sonnet-routed) → bx:<agent>
-│   │   ├── arch-performance.md
-│   │   ├── arch-refactors.md
-│   │   ├── arch-simplification.md
-│   │   ├── arch-structure.md
-│   │   ├── cleanup-deps-config.md
-│   │   ├── cleanup-files-code.md
-│   │   ├── cleanup-styles-tests.md
-│   │   ├── geo-generative.md
-│   │   ├── save-writer.md
-│   │   ├── seo-content.md
-│   │   ├── seo-gsc-insights.md
-│   │   ├── seo-technical.md
-│   │   ├── test-coverage.md
-│   │   ├── test-economics.md
-│   │   ├── test-quality.md
-│   │   ├── upstream-changelog.md
-│   │   ├── upstream-community.md
-│   │   └── upstream-docs.md
-│   ├── hooks/
-│   │   └── hooks.json                 # SessionStart project-orientation injection
-│   ├── scripts/
-│   │   ├── session-start-context.sh   # SessionStart hook (Mac/Linux)
-│   │   └── session-start-context.ps1  # SessionStart hook (Windows)
-│   └── skills/                        # 11 skills → /bx:<name> (each: SKILL.md + references/)
-│       ├── arch/                      # /bx:arch      — repo-wide architecture audit
-│       ├── clean/                     # /bx:clean     — codebase cleanup audit
-│       ├── evolve/                    # /bx:evolve    — upstream-watch: audit toolkit against latest Anthropic changes
-│       ├── health/                    # /bx:health    — skill-routing advisor
-│       ├── plan/                      # /bx:plan      — feature planning interview
-│       ├── resume/                    # /bx:resume    — resume a dev session
-│       ├── review/                    # /bx:review    — senior-engineer code review
-│       ├── save/                      # /bx:save      — session save + docs management
-│       ├── seo/                       # /bx:seo       — SEO + GEO audit
-│       ├── tests/                     # /bx:tests     — test-suite audit
-│       └── webdesign/                 # /bx:webdesign — visual re-skin via Google Stitch MCP
-├── .claude/
-│   ├── scripts/                       # Launchers (not plugin components)
-│   │   ├── start-claude.sh            # Mac/Linux launcher
-│   │   └── start-claude.ps1           # Windows launcher (PowerShell)
-│   └── settings.local.json            # Local Claude Code settings
-├── docs/                              # Reference files (overflow from CLAUDE.md)
-│   ├── completed-work.md
-│   ├── key-decisions.md
-│   ├── modernization-roadmap.md
-│   ├── session-history.md
-│   └── upstream/                      # /bx:evolve watermark + decision log
-├── .gitignore
-├── CLAUDE.md                          # AI session context
-├── README.md                          # This file
-└── workflow.md                        # Personal workflow guide
-```
+The plugin bundles a full engineering workflow into namespaced `/bx:*` slash commands:
+
+- **Session continuity** — `/bx:resume` (get up to speed) and `/bx:save` (save progress + docs) bookend each working session.
+- **Code review & audits** — `/bx:review` (senior-engineer review), `/bx:arch` (architecture), `/bx:tests` (test suite), `/bx:clean` (dead code & cruft).
+- **Web** — `/bx:seo` (SEO + GEO audit) and `/bx:webdesign` (visual re-skin via Google Stitch).
+- **Planning & meta** — `/bx:plan` (feature interview), `/bx:health` (routing advisor), `/bx:evolve` (keeps the toolkit current with Anthropic releases).
+
+**Install once and every `/bx:*` command works in all your Claude Code sessions, on any repo** — see [Setup](#setup-on-a-new-machine). Joining a team that already uses `bx`? You only need Step 1.
 
 ## Setup on a New Machine
 
@@ -348,6 +296,68 @@ A few harness-level features worth knowing about when using these skills:
 - **Plugin `bin/` on PATH** (added 2.1.91). If you install a marketplace plugin that ships `bin/check` or `bin/test`, `bx:resume deep` picks it up automatically in the health check detection ladder.
 - **MCP `maxResultSizeChars`** (added 2.1.91). If a future `bx:review` run hits an MCP-backed file reader that truncates, the MCP server can set `_meta["anthropic/maxResultSizeChars"]` up to 500K per tool to return fuller context in one call.
 - **MCP server setup.** Add servers via `claude mcp add --transport {http|sse|stdio} <name> <target>`. Three scopes are available: **local** (default, personal-to-this-project, stored in `~/.claude.json`), **project** (team-shared via `.mcp.json` at repo root), and **user** (all your projects, stored in `~/.claude.json`). Project scope is the one to use when a server should travel with the repo. Tool-search deferral keeps context cost low even with multiple servers, so the practical ceiling is tool-menu clarity and permission-prompt volume, not token budget. See the [MCP docs](https://code.claude.com/docs/en/mcp) for transport-specific setup.
+
+## Repository Layout
+
+```
+claude-config/                         # marketplace repo
+├── .claude-plugin/
+│   └── marketplace.json               # "burak-tools" marketplace catalog
+├── bx/                                # the installable `bx` plugin
+│   ├── .claude-plugin/
+│   │   └── plugin.json                # plugin manifest (skills invoke as /bx:<name>)
+│   ├── agents/                        # 18 subagents (Sonnet-routed) → bx:<agent>
+│   │   ├── arch-performance.md
+│   │   ├── arch-refactors.md
+│   │   ├── arch-simplification.md
+│   │   ├── arch-structure.md
+│   │   ├── cleanup-deps-config.md
+│   │   ├── cleanup-files-code.md
+│   │   ├── cleanup-styles-tests.md
+│   │   ├── geo-generative.md
+│   │   ├── save-writer.md
+│   │   ├── seo-content.md
+│   │   ├── seo-gsc-insights.md
+│   │   ├── seo-technical.md
+│   │   ├── test-coverage.md
+│   │   ├── test-economics.md
+│   │   ├── test-quality.md
+│   │   ├── upstream-changelog.md
+│   │   ├── upstream-community.md
+│   │   └── upstream-docs.md
+│   ├── hooks/
+│   │   └── hooks.json                 # SessionStart project-orientation injection
+│   ├── scripts/
+│   │   ├── session-start-context.sh   # SessionStart hook (Mac/Linux)
+│   │   └── session-start-context.ps1  # SessionStart hook (Windows)
+│   └── skills/                        # 11 skills → /bx:<name> (each: SKILL.md + references/)
+│       ├── arch/                      # /bx:arch      — repo-wide architecture audit
+│       ├── clean/                     # /bx:clean     — codebase cleanup audit
+│       ├── evolve/                    # /bx:evolve    — upstream-watch: audit toolkit against latest Anthropic changes
+│       ├── health/                    # /bx:health    — skill-routing advisor
+│       ├── plan/                      # /bx:plan      — feature planning interview
+│       ├── resume/                    # /bx:resume    — resume a dev session
+│       ├── review/                    # /bx:review    — senior-engineer code review
+│       ├── save/                      # /bx:save      — session save + docs management
+│       ├── seo/                       # /bx:seo       — SEO + GEO audit
+│       ├── tests/                     # /bx:tests     — test-suite audit
+│       └── webdesign/                 # /bx:webdesign — visual re-skin via Google Stitch MCP
+├── .claude/
+│   ├── scripts/                       # Launchers (not plugin components)
+│   │   ├── start-claude.sh            # Mac/Linux launcher
+│   │   └── start-claude.ps1           # Windows launcher (PowerShell)
+│   └── settings.local.json            # Local Claude Code settings
+├── docs/                              # Reference files (overflow from CLAUDE.md)
+│   ├── completed-work.md
+│   ├── key-decisions.md
+│   ├── modernization-roadmap.md
+│   ├── session-history.md
+│   └── upstream/                      # /bx:evolve watermark + decision log
+├── .gitignore
+├── CLAUDE.md                          # AI session context
+├── README.md                          # This file
+└── workflow.md                        # Personal workflow guide
+```
 
 ## Documentation
 
