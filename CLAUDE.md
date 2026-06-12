@@ -135,5 +135,6 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 - Confirmed (on-disk) that `/plugin marketplace add` auto-clones the repo into `~/.claude/plugins/marketplaces/` — teammates never clone manually; README Step 2's manual clone only powers the `cc` launcher / skill editing.
 - Simplified README for teammates: "you only need Step 1" callout moved to top of Setup, "Updating" split Everyone-vs-Contributors, symlink-migration collapsed into a `<details>`, "Syncing Changes" → "Editing the skills (contributors only)".
 - Privacy tradeoff weighed (`docs/` session history + decisions are now world-readable; no secrets, but internal narrative) and **decided: keep the repo public** — easier teammate onboarding wins.
+- Reorganized the README to lead with a real description + grouped `/bx:*` command map, then Setup; relocated the file tree to a bottom **Repository Layout** section (`d808bb3`, `fd43e4b`).
 
 > Full session detail: [docs/session-history.md](docs/session-history.md) S49

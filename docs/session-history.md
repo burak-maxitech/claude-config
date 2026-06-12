@@ -177,11 +177,11 @@
 - Resumed via `/bx:resume` (clean tree at `8d206df`; plugin cache still one commit behind per the S48 blocker).
 - User switched the claude-config repo from **private → public** (done on GitHub before the session) to make teammate plugin-install easier, and asked whether it was necessary, how teammates install, and to simplify README.
 - Clarified the install model with on-disk evidence: `/plugin marketplace add burak-maxitech/claude-config` auto-clones the repo into `~/.claude/plugins/marketplaces/` (and `/plugin install` caches `bx` under `~/.claude/plugins/cache/`) — teammates never `git clone` manually; the manual clone (README Step 2) only powers the `cc` launcher / skill editing. Public wasn't strictly required (private works for anyone with repo read access) but removes per-teammate access management; flagged that `docs/` session notes are now world-readable (no secrets, but internal narrative).
-- Simplified README for teammates: moved the "you only need Step 1" callout to the top of Setup, rewrote Step 1's private→public note, split "Updating" into Everyone vs Contributors, collapsed the symlink-migration block into a `<details>`, and renamed "Syncing Changes" → "Editing the skills (contributors only)".
-- Swept stale `(private)` → `(public)` across CLAUDE.md, workflow.md, and auto-memory `MEMORY.md`.
+- Simplified README for teammates: moved the "you only need Step 1" callout to the top of Setup, rewrote Step 1's private→public note, split "Updating" into Everyone vs Contributors, collapsed the symlink-migration block into a `<details>`, and renamed "Syncing Changes" → "Editing the skills (contributors only)". Then (follow-up, commit `fd43e4b`) reorganized the README top-level structure to lead with a description + grouped `/bx:*` command map → Setup, relocating the file tree to a bottom **Repository Layout** section (relocated byte-for-byte via script).
+- Swept stale `(private)` → `(public)` across CLAUDE.md, workflow.md, and auto-memory `MEMORY.md`. Resolved the keep-public question same session (commit `d808bb3`).
 
 **Files created/modified:**
-- `README.md` - teammate-facing setup simplification + public-install note
+- `README.md` - teammate-facing setup simplification + public-install note + structural reorg (description-first lead, file tree → Repository Layout)
 - `CLAUDE.md` - repo line private→public (+ /bx:save session block, Last Updated)
 - `workflow.md` - repo visibility line
 - `~/.claude/projects/-Users-burakarik-Development-projects-claude-config/memory/MEMORY.md` - repo visibility fact (auto-memory)
