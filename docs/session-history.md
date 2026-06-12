@@ -187,5 +187,5 @@
 - `~/.claude/projects/-Users-burakarik-Development-projects-claude-config/memory/MEMORY.md` - repo visibility fact (auto-memory)
 
 **Next session should:**
-- Decide whether to keep the repo public or revert to private + add teammates as collaborators (docs/ session notes are now world-readable).
+- ~~Decide whether to keep the repo public~~ → **resolved: keep public** (decided 2026-06-12; privacy tradeoff on `docs/` notes accepted for easier teammate onboarding).
 - Dogfood `/bx:webdesign` (refresh plugin cache ≥`9b9c703`, install Stitch MCP + `stitch-skills` first).
