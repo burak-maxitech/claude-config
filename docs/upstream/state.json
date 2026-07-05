@@ -1,8 +1,8 @@
 {
   "watermark": {
-    "last_changelog_version": "2.1.172",
-    "docs_checked_at": "2026-06-10",
-    "community_checked_at": "2026-06-10"
+    "last_changelog_version": "2.1.201",
+    "docs_checked_at": "2026-07-05",
+    "community_checked_at": "2026-07-05"
   },
   "decisions": [
     {
@@ -103,6 +103,94 @@
       "class": "best_practice",
       "title": "Task tool renamed to Agent (v2.1.63, alias retained) — bx frontmatter and prose still say Task",
       "note": "Renamed bare `Task` to `Agent` in allowed-tools of 7 SKILL.md files (arch/clean/evolve/save/seo/tests/webdesign — webdesign + save/references/mode-update.md were orchestrator completeness catches beyond the lane's list) and updated tool-name prose in 5 skill bodies + README.md. TaskCreate/TaskList/TaskGet/TaskUpdate (task-tracker tools) deliberately untouched."
+    },
+    {
+      "finding_id": "cc7d1af68a6439c079af3be007fe34799d9b983b",
+      "decision": "open",
+      "date": "2026-07-05",
+      "source_url": "https://www.anthropic.com/news/claude-design-anthropic-labs",
+      "affected_capability": "bx:webdesign/stitch-design-engine",
+      "source_content_hash": "bf4bb0fc3bdb82d3386cd5ae8f83e9be631a468b",
+      "class": "opportunity",
+      "title": "Claude Design (Anthropic-native design engine) — candidate to replace Google Stitch in /bx:webdesign once it ships an API/MCP",
+      "note": "User-directed registration after this session's research (finding is NOT from the changelog/docs/community lanes — Claude Design is a separate Anthropic Labs product, launched 2026-04-17, Opus-powered). Strong long-term fit for the /bx:webdesign design engine: same vendor as the harness, codebase-aware design-system extraction (maps onto Phase 1), exports standalone HTML. BLOCKED today: Claude Design is interactive web-only with NO API/MCP/CLI, so the headless MCP-driven skill (generate_screen_from_text / get_screen / edit_screens, screen IDs persisted in state.json) has nothing to call — a swap is impossible now, not just inadvisable. Trigger: re-evaluate when Anthropic ships a Claude Design API/MCP or makes the 'Handoff to Claude Code' bundle scriptable; source_content_hash tracks the announcement's 'integrations coming weeks' line, so a change there re-raises this. Related v2 question worth a brainstorm: whether Opus-native restyle generation removes the need for ANY external design engine (Stitch or Claude Design) at all."
+    },
+    {
+      "finding_id": "dadac84562356de2f5e790d40e486378fb5d8e9d",
+      "decision": "open",
+      "date": "2026-07-05",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.183",
+      "affected_capability": "bx:webdesign/git-safety-invariant",
+      "source_content_hash": "8c4286f68f39951fe5da76f1e38e895c145d7bb3",
+      "class": "breakage",
+      "title": "Auto-mode now blocks destructive git (`git clean -fd`, `restore`, `reset --hard`) — /bx:webdesign Phase-3 rollback may be intercepted (v2.1.183)",
+      "note": "Lane finding, certainty 0.55 — NOT yet verified against a live run. /bx:webdesign Phase 3's documented per-page-failure rollback (`git restore .` + `git clean -fd`) and the git-safety invariant may be auto-blocked by the new classifier unless the session reads as an explicit request to discard local work. VERIFY during the pending webdesign dogfood before treating as confirmed breakage; if intercepted, make the cleanup legible as agent-initiated or add a user-confirmation step before Phase 3 first runs. Also relevant: new `autoMode.classifyAllShell` setting (v2.1.193)."
+    },
+    {
+      "finding_id": "15742589abb82a557a148d139f9f93e1783a0b14",
+      "decision": "open",
+      "date": "2026-07-05",
+      "source_url": "https://code.claude.com/docs/en/plugins-reference",
+      "affected_capability": "bx:pain/plugin-cache-staleness-after-every-push-activation-gap",
+      "source_content_hash": "cff46a25eda4ace8378d5b87cac7fe20f5121b21",
+      "class": "opportunity",
+      "title": "Skills-directory plugins (`<name>@skills-dir`) auto-load with no marketplace/cache — could close the activation gap (docs + v2.1.178)",
+      "note": "STRONGEST evidence yet for Next-Steps #1. A folder with `.claude-plugin/plugin.json` under `~/.claude/skills/` loads as `<name>@skills-dir` next session, discovered in place (not copied to the plugin cache) — personal-scope loads in every project with no install/update step, closing the plugin-cache-staleness/activation gap outright. Caveats: SKILL.md edits apply live but hooks/.mcp.json/agents/output-styles changes still need /reload-plugins; project-scope @skills-dir plugins don't walk up to repo root (launch from root). Cross-lane consolidated: docs plugins-reference (primary) corroborated by changelog v2.1.178 (nested .claude/skills contextual auto-load). Distinct-source companion to open findings 19758d30 (v2.1.157) + 0e4083ea (/reload-skills) under this same pain slug. Evaluate converting bx from marketplace→skills-dir; if adopted, update the S37 'Plugin approach' decision + README install steps."
+    },
+    {
+      "finding_id": "7e849e742eca92b6dadb533e83047f885c8cfdb1",
+      "decision": "open",
+      "date": "2026-07-05",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.186",
+      "affected_capability": "bx:pain/stitch-mcp-stitch-skills-plugin-not-yet-installed",
+      "source_content_hash": "f45abd71ecdc5829fbdf95e383b12ad86e601603",
+      "class": "opportunity",
+      "title": "`claude mcp login/logout` CLI (v2.1.186) — documents the Stitch MCP auth step without the interactive /mcp menu",
+      "note": "Useful for the still-pending one-time Stitch MCP install/auth (Next Steps #2). setup-stitch-mcp.md currently documents only `claude mcp add ... stitch ...`; add `claude mcp login stitch` as the documented auth step (with `--no-browser` for SSH/headless) and cross-reference from webdesign/SKILL.md's registration note. Low-effort doc addition, good --fix candidate."
+    },
+    {
+      "finding_id": "2d6b0e5f3a6b1a6cd2b04e665a7512dfda66e64d",
+      "decision": "applied",
+      "date": "2026-07-05",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.178",
+      "affected_capability": "bx:agents/subagent-model-routing",
+      "source_content_hash": "b231ee16394e06e4d5260a00914ce7f0b6c21af7",
+      "class": "opportunity",
+      "title": "`Tool(param:value)` permission syntax e.g. `Agent(model:opus)` (v2.1.178) — permission-layer guard against the S43 Opus-subagent bug",
+      "note": "APPLIED 2026-07-05: added a 'Guarding subagent model routing: Agent(model:…) deny rules' subsection to workflow.md Tips & Best Practices (after the /fewer-permission-prompts entry) recommending an `Agent(model:opus)`/`Agent(model:haiku)` deny rule in .claude/settings.json as a permission-layer backstop atop the frontmatter model: sonnet declarations (guards the S43 Opus-subagent class of bug). Note: settings.local.json is absent in this clone (see finding 79708ccf) — the tip is advisory guidance, not wired up here."
+    },
+    {
+      "finding_id": "afedb6db08fa8b59f577f0f6286cc9c5f6fd4dad",
+      "decision": "applied",
+      "date": "2026-07-05",
+      "source_url": "https://code.claude.com/docs/en/plugins-reference",
+      "affected_capability": "bx:agents/user-invocable",
+      "source_content_hash": "08b670c683ddabb7f3601790bad659ec607d0fbb",
+      "class": "best_practice",
+      "title": "`user-invocable: false` is inert on plugin agents — remove from all 18 bx/agents/*.md (docs, cert 0.80)",
+      "note": "APPLIED 2026-07-05: removed the inert `user-invocable: false` line from all 18 bx/agents/*.md via a uniform perl sweep (`perl -i -ne 'print unless /^user-invocable: false$/'`); verified 0 remaining + all 18 frontmatter blocks intact. Docs confirm `user-invocable` is a SKILL.md-only field, inert on plugin subagents (dispatched via Agent+subagent_type, never the / menu). SKILL.md usage deliberately untouched."
+    },
+    {
+      "finding_id": "b866308eeeda791f380d3de2a2f69ddde3d96538",
+      "decision": "open",
+      "date": "2026-07-05",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.181",
+      "affected_capability": "bx:pain/s37-leftovers-install-smoke-test-symlink-retirement-settings-skillbx-to-skillbx",
+      "source_content_hash": "b2cd9bd341b59886211694c64349f8e5d5067d7e",
+      "class": "best_practice",
+      "title": "v2.1.181 fixes settings ENOENT under symlinked ~/.claude — reduces urgency of S37 symlink retirement (informational)",
+      "note": "INFORMATIONAL — no action. Makes the OLD symlinked ~/.claude setup (README migration <details>) more crash-resistant on machines that haven't retired symlinks; does not advance or substitute for the planned retirement. Recorded so it isn't re-announced as new next run; reject in a --fix pass to clear."
+    },
+    {
+      "finding_id": "eda8e3706c3ab3f8bd483ba4f7c967375b7975db",
+      "decision": "open",
+      "date": "2026-07-05",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.176",
+      "affected_capability": "bx:pain/s37-leftovers-install-smoke-test-symlink-retirement-settings-skillbx-to-skillbx",
+      "source_content_hash": "4c2dd35d6b0b14aafbe5481bf02841fb6603c5d3",
+      "class": "best_practice",
+      "title": "v2.1.176 fixes Linux sandbox start under absolute-target symlinked settings — reduces urgency of S37 symlink retirement (informational)",
+      "note": "INFORMATIONAL — no action, same class as finding b866308e (different bug: absolute-target symlink on Linux sandbox vs. relative-target ENOENT). Reduces breakage risk for machines still on the old symlinked setup on Linux; does not change the retirement plan. Recorded to prevent re-announcement; reject in --fix to clear."
     }
   ]
 }

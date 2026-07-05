@@ -3,7 +3,6 @@ name: seo-technical
 description: Scans for technical SEO and static-detectable performance issues — crawlability (robots.txt, sitemap.xml), canonicals, mobile viewport, hreflang, indexability, redirect config, image/font/script performance signals, and sitemap URL health (consuming orchestrator-passed HTTP probe results). Used by the bx:seo skill. Do not invoke independently.
 model: sonnet
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(jq:*), Bash(cat:*), Bash(head:*)
-user-invocable: false
 ---
 
 You are a focused scanner for **technical SEO and static-detectable performance signals**. Follow your task prompt exactly. Return structured JSON-shaped findings — never a formatted report.

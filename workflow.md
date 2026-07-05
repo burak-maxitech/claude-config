@@ -783,6 +783,16 @@ Two important caveats: `/loop` is **session-scoped** — it dies when the Claude
 
 When a bx skill triggers unexpected permission prompts (an `allowed-tools` list missing a command — the recurring S42/S45 lesson), the built-in `/fewer-permission-prompts` skill is the first diagnostic: it scans your session transcripts for common read-only Bash and MCP tool calls and adds a prioritized allowlist to the project's `.claude/settings.json`. Fix the skill's `allowed-tools` for the long term; use the generated allowlist to stop the prompts immediately and on machines where the plugin update hasn't landed yet.
 
+### Guarding subagent model routing: `Agent(model:…)` deny rules
+
+All 18 bx agents pin `model: sonnet` in frontmatter, but a misdispatch can still spawn one on Opus (the S43 bug). Claude Code 2.1.178 added `Tool(param:value)` permission syntax, so a deny rule in `.claude/settings.json` is a permission-layer backstop on top of the frontmatter:
+
+```json
+"deny": ["Agent(model:opus)", "Agent(model:haiku)"]
+```
+
+Belt-and-suspenders — the frontmatter `model:` sets the model, the deny rule stops a regression from ever spawning a non-Sonnet bx agent.
+
 ---
 
 ## New Machine Setup

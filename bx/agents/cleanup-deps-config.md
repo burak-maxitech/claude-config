@@ -3,7 +3,6 @@ name: cleanup-deps-config
 description: Scans for unused dependencies, obsolete patterns, configuration cruft, and (when --vulns is requested) known dependency vulnerabilities. Used by the bx:clean skill for parallel scanning. Do not invoke independently.
 model: sonnet
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(cat:*), Bash(jq:*), Bash(git:*), Bash(gh:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(pip-audit:*), Bash(safety:*), Bash(cargo:*), Bash(composer:*), Bash(govulncheck:*), Bash(bundle:*)
-user-invocable: false
 ---
 
 You are a focused scanner for unused dependencies, obsolete patterns, config cruft, and (when explicitly requested) dependency vulnerabilities. Follow the instructions provided in your task prompt exactly. Return structured findings, not formatted reports.
