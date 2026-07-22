@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-06-12 (Session 49)
+Last Updated: 2026-07-22 (Session 50)
 
 ## Project Overview
 
@@ -33,13 +33,13 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 ## In Progress
 
-**`/bx:webdesign` shipped + twice review-hardened (S42, S48), pending activation.** The 10th skill is built, merged, pushed, and review-hardened twice: S42 (skill-creator content review + `/code-review` xhigh, 16 fixes — incl. the `app_runnable:false` Phase-2 dead-end closure + Phase-3 git-safety invariant) and S48 (fresh skill-creator pass, 13 findings / 12 fixed in `9b9c703` — incl. a repo-rooted sibling-skill path bug and a Phase-3 null-screen brick). Plugin cache is at `15295d8` — refresh to pick up `9b9c703`, then install the **Stitch MCP + `stitch-skills` plugin** (one-time) before dogfood. Dogfood checklist: `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
+**`/bx:webdesign` shipped + twice review-hardened (S42, S48), pending activation.** The 10th skill is built, merged, pushed, and review-hardened twice: S42 (skill-creator content review + `/code-review` xhigh, 16 fixes — incl. the `app_runnable:false` Phase-2 dead-end closure + Phase-3 git-safety invariant) and S48 (fresh skill-creator pass, 13 findings / 12 fixed in `9b9c703` — incl. a repo-rooted sibling-skill path bug and a Phase-3 null-screen brick). Plugin cache is at `08d69da` — refresh to pick up `9b9c703` and everything after it, then install the **Stitch MCP + `stitch-skills` plugin** (one-time) before dogfood. Dogfood checklist: `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
 
 **S37 plugin packaging — remaining:** install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement. (GSC MCP migration #1 declined; Playwright #2 deferred.)
 
 ## Next Steps
 
-1. **`/bx:evolve` follow-ups** — give it the S42 content-review treatment (skipped before the S47 dogfood); act on the 6 `open` findings in `docs/upstream/state.json` (top: evaluate `.claude/skills` auto-load, which may close the activation gap for local clones); smoke-check the new `CLAUDE_ENV_FILE` UTF-8 persistence next session before retiring per-call prefixes; v2 ideas: re-arm carried-forward findings for `--fix` from state, and treat lane digest one-liners as non-citation-grade (v2.1.145 misattribution caught in S47).
+1. **`/bx:evolve` follow-ups** — **add `code.claude.com/docs/en/permissions` to `scan-docs.md`'s pinned allowlist** (S50: its absence made the docs lane declare `Agent(model:opus)` undocumented and nearly reverted a correct fix — the page that owns permission-rule syntax was never being read); smoke-check open finding `093df977` (v2.1.214 fail-closed FD-redirects — do bx's pervasive `2>/dev/null` calls now prompt?) together with the still-pending `CLAUDE_ENV_FILE` UTF-8 check; give the skill the S42 content-review treatment; act on the 13 `open` findings (top: `.claude/skills` / `@skills-dir` auto-load, 4 sources now converging on it); v2 ideas: re-arm carried-forward findings for `--fix` from state (S50 hit this again — Section 4 entries can't be gated), treat lane digest one-liners as non-citation-grade.
 2. **Dogfood `/bx:webdesign`** — refresh the plugin cache to ≥`9b9c703`, install the Stitch MCP + `stitch-skills` plugin once, then run per `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
 3. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
 4. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — all content-review-hardened in S46, never run end-to-end.
@@ -52,10 +52,6 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 | Decision | Rationale |
 |----------|-----------|
-
-| Renamed custom `/code-review` → `/review-deep` after Anthropic naming collision (S32) | On 2026-05-23 Anthropic renamed built-in `/simplify` → `/code-review`, colliding with the custom code-review skill in this repo. The two skills are genuinely different — built-in is a lightweight diff scan with effort levels + `--comment` PR-comment posting; custom is a senior-engineer review with codebase-convention scanning + `--security` (OWASP) / `--verify` (run tests/lint, parallel-backgrounded since S19) / `--fix` / `--last-commit` modes. Solution: rename the custom skill to `/review-deep` and position the review tooling as a **3-tier ladder**: `/code-review` (built-in, fast, daily driver) → `/review-deep` (custom, thorough) → `/ultrareview` (built-in, cloud, 5+ verifying agents, high-risk pre-merge). Scope expanded to also updating `/simplify` references throughout operational docs to `/code-review` (since `/simplify` no longer exists by that name). 16 operational files modified + 1 directory rename via `git mv`; historical files deliberately left untouched as records of past state. README "Three review tiers" blockquote restructured to lead with the rename context + 2026-05-23 date. |
-
-| 5 best-practice improvements from 2026 Claude Code docs audit (S33) | Web research across official Anthropic docs + 2026 community guides surfaced 5 high-leverage improvements, all implemented same-session in commit `5a441d1`: **(1) `${CLAUDE_SKILL_DIR}` substitution** in `/seo-review` for `gsc-parse-helper.py` invocations (CWD-independent + cross-platform). **(2) `effort: high` audit + `ultrathink` injection** — added `effort: high` to `/code-cleanup`; deliberate `effort: low` retained on `/code-health-advice`, `/resume-work`, `/update-docs` (routing/IO-bound). Added `ultrathink` keyword to the three `--plan` mode reference files. **(3) `description:` / `when_to_use:` split** on 4 verbose skills. Guards against silent description-truncation. **(4) Dynamic `` !`<cmd>` `` injection** in `/code-health-advice` Step 1 + `/resume-work` Step 2. Saves 1 turn per invocation. **(5) SessionStart hook bundle** — `session-start-context.sh` + `.ps1` in `.claude/scripts/`. Eliminates manual `/resume-work` for routine session starts. |
 
 | `/seo-review` S34 extension — sub-dim 14 `deindex_regression` + 200/run URL Inspection + 4-slice URL selection + known-bad-urls.txt (2026-05-26) | Triggered by user's burakarik.com indexed-page decline + two GSC validation-failed emails (838 "Page with redirect" + 663 "Not found (404)" URLs sharing `/article/*` + `/en/article/*` + `/tr/article/*` locale-collision pattern). Existing skill's impressions-only sampling was blind to URLs Google had deindexed (they fall out of `url_impressions_map` → never inspected → user only learns when Google emails). 5-area extension across 10 files (+662/-67): **(1) URL Inspection 100/run → 200/run**, new sitemap-orphan slice (document-order sort — deterministic for snapshot regression diff). **(2) Sub-dim 14 `deindex_regression`** — orchestrator-emitted from snapshot diff at `.seo-data/gsc/snapshots/<ts>-<sha>.json` (30-day rotation, path-cluster + git-correlation evidence). **(3) Sub-dim 5 severity tiering** medium/<50, high/≥50 + locale-prefix-cluster detection. **(4) Sub-dim 4 ↔ sub-dim 5 cross-link** via `co_occurrence_with_sub_dim_5` evidence (the "single i18n migration root cause, two symptoms" diagnosis); git-changed slice now resolves BOTH `old_path` AND `new_path` from rename commits. **(5) `.seo-data/gsc/known-bad-urls.txt`** as 4th user-supplied URL source (S35 raised cap 50→100/run). `score_impact:0` invariant maintained on all GSC findings. **Burakarik.com's indexing decline is a codebase-level issue** (incomplete i18n canonical migration around ~4/21/26 inflection) — NOT caused by anything Claude has done. |
 
@@ -77,6 +73,8 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 | `/bx:evolve` relevance gate confirmed + user-directed registration path (S47) | First dogfood validated the S46 gate: opportunity findings require a pain-point match, so per-skill "new capability" items are filtered by design. When the user wants them anyway, the orchestrator registers them as proper `open` findings with re-fetched verbatim excerpts + caveat notes. Lane digest one-liners are NOT citation-grade — verify against release bodies (wildcard fix: v2.1.139, not v2.1.145; v2.1.143 dependency enforcement: enable/disable-time only). |
 | `CLAUDE_ENV_FILE` session env persistence (S47) | SessionStart scripts now write `PYTHONIOENCODING=utf-8` + `PYTHONUTF8=1` exports to the harness-provided `$CLAUDE_ENV_FILE` (CC 2.1.152+), persisting to every Bash call in the session — the principled fix for the recurring Windows-charmap class (S31/S33). Per-call prefixes in /bx:seo stay until a smoke-check passes. |
 | Cross-skill references must resolve against the skill base directory, not repo-rooted paths (S48) | /bx:webdesign phase1 pointed at `bx/skills/seo/SKILL.md` for the route-enumeration table — a path that exists in neither the installed plugin-cache layout (no `bx/` prefix) nor the target project's CWD where the skill actually runs; same class as the S39 `${CLAUDE_SKILL_DIR}` bug. Rule: sibling-skill reads use `../<skill>/...` resolved against the base directory Claude Code announces at skill load. Corollary from the same review: every background process a skill starts needs its stop mechanism named and permitted (`KillShell`), or orchestrators improvise `kill`/`taskkill`. |
+| `Agent(model:…)` deny rules do NOT guard omitted-model dispatch (S50) | The permissions docs confirm `Tool(param:value)` is real, but also that "a parameter the model omits is never matched" — so `Agent(model:opus)` catches an *explicit* Opus request and never fires on a generic dispatch that sends no `model` param, which is exactly the S43 bug it was added to guard. Two further limits: the value is compared against literal input before normalization (alias `opus` matches, a full model ID does not), and parameter rules are valid in `deny`/`ask` only, never `allow`. The durable guard remains frontmatter `model: sonnet` + dispatching agents by name. |
+| `${CLAUDE_SKILL_DIR}` is real, but text-substitution — not a shell variable (S50) | Corrects a repo-wide claim (in `bx/bin/gsc-parse-helper` and `bx/skills/seo/SKILL.md`) that it "is NOT a real Claude Code substitution". It is real and documented, expanded in a skill's rendered markdown and in `allowed-tools` Bash rules (v2.1.129+) — but never by the shell, so anything reaching the shell unexpanded still yields an empty string. That distinction is what the S33 bug actually was; the `bin/`-launcher-on-PATH remedy stays correct, and `${CLAUDE_PLUGIN_ROOT}` genuinely is unavailable to Bash. |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -88,11 +86,11 @@ claude-config/                         # marketplace repo
 │   └── marketplace.json               # "burak-tools" marketplace catalog
 ├── bx/                                # the installable `bx` plugin (S37, see Key Decisions)
 │   ├── .claude-plugin/plugin.json     # manifest (commit-SHA versioned; skills → /bx:<name>)
-│   ├── agents/                        # 15 subagents (Sonnet-routed) → bx:<agent>
+│   ├── agents/                        # 18 subagents (Sonnet-routed) → bx:<agent>
 │   ├── hooks/hooks.json               # SessionStart project-orientation injection
 │   ├── scripts/                       # session-start-context.{sh,ps1}
-│   └── skills/                        # 10 skills (SKILL.md + references/) → /bx:<name>
-│       ├── arch/    clean/   health/
+│   └── skills/                        # 11 skills (SKILL.md + references/) → /bx:<name>
+│       ├── arch/    clean/   evolve/  health/
 │       ├── plan/    resume/  review/
 │       ├── save/    seo/     tests/   # save = /bx:save (was docs)
 │       └── webdesign/                  # /bx:webdesign — visual re-skin via Stitch MCP
@@ -114,13 +112,13 @@ claude-config/                         # marketplace repo
 
 **Skills** are directories under `bx/skills/` containing `SKILL.md` (YAML frontmatter) + a `references/` folder. Invocable as `/bx:<name>`.
 
-**Subagents** are the 15 markdown files under `bx/agents/`, dispatched by skills. They run on Sonnet for cost efficiency and have scoped tool permissions. (`save-writer` is dispatched by `/bx:save` to apply doc edits off the main thread.)
+**Subagents** are the 18 markdown files under `bx/agents/`, dispatched by skills. They run on Sonnet for cost efficiency and have scoped tool permissions. (`save-writer` is dispatched by `/bx:save` to apply doc edits off the main thread.)
 
 ## Known Issues / Blockers
 
 **The S37 `/bx:seo` "messed up" breakage is RESOLVED (S39).** Root-caused to the `${CLAUDE_SKILL_DIR}` path bug (not a real Claude Code variable → the helper was never found → GSC silently fell back to heuristic-only) + an impossible "mint token once, reuse across Bash calls" auth model (shell state does not persist across Bash tool calls). Both fixed and verified against live GSC. See Session History S39 + Key Decisions.
 
-**Plugin cache one commit behind (S48):** refreshed to `15295d8` at session start (S47 `--fix` content live), but the S48 webdesign review fixes (`9b9c703`, committed + pushed) landed after — run `/plugin update bx` + `/reload-plugins` (or try the lighter `/reload-skills`, v2.1.152 — open finding `0e4083ea`) before the webdesign dogfood. `/bx:webdesign` still needs the Stitch MCP + `stitch-skills` plugin installed once. 6 open upstream findings live in `docs/upstream/state.json`.
+**Plugin cache stale by 3+ commits (S50):** the cache is at `08d69da`; `9b9c703` (S48 webdesign fixes), `fc2fa7b` (S47 `--fix`), `acff6b1` (hook exec bit) and this session's edits all postdate it. Run `/plugin update bx` + `/reload-plugins` (or try the lighter `/reload-skills`, v2.1.152 — open finding `0e4083ea`) before any dogfood. `/bx:webdesign` still needs the Stitch MCP + `stitch-skills` plugin installed once. **13 open upstream findings** now live in `docs/upstream/state.json` (up from 6; S50 applied 3 and rejected 1).
 
 ## Environment Variables
 
@@ -130,11 +128,11 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 49) - 2026-06-12
-- Made the claude-config repo **public** (was private) so teammates install the `bx` plugin without an access grant; updated README, CLAUDE.md, workflow.md, and auto-memory accordingly.
-- Confirmed (on-disk) that `/plugin marketplace add` auto-clones the repo into `~/.claude/plugins/marketplaces/` — teammates never clone manually; README Step 2's manual clone only powers the `cc` launcher / skill editing.
-- Simplified README for teammates: "you only need Step 1" callout moved to top of Setup, "Updating" split Everyone-vs-Contributors, symlink-migration collapsed into a `<details>`, "Syncing Changes" → "Editing the skills (contributors only)".
-- Privacy tradeoff weighed (`docs/` session history + decisions are now world-readable; no secrets, but internal narrative) and **decided: keep the repo public** — easier teammate onboarding wins.
-- Reorganized the README to lead with a real description + grouped `/bx:*` command map, then Setup; relocated the file tree to a bottom **Repository Layout** section (`d808bb3`, `fd43e4b`).
+### Last Session (Session 50) - 2026-07-22
+- Ran `/bx:evolve` + `/bx:evolve --fix`: watermark `2.1.201 → 2.1.217`, docs/community → 2026-07-22; 8 findings consolidated, **3 applied / 1 rejected / 5 net-new open** (13 open total).
+- **Caught the audit auditing itself wrong:** the docs lane reported `Agent(model:opus)` as undocumented and proposed reverting the S47 fix. Verified against `code.claude.com/docs/en/permissions` — a page **missing from `scan-docs.md`'s pinned allowlist** — the syntax is real.
+- But the same page says *"a parameter the model omits is never matched"*, so the deny rule never guards the S43 bug (a generic dispatch that sends no `model` param). Corrected `workflow.md`'s "belt-and-suspenders" overclaim.
+- Corrected the repo-wide stale claim that `${CLAUDE_SKILL_DIR}` "is NOT a real substitution" (`bx/bin/gsc-parse-helper`, `bx/skills/seo/SKILL.md`) — it is real, but text-level, not a shell variable; the S39 lesson survives, reframed.
+- CLAUDE.md had been stale 39 days: commits `fc2fa7b` (2026-07-05) and `acff6b1` (2026-07-21) were never recorded in session history — this save covers them.
 
-> Full session detail: [docs/session-history.md](docs/session-history.md) S49
+> Full session detail: [docs/session-history.md](docs/session-history.md) S50

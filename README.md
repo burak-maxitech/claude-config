@@ -73,7 +73,7 @@ cc my-project    # launch a project directly
 /plugin update bx
 ```
 
-Updates are on-demand; because the plugin omits an explicit `version`, every pushed commit counts as a new version. (If you use the `cc` launcher, it runs this refresh automatically on every launch — so you can skip these two commands.)
+Updates are on-demand; because the plugin omits an explicit `version`, every pushed commit counts as a new version. (If you use the `cc` launcher, it runs this refresh automatically on every launch — so you can skip these two commands.) Claude Code 2.1.216 made skills and commands edited *during* a session appear in the slash menu without a restart — but that covers in-place edits to files already loaded, not pulling a new commit from the marketplace, so the two commands above are still how you pick up someone else's changes.
 
 **Contributors only** — if you edited skills in a local clone, `git commit` → `git push` first, then run the two commands above to pick up your own change.
 

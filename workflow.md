@@ -785,13 +785,13 @@ When a bx skill triggers unexpected permission prompts (an `allowed-tools` list 
 
 ### Guarding subagent model routing: `Agent(model:…)` deny rules
 
-All 18 bx agents pin `model: sonnet` in frontmatter, but a misdispatch can still spawn one on Opus (the S43 bug). Claude Code 2.1.178 added `Tool(param:value)` permission syntax, so a deny rule in `.claude/settings.json` is a permission-layer backstop on top of the frontmatter:
+All 18 bx agents pin `model: sonnet` in frontmatter, but a misdispatch can still spawn one on Opus (the S43 bug). Claude Code 2.1.178 added `Tool(param:value)` permission syntax, so a deny rule in `.claude/settings.json` is a partial permission-layer backstop on top of the frontmatter:
 
 ```json
 "deny": ["Agent(model:opus)", "Agent(model:haiku)"]
 ```
 
-Belt-and-suspenders — the frontmatter `model:` sets the model, the deny rule stops a regression from ever spawning a non-Sonnet bx agent.
+**Know its limit before relying on it.** Parameter rules only match a parameter the caller actually sends — per the permissions docs, "a parameter the model omits is never matched." The S43 bug was a *generic* subagent dispatched with no `model` param at all, inheriting the orchestrator's Opus; a deny rule would **not** have fired on it. It catches an explicit `model: opus` misdispatch, not an omitted-model inherit. Two further caveats: the value is compared against the literal input before normalization (the alias `opus` matches, a full model ID does not), and parameter rules work in `deny`/`ask` only, never `allow`. The durable guard remains the frontmatter `model:` line plus dispatching agents by name.
 
 ---
 

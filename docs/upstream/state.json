@@ -1,8 +1,8 @@
 {
   "watermark": {
-    "last_changelog_version": "2.1.201",
-    "docs_checked_at": "2026-07-05",
-    "community_checked_at": "2026-07-05"
+    "last_changelog_version": "2.1.217",
+    "docs_checked_at": "2026-07-22",
+    "community_checked_at": "2026-07-22"
   },
   "decisions": [
     {
@@ -135,7 +135,7 @@
       "source_content_hash": "cff46a25eda4ace8378d5b87cac7fe20f5121b21",
       "class": "opportunity",
       "title": "Skills-directory plugins (`<name>@skills-dir`) auto-load with no marketplace/cache — could close the activation gap (docs + v2.1.178)",
-      "note": "STRONGEST evidence yet for Next-Steps #1. A folder with `.claude-plugin/plugin.json` under `~/.claude/skills/` loads as `<name>@skills-dir` next session, discovered in place (not copied to the plugin cache) — personal-scope loads in every project with no install/update step, closing the plugin-cache-staleness/activation gap outright. Caveats: SKILL.md edits apply live but hooks/.mcp.json/agents/output-styles changes still need /reload-plugins; project-scope @skills-dir plugins don't walk up to repo root (launch from root). Cross-lane consolidated: docs plugins-reference (primary) corroborated by changelog v2.1.178 (nested .claude/skills contextual auto-load). Distinct-source companion to open findings 19758d30 (v2.1.157) + 0e4083ea (/reload-skills) under this same pain slug. Evaluate converting bx from marketplace→skills-dir; if adopted, update the S37 'Plugin approach' decision + README install steps."
+      "note": "STRONGEST evidence yet for Next-Steps #1. A folder with `.claude-plugin/plugin.json` under `~/.claude/skills/` loads as `<name>@skills-dir` next session, discovered in place (not copied to the plugin cache) — personal-scope loads in every project with no install/update step, closing the plugin-cache-staleness/activation gap outright. Caveats: SKILL.md edits apply live but hooks/.mcp.json/agents/output-styles changes still need /reload-plugins; project-scope @skills-dir plugins don't walk up to repo root (launch from root). Cross-lane consolidated: docs plugins-reference (primary) corroborated by changelog v2.1.178 (nested .claude/skills contextual auto-load). Distinct-source companion to open findings 19758d30 (v2.1.157) + 0e4083ea (/reload-skills) under this same pain slug. Evaluate converting bx from marketplace→skills-dir; if adopted, update the S37 'Plugin approach' decision + README install steps. ADDENDUM 2026-07-22: the docs lane re-emitted this same finding_id from a DIFFERENT section of the same page — 'Version management', which states '/plugin update or auto-update fires' and confirms bx's omitted-`version` field means commit-SHA versioning ('users get updates on every new commit'). Implies an automatic update path may already exist alongside the manual step; the fetched section does not specify the auto-update trigger cadence or scope, so verify live behavior before softening the manual `/plugin update bx` + `/reload-plugins` instructions in README.md / workflow.md / fix-mode-evolve.md. stored source_content_hash intentionally left anchored to the original skills-dir excerpt (open entries have no hash-trigger semantics; Rules 3/5 cover rejected/deferred only)."
     },
     {
       "finding_id": "7e849e742eca92b6dadb533e83047f885c8cfdb1",
@@ -191,6 +191,61 @@
       "class": "best_practice",
       "title": "v2.1.176 fixes Linux sandbox start under absolute-target symlinked settings — reduces urgency of S37 symlink retirement (informational)",
       "note": "INFORMATIONAL — no action, same class as finding b866308e (different bug: absolute-target symlink on Linux sandbox vs. relative-target ENOENT). Reduces breakage risk for machines still on the old symlinked setup on Linux; does not change the retirement plan. Recorded to prevent re-announcement; reject in --fix to clear."
+    },
+    {
+      "finding_id": "313c3669fbbab1587bb80ee0d8d2a45ae691be53",
+      "decision": "applied",
+      "date": "2026-07-22",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.216",
+      "affected_capability": "bx:pain/plugin-cache-staleness-after-every-push-activation-gap",
+      "source_content_hash": "b8f5c73ce4688b1eb020f169f958bd5043cfba3d",
+      "class": "opportunity",
+      "title": "Skills/commands edited mid-session now appear in the slash menu without a restart (v2.1.216) — may soften the hard /reload-plugins requirement",
+      "note": "APPLIED 2026-07-22 as a HEDGED doc note, not a behavioural claim — v2.1.216's fix covers in-place edits to already-loaded skill/command files, which is a different mechanism from a plugin-cache refresh pulling a new marketplace commit; that distinction is unverified, so both edits keep the manual steps fully intact (no-remove-manual-steps convention). README.md 'Updating to the latest version': appended a sentence noting the 2.1.216 change and why `/plugin marketplace update` + `/plugin update bx` are still how you pick up someone else's commits. fix-mode-evolve.md 'Next steps': appended a parenthetical to the `/reload-plugins` bullet saying the same, ending 'keep running the refresh until someone confirms otherwise'. SCOPE CORRECTION: the lane listed workflow.md in affected_files, but its /plugin-update hits (lines 59, 87) are inside the `cc` launcher-script comments — launch-time behaviour, unrelated to mid-session refresh — so workflow.md was deliberately excluded. This is a scope fix, not a partial application under the S45 sibling-echo rule. Fourth distinct source under this pain slug (companions: 19758d30 v2.1.157, 0e4083ea /reload-skills, 15742589 plugins-reference), all still open."
+    },
+    {
+      "finding_id": "e3964f2fac62df577611a95dc106fd27fa0d9424",
+      "decision": "rejected",
+      "date": "2026-07-22",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.216",
+      "affected_capability": "bx:pain/permission-prompts-when-allowed-tools-misses-a-command",
+      "source_content_hash": "1d06738a540c75c71e5a7ec13798ab11f691c649",
+      "class": "best_practice",
+      "title": "v2.1.216 fixes Bash permission checking for compound statements with redirects inside `&&` lists — informational, covers patterns bx already uses",
+      "note": "REJECTED 2026-07-22 in the --fix pass — nothing to act on, which is the intended terminal state for an informational finding, not a disagreement with it. Upstream fixed a permission-classifier misjudgment in bx's favour: bx/bin/gsc-parse-helper (`command -v \"$cand\" >/dev/null 2>&1 && \"$cand\" -c '...'`) and bx/skills/seo/references/gsc-cache.md (`[ \"$NO_CACHE\" != \"1\" ] && [ -n \"$(find ... 2>/dev/null)\" ]`) use exactly the fixed compound-redirect shape. Rejected to clear it from the carried-forward list; per lifecycle Rule 3 it re-raises only if a future run re-emits it with a CHANGED source_content_hash. NOTE the tension with still-open finding 093df977 (v2.1.214) which pushes the opposite direction — fail-CLOSED on FD-redirect forms — and remains unverified; do not read this rejection as 'bx's redirect usage is confirmed safe'."
+    },
+    {
+      "finding_id": "093df977517e69b869dfe2939f98f59ccb9bed07",
+      "decision": "open",
+      "date": "2026-07-22",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.214",
+      "affected_capability": "bx:pain/permission-prompts-when-allowed-tools-misses-a-command",
+      "source_content_hash": "ac19b8e3d76dd7d990b0124f5d1875b8943ec84c",
+      "class": "best_practice",
+      "title": "v2.1.214 Bash permission checks now fail CLOSED on file-descriptor redirect forms — may cause new prompts on bx's pervasive `2>/dev/null` usage",
+      "note": "Certainty 0.50 — NOT verified as a live regression. `2>/dev/null` / `2>&1` appears across bx/scripts/session-start-context.sh, bx/skills/health/SKILL.md (`!`-injected commands), bx/skills/resume/SKILL.md, bx/skills/seo/SKILL.md and bx/skills/seo/references/gsc-cache.md. Fail-closed means previously auto-approved forms now prompt. ACTION: smoke-check next session (run a few of these, watch for new prompts) before touching allowed-tools. Note the opposite direction from finding e3964f2f (v2.1.216 relaxes a different misclassification)."
+    },
+    {
+      "finding_id": "6ec5c1a02dbed0bb6c00559c1959597fde76d7a5",
+      "decision": "applied",
+      "date": "2026-07-22",
+      "source_url": "https://code.claude.com/docs/en/skills",
+      "affected_capability": "bx:pain/permission-prompts-when-allowed-tools-misses-a-command",
+      "source_content_hash": "06f734214b2cd1ca9380a6a580abd951c8010e8c",
+      "class": "opportunity",
+      "title": "`${CLAUDE_SKILL_DIR}` IS a real substitution per current docs — the S39-era 'not a real variable' comments in bx/bin/gsc-parse-helper + seo/SKILL.md are now factually stale",
+      "note": "APPLIED 2026-07-22 — corrected the stale claim in both files without weakening the S39 lesson. The precise correction: ${CLAUDE_SKILL_DIR} IS real, but Claude Code expands it only as text pre-processing of a skill's rendered markdown and of Bash rules in allowed-tools (v2.1.129+); it is NOT a shell variable, so anything reaching the shell with it unexpanded still gets an empty string — which is what the S33 bug actually was. bx/bin/gsc-parse-helper: rewrote the 'Why this wrapper exists' header comment. bx/skills/seo/SKILL.md ~line 903: rewrote the trailing parenthetical. DELIBERATELY PRESERVED: the ${CLAUDE_PLUGIN_ROOT} half of both warnings — that claim is still accurate (it is not exported to the Bash tool environment; the hooks.json usage is a different context). NOT DONE (deliberately deferred): collapsing the bin/ PATH-launcher indirection to `allowed-tools: Bash(${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py *)`. The launcher is verified working since S39 and /bx:seo has still never had a real run — do not touch the dispatch path before that run."
+    },
+    {
+      "finding_id": "9aa8e1d0da727888b1d83e39a3d3cd8468127241",
+      "decision": "applied",
+      "date": "2026-07-22",
+      "source_url": "https://code.claude.com/docs/en/sub-agents",
+      "affected_capability": "bx:agents/agent-model-deny-rule-syntax",
+      "source_content_hash": "59b96e84da470560f5e4bda98b4dfec9aff3c419",
+      "class": "best_practice",
+      "title": "Docs document only `Agent(<subagent-name>)` deny rules — the `Agent(model:opus)` tip applied 2026-07-05 is uncorroborated by the sub-agents/settings pages",
+      "note": "APPLIED 2026-07-22, but the lane's PREMISE WAS WRONG — resolved by orchestrator verification against https://code.claude.com/docs/en/permissions#match-by-input-parameter (outside the docs lane's pinned allowlist, which is why the lane missed it). `Agent(model:opus)` IS real and documented under 'Match by input parameter'; the v2.1.178-sourced tip applied in finding 2d6b0e5f was NOT wrong about the syntax. The finding survived for a different and more serious reason: the same docs section states 'a parameter the model omits is never matched', and the S43 bug was a GENERIC subagent dispatched with no `model` param at all — so the deny rule would never have fired on the exact bug the tip claimed to guard. Rewrote workflow.md's 'Guarding subagent model routing' section: 'permission-layer backstop' → 'partial permission-layer backstop', and replaced the 'Belt-and-suspenders … stops a regression from ever spawning a non-Sonnet bx agent' overclaim with the omitted-parameter limit + two further caveats (literal-input comparison before normalization, so alias `opus` matches but a full model ID does not; parameter rules valid in deny/ask only, never allow) and a pointer back to frontmatter `model:` + dispatch-by-name as the durable guard. LESSON for scan-docs.md: the pinned allowlist lacks the permissions page, which owns permission-rule syntax — consider adding it. Orchestrator normalized the lane's `bx:*/agent-model-deny-rule-syntax` to `bx:agents/...` per the bx:<skill>/<area> capability-string form."
     }
   ]
 }

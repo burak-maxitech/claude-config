@@ -103,7 +103,10 @@ Aborted-remaining: 0
 
 Next steps:
 - Run `/plugin update bx` then `/reload-plugins` (or relaunch `cc`) — the plugin cache does not
-  pick up edits until refreshed.
+  pick up edits until refreshed. (Claude Code 2.1.216 fixed mid-session skill/command edits not
+  appearing in the slash menu until restart. That has NOT been verified to cover a plugin-cache
+  refresh, which is a different mechanism — keep running the refresh until someone confirms
+  otherwise.)
 - For any SKILL.md that received non-trivial edits, consider the S42 content-review treatment:
   invoke skill-creator's qualitative review on the updated skill before the next real run.
 - Use `Esc Esc` or `/rewind` to undo individual edits.

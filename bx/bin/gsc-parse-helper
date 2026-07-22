@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # gsc-parse-helper — launcher for the /bx:seo GSC JSON helper.
 #
-# Why this wrapper exists: skill-emitted Bash has no reliable way to locate a
-# plugin's bundled files. ${CLAUDE_SKILL_DIR} is NOT a real Claude Code
-# substitution (it expands to empty), and ${CLAUDE_PLUGIN_ROOT} is not exported
-# into the Bash tool's environment. The one mechanism that works is the plugin
+# Why this wrapper exists: ${CLAUDE_PLUGIN_ROOT} is not exported into the Bash
+# tool's environment. ${CLAUDE_SKILL_DIR} IS a real Claude Code substitution
+# (docs: skills.md) — but it is applied as text pre-processing to a skill's
+# rendered markdown and to Bash rules in `allowed-tools`, NOT as a shell
+# variable; anything reaching the shell with it unexpanded gets an empty string,
+# which is what the S33 bug actually was (framing corrected 2026-07-22). A
+# standalone script like this one runs outside that substitution pass entirely.
+# The mechanism this launcher relies on instead is the plugin
 # `bin/` directory being auto-added to PATH while the plugin is enabled
 # (Claude Code 2.1.91+). So this launcher lives in bin/, resolves its own
 # location, and execs the real implementation with a working Python 3.

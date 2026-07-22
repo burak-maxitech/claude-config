@@ -99,21 +99,7 @@
 
 ### Session 44 - 2026-06-09: Shipped `/bx:save --silent` — zero-prompt saves (auto-commit suggested msg, no push; first-run rollup consents declined-without-sentinel; Part 7.4 skip-all); never answers "yes" except the commit, hence `--silent` over `--yes`. Plugin cache → `b82162d`. (commit: b82162d)
 
-### Session 45 - 2026-06-09
-**What happened:**
-- Ran skill-creator's qualitative content review on `/bx:seo` (scope chosen over the full eval loop — the skill's live WebSearch/WebFetch + GSC dependence makes fixture evals flaky): all 15 files (7,305 lines) read against each other + the S31–S39 decision log.
-- 3 high findings: `allowed-tools` gaps (`gsc-parse-helper` + 12 other invoked commands → permission prompts on every GSC turn); Step 1.6.14's `${LOOKBACK_DAYS:-90}` env default can't survive across Bash calls → Q2 cache-hash mismatch → all watchpoints silently `no_data`; canonical-paths table + 3 other spots still mandated the "N parallel curl" Turn 2b dispatch that gsc-cache.md forbids (stale since S35 shipped `inspect-batch`).
-- 9 medium: 20-vs-6 worker drift (SKILL.md + helper's own docstring), unpinned cache-key serialization, `cluster_for` diverging from the lookup table (alternate-page → canonical_conflict; indexed-with-caveat → blocked_access), stale no-retry 429 docs vs the helper's actual 3×-backoff, pre-S39 auth text in gsc-api-schema.md, "gcloud installed" still gating in 2 spots, CSV-era language in rubric/plan-mode, URL Inspection cap 100→200 stragglers.
-- Applied all fixes + cosmetic sweep (split-TTL wording ×5, Step 3.2 renumbering, dead `.claude/agents/` path, `CACHE_STATUS` age-field drift); verified helper compile + 18/18 classification test; gitignored `__pycache__`. Commit `1d6698a` (12 files, +106/−82), pushed.
-- Lesson recorded as a Key Decision: every `/bx:seo` rework generation (CSV→API S29, helper-dispatch S35, auth S39) left stale echoes in sibling files that bait orchestrator improvisation — a rework isn't done until its echoes are swept.
-
-**Files created/modified:**
-- `bx/skills/seo/SKILL.md` + 10 `references/` files — all review fixes (see commit `1d6698a`)
-- `.gitignore` — added `__pycache__/`
-
-**Next session should:**
-- `/plugin update bx` + `/reload-plugins` to activate `1d6698a`
-- Dogfood `/bx:webdesign` (one-time Stitch MCP + `stitch-skills` setup) or run `/bx:seo` against burakarik.com
+### Session 45 - 2026-06-09: skill-creator content review of all 15 `/bx:seo` files before its first real run — 3 high (`allowed-tools` gaps → permission prompts every GSC turn; Step 1.6.14's `${LOOKBACK_DAYS:-90}` env default can't survive across Bash calls → Q2 hash mismatch → all watchpoints silently `no_data`; canonical-paths table still mandating the N-parallel-curl dispatch S35 replaced with `inspect-batch`) + 9 medium, all fixed. Rule recorded: a rework isn't done until its echoes are swept from sibling files. (commit: 1d6698a)
 
 ### Session 46 - 2026-06-09
 **What happened:**
@@ -189,3 +175,21 @@
 **Next session should:**
 - ~~Decide whether to keep the repo public~~ → **resolved: keep public** (decided 2026-06-12; privacy tradeoff on `docs/` notes accepted for easier teammate onboarding).
 - Dogfood `/bx:webdesign` (refresh plugin cache ≥`9b9c703`, install Stitch MCP + `stitch-skills` first).
+
+### Session 50 - 2026-07-22
+**What happened:**
+- `/bx:resume` flagged CLAUDE.md as 39 days stale — two commits (`fc2fa7b` 2026-07-05 `/bx:evolve --fix` pass; `acff6b1` 2026-07-21 hook exec bit) were committed but never written into session history. No conversation record exists for them, so they are recorded here by reference rather than reconstructed as a fabricated session entry.
+- Ran `/bx:evolve` (default delta): 3 lanes — changelog `ok` (15 releases, `2.1.201 → 2.1.217`), docs `ok` (8/8 pinned pages), community `degraded` (1 fetch failed on a Medium interstitial). 8 findings consolidated, 0 breakage, 0 sentinels.
+- One consolidated finding collided with existing open entry `15742589` — same page + same pain slug ⇒ identical `finding_id` — from a *different* section of `plugins-reference`. Appended a dated addendum to the existing note instead of creating a duplicate; left `source_content_hash` anchored to the original excerpt (open entries have no hash-trigger semantics; Rules 3/5 cover rejected/deferred only).
+- Ran `/bx:evolve --fix`: 3 applied across 5 files, 1 rejected. Did NOT re-dispatch the lanes — the watermark had already advanced to today, so a re-run would have produced an empty eligible set. Gated the 6 findings still in context.
+- **The pinned-allowlist gap is the session's real finding.** The docs lane concluded `Agent(model:opus)` was undocumented from `sub-agents.md` + `settings.md` alone and proposed reverting the correct S47 fix; `code.claude.com/docs/en/permissions` — the page that actually owns permission-rule syntax — is not in `scan-docs.md`'s allowlist. Verified there: the syntax is real, but *"a parameter the model omits is never matched"*, so it cannot guard the S43 omitted-model dispatch it was written to guard.
+
+**Files created/modified:**
+- `workflow.md` — "Guarding subagent model routing": `permission-layer backstop` → `partial`; replaced the belt-and-suspenders overclaim with the omitted-parameter limit + literal-input-comparison and deny/ask-only caveats
+- `bx/bin/gsc-parse-helper`, `bx/skills/seo/SKILL.md` — corrected the `${CLAUDE_SKILL_DIR}` "not a real substitution" claim; deliberately preserved the still-accurate `${CLAUDE_PLUGIN_ROOT}` half
+- `README.md`, `bx/skills/evolve/references/fix-mode-evolve.md` — hedged v2.1.216 slash-menu-refresh notes beside the manual `/plugin update` steps (manual steps kept fully visible)
+- `docs/upstream/state.json` — watermark advance + 5 new entries + 3 applied + 1 rejected (22 entries: 13 open / 8 applied / 1 rejected)
+
+**Next session should:**
+- Add `code.claude.com/docs/en/permissions` to `scan-docs.md`'s pinned allowlist — highest-value `/bx:evolve` fix surfaced this run
+- `/plugin update bx` + `/reload-plugins` (cache is at `08d69da`, 3+ commits behind), then smoke-check open finding `093df977` (fail-closed FD-redirects) alongside the pending `CLAUDE_ENV_FILE` UTF-8 check
