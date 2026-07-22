@@ -16,7 +16,7 @@ You have these tools available: Read, Grep, Glob, WebFetch. Use WebFetch for all
 
 ## Pinned URL allowlist
 
-Verified 2026-06-09. For each URL: the working form confirmed by WebFetch, the capability area it covers, and any redirect note.
+Verified 2026-06-09; `permissions` added 2026-07-22 (S50). For each URL: the working form confirmed by WebFetch, the capability area it covers, and any redirect note.
 
 | URL | Capability area | Notes |
 |-----|----------------|-------|
@@ -25,11 +25,14 @@ Verified 2026-06-09. For each URL: the working form confirmed by WebFetch, the c
 | `https://code.claude.com/docs/en/plugins-reference` | plugin technical reference — complete schema specs, CLI commands, version management, monitors, LSP servers | loads directly |
 | `https://code.claude.com/docs/en/hooks` | hook events — lifecycle points, matcher patterns, handler types, JSON schemas, exit codes, async/HTTP/MCP/prompt hooks | loads directly (page title is "Hooks reference"; the `/hooks-reference` path 404s) |
 | `https://code.claude.com/docs/en/settings` | settings — scope hierarchy, settings files, permissions, allowed-tools syntax, env vars | loads directly |
+| `https://code.claude.com/docs/en/permissions` | permission rules — `Tool(param:value)` parameter matching, `Agent(<name>)` subagent rules, Bash/Read/Edit specifier syntax, allow/ask/deny precedence, wildcards, working directories | loads directly |
 | `https://code.claude.com/docs/en/sub-agents` | subagent configuration — system prompts, tool restrictions, model routing, persistent memory | loads directly |
 | `https://code.claude.com/docs/en/memory` | memory — CLAUDE.md authoring, auto memory, .claude/rules/, path-scoped rules, import syntax | loads directly |
 | `https://code.claude.com/docs/en/commands` | commands/slash-commands reference — built-in commands, bundled skills, workflow commands | candidate `/slash-commands` redirects to skills page; successor is this URL |
 
 This lane fetches ONLY these allowlisted URLs. Following a link is allowed only to an anchor on the **same page** (one hop to a `#fragment`). Never follow links to other pages or domains. Why: unbounded link-chasing turns this pinned lane into an open-research lane and destroys the authority guarantee — findings must be traceable to a specific canonical page.
+
+**Allowlist completeness rule (S50).** A page belongs on this list when it is the *canonical owner* of a syntax or contract the bx plugin depends on — not merely when it mentions that syntax in passing. `permissions` was absent while `settings` and `sub-agents` were present; both show only name-based `Agent(<name>)` rules, so the lane concluded `Tool(param:value)` was undocumented and proposed reverting a correct fix. **Before emitting any finding whose claim is "the docs don't document X," check whether the page that owns X is on this list at all** — if it isn't, that is an allowlist gap to report in `scan_note`, not a finding about the plugin.
 
 ---
 

@@ -183,13 +183,14 @@
 - One consolidated finding collided with existing open entry `15742589` — same page + same pain slug ⇒ identical `finding_id` — from a *different* section of `plugins-reference`. Appended a dated addendum to the existing note instead of creating a duplicate; left `source_content_hash` anchored to the original excerpt (open entries have no hash-trigger semantics; Rules 3/5 cover rejected/deferred only).
 - Ran `/bx:evolve --fix`: 3 applied across 5 files, 1 rejected. Did NOT re-dispatch the lanes — the watermark had already advanced to today, so a re-run would have produced an empty eligible set. Gated the 6 findings still in context.
 - **The pinned-allowlist gap is the session's real finding.** The docs lane concluded `Agent(model:opus)` was undocumented from `sub-agents.md` + `settings.md` alone and proposed reverting the correct S47 fix; `code.claude.com/docs/en/permissions` — the page that actually owns permission-rule syntax — is not in `scan-docs.md`'s allowlist. Verified there: the syntax is real, but *"a parameter the model omits is never matched"*, so it cannot guard the S43 omitted-model dispatch it was written to guard.
+- **Closed that gap same-session:** added `code.claude.com/docs/en/permissions` to the pinned allowlist (8 → 9 pages) plus an **allowlist completeness rule** — a page belongs on the list when it is the canonical *owner* of a syntax bx depends on, not merely when it mentions it in passing; and any finding claiming "the docs don't document X" must first verify that X's owning page is listed at all, reporting an allowlist gap in `scan_note` rather than a finding against the plugin.
 
 **Files created/modified:**
 - `workflow.md` — "Guarding subagent model routing": `permission-layer backstop` → `partial`; replaced the belt-and-suspenders overclaim with the omitted-parameter limit + literal-input-comparison and deny/ask-only caveats
 - `bx/bin/gsc-parse-helper`, `bx/skills/seo/SKILL.md` — corrected the `${CLAUDE_SKILL_DIR}` "not a real substitution" claim; deliberately preserved the still-accurate `${CLAUDE_PLUGIN_ROOT}` half
 - `README.md`, `bx/skills/evolve/references/fix-mode-evolve.md` — hedged v2.1.216 slash-menu-refresh notes beside the manual `/plugin update` steps (manual steps kept fully visible)
 - `docs/upstream/state.json` — watermark advance + 5 new entries + 3 applied + 1 rejected (22 entries: 13 open / 8 applied / 1 rejected)
+- `bx/skills/evolve/references/scan-docs.md` — `permissions` added to the pinned allowlist (8 → 9 pages) + the allowlist completeness rule
 
 **Next session should:**
-- Add `code.claude.com/docs/en/permissions` to `scan-docs.md`'s pinned allowlist — highest-value `/bx:evolve` fix surfaced this run
 - `/plugin update bx` + `/reload-plugins` (cache is at `08d69da`, 3+ commits behind), then smoke-check open finding `093df977` (fail-closed FD-redirects) alongside the pending `CLAUDE_ENV_FILE` UTF-8 check
