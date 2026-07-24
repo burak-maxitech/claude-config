@@ -1,8 +1,6 @@
 # Stitch canonical formats
 
-> Bundled baseline. Stitch evolves fast — **at the start of Phase 2 Step 2.1** (immediately before generation prompts are built), fetch the official prompting doc fresh and let it supersede anything here that diverges:
-> `WebFetch https://stitch.withgoogle.com/docs/learn/prompting/ "Extract the current recommended prompt structure, frameworks, and any changes to design-system handling."`
-> This fetch lives in `phase2-design-review.md` Step 2.1 — relocated out of Phase 1 so it can't be deferred-then-dropped (which is exactly what happened on the first dogfood). If the fetch fails, proceed with this baseline and note it in the review card. Banner-stop sessions (Step A dependency missing) do not trigger this fetch.
+> Bundled baseline. Stitch evolves fast — at the **start of Phase 2** (before any prompt is built) the orchestrator fetches the official prompting doc fresh and lets it supersede anything here that diverges; see `phase2-design-review.md` Step 2 for the exact call. If that fetch fails, this baseline stands. Banner-stop sessions (Step A dependency missing) don't trigger it.
 
 ## Per-screen generation prompt format
 

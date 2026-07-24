@@ -53,7 +53,7 @@ Determines where design tokens land in Phase 3 injection. Detect in **priority o
 | 5 | CSS custom properties | A theme/tokens file (e.g. `tokens.css`, `variables.css`, `theme.css`) **OR** `:root { --…` declarations in any CSS file | `css-vars` |
 | 6 | Plain CSS | Fallback — CSS files present but none of the above | `plain-css` |
 
-> **Tailwind v4 note (load-bearing for Phase 3).** v4 projects typically have **no `tailwind.config.*` file** — the `tailwindcss` dependency plus an `@import "tailwindcss"` line in a CSS file are the definitive signals, and design tokens live in an `@theme { … }` block inside that CSS (e.g. `app/globals.css`), not in a JS/TS config. Still record `styling_system: tailwind`, but Phase 3's token-merge must target that `@theme` block, not a `tailwind.config.js/ts` that doesn't exist (see `phase3-inject.md` Step 2).
+> **Tailwind v4 note.** v4 projects typically have **no `tailwind.config.*` file** — the `tailwindcss` dependency plus an `@import "tailwindcss"` line in a CSS file are the definitive signals, and design tokens live in an `@theme { … }` block inside that CSS (e.g. `app/globals.css`). Still record `styling_system: tailwind`; Phase 3 handles the v4 `@theme` merge (see `phase3-inject.md` Step 2).
 
 **If no CSS or styling files are found at all**, set `styling_system: unknown` and emit a warning:
 

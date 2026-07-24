@@ -66,7 +66,7 @@ git -C <project-root> add .gitignore
 git -C <project-root> commit -m "webdesign: gitignore managed working dirs"
 ```
 
-Leaving `.gitignore` modified-but-uncommitted is itself a clean-tree trap: Phase 3 Step 3 asserts `git status --porcelain` is empty at the start of every page, and an uncommitted (or resume-time marker-updated) `.gitignore` would halt the run. Commit it here so the tree is clean going into Phase 2/3. (If the marker block was already present and unchanged, there is nothing to commit — skip silently.)
+A modified-but-uncommitted `.gitignore` — including the resume-time case where the marker block gets updated — would trip the same clean-tree guard, so commit it here. If the marker block was already present and unchanged, there is nothing to commit; skip silently.
 
 **The general invariant (load-bearing for Phase 3):** every artifact the skill *or Google's `stitch-skills`* create **or modify** at the repo root must be either **gitignored** (working state) or **committed** (a real change) — otherwise it false-trips Phase 3's per-page "working tree must be clean" assertion and risks deletion by `git clean -fd` on a page failure. The artifacts that exist today: Google's `.stitch/` scratch dir and the Playwright MCP's `.playwright-mcp/` output dir (both gitignored via the block above); a root-level `DESIGN.md` (staged into the Phase 3 token commit); and **the `.gitignore` edit itself** (committed in the step above — the one tracked-file modification the skill makes). Any new root artifact a future `stitch-skills` release emits, or any new file the Playwright verification writes, must be handled the same way.
 
@@ -174,7 +174,7 @@ mcp__plugin_playwright_playwright__browser_take_screenshot → <page>.png
 
 Use desktop viewport (1280 × 800 minimum). Screenshot sequentially (Playwright is stateful).
 
-> **The Playwright MCP writes to its own `.playwright-mcp/` dir, not the path you name.** The `filename` argument is resolved relative to the MCP's output directory (`.playwright-mcp/`), so the shots land there, not in `.webdesign/before/`. After capturing all routes, move them: `.playwright-mcp/<page>.png` → `.webdesign/before/<page>.png`. `.playwright-mcp/` is gitignored by Step 1.3, so it never dirties the tree.
+> **The Playwright MCP writes to its own `.playwright-mcp/` dir, not the path you name.** The `filename` argument is resolved relative to the MCP's output directory (`.playwright-mcp/`), so the shots land there, not in `.webdesign/before/`. After capturing all routes, move them in one turn: `mv .playwright-mcp/*.png .webdesign/before/` (the before-shots are the only PNGs there in Phase 1). `.playwright-mcp/` is gitignored by Step 1.3, so it never dirties the tree. (Phase 3's after-shots use the same convention — see Step 3c / `verification.md`.)
 
 ### 3.3 — Confirm, stop the server, or warn
 
@@ -194,7 +194,7 @@ Phase 3 will also skip Playwright verification — degrade to build-only.
 
 ## Step 4 — Seed Stitch
 
-> **What Step 4 actually involves.** `code-to-design` is **not** a single turnkey call — it *chains* several `stitch-design:*` sub-skills, and on a real run it fans out into: create a project, snapshot the current design to HTML, write a baseline `DESIGN.md`, upload both, and create a design system. Several of those sub-steps carry their own prerequisites and mandatory confirmation checkpoints (below). Read each sub-skill before invoking it, and narrate every Stitch write.
+> **What Step 4 actually involves.** `code-to-design` is **not** a single turnkey call — it *chains* several `stitch-design:*` sub-skills, so on a real run **Step 4** fans out into: create the project yourself (`code-to-design` uploads *into* one, it doesn't create it), snapshot the current design to HTML, write a baseline `DESIGN.md`, upload both, and create a design system. Several of those sub-steps carry their own prerequisites and mandatory confirmation checkpoints (below). Read each sub-skill before invoking it, and narrate every Stitch write.
 >
 > **The current-design HTML baseline is reference-only — not load-bearing.** It becomes a reference screen in the canvas; **Phase 2 generates from your briefs + the new direction, not from the old HTML.** So if the HTML-snapshot path is expensive (see the puppeteer note), you may seed from `DESIGN.md` alone without losing anything Phase 2 needs — offer the user that choice rather than forcing a heavy install.
 
@@ -212,7 +212,7 @@ Phase 3 will also skip Playwright verification — degrade to build-only.
    ```
    mcp__stitch__create_project(name = "<repo-name> — webdesign <YYYY-MM-DD>")
    ```
-   Persist immediately to `state.json` (`{ "stitch_project_id": "<id>" }`) and to `.webdesign/SITE.md` (schema in sub-step 5).
+   Persist immediately to `state.json` (`{ "stitch_project_id": "<id>" }`) — that alone satisfies the crash-safety rationale; `.webdesign/SITE.md` is written once, in sub-step 5.
 
 3. **Seed the baseline into that project** via `stitch-design:code-to-design`, passing the `stitch_project_id` from sub-step 2 and the current `DESIGN.md` if one exists (omit if absent — the chain extracts tokens from the build/snapshot). Follow the sub-skill's prompts rather than guessing an argument signature:
    ```

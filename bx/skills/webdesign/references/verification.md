@@ -131,8 +131,11 @@ If any PRESERVE assertion fails (element absent, expected DOM change did not occ
 After all PRESERVE assertions pass (Step 2):
 
 ```
-mcp__plugin_playwright_playwright__browser_take_screenshot(path = ".webdesign/after/<page>-post-inject.png")
+mcp__plugin_playwright_playwright__browser_take_screenshot(filename = "<page>-post-inject.png")
+mv .playwright-mcp/<page>-post-inject.png .webdesign/after/
 ```
+
+> Same Playwright-output convention as Phase 1 (see `phase1-extract.md` Step 3.2): the MCP writes under `.playwright-mcp/` regardless of the name you pass, so capture with a bare filename and `mv` it into `.webdesign/after/`.
 
 Surface paths to the human for visual confirmation:
 ```

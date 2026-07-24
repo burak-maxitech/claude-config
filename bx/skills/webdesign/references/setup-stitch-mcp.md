@@ -13,7 +13,7 @@ Run both checks at the top of every `/bx:webdesign` invocation (the orchestrator
 
 Both checks are passive (no shell invocation needed). Perform them in parallel before touching anything else.
 
-> **Note — don't be misled by `claude mcp list`.** For a remote HTTP MCP server, an out-of-session `claude mcp list` can report `Connected · tools fetch failed` even when the server is perfectly healthy — it can't always complete the streamable-HTTP session handshake a live in-session connection does. The authoritative check is the passive in-session one above (are `mcp__stitch__*` tools visible? does a zero-cost `list_projects` round-trip succeed?), **not** `claude mcp list`.
+> **Note — don't be misled by `claude mcp list`.** For a remote HTTP MCP server, an out-of-session `claude mcp list` can report `Connected · tools fetch failed` even when the server is perfectly healthy — it can't always complete the streamable-HTTP session handshake a live in-session connection does. The authoritative check is the free passive one above (are `mcp__stitch__*` tools visible in-session?); only if that's inconclusive, confirm with a zero-cost `list_projects` round-trip — **not** `claude mcp list`.
 
 ---
 

@@ -76,16 +76,16 @@ its project ID here — or type "skip" to stop.
 
 Never call `generate_screen_from_text` with a null project id.
 
-Iterate over every page brief. For each page, generate one screen per state.
-
-### 2.1 — Build the generation prompt
-
-**First, fetch the live Stitch prompting doc once** (this is the fetch relocated out of Phase 1 — it belongs here, immediately before prompts are built, so it can't be deferred-then-dropped):
+**Fetch the live Stitch prompting doc once** (relocated here from Phase 1 — this section is its only consumer), before generating anything:
 ```
 WebFetch https://stitch.withgoogle.com/docs/learn/prompting/
   "Extract the current recommended prompt structure and any changes to design-system handling."
 ```
-If the fetch fails, proceed with the bundled baseline in `stitch-formats.md` and note it in the review card. Where the live doc and the baseline diverge, the live doc wins.
+If it fails, use the bundled baseline in `stitch-formats.md`; where they diverge, the live doc wins.
+
+Iterate over every page brief. For each page, generate one screen per state.
+
+### 2.1 — Build the generation prompt
 
 For each `(page, state)` pair, construct a prompt from the brief using the **layout/content-only format** from `stitch-formats.md § Per-screen generation prompt format`. Populate the PAGE STRUCTURE sections from the brief's fields (Header → nav/branding, Hero → headline/subtext/CTA, Content → Key components, Footer → links/legal), per the format defined there.
 
@@ -95,20 +95,20 @@ For dynamic pages (brief has multiple `states:`), generate each state as a separ
 
 ### 2.1a — Palette verification pass (generate ONE screen first)
 
-**Do not batch-generate every screen before confirming the palette resolved as intended.** Stitch's design-system color control is lossy (see `stitch-formats.md § Vibe → knob mapping` caveat): a seed is auto-toned by Material dynamic-color for legibility, so a light/warm seed (e.g. yellow) can land on gold or terracotta rather than the bright palette the user pictured, and `overridePrimaryColor/secondary/tertiary` may silently not apply. On the first dogfood this cost **5 wasted generations** guessing at the palette.
+**Do not batch-generate every screen before confirming the palette resolved as intended.** Stitch's color control is lossy — the resolved palette often won't match what the user pictured (auto-toning; overrides that silently no-op; see `stitch-formats.md § Vibe → knob mapping` for the specifics). On the first dogfood this cost **5 wasted generations** guessing at the palette.
 
 So generate **one representative screen** first (the most color-expressive page — usually the flagship content page), then verify before spending the rest:
 
-1. Generate that single screen (per 2.2).
+1. Generate that single screen (using 2.2's mechanics) and **record it in `state.json` per 2.3** — it is the real first screen, not a throwaway.
 2. Read the resolved theme back via `get_project` **and** view the generated screenshot — trust the actual token colors + pixels, not the design-system echo (the echo can diverge from what generation actually used).
-3. Show the user the one screen + resolved palette. If it's wrong, adjust the design system — **prefer authoring `DESIGN.md` colors + `create_design_system_from_design_md` over knob-only `update_design_system`** when a specific palette is required — and regenerate **just this one screen**. Repeat until the palette is right.
-4. Only once the palette is confirmed, generate the remaining screens.
+3. Show the user the one screen + resolved palette. If it's wrong, adjust the design system — **prefer authoring `DESIGN.md` colors + `create_design_system_from_design_md` over knob-only `update_design_system`** when a specific palette is required — and regenerate **just this one screen** (overwrite its `screen_id` in `state.json`; do not accumulate rejected screens in the page's record). Repeat until the palette is right.
+4. Only once the palette is confirmed, generate the **remaining** screens via the 2.2 loop — which skips the one 2.1a already produced (it is already marked `generated` in `state.json`).
 
 This turns "generate N → discover the palette is wrong → regenerate N" into "generate 1 → fix → generate N−1."
 
 ### 2.2 — Invoke `stitch-design:generate-design`
 
-For each `(page, state)` pair call `stitch-design:generate-design` via the Skill tool, which internally calls `generate_screen_from_text`:
+For each `(page, state)` pair **that isn't already generated** — skip any state already marked `status: generated` with a non-null `screen_id` in `state.json` (that's 2.1a's palette-verification screen, and on a resumed run, any screen from a prior Phase-2 pass) — call `stitch-design:generate-design` via the Skill tool, which internally calls `generate_screen_from_text`:
 
 ```
 Skill("stitch-design:generate-design")

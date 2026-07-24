@@ -185,6 +185,8 @@
 - Fixed latent Phase-3 clean-tree traps the paused run never reached: `.gitignore` edit now committed in Phase 1, `.playwright-mcp/` added to the managed gitignore block; added Tailwind-v4 detection + `@theme` token-merge (the kaanarik stack).
 - Rewrote the setup doc (wizard prints its own `claude mcp add`; API-key/`.env` secret hygiene; TUI needs a real terminal) and encoded Stitch platform gotchas (generation timeout≠failure; `list_screens` omits generated screens; lossy color control → new "generate one, verify palette, then batch" pass).
 
+- Re-save: after committing the 15 fixes (`62d3461`, pushed), self-reviewed them — `/bx:review` surfaced 2 more (allowed-tools `mv`/`cp`; a 2.1a↔2.2 double-generation that would waste a generation), and a 4-agent `/simplify` pass applied 11 dedup/altitude refinements, notably fixing a missed Phase-3 after-shot site (Playwright writes to `.playwright-mcp/`) the before-shot fix hadn't covered, plus a Step-4 overview self-contradiction. Skipped 2 as v2 structural refactors (role-based skill-name indirection; a shared platform-notes section).
+
 **Files created/modified:**
 - `bx/skills/webdesign/SKILL.md` — allowed-tools +python/python3/tsx/node
 - `bx/skills/webdesign/references/{setup-stitch-mcp,web-stack-detection,phase1-extract,phase2-design-review,phase3-inject,stitch-formats}.md` — 6 reference files hardened

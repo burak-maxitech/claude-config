@@ -5,6 +5,7 @@
 ---
 
 ## Skills
+- [x] /bx:webdesign S52 self-review — /bx:review (2 fixes) + /simplify (11 refinements) on the dogfood hardening - bx/skills/webdesign/*
 - [x] `/resume-work` — Session startup with parallel doc reads, git scans, auto-memory, task hydration
 - [x] `/plan-feature` — Feature interview with greenfield/existing modes, Plan Mode, task hydration
 - [x] `/update-docs` — Session end with task drain, session archiving, auto-memory sync, CREATE/REFACTOR/UPDATE modes
