@@ -101,23 +101,7 @@
 
 ### Session 45 - 2026-06-09: skill-creator content review of all 15 `/bx:seo` files before its first real run — 3 high (`allowed-tools` gaps → permission prompts every GSC turn; Step 1.6.14's `${LOOKBACK_DAYS:-90}` env default can't survive across Bash calls → Q2 hash mismatch → all watchpoints silently `no_data`; canonical-paths table still mandating the N-parallel-curl dispatch S35 replaced with `inspect-batch`) + 9 medium, all fixed. Rule recorded: a rework isn't done until its echoes are swept from sibling files. (commit: 1d6698a)
 
-### Session 46 - 2026-06-09
-**What happened:**
-- Content-reviewed all four dogfood-pending audit skills (S42/S45 treatment): `/bx:clean` (`c659025` — dry-run `git checkout main` carried staged deletions onto main, `--vulns` listed as a single-category filter contradicting the scope table, allowed-tools gaps incl. Edit/md5sum); `/bx:health` (`e1802e6` — backticks inside a double-quoted `!` injection echo tried to EXECUTE `/bx:seo`, awk `^## [^C]` swallowed the Completed section, grep/head/awk/tr missing from allowed-tools); `/bx:tests` (`26ea1c3` — `bx:arch/references/...` pseudo-paths unresolvable, pre-ship "if it exists" scaffolding, phpunit/JaCoCo parsing gap); `/bx:arch` (`17e518a` — "all three subagents" predated the 4th agent, radon/ruff/lizard/madge/pydeps missing from arch-structure tools, scale-strategy's sort/uniq missing from BOTH arch and tests allowed-tools). `/bx:health` also gained `/bx:webdesign` Bucket-E routing (`0a81f86`).
-- Built `/bx:evolve` (11th skill, 3 new Sonnet agents → 18) via brainstorm → spec (`4d88c92`) → plan (`0b94553`) → subagent-driven execution (9 tasks, implementer + spec-reviewer + quality-reviewer per task, 19 commits on `feature/bx-evolve`, merged `7805d75`). Two-tier authority; watermark + decision log with open/applied/rejected/deferred lifecycle and trigger-based re-raise; capability-inventory relevance gate; report template + per-finding combined-diff fix mode.
-- Review loops caught real defects pre-ship: invented "weekly cadence" semantics; live-verified v-prefix tag vs CHANGELOG-heading mismatch that would break the watermark; a fabricated URL-verification claim (`/hooks-reference` 404s); WebFetch-summary hashing instability that would re-litigate every rejected finding forever → settled contract: lanes emit `source_excerpt`, orchestrator computes finding_id + source_content_hash via one batched python call.
-- `/simplify` over the merge (4 parallel agents → `21b41bb`, +52/−102): deleted two-live-copies agent-body restatements, lanes now Read their own refs instead of ~24k tokens/run of prompt inlining, checkpoints live only in state-schema (fixed a live CP1 drift), sentinel exit-point principle, gh api batching, affected_files Grep batching, dead `tier_definitions` input removed. Deferred to v2: shared lane-contract.md extraction.
-- Session ops: plugin cache → `9a80c20`; task tracker drained (6 completed); one mid-build session-limit stall recovered cleanly.
-
-**Files created/modified:**
-- `bx/skills/evolve/` (SKILL.md + 6 references) + `bx/agents/upstream-{changelog,docs,community}.md` + `docs/upstream/state.json` — the new skill
-- `bx/skills/{clean,health,tests,arch}/` + `bx/agents/{arch-structure,test-coverage,test-quality}.md` — content-review hardenings
-- `README.md`, `workflow.md`, `bx/skills/health/references/state-buckets.md` — 11/18 counts, /bx:evolve docs, routing
-- `docs/superpowers/specs/2026-06-09-bx-evolve-design.md`, `docs/superpowers/plans/2026-06-09-bx-evolve.md`
-
-**Next session should:**
-- Run `/plugin update bx` + `/reload-plugins`, then dogfood `/bx:evolve` (smoke criteria in the spec) after giving it the S42 content-review treatment.
-- Continue the dogfood queue: webdesign (Stitch MCP install first), seo vs burakarik.com, tests/arch/health.
+### Session 46 - 2026-06-09: Content-reviewed 4 dogfood-pending audit skills (`/bx:clean` c659025, `/bx:health` e1802e6 + webdesign Bucket-E routing 0a81f86, `/bx:tests` 26ea1c3, `/bx:arch` 17e518a) + built `/bx:evolve` (11th skill, 3 new Sonnet agents → 18; two-tier authority, watermark/decision-log lifecycle, capability relevance gate) via brainstorm→spec→plan→subagent-driven; `/simplify` pass established the sentinel exit-point principle + lanes-Read-own-refs. (commits: 7805d75, 21b41bb, c659025, 17e518a)
 
 ### Session 47 - 2026-06-10
 **What happened:**
@@ -194,3 +178,19 @@
 
 **Next session should:**
 - `/plugin update bx` + `/reload-plugins` (cache is at `08d69da`, 3+ commits behind), then smoke-check open finding `093df977` (fail-closed FD-redirects) alongside the pending `CLAUDE_ENV_FILE` UTF-8 check
+
+### Session 51 - 2026-07-23
+**What happened:**
+- Prepped the first-ever `/bx:webdesign` end-to-end dogfood. Read the full skill (SKILL.md + all 3 phase references + setup detection) to explain the experience: 2 gates (one-time Stitch setup + plugin-cache refresh) then 3 phases (Extract & Stage → Design & Review → Inject & Verify), with mandatory human checkpoints at page-inventory, design-direction, quota pre-flight, and the design review. Confirmed it creates a REAL Google Stitch project (remote), not local samples.
+- Verified dependency provenance via npm/GitHub: `@_davideast/stitch-mcp` is David East's personal Apache-2.0 package (a Google DevRel engineer — Google-adjacent, not first-party); `google-labs-code/stitch-skills` is the official Google Labs org (~7.8k stars). Flagged the trust implication (a personal npm pkg holds the GCP OAuth token).
+- Determined setup runs in the TARGET repo: MCP add uses `-s user` (machine-global) but skills install uses `--scope project` (must live in target repo); claude-config isn't a web project and fails the web-gate anyway. Target GCP project ID = `kaanarik` (billing linked per dashboard screenshot).
+- Wrote + committed `docs/webdesign-first-run-prompt.md` (b82637a) with a paste-ready kickoff prompt for the kaanarik session; saved auto-memory note `webdesign-first-run-queued.md` + `## /bx:webdesign` pointer in MEMORY.md.
+
+**Files created/modified:**
+- `docs/webdesign-first-run-prompt.md` - new: paste-ready first-run prompt + trust/scope context (committed b82637a)
+- auto-memory `webdesign-first-run-queued.md` - new note (project type)
+- auto-memory `MEMORY.md` - added `## /bx:webdesign` section pointer
+
+**Next session should:**
+- Run the `kaanarik` `/bx:webdesign` dogfood using `docs/webdesign-first-run-prompt.md` (needs one-time Stitch MCP + stitch-skills install in that repo first).
+- Or pick up `/bx:evolve` follow-ups (finding `093df977` FD-redirects smoke-check + `CLAUDE_ENV_FILE` UTF-8 check).

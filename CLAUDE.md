@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-07-22 (Session 50)
+Last Updated: 2026-07-23 (Session 51)
 
 ## Project Overview
 
@@ -33,14 +33,14 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 ## In Progress
 
-**`/bx:webdesign` shipped + twice review-hardened (S42, S48), pending activation.** The 10th skill is built, merged, pushed, and review-hardened twice: S42 (skill-creator content review + `/code-review` xhigh, 16 fixes — incl. the `app_runnable:false` Phase-2 dead-end closure + Phase-3 git-safety invariant) and S48 (fresh skill-creator pass, 13 findings / 12 fixed in `9b9c703` — incl. a repo-rooted sibling-skill path bug and a Phase-3 null-screen brick). Plugin cache is at `08d69da` — refresh to pick up `9b9c703` and everything after it, then install the **Stitch MCP + `stitch-skills` plugin** (one-time) before dogfood. Dogfood checklist: `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
+**`/bx:webdesign` shipped + twice review-hardened (S42, S48), pending activation.** The 10th skill is built, merged, pushed, and review-hardened twice: S42 (skill-creator content review + `/code-review` xhigh, 16 fixes — incl. the `app_runnable:false` Phase-2 dead-end closure + Phase-3 git-safety invariant) and S48 (fresh skill-creator pass, 13 findings / 12 fixed in `9b9c703` — incl. a repo-rooted sibling-skill path bug and a Phase-3 null-screen brick). Plugin cache is at `08d69da` — refresh to pick up `9b9c703` and everything after it, then install the **Stitch MCP + `stitch-skills` plugin** (one-time) before dogfood. Dogfood checklist: `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`. **First-run kickoff prompt for the `kaanarik` target repo prepared at `docs/webdesign-first-run-prompt.md` (S51).**
 
 **S37 plugin packaging — remaining:** install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement. (GSC MCP migration #1 declined; Playwright #2 deferred.)
 
 ## Next Steps
 
 1. **`/bx:evolve` follow-ups** — ~~add the `permissions` page to `scan-docs.md`'s allowlist~~ **done S50** (9 pinned pages now; added an *allowlist completeness rule* — a page belongs on the list when it is the canonical **owner** of a syntax bx depends on, and a "docs don't document X" claim must first check whether X's owning page is even listed); smoke-check open finding `093df977` (v2.1.214 fail-closed FD-redirects — do bx's pervasive `2>/dev/null` calls now prompt?) together with the still-pending `CLAUDE_ENV_FILE` UTF-8 check; give the skill the S42 content-review treatment; act on the 13 `open` findings (top: `.claude/skills` / `@skills-dir` auto-load, 4 sources now converging on it); v2 ideas: re-arm carried-forward findings for `--fix` from state (S50 hit this again — Section 4 entries can't be gated), treat lane digest one-liners as non-citation-grade.
-2. **Dogfood `/bx:webdesign`** — refresh the plugin cache to ≥`9b9c703`, install the Stitch MCP + `stitch-skills` plugin once, then run per `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
+2. **Dogfood `/bx:webdesign`** — refresh the plugin cache, install the Stitch MCP + `stitch-skills` plugin once, then run per `docs/webdesign-first-run-prompt.md` (paste-ready kickoff prompt for the `kaanarik` target repo) / `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
 3. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
 4. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — all content-review-hardened in S46, never run end-to-end.
 5. **S37 plugin-packaging leftovers** — install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement.
@@ -118,7 +118,7 @@ claude-config/                         # marketplace repo
 
 **The S37 `/bx:seo` "messed up" breakage is RESOLVED (S39).** Root-caused to the `${CLAUDE_SKILL_DIR}` path bug (not a real Claude Code variable → the helper was never found → GSC silently fell back to heuristic-only) + an impossible "mint token once, reuse across Bash calls" auth model (shell state does not persist across Bash tool calls). Both fixed and verified against live GSC. See Session History S39 + Key Decisions.
 
-**Plugin cache stale by 3+ commits (S50):** the cache is at `08d69da`; `9b9c703` (S48 webdesign fixes), `fc2fa7b` (S47 `--fix`), `acff6b1` (hook exec bit) and this session's edits all postdate it. Run `/plugin update bx` + `/reload-plugins` (or try the lighter `/reload-skills`, v2.1.152 — open finding `0e4083ea`) before any dogfood. `/bx:webdesign` still needs the Stitch MCP + `stitch-skills` plugin installed once. **13 open upstream findings** now live in `docs/upstream/state.json` (up from 6; S50 applied 3 and rejected 1).
+**Plugin cache stale (S51):** the cache advanced to `e88b6ba` (this session's skills loaded from that base dir); `b82637a` (S51 webdesign first-run prompt doc) postdates it. Run `/plugin update bx` + `/reload-plugins` (or try the lighter `/reload-skills`, v2.1.152 — open finding `0e4083ea`) before any dogfood. `/bx:webdesign` still needs the Stitch MCP + `stitch-skills` plugin installed once. **13 open upstream findings** now live in `docs/upstream/state.json` (up from 6; S50 applied 3 and rejected 1).
 
 ## Environment Variables
 
@@ -128,11 +128,11 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 50) - 2026-07-22
-- Ran `/bx:evolve` + `/bx:evolve --fix`: watermark `2.1.201 → 2.1.217`, docs/community → 2026-07-22; 8 findings consolidated, **3 applied / 1 rejected / 5 net-new open** (13 open total).
-- **Caught the audit auditing itself wrong:** the docs lane reported `Agent(model:opus)` as undocumented and proposed reverting the S47 fix. Verified against `code.claude.com/docs/en/permissions` — a page **missing from `scan-docs.md`'s pinned allowlist** — the syntax is real. Gap closed same-session: allowlist 8 → 9 pages, plus an *allowlist completeness rule* (any "the docs don't document X" finding must first check that X's owning page is listed at all).
-- But the same page says *"a parameter the model omits is never matched"*, so the deny rule never guards the S43 bug (a generic dispatch that sends no `model` param). Corrected `workflow.md`'s "belt-and-suspenders" overclaim.
-- Corrected the repo-wide stale claim that `${CLAUDE_SKILL_DIR}` "is NOT a real substitution" (`bx/bin/gsc-parse-helper`, `bx/skills/seo/SKILL.md`) — it is real, but text-level, not a shell variable; the S39 lesson survives, reframed.
-- CLAUDE.md had been stale 39 days: commits `fc2fa7b` (2026-07-05) and `acff6b1` (2026-07-21) were never recorded in session history — this save covers them.
+### Last Session (Session 51) - 2026-07-23
+- Prepped the first-ever `/bx:webdesign` dogfood: walked the full 3-phase skill flow (setup gate → Phase 1 extract/seed → Phase 2 generate/review → Phase 3 safe inject/verify) and confirmed it creates a **real Google Stitch project** (remote), not local samples.
+- **Verified dependency provenance** (user was right to ask): the Stitch **MCP** `@_davideast/stitch-mcp` is David East's *personal* Apache-2.0 package (Google DevRel — Google-adjacent, NOT first-party); the **skills** `google-labs-code/stitch-skills` are *official Google Labs*. Two different trust tiers.
+- Setup runs **in the target repo** (MCP add is `-s user`/global, but skills install is `--scope project`); target GCP project is `kaanarik` (billing linked).
+- Wrote + committed `docs/webdesign-first-run-prompt.md` (`b82637a`, paste-ready kickoff prompt + context); saved auto-memory note `webdesign-first-run-queued.md` + `## /bx:webdesign` pointer in MEMORY.md.
+- Corrected the stale "plugin cache at 08d69da" blocker — this session's skills loaded from cache `e88b6ba`.
 
-> Full session detail: [docs/session-history.md](docs/session-history.md) S50
+> Full session detail: [docs/session-history.md](docs/session-history.md) S51
