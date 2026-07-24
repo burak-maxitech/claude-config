@@ -1,8 +1,8 @@
 # Stitch canonical formats
 
-> Bundled baseline. Stitch evolves fast — **when Phase 1 begins executing** (setup passed, web/refactor gate passed), fetch the official prompting doc fresh and let it supersede anything here that diverges:
+> Bundled baseline. Stitch evolves fast — **at the start of Phase 2 Step 2.1** (immediately before generation prompts are built), fetch the official prompting doc fresh and let it supersede anything here that diverges:
 > `WebFetch https://stitch.withgoogle.com/docs/learn/prompting/ "Extract the current recommended prompt structure, frameworks, and any changes to design-system handling."`
-> This fetch happens in `phase1-extract.md` Step 1 (after stack detection, before route enumeration). If the fetch fails, proceed with this baseline and note it in the run summary. Banner-stop sessions (Step A dependency missing) do not trigger this fetch.
+> This fetch lives in `phase2-design-review.md` Step 2.1 — relocated out of Phase 1 so it can't be deferred-then-dropped (which is exactly what happened on the first dogfood). If the fetch fails, proceed with this baseline and note it in the review card. Banner-stop sessions (Step A dependency missing) do not trigger this fetch.
 
 ## Per-screen generation prompt format
 
@@ -100,6 +100,13 @@ Used by Phase 1 Step 5a (the Claude-led interview path) to translate the user's 
 
 `colorMode` (LIGHT/DARK) and `customColor` (seed hex) come from the user's stated direction or a preserved brand color. This table is a starting point — always show the chosen knobs to the user before applying.
 
+> ⚠ **Color control is lossy — set expectations before spending generations.** Stitch applies **Material dynamic-color**, which auto-tones the seed for legibility. Observed on the first dogfood:
+> - A **light/warm seed never yields bright primaries.** A yellow seed (`#FFCF00`) resolved to olive-gold under `RAINBOW` and terracotta under `FRUIT_SALAD` — never a bright red/yellow/blue "toy-brick" palette.
+> - **`overridePrimaryColor` / `overrideSecondaryColor` / `overrideTertiaryColor` may silently not apply** through `update_design_system` — the set value, `get_project`, and the actual generation output three-way-diverged.
+> - **Filled buttons use white text**, so a bright light color (yellow) fails contrast as a primary/CTA — it belongs on accents (badges/highlights), with red or blue carrying CTAs.
+>
+> When a **specific** palette is required, don't rely on seed + variant knobs: author the colors directly in `DESIGN.md` and apply via `create_design_system_from_design_md`, then **verify the resolved palette via `get_project` before batch-generating** (see `phase2-design-review.md` Step 2.1a). Treat this table as a *starting nudge*, not a deterministic mapping.
+
 ## Stitch MCP tool surface (called via Google's stitch-skills)
 
 - Projects: `list_projects`, `create_project`, `get_project`
@@ -111,13 +118,13 @@ Used by Phase 1 Step 5a (the Claude-led interview path) to translate the user's 
 
 | Need | Skill |
 |---|---|
-| Existing code → seeded Stitch project | `stitch::code-to-design` (chains the three below) |
-| Standalone HTML from build output | `stitch::extract-static-html` |
-| Source → DESIGN.md | `stitch::extract-design-md` |
-| Upload + create design system | `stitch::manage-design-system` |
-| Generate / edit screens | `stitch::generate-design` |
+| Existing code → seeded Stitch project | `stitch-design:code-to-design` (chains the three below) |
+| Standalone HTML from build output | `stitch-design:extract-static-html` |
+| Source → DESIGN.md | `stitch-design:extract-design-md` |
+| Upload + create design system | `stitch-design:manage-design-system` |
+| Generate / edit screens | `stitch-design:generate-design` |
 
-> `stitch::react-components` is **NOT** used in the refactor path (it generates *new* components rather than restyling existing ones).
+> `stitch-build:react-components` is **NOT** used in the refactor path (it generates *new* components rather than restyling existing ones).
 
 ## Dynamic / JS-heavy pages
 

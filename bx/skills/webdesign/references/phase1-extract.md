@@ -16,13 +16,7 @@ Read and execute `references/web-stack-detection.md` (all four passes, single pa
 Detected: <framework> · styling: <styling_system> · app_runnable: <true|false>
 ```
 
-Then fetch the live Stitch prompting doc (see `references/stitch-formats.md` preamble note) — this is the Phase-1-execution-time fetch; issue it in parallel with Step 1.2 below if feasible:
-
-```
-WebFetch https://stitch.withgoogle.com/docs/learn/prompting/
-```
-
-If the fetch fails, proceed with the baseline in `stitch-formats.md` and note it in the Phase 1 summary.
+> **Do NOT fetch the Stitch prompting doc here.** The live-doc fetch (`https://stitch.withgoogle.com/docs/learn/prompting/`) now happens at **Phase 2 Step 2.1**, immediately before generation prompts are built — the only place its output is consumed. Fetching it in Phase 1 invites the deferral-then-drop that happened on the first dogfood (the fetch was pushed to Phase 2 and then silently skipped). Keep this inventory turn lean.
 
 ### 1.2 — Create or resume the work branch
 
@@ -49,20 +43,32 @@ mkdir -p .webdesign/briefs .webdesign/before .webdesign/after
 
 Then check the **target repo's** `.gitignore` for the sentinel start marker `# /bx:webdesign managed`:
 
-- **Marker absent:** append the sentinel-marked block (create `.gitignore` if the file does not exist), then print `Added .webdesign/ + .stitch/ to .gitignore (sentinel-marked block).`
+- **Marker absent:** append the sentinel-marked block (create `.gitignore` if the file does not exist), then print `Added .webdesign/ + .stitch/ + .playwright-mcp/ to .gitignore (sentinel-marked block).`
 
   ```
   # /bx:webdesign managed — do not edit between markers
   .webdesign/
   .stitch/
+  .playwright-mcp/
   # /end /bx:webdesign managed
   ```
 
-- **Marker already present:** do **not** append a second block — but **verify the existing block lists both `.webdesign/` and `.stitch/`**. If `.stitch/` is missing (a pre-fix block written by an older run), add the `.stitch/` line **inside** the existing markers and print `Added .stitch/ to existing .gitignore block.`. If both are already present, stay silent. (Don't rely on a separate "migration note" — this check is part of the present-marker branch, so it always runs.)
+- **Marker already present:** do **not** append a second block — but **verify the existing block lists all three of `.webdesign/`, `.stitch/`, and `.playwright-mcp/`**. Add any missing line **inside** the existing markers (a pre-fix block from an older run may lack `.stitch/` or `.playwright-mcp/`) and print `Added <lines> to existing .gitignore block.`. If all three are present, stay silent. (Don't rely on a separate "migration note" — this check is part of the present-marker branch, so it always runs.)
 
-This covers `.webdesign/state.json`, `.webdesign/.setup-shown`, `.webdesign/SITE.md`, `.webdesign/briefs/`, `.webdesign/before/`, and all other working state — so the transient design artefacts are never committed alongside the refactored code.
+`.playwright-mcp/` is where the Playwright MCP writes screenshots — in **both** Phase 1 before-shots and Phase 3 per-page verification. Left untracked, it would trip Phase 3's clean-tree assertion on the *second* page iteration (the first verification creates it). Gitignoring it up front is what keeps that guard honest.
 
-**The general invariant (load-bearing for Phase 3):** every artifact the skill *or Google's `stitch-skills`* create at the repo root must be either **gitignored** (working state) or **staged into the right commit** (a real design artifact) — otherwise it false-trips Phase 3's per-page "working tree must be clean" assertion and risks deletion by `git clean -fd` on a page failure. Two such artifacts exist today: Google's `.stitch/` scratch dir (gitignored here) and a root-level `DESIGN.md` (staged into the Phase 3 token commit). Any new root artifact a future `stitch-skills` release emits must be handled the same way.
+This covers `.webdesign/state.json`, `.webdesign/.setup-shown`, `.webdesign/SITE.md`, `.webdesign/briefs/`, `.webdesign/before/`, `.playwright-mcp/`, and all other working state — so the transient design artefacts are never committed alongside the refactored code.
+
+Then **commit the `.gitignore` change immediately** (it is a tracked-file modification, and everything is on the throwaway `webdesign/<date>` branch):
+
+```bash
+git -C <project-root> add .gitignore
+git -C <project-root> commit -m "webdesign: gitignore managed working dirs"
+```
+
+Leaving `.gitignore` modified-but-uncommitted is itself a clean-tree trap: Phase 3 Step 3 asserts `git status --porcelain` is empty at the start of every page, and an uncommitted (or resume-time marker-updated) `.gitignore` would halt the run. Commit it here so the tree is clean going into Phase 2/3. (If the marker block was already present and unchanged, there is nothing to commit — skip silently.)
+
+**The general invariant (load-bearing for Phase 3):** every artifact the skill *or Google's `stitch-skills`* create **or modify** at the repo root must be either **gitignored** (working state) or **committed** (a real change) — otherwise it false-trips Phase 3's per-page "working tree must be clean" assertion and risks deletion by `git clean -fd` on a page failure. The artifacts that exist today: Google's `.stitch/` scratch dir and the Playwright MCP's `.playwright-mcp/` output dir (both gitignored via the block above); a root-level `DESIGN.md` (staged into the Phase 3 token commit); and **the `.gitignore` edit itself** (committed in the step above — the one tracked-file modification the skill makes). Any new root artifact a future `stitch-skills` release emits, or any new file the Playwright verification writes, must be handled the same way.
 
 ---
 
@@ -163,14 +169,18 @@ For each page in the inventory, invoke the Playwright MCP to navigate to the rou
 
 ```
 mcp__plugin_playwright_playwright__browser_navigate → http://localhost:<port><route>
-mcp__plugin_playwright_playwright__browser_take_screenshot → .webdesign/before/<page>.png
+mcp__plugin_playwright_playwright__browser_take_screenshot → <page>.png
 ```
 
 Use desktop viewport (1280 × 800 minimum). Screenshot sequentially (Playwright is stateful).
 
+> **The Playwright MCP writes to its own `.playwright-mcp/` dir, not the path you name.** The `filename` argument is resolved relative to the MCP's output directory (`.playwright-mcp/`), so the shots land there, not in `.webdesign/before/`. After capturing all routes, move them: `.playwright-mcp/<page>.png` → `.webdesign/before/<page>.png`. `.playwright-mcp/` is gitignored by Step 1.3, so it never dirties the tree.
+
 ### 3.3 — Confirm, stop the server, or warn
 
 After all screenshots: **stop the background dev server** — use the `KillShell` tool with the background-shell ID returned when the server was started in Step 3.1. Do not improvise `kill`/`taskkill` shell commands (unpermitted, and process-name kills can hit unrelated processes). The server is not needed for Step 4's build or the rest of Phase 1, and leaving it running leaks a background process for the session. Then print `Captured N before/ screenshots in .webdesign/before/.`
+
+> **Windows caveat — `KillShell` can orphan the dev-server child.** On Windows, `KillShell` terminates the `npm run dev` wrapper but the actual framework child (e.g. `next dev`) often survives and keeps holding the port. So **any later step that (re)starts a dev server must tolerate "port already in use"**: poll the port first (`curl -sf http://localhost:<port>/`), and if something already responds, reuse it instead of trying to spawn a second server (which will exit with "port in use"). This applies to Step 4's snapshot server and to Phase 3's per-loop server startup. Never `taskkill` the survivor — reuse it, or let it be reclaimed when the CLI session ends.
 
 **Condition: `app_runnable == false`.** Skip this step entirely. Print:
 
@@ -184,26 +194,35 @@ Phase 3 will also skip Playwright verification — degrade to build-only.
 
 ## Step 4 — Seed Stitch
 
+> **What Step 4 actually involves.** `code-to-design` is **not** a single turnkey call — it *chains* several `stitch-design:*` sub-skills, and on a real run it fans out into: create a project, snapshot the current design to HTML, write a baseline `DESIGN.md`, upload both, and create a design system. Several of those sub-steps carry their own prerequisites and mandatory confirmation checkpoints (below). Read each sub-skill before invoking it, and narrate every Stitch write.
+>
+> **The current-design HTML baseline is reference-only — not load-bearing.** It becomes a reference screen in the canvas; **Phase 2 generates from your briefs + the new direction, not from the old HTML.** So if the HTML-snapshot path is expensive (see the puppeteer note), you may seed from `DESIGN.md` alone without losing anything Phase 2 needs — offer the user that choice rather than forcing a heavy install.
+
 ### 4a — When `app_runnable == true`
 
-1. Run the build:
+1. **Run the build** (produces the artefacts the seeding chain reads):
    ```bash
    <build_cmd from state.json>
    ```
    If the build fails, print the error and skip to Step 4b's fallback path.
 
-2. Invoke `stitch::code-to-design` via the Skill tool:
-   ```
-   Skill("stitch::code-to-design")
-   ```
-   Pass the project's **current** `DESIGN.md` as the baseline (read it if it exists; omit the argument if the file is absent — `stitch::code-to-design` will infer design tokens from the build output). Pass the DESIGN.md content per `stitch::code-to-design`'s own input convention (e.g. as the design-md content argument). If the exact argument signature is unknown, invoke the skill and follow its prompts rather than guessing a flag name.
+   > **SSR frameworks don't emit static HTML.** Next.js app-router / Nuxt / Remix / SvelteKit `build` produce a server bundle (`.next/`, etc.), not an `index.html`. For these, `extract-static-html` snapshots the **running dev server** instead — reuse the Step 3 server per the port-in-use caveat, and see the headless-browser note in sub-step 3.
 
-3. From the Skill result, capture the `stitch_project_id` (the newly created Stitch project identifier).
-
-4. Persist to `state.json`:
-   ```json
-   { "stitch_project_id": "<id>" }
+2. **Create the Stitch project FIRST — `code-to-design` uploads *into* an existing project; it does not create one.** Its prerequisite is a `projectId`. Call `create_project` directly, then persist the ID *before* any further Stitch write so an interruption can't orphan the work:
    ```
+   mcp__stitch__create_project(name = "<repo-name> — webdesign <YYYY-MM-DD>")
+   ```
+   Persist immediately to `state.json` (`{ "stitch_project_id": "<id>" }`) and to `.webdesign/SITE.md` (schema in sub-step 5).
+
+3. **Seed the baseline into that project** via `stitch-design:code-to-design`, passing the `stitch_project_id` from sub-step 2 and the current `DESIGN.md` if one exists (omit if absent — the chain extracts tokens from the build/snapshot). Follow the sub-skill's prompts rather than guessing an argument signature:
+   ```
+   Skill("stitch-design:code-to-design")
+   ```
+   Two things it will surface and you must handle:
+   - **Headless-browser strategy (SSR only).** `extract-static-html` requires either `puppeteer` (Google's default — an `npm install puppeteer` that downloads a bundled Chromium) or the already-connected Playwright MCP. Present this as a choice framed by the "baseline is reference-only" note above — puppeteer is a heavy install for a non-load-bearing artefact. If installing, prefer `npm install puppeteer --no-save` so `package.json` stays clean (node_modules is gitignored). The snapshot script may `import puppeteer` from **its own** directory, so it can't see a `--no-save` puppeteer in the project's `node_modules` — copy the (self-contained) script into a gitignored project dir (e.g. `.stitch/`) so the import resolves.
+   - **Large uploads go through a Python helper, not MCP tools.** The design-system + HTML uploads use `upload_to_stitch.py` (the MCP tool-arg limit can't carry a multi-MB inlined HTML file). It needs a Python interpreter — **use `python`, not `python3`, on Windows** (`python3` is a broken Store stub there). Pass the API key from `.env`/env via a shell variable so it never prints to the transcript. Both upload sub-skills carry a mandatory "confirm before upload" checkpoint — honor them.
+
+4. **Capture the baseline `design_system_id`** the chain creates and persist it (`{ "design_system_id": "<id>" }`). Step 5 *updates* this same asset with the new direction — it is created here, not replaced there.
 
 5. Record in `.webdesign/SITE.md` (create if absent, append if present):
    ```markdown
@@ -221,13 +240,13 @@ Print: `Stitch project seeded: <id>. URL: https://stitch.withgoogle.com/project/
 
 Build output is unavailable. Use the source-only seeding path:
 
-1. Invoke `stitch::extract-design-md` on the source to produce or update `DESIGN.md`:
+1. Invoke `stitch-design:extract-design-md` on the source to produce or update `DESIGN.md`:
    ```
-   Skill("stitch::extract-design-md")
+   Skill("stitch-design:extract-design-md")
    ```
-2. Invoke `stitch::manage-design-system` to seed the design system from the extracted `DESIGN.md`:
+2. Invoke `stitch-design:manage-design-system` to seed the design system from the extracted `DESIGN.md`:
    ```
-   Skill("stitch::manage-design-system")
+   Skill("stitch-design:manage-design-system")
    ```
 
 3. **Establish a Stitch project and persist its ID.** Phase 2 cannot generate screens without a `stitch_project_id`, so this path must still produce one — it just can't seed it from a build:
@@ -309,10 +328,10 @@ Map the answers to knobs using the vibe→knob table in `references/stitch-forma
 Confirm to apply, or tell me what to change.
 ```
 
-Wait for user confirmation. On confirm, apply via `stitch::manage-design-system` (prefer `create_design_system_from_design_md` if a full DESIGN.md is available; use `update_design_system` for knob-only application):
+Wait for user confirmation. On confirm, apply via `stitch-design:manage-design-system` (prefer `create_design_system_from_design_md` if a full DESIGN.md is available; use `update_design_system` for knob-only application):
 
 ```
-Skill("stitch::manage-design-system")
+Skill("stitch-design:manage-design-system")
 ```
 
 Record the resulting `design_system_id` in `state.json` (key: `design_system_id`).
@@ -321,10 +340,10 @@ Record the resulting `design_system_id` in `state.json` (key: `design_system_id`
 
 Print the Stitch project URL (or instructions to create one) and wait for the user to return.
 
-When the user resumes, invoke `stitch::manage-design-system` via the Skill tool to read back the current state via `list_design_systems`:
+When the user resumes, invoke `stitch-design:manage-design-system` via the Skill tool to read back the current state via `list_design_systems`:
 
 ```
-Skill("stitch::manage-design-system")  # calls list_design_systems internally
+Skill("stitch-design:manage-design-system")  # calls list_design_systems internally
 ```
 
 Identify the design system the user configured (by project, or ask the user to confirm the design-system name/ID). Record the `design_system_id` in `state.json`.
@@ -372,7 +391,7 @@ Run /bx:webdesign again (or continue in this session) to start generating screen
 | `pages[].status` | string (`pending`) | Step 2.4 | Phase 3 per-page loop gate; `status` display |
 | `pages[].states` | object keyed by state name | Step 2.4 (object shape, not array) | Phase 2 fills `screen_id`; Phase 3 `get_screen` |
 | `stitch_project_id` | string | Step 4a (build path) — or Step 4b/5b (source-only path, via a returned or user-supplied ID) | Phase 2 screen generation, Step 5b |
-| `design_system_id` | string | Step 5a or 5b | Phase 2 screen generation |
+| `design_system_id` | string | Step 4a (baseline, created by the code-to-design chain) — updated in Step 5a/5b with the new direction | Phase 2 screen generation |
 | `design_direction` | string | Step 6 | Phase 1 summary; `status` display |
 | `phase` | string (`direction_set`) | Step 6 | resume logic in skill entry |
 
@@ -385,4 +404,4 @@ Run /bx:webdesign again (or continue in this session) to start generating screen
 | Before screenshots | `.webdesign/before/<page>.png` |
 | Stitch project record | `.webdesign/SITE.md` (gitignored) |
 | gitignore block | `.gitignore` (sentinel-marked) |
-| DESIGN.md | created/updated by stitch::extract-design-md in Step 4b (source-only fallback path) |
+| DESIGN.md | created/updated by stitch-design:extract-design-md in Step 4b (source-only fallback path) |

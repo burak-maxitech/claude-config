@@ -46,12 +46,14 @@ Determines where design tokens land in Phase 3 injection. Detect in **priority o
 
 | Priority | System | Detection signals | `styling_system` value |
 |----------|--------|-------------------|------------------------|
-| 1 | Tailwind CSS | `tailwind.config.{js,ts,cjs,mjs}` exists (definitive) **OR** `@tailwind` directives in `*.css` files under `src/` and repo root (tiebreaker — use `Grep "@tailwind" glob:"*.css"` scoped to those directories, not a repo-wide scan) | `tailwind` |
+| 1 | Tailwind CSS | `tailwind.config.{js,ts,cjs,mjs}` exists (definitive, v3-style) **OR** `tailwindcss` in `package.json` deps/devDeps **OR** an `@import "tailwindcss"` (v4) or `@tailwind` (v3) directive in `*.css` files under `src/` and repo root (use `Grep "@import \"tailwindcss\"|@tailwind" glob:"*.css"` scoped to those directories, not a repo-wide scan) | `tailwind` |
 | 2 | CSS-in-JS | `styled-components` or `@emotion/react` / `@emotion/styled` in `package.json` | `css-in-js` |
 | 3 | CSS Modules | Any `*.module.css` file in the project | `css-modules` |
 | 4 | vanilla-extract | `@vanilla-extract/css` in `package.json` **OR** `*.css.ts` files | `vanilla-extract` |
 | 5 | CSS custom properties | A theme/tokens file (e.g. `tokens.css`, `variables.css`, `theme.css`) **OR** `:root { --…` declarations in any CSS file | `css-vars` |
 | 6 | Plain CSS | Fallback — CSS files present but none of the above | `plain-css` |
+
+> **Tailwind v4 note (load-bearing for Phase 3).** v4 projects typically have **no `tailwind.config.*` file** — the `tailwindcss` dependency plus an `@import "tailwindcss"` line in a CSS file are the definitive signals, and design tokens live in an `@theme { … }` block inside that CSS (e.g. `app/globals.css`), not in a JS/TS config. Still record `styling_system: tailwind`, but Phase 3's token-merge must target that `@theme` block, not a `tailwind.config.js/ts` that doesn't exist (see `phase3-inject.md` Step 2).
 
 **If no CSS or styling files are found at all**, set `styling_system: unknown` and emit a warning:
 

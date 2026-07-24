@@ -8,10 +8,12 @@ Read first by the `/bx:webdesign` orchestrator at **Step A — Setup check**. If
 
 Run both checks at the top of every `/bx:webdesign` invocation (the orchestrator knows its available tools and skills without any shell commands):
 
-1. **Stitch MCP present?** — Inspect the current tool set for any tool whose name begins with `stitch`. If no `stitch*` tool is visible → the Stitch MCP is not configured for this project.
-2. **`stitch-skills` installed?** — Confirm that the skill `stitch::code-to-design` is among available skills (callable via the Skill tool). If absent → the Google `stitch-skills` plugin is not installed. (If the `Skill` tool itself is unavailable, treat `stitch-skills` as absent.)
+1. **Stitch MCP present?** — Inspect the current tool set for any `mcp__stitch__*` tool (the server registered under the name `stitch`). If none is visible → the Stitch MCP is not configured for this session.
+2. **`stitch-skills` installed?** — Confirm that the skill `stitch-design:code-to-design` is among available skills (callable via the Skill tool). The Google `stitch-skills` marketplace installs **three** plugins — `stitch-build`, `stitch-design`, `stitch-utilities` — and every skill this refactor delegates to is namespaced `stitch-design:<name>` (NOT `stitch::<name>`). If `stitch-design:code-to-design` is absent → `stitch-skills` is not installed. (If the `Skill` tool itself is unavailable, treat `stitch-skills` as absent.)
 
 Both checks are passive (no shell invocation needed). Perform them in parallel before touching anything else.
+
+> **Note — don't be misled by `claude mcp list`.** For a remote HTTP MCP server, an out-of-session `claude mcp list` can report `Connected · tools fetch failed` even when the server is perfectly healthy — it can't always complete the streamable-HTTP session handshake a live in-session connection does. The authoritative check is the passive in-session one above (are `mcp__stitch__*` tools visible? does a zero-cost `list_projects` round-trip succeed?), **not** `claude mcp list`.
 
 ---
 
@@ -29,19 +31,24 @@ When **either** dependency is absent, print the relevant section(s) of the banne
 
 This skill drives Google Stitch through its MCP + Google's official skills. Set up once:
 
-1. Install + auth the Stitch MCP (interactive wizard: gcloud, Google login, GCP project, enable Stitch API):
+1. **Install + auth the Stitch MCP.** Run the init wizard **in a real external terminal** (Windows Terminal / PowerShell / iTerm) — it is a full-screen arrow-key TUI and **cannot** be driven through Claude Code's `!` prefix (the prompt force-closes):
    ```
    npx @_davideast/stitch-mcp init
-   claude mcp add -e GOOGLE_CLOUD_PROJECT=<your-gcp-project> -s user stitch -- npx -y @_davideast/stitch-mcp proxy
    ```
-2. Install Google's Stitch skills:
+   The wizard offers two auth modes — pick either:
+   - **API key (Direct)** — simplest. No gcloud, no GCP project, no billing. You paste a Stitch API key; the wizard offers to store it in a `.env` file.
+   - **gcloud / Google login** — Application Default Credentials against a GCP project (this path is the one that needs **billing enabled**, the **Stitch API enabled**, and Owner/Editor on the project).
+
+   When it finishes, the wizard **prints the exact `claude mcp add …` command to run — copy that one.** It differs by auth mode (e.g. an `http` transport with an `X-Goog-Api-Key` header for API-key mode — NOT a fixed `… -- npx … proxy` command, and NOT `-e GOOGLE_CLOUD_PROJECT=…`). Keep the server name `stitch` and use **`-s user`** so it saves to `~/.claude.json`, outside the repo.
+2. **Install Google's Stitch skills:**
    ```
    npx plugins add google-labs-code/stitch-skills --scope project --target claude-code
    ```
 
-Prerequisites: a GCP project with **billing enabled** and the **Stitch API enabled**, and Owner/Editor on it.
-Re-run `/bx:webdesign` once both are done.
+Then **restart Claude Code** (or `/reload-plugins` — a newly-added MCP server's tools appear only on reconnect) and re-run `/bx:webdesign`.
 ```
+
+> 🔒 **Secret hygiene (API-key mode).** The `claude mcp add` command the wizard prints embeds your **raw API key** in a `--header`. Run it in the external terminal, **never via `!`**, so the key never lands in the Claude Code transcript. If the wizard wrote the key to `.env`, confirm `.env` is gitignored (`git check-ignore .env`) before any commit. Use `-s user`, **not** `-s project` — `-s project` writes `./.mcp.json` into the repo and risks committing the key. (The `.env` copy is redundant once the key is in `~/.claude.json` for the `http` transport; it can be deleted afterward.)
 
 After printing the applicable steps, **stop**. Do not print a phase summary, do not touch `state.json`, do not run any other detection pass.
 

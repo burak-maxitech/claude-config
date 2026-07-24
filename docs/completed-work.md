@@ -225,3 +225,4 @@
 - [x] Dogfood /bx:evolve — first real run + immediate re-run + --fix pass (3 findings applied across 13 files; decision log at docs/upstream/state.json) (S47)
 - [x] Fresh content review of /bx:webdesign (9 skill files) — 13 findings (1 high / 4 medium / 8 low), 12 fixed, 1 no-action (unused Agent grant) — commit 9b9c703 (bx/skills/webdesign/SKILL.md + 5 references)
 - [x] README teammate-install simplification + repo made public (S49) — README.md, CLAUDE.md, workflow.md, auto-memory
+- [x] /bx:webdesign dogfood-hardening — reviewed first kaanarik run, applied 15 findings across 7 skill files (S52) - bx/skills/webdesign/*

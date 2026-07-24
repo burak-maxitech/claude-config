@@ -79,13 +79,13 @@ Fetched: <N> screens → .webdesign/after/ and .webdesign/tmp/
 
 **Merge the Stitch design-system tokens into the project theme layer before touching any page.**
 
-The Stitch HTML `<head>` carries a localized `tailwind.config`; `DESIGN.md` (written by Phase 1 Step 4b, or by `stitch::extract-design-md`) carries the canonical token set. Use whichever is available; prefer the `<head>` config for `tailwind` projects.
+The Stitch HTML `<head>` carries a localized `tailwind.config`; `DESIGN.md` (written by Phase 1 Step 4b, or by `stitch-design:extract-design-md`) carries the canonical token set. Use whichever is available; prefer the `<head>` config for `tailwind` projects.
 
 Merge strategy by `styling_system`:
 
 | `styling_system` | What to merge | Where to apply |
 |---|---|---|
-| `tailwind` | Extract the `tailwind.config` block from any fetched Stitch `<head>` + the DESIGN.md token values; merge into the project's `tailwind.config.js` / `tailwind.config.ts` (colors, fonts, radius, spacing under `theme.extend`). Do not overwrite custom project extensions — merge at the token key level. | `tailwind.config.js` or `tailwind.config.ts` |
+| `tailwind` | Extract the token values from any fetched Stitch `<head>` `tailwind.config` block + the DESIGN.md token set (colors, fonts, radius, spacing). **Detect the Tailwind version first:** if a `tailwind.config.{js,ts,cjs,mjs}` exists (v3), merge tokens under `theme.extend`. If there is **no config file** (v4), merge them into the `@theme { … }` block of the main CSS entry (the file that has `@import "tailwindcss"`, e.g. `app/globals.css`) as `--color-*` / `--font-*` / `--radius-*` / `--spacing-*` custom properties. Either way, do not overwrite custom project extensions — merge at the token-key level. | v3: `tailwind.config.js/ts` · **v4: the `@theme {}` block in the `@import "tailwindcss"` CSS file** |
 | `css-vars` | Write the DESIGN.md color/typography/spacing tokens as CSS custom properties in the `--` namespace into the `:root {}` block of the project's theme stylesheet (create a dedicated `tokens.css` / `design-tokens.css` if no single `:root` file exists). | theme / `:root` stylesheet |
 | `plain-css` | Same as `css-vars` — write as `--token-name: value` properties under `:root {}`. | theme / `:root` stylesheet |
 | `css-in-js` | Update the project's theme object with the new token values. **Detection:** locate the theme object by grepping for `ThemeProvider` (e.g. `Grep -r "ThemeProvider" src/`); the object passed to it at its definition site is the merge target. Match the existing key-naming convention (camelCase vs kebab) in that file. | theme object / token file |
@@ -130,7 +130,7 @@ After writing the tokens:
    ```
    This ensures a mid-loop interruption resumes into the page loop correctly. `phase` stays `injecting_pages` until Step 4 sets it to `done`.
 
-2. **Start the dev server once (if `app_runnable == true`).** Using `state.json["serve_cmd"]`, start the dev server in the background and wait for it to be ready (poll up to 30 s). Note the port it reports at startup; if it differs from `state.json["port"]`, update `state.json["port"]`. Keep the server running for the entire loop; stop it after Step 4 (or on early exit) with the `KillShell` tool using the background-shell ID from startup — do not improvise `kill`/`taskkill` shell commands. Do not restart it per-page. Verification (`references/verification.md`) assumes the server is already running.
+2. **Start the dev server once (if `app_runnable == true`).** **First poll the port** — `curl -sf http://localhost:<port>/` — and if something already responds (e.g. an orphaned `next dev` child from an earlier step or session that a Windows `KillShell` didn't reap; see Phase 1 Step 3.3), **reuse it** rather than spawning a second server (a second start just exits with "port in use"). Otherwise, using `state.json["serve_cmd"]`, start the dev server in the background and wait for it to be ready (poll up to 30 s). Note the port it reports at startup; if it differs from `state.json["port"]`, update `state.json["port"]`. Keep the server running for the entire loop; stop it after Step 4 (or on early exit) with the `KillShell` tool using the background-shell ID from startup — do not improvise `kill`/`taskkill` shell commands. Do not restart it per-page. Verification (`references/verification.md`) assumes the server is already running.
 
    If `app_runnable == false`, skip this sub-step.
 
@@ -148,8 +148,9 @@ If the output is non-empty, **STOP** and warn the user:
 ```
 ⚠ Unexpected dirty working tree before starting <page>. Phase 3 cannot continue safely.
   Resolve or commit the outstanding changes, then re-run /bx:webdesign.
-  (Common cause: a root-level DESIGN.md / SITE.md or Google's .stitch/ scratch dir that
-   isn't committed or gitignored — see Phase 1 Step 1.3 and Step 2 above.)
+  (Common cause: a root-level DESIGN.md / SITE.md, Google's .stitch/ scratch dir, or the
+   Playwright MCP's .playwright-mcp/ output that isn't committed or gitignored — see
+   Phase 1 Step 1.3 and Step 2 above.)
 ```
 Do not proceed to 3a until the tree is confirmed clean. This holds because Phase 3 commits after every successful page (so the tree is clean between pages) **and** because Phase 1 Step 1.3's general invariant ensures every skill/Google artifact is gitignored or staged. If something slipped through, this guard catches it.
 

@@ -103,25 +103,7 @@
 
 ### Session 46 - 2026-06-09: Content-reviewed 4 dogfood-pending audit skills (`/bx:clean` c659025, `/bx:health` e1802e6 + webdesign Bucket-E routing 0a81f86, `/bx:tests` 26ea1c3, `/bx:arch` 17e518a) + built `/bx:evolve` (11th skill, 3 new Sonnet agents → 18; two-tier authority, watermark/decision-log lifecycle, capability relevance gate) via brainstorm→spec→plan→subagent-driven; `/simplify` pass established the sentinel exit-point principle + lanes-Read-own-refs. (commits: 7805d75, 21b41bb, c659025, 17e518a)
 
-### Session 47 - 2026-06-10
-**What happened:**
-- Updated plugin cache to `21b41bb` (closing the S46 activation gap) and dogfooded `/bx:evolve` end-to-end: first full audit (3 lanes parallel; changelog 50 releases → 2.1.172; docs 8/8 pages; community degraded 3/5) yielding 3 pain-point opportunities; immediate re-run passed the spec smoke criterion (changelog clean no-op, carried-forward findings only).
-- Mid-session user redirect: the report's findings were all plugin-meta — per-skill "new capability" items are filtered by the relevance gate by design. Produced a per-skill supplement from lane digests, then registered 4 items as proper `open` findings (health `disallowed-tools`, stitch-skills plugin dependency, Stop-hook save reminder, Skill-wildcard settings migration) with re-fetched verbatim release bodies for hashing.
-- Verification during registration caught two lane-accuracy issues: the Skill(name *) wildcard fix ships in v2.1.139 (digest had also claimed v2.1.145), and v2.1.143 dependency enforcement is enable/disable-time only (install-time unconfirmed).
-- `/bx:evolve --fix` walked 3 eligible findings (y on all): Task→Agent rename across 10 files (7 SKILL.md allowed-tools + prose + README + save/references/mode-update.md; TaskCreate/TaskList tracker tools untouched); CLAUDE_ENV_FILE UTF-8 persistence blocks in session-start-context.sh/.ps1; /fewer-permission-prompts subsection in workflow.md. Single CP2+CP3 state write; decision log 9 entries (3 applied / 6 open).
-- Dogfood observations for v2: carried-forward findings are display-only in fix mode (re-arm-from-state path?); orchestrator completeness spot-checks repeatedly extended lane `affected_files` (webdesign frontmatter, mode-update.md, .ps1 sibling).
-
-**Files created/modified:**
-- `docs/upstream/state.json` — watermark 2.1.172/2026-06-10 + 9-entry decision log (3 applied, 6 open)
-- `bx/skills/{arch,clean,evolve,save,seo,tests,webdesign}/SKILL.md` — allowed-tools `Task`→`Agent` + tool-name prose
-- `bx/skills/save/references/mode-update.md`, `README.md` — Agent-tool prose
-- `bx/scripts/session-start-context.{sh,ps1}` — CLAUDE_ENV_FILE UTF-8 persistence blocks
-- `workflow.md` — `/fewer-permission-prompts` subsection in Tips & Best Practices
-
-**Next session should:**
-- Commit+push, then `/plugin update bx` + `/reload-plugins` (or try `/reload-skills`)
-- Smoke-check CLAUDE_ENV_FILE UTF-8 persistence (`python -c "import sys; print(sys.stdout.encoding)"` without prefixes)
-- Give `/bx:evolve` the S42 content-review treatment; act on the 6 open upstream findings
+### Session 47 - 2026-06-10: `/bx:evolve` first end-to-end dogfood (3-lane audit → 3 pain-point opportunities; registered 4 per-skill items as `open` findings) + `--fix` applied 3 (Task→Agent rename across 10 files, CLAUDE_ENV_FILE UTF-8 persistence, /fewer-permission-prompts doc); caught 2 lane-accuracy issues (wildcard fix v2.1.139 not v2.1.145; v2.1.143 enforcement enable/disable-time only). (commit: 15295d8)
 
 ### Session 48 - 2026-06-10
 **What happened:**
@@ -194,3 +176,20 @@
 **Next session should:**
 - Run the `kaanarik` `/bx:webdesign` dogfood using `docs/webdesign-first-run-prompt.md` (needs one-time Stitch MCP + stitch-skills install in that repo first).
 - Or pick up `/bx:evolve` follow-ups (finding `093df977` FD-redirects smoke-check + `CLAUDE_ENV_FILE` UTF-8 check).
+
+### Session 52 - 2026-07-23
+**What happened:**
+- Reviewed the full transcript of the first-ever `/bx:webdesign` end-to-end run (on the `kaanarik` repo) — a careful shakedown that exercised the whole pipeline and paused cleanly at `review_pending` on the `webdesign/2026-07-23` branch with no app code touched. Mapped observed vs. intended behavior against all 9 skill files.
+- Identified 15 optimization findings (3 tiers: confirmed defects, under-documentation gaps, nits) and, on user request ("apply everything"), applied all 15 across 7 skill files (+120/−59).
+- Verified the `stitch-skills` plugin namespaces on disk before the global rename (`stitch::` → `stitch-design:`; `react-components` → `stitch-build:`).
+- Fixed latent Phase-3 clean-tree traps the paused run never reached: `.gitignore` edit now committed in Phase 1, `.playwright-mcp/` added to the managed gitignore block; added Tailwind-v4 detection + `@theme` token-merge (the kaanarik stack).
+- Rewrote the setup doc (wizard prints its own `claude mcp add`; API-key/`.env` secret hygiene; TUI needs a real terminal) and encoded Stitch platform gotchas (generation timeout≠failure; `list_screens` omits generated screens; lossy color control → new "generate one, verify palette, then batch" pass).
+
+**Files created/modified:**
+- `bx/skills/webdesign/SKILL.md` — allowed-tools +python/python3/tsx/node
+- `bx/skills/webdesign/references/{setup-stitch-mcp,web-stack-detection,phase1-extract,phase2-design-review,phase3-inject,stitch-formats}.md` — 6 reference files hardened
+- auto-memory — webdesign-first-run-queued → webdesign-dogfood-hardened; MEMORY.md pointer
+
+**Next session should:**
+- Push the S52 fixes, `/plugin update bx`, then re-run `/bx:webdesign` on kaanarik past review into Phase 3 to exercise the latent fixes (Tailwind-v4 merge, clean-tree guards).
+- Consider the same real-run treatment for `/bx:seo`, `/bx:tests`, `/bx:arch`, `/bx:health` (all content-hardened, never run E2E).

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-07-23 (Session 51)
+Last Updated: 2026-07-23 (Session 52)
 
 ## Project Overview
 
@@ -33,14 +33,14 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 ## In Progress
 
-**`/bx:webdesign` shipped + twice review-hardened (S42, S48), pending activation.** The 10th skill is built, merged, pushed, and review-hardened twice: S42 (skill-creator content review + `/code-review` xhigh, 16 fixes — incl. the `app_runnable:false` Phase-2 dead-end closure + Phase-3 git-safety invariant) and S48 (fresh skill-creator pass, 13 findings / 12 fixed in `9b9c703` — incl. a repo-rooted sibling-skill path bug and a Phase-3 null-screen brick). Plugin cache is at `08d69da` — refresh to pick up `9b9c703` and everything after it, then install the **Stitch MCP + `stitch-skills` plugin** (one-time) before dogfood. Dogfood checklist: `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`. **First-run kickoff prompt for the `kaanarik` target repo prepared at `docs/webdesign-first-run-prompt.md` (S51).**
+**`/bx:webdesign` first dogfood + third hardening pass (S52), pending re-run.** The 10th skill had its **first real end-to-end run** (on `kaanarik`): the whole pipeline ran — setup → detection → branch → inventory → before-shots → Stitch seeding → direction interview → quota pre-flight → 3-screen generation → mandatory review → palette iteration — and **paused cleanly at `review_pending`** on `webdesign/2026-07-23`, **no app code touched**. The safety architecture held; every failure was in the delegation surface (Google's skills + Stitch platform + Windows env). The run surfaced **15 findings, all applied S52** across 7 files: `stitch::`→`stitch-design:` naming; latent Phase-3 clean-tree traps (`.gitignore` now committed, `.playwright-mcp/` gitignored); Tailwind-v4 detection + `@theme` merge; setup-doc rewrite; Stitch platform gotchas + lossy-palette "verify-one-then-batch" pass. Earlier hardening: S42 (16 fixes) + S48 (13/12, `9b9c703`). **Fixes committed in the S52 save but unpushed — refresh the plugin cache (`/plugin update bx`) before the fixed skill runs.** Kickoff prompt: `docs/webdesign-first-run-prompt.md`; dogfood checklist: `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
 
 **S37 plugin packaging — remaining:** install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement. (GSC MCP migration #1 declined; Playwright #2 deferred.)
 
 ## Next Steps
 
 1. **`/bx:evolve` follow-ups** — ~~add the `permissions` page to `scan-docs.md`'s allowlist~~ **done S50** (9 pinned pages now; added an *allowlist completeness rule* — a page belongs on the list when it is the canonical **owner** of a syntax bx depends on, and a "docs don't document X" claim must first check whether X's owning page is even listed); smoke-check open finding `093df977` (v2.1.214 fail-closed FD-redirects — do bx's pervasive `2>/dev/null` calls now prompt?) together with the still-pending `CLAUDE_ENV_FILE` UTF-8 check; give the skill the S42 content-review treatment; act on the 13 `open` findings (top: `.claude/skills` / `@skills-dir` auto-load, 4 sources now converging on it); v2 ideas: re-arm carried-forward findings for `--fix` from state (S50 hit this again — Section 4 entries can't be gated), treat lane digest one-liners as non-citation-grade.
-2. **Dogfood `/bx:webdesign`** — refresh the plugin cache, install the Stitch MCP + `stitch-skills` plugin once, then run per `docs/webdesign-first-run-prompt.md` (paste-ready kickoff prompt for the `kaanarik` target repo) / `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
+2. **Resume the `/bx:webdesign` kaanarik run past review** — push the S52 fixes, refresh the plugin cache (`/plugin update bx`), then re-run `/bx:webdesign` (resumes at `review_pending`) and push through **Phase 3 inject+verify** to exercise the latent fixes the paused first run never reached (Tailwind-v4 `@theme` merge, `.gitignore`/`.playwright-mcp` clean-tree guards). Stitch MCP + `stitch-skills` already installed in the target repo.
 3. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
 4. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — all content-review-hardened in S46, never run end-to-end.
 5. **S37 plugin-packaging leftovers** — install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement.
@@ -75,6 +75,7 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 | Cross-skill references must resolve against the skill base directory, not repo-rooted paths (S48) | /bx:webdesign phase1 pointed at `bx/skills/seo/SKILL.md` for the route-enumeration table — a path that exists in neither the installed plugin-cache layout (no `bx/` prefix) nor the target project's CWD where the skill actually runs; same class as the S39 `${CLAUDE_SKILL_DIR}` bug. Rule: sibling-skill reads use `../<skill>/...` resolved against the base directory Claude Code announces at skill load. Corollary from the same review: every background process a skill starts needs its stop mechanism named and permitted (`KillShell`), or orchestrators improvise `kill`/`taskkill`. |
 | `Agent(model:…)` deny rules do NOT guard omitted-model dispatch (S50) | The permissions docs confirm `Tool(param:value)` is real, but also that "a parameter the model omits is never matched" — so `Agent(model:opus)` catches an *explicit* Opus request and never fires on a generic dispatch that sends no `model` param, which is exactly the S43 bug it was added to guard. Two further limits: the value is compared against literal input before normalization (alias `opus` matches, a full model ID does not), and parameter rules are valid in `deny`/`ask` only, never `allow`. The durable guard remains frontmatter `model: sonnet` + dispatching agents by name. |
 | `${CLAUDE_SKILL_DIR}` is real, but text-substitution — not a shell variable (S50) | Corrects a repo-wide claim (in `bx/bin/gsc-parse-helper` and `bx/skills/seo/SKILL.md`) that it "is NOT a real Claude Code substitution". It is real and documented, expanded in a skill's rendered markdown and in `allowed-tools` Bash rules (v2.1.129+) — but never by the shell, so anything reaching the shell unexpanded still yields an empty string. That distinction is what the S33 bug actually was; the `bin/`-launcher-on-PATH remedy stays correct, and `${CLAUDE_PLUGIN_ROOT}` genuinely is unavailable to Bash. |
+| `/bx:webdesign` first dogfood + 15-fix hardening (S52) | First real end-to-end run (kaanarik) paused clean at `review_pending`; the safety architecture held and all 15 findings were in the delegation surface, not orchestration. Durable gotchas now encoded: `stitch-skills` install as `stitch-design:<name>` (NOT `stitch::`); Tailwind v4 has no config file (tokens in `@theme`, not `tailwind.config.js`); the init wizard prints its own `claude mcp add` (API-key `http` path, not a fixed `proxy`/`GOOGLE_CLOUD_PROJECT` command); Stitch color control is lossy (a light seed never resolves bright, overrides silently drop) → verify the palette via `get_project` before batch-generating. |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -118,7 +119,7 @@ claude-config/                         # marketplace repo
 
 **The S37 `/bx:seo` "messed up" breakage is RESOLVED (S39).** Root-caused to the `${CLAUDE_SKILL_DIR}` path bug (not a real Claude Code variable → the helper was never found → GSC silently fell back to heuristic-only) + an impossible "mint token once, reuse across Bash calls" auth model (shell state does not persist across Bash tool calls). Both fixed and verified against live GSC. See Session History S39 + Key Decisions.
 
-**Plugin cache stale (S51):** the cache advanced to `e88b6ba` (this session's skills loaded from that base dir); `b82637a` (S51 webdesign first-run prompt doc) postdates it. Run `/plugin update bx` + `/reload-plugins` (or try the lighter `/reload-skills`, v2.1.152 — open finding `0e4083ea`) before any dogfood. `/bx:webdesign` still needs the Stitch MCP + `stitch-skills` plugin installed once. **13 open upstream findings** now live in `docs/upstream/state.json` (up from 6; S50 applied 3 and rejected 1).
+**Plugin cache stale (S52):** the S52 `/bx:webdesign` hardening (15 fixes across 7 files) is committed in the S52 save but **unpushed** — the plugin cache won't carry it until the changes are pushed and `/plugin update bx` runs. The Stitch MCP + `stitch-skills` are already installed in the `kaanarik` target repo (S52 dogfood). **13 open upstream findings** live in `docs/upstream/state.json`.
 
 ## Environment Variables
 
@@ -128,11 +129,11 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 51) - 2026-07-23
-- Prepped the first-ever `/bx:webdesign` dogfood: walked the full 3-phase skill flow (setup gate → Phase 1 extract/seed → Phase 2 generate/review → Phase 3 safe inject/verify) and confirmed it creates a **real Google Stitch project** (remote), not local samples.
-- **Verified dependency provenance** (user was right to ask): the Stitch **MCP** `@_davideast/stitch-mcp` is David East's *personal* Apache-2.0 package (Google DevRel — Google-adjacent, NOT first-party); the **skills** `google-labs-code/stitch-skills` are *official Google Labs*. Two different trust tiers.
-- Setup runs **in the target repo** (MCP add is `-s user`/global, but skills install is `--scope project`); target GCP project is `kaanarik` (billing linked).
-- Wrote + committed `docs/webdesign-first-run-prompt.md` (`b82637a`, paste-ready kickoff prompt + context); saved auto-memory note `webdesign-first-run-queued.md` + `## /bx:webdesign` pointer in MEMORY.md.
-- Corrected the stale "plugin cache at 08d69da" blocker — this session's skills loaded from cache `e88b6ba`.
+### Last Session (Session 52) - 2026-07-23
+- Reviewed the **first-ever `/bx:webdesign` dogfood** (full transcript of the `kaanarik` run, which paused clean at `review_pending` with no app code touched) and identified 15 optimization findings across 3 tiers.
+- **Applied all 15 fixes** across 7 skill files (+120/−59): `stitch::`→`stitch-design:` naming sweep (plugin namespaces verified on disk), latent Phase-3 clean-tree traps (`.gitignore` now committed, `.playwright-mcp/` gitignored), Tailwind-v4 detection + `@theme` token-merge, setup-doc rewrite (wizard prints its own `claude mcp add`; secret hygiene), Stitch platform gotchas (timeout≠fail; lossy palette → "verify-one-then-batch" pass).
+- The skill's **safety architecture held up completely** on the real run — every failure was in the delegation surface, not orchestration.
+- Updated auto-memory: replaced `webdesign-first-run-queued` with `webdesign-dogfood-hardened`.
+- Fixes committed in this save but unpushed — plugin cache needs `/plugin update bx` before the fixed skill runs.
 
-> Full session detail: [docs/session-history.md](docs/session-history.md) S51
+> Full session detail: [docs/session-history.md](docs/session-history.md) S52

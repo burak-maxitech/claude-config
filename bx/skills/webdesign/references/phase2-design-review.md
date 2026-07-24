@@ -38,7 +38,8 @@ Print the following and **wait for explicit user confirmation before generating 
 
 Briefs on file: <N pages>
 Estimated screens: <estimated_screens>   (Σ states per page)
-Free-tier budget: ~350 screens/month
+Budget: free tier is ~350 screens/month — your account tier may be higher
+  (e.g. TEXT_TO_UI_PRO), and the exact remaining balance is not API-readable.
 
 ⚠ Dynamic pages multiply the count — each state in a brief's `states:` list is
   one screen. Review the states lists in .webdesign/briefs/ before confirming.
@@ -79,18 +80,38 @@ Iterate over every page brief. For each page, generate one screen per state.
 
 ### 2.1 — Build the generation prompt
 
+**First, fetch the live Stitch prompting doc once** (this is the fetch relocated out of Phase 1 — it belongs here, immediately before prompts are built, so it can't be deferred-then-dropped):
+```
+WebFetch https://stitch.withgoogle.com/docs/learn/prompting/
+  "Extract the current recommended prompt structure and any changes to design-system handling."
+```
+If the fetch fails, proceed with the bundled baseline in `stitch-formats.md` and note it in the review card. Where the live doc and the baseline diverge, the live doc wins.
+
 For each `(page, state)` pair, construct a prompt from the brief using the **layout/content-only format** from `stitch-formats.md § Per-screen generation prompt format`. Populate the PAGE STRUCTURE sections from the brief's fields (Header → nav/branding, Hero → headline/subtext/CTA, Content → Key components, Footer → links/legal), per the format defined there.
 
 > Layout/content/structure ONLY — never colors, fonts, roundness, or hex codes. See `stitch-formats.md § Per-screen generation prompt format`.
 
 For dynamic pages (brief has multiple `states:`), generate each state as a separate screen. Adjust the one-line purpose to name the state: e.g. `"Blog listing — loading state, skeleton placeholders"`.
 
-### 2.2 — Invoke `stitch::generate-design`
+### 2.1a — Palette verification pass (generate ONE screen first)
 
-For each `(page, state)` pair call `stitch::generate-design` via the Skill tool, which internally calls `generate_screen_from_text`:
+**Do not batch-generate every screen before confirming the palette resolved as intended.** Stitch's design-system color control is lossy (see `stitch-formats.md § Vibe → knob mapping` caveat): a seed is auto-toned by Material dynamic-color for legibility, so a light/warm seed (e.g. yellow) can land on gold or terracotta rather than the bright palette the user pictured, and `overridePrimaryColor/secondary/tertiary` may silently not apply. On the first dogfood this cost **5 wasted generations** guessing at the palette.
+
+So generate **one representative screen** first (the most color-expressive page — usually the flagship content page), then verify before spending the rest:
+
+1. Generate that single screen (per 2.2).
+2. Read the resolved theme back via `get_project` **and** view the generated screenshot — trust the actual token colors + pixels, not the design-system echo (the echo can diverge from what generation actually used).
+3. Show the user the one screen + resolved palette. If it's wrong, adjust the design system — **prefer authoring `DESIGN.md` colors + `create_design_system_from_design_md` over knob-only `update_design_system`** when a specific palette is required — and regenerate **just this one screen**. Repeat until the palette is right.
+4. Only once the palette is confirmed, generate the remaining screens.
+
+This turns "generate N → discover the palette is wrong → regenerate N" into "generate 1 → fix → generate N−1."
+
+### 2.2 — Invoke `stitch-design:generate-design`
+
+For each `(page, state)` pair call `stitch-design:generate-design` via the Skill tool, which internally calls `generate_screen_from_text`:
 
 ```
-Skill("stitch::generate-design")
+Skill("stitch-design:generate-design")
   → generate_screen_from_text(
       project_id       = state.json["stitch_project_id"],
       designSystem     = state.json["design_system_id"],
@@ -102,6 +123,10 @@ Skill("stitch::generate-design")
 Collect the returned screen ID for each call. The page/state ↔ screen_id mapping is tracked in `state.json` (Step 2.3); no `screen_name` parameter exists on this API.
 
 Generate pages **sequentially** (Stitch screen generation is stateful and rate-sensitive; do not parallelise).
+
+> **Two Stitch platform behaviors to handle (both cost the first dogfood time):**
+> - **Generation times out client-side but usually completes server-side.** If a `generate_screen_from_text` call times out, **do NOT retry it** — a retry double-generates and double-spends quota. The screen is almost certainly still being created. Recover its ID via `get_project` (below), never by re-calling.
+> - **Generated screens do NOT appear in `list_screens`** — that lists only *uploaded* screens. To find a just-generated screen's ID (whether the call returned normally or timed out), read `get_project` and inspect its `screenInstances` for the new one (positioned below the others / absent from your recorded set). Use `get_project`, never `list_screens`, for generated-screen discovery.
 
 ### 2.3 — Record results in `state.json`
 
@@ -173,9 +198,9 @@ When `/bx:webdesign` is invoked and `state.json["phase"] == "review_pending"`, t
 
 3. **If changes requested:** route through `edit_screens`.
 
-   For each change the user describes (e.g. "edit about to move the CTA above the fold"), call `stitch::generate-design` via the Skill tool to invoke `edit_screens`:
+   For each change the user describes (e.g. "edit about to move the CTA above the fold"), call `stitch-design:generate-design` via the Skill tool to invoke `edit_screens`:
    ```
-   Skill("stitch::generate-design")
+   Skill("stitch-design:generate-design")
      → edit_screens(
          project_id = state.json["stitch_project_id"],
          screen_id  = <screen_id from state.json["pages"][...]["states"][...]["screen_id"]>,
