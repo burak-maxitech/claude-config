@@ -307,7 +307,7 @@ cd -
 
 **Output:** Severity summary table (counts) → Critical / Important / Suggestions / Convention Violations / What's Good
 
-**Tiering:** built-in `/simplify` (quality cleanup) → built-in `/code-review` (quick bug scan) → `/bx:review` (this, thorough) → `/code-review ultra` (cloud, pre-merge). Pick the rung that matches the risk of the diff.
+**Tiering:** built-in `/simplify` (quality cleanup) → built-in `/code-review` (quick bug scan) → `/bx:review` (this, thorough) → `/code-review ultra` (cloud, pre-merge). Pick the rung that matches the risk of the diff. The arrows are a risk ladder, not a strict sequence — since v2.1.218 the built-in `/code-review` runs in the background, so its findings can land after you've moved on.
 
 ---
 
@@ -776,6 +776,8 @@ Claude Code ships a built-in `/loop` skill for running a prompt or slash command
 ```
 
 Two important caveats: `/loop` is **session-scoped** — it dies when the Claude Code session closes — and recurring jobs **auto-expire after 3 days** even if the session lives longer. Don't use it as a replacement for a real cron job or scheduled remote agent (see `/schedule` for persistent scheduling).
+
+**Unverified caveat — smoke-test before relying on this.** Every `bx` skill sets `disable-model-invocation: true`. Anthropic's docs state that a command with that flag, used as a *scheduled task's* prompt, is read as plain text instead of being run. `/loop` and `/schedule` are different mechanisms so this may not transfer — but if `/loop /bx:review` or `/loop /bx:clean --dry-run` appears to do nothing, that flag is the first thing to check.
 
 **Do not build a custom `/loop` skill in this repo.** The built-in already covers this use case; re-implementing it in the `bx` plugin would be waste.
 

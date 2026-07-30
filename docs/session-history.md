@@ -105,24 +105,7 @@
 
 ### Session 47 - 2026-06-10: `/bx:evolve` first end-to-end dogfood (3-lane audit → 3 pain-point opportunities; registered 4 per-skill items as `open` findings) + `--fix` applied 3 (Task→Agent rename across 10 files, CLAUDE_ENV_FILE UTF-8 persistence, /fewer-permission-prompts doc); caught 2 lane-accuracy issues (wildcard fix v2.1.139 not v2.1.145; v2.1.143 enforcement enable/disable-time only). (commit: 15295d8)
 
-### Session 48 - 2026-06-10
-**What happened:**
-- Fresh skill-creator content review of `/bx:webdesign` (second pass; S42 was the first) — all 9 skill files, 13 findings: 1 high / 4 medium / 8 low; 12 fixed, 1 no-action (unused `Agent` grant in allowed-tools, revisit after dogfood). Commit `9b9c703` (6 files, +29/−27), pushed.
-- High: phase1 Step 2.1 referenced `bx/skills/seo/SKILL.md` by repo-rooted path — unresolvable from both the installed plugin-cache layout (no `bx/` prefix) and the target project's CWD where the skill runs (S39 `${CLAUDE_SKILL_DIR}` class); now resolves `../seo/SKILL.md` against the skill base directory announced at skill load.
-- Medium: SKILL.md stop-on-any-Stitch-error guardrail contradicted phase2's mark-failed-and-continue → reworded to "never *silently* continue" with phase-defined recorded-failure carve-outs; phase3 Step 1 now skips null-`screen_id` states (one failed Phase-2 generation no longer bricks Phase 3 for healthy pages); per-state `status` made terminal after Phase 2 (page-level status owns the Phase-3 lifecycle); dev-server stop mechanism named — `KillShell` added to `allowed-tools` and cited at both stop sites.
-- Low: `app_runnable:false` degradation note appended to restyle commit messages; phantom `--skip-quota-check` flag demoted to a natural-language override; stale spec jargon fixed ("decision-9" → Step 5a, "Step 0" warning anchor); phase1 git commands normalized to `git -C`; `checkout -b` falls back to checkout when the branch already exists; 3d/3e list renumbering.
-- Plugin cache refreshed to `15295d8` at session start (S47 content live); `9b9c703` landed after — needs another `/plugin update bx` + `/reload-plugins` before dogfood.
-
-**Files created/modified:**
-- `bx/skills/webdesign/SKILL.md` — KillShell grant; per-state-status-terminal wording; guardrail carve-outs
-- `bx/skills/webdesign/references/phase1-extract.md` — sibling-skill path fix; `git -C`; branch-exists fallback; KillShell stop
-- `bx/skills/webdesign/references/phase2-design-review.md` — page-level failed rule; quota-override wording
-- `bx/skills/webdesign/references/phase3-inject.md` — null-screen skip; KillShell; degradation commit note; renumbering; state-table fix
-- `bx/skills/webdesign/references/stitch-formats.md`, `references/web-stack-detection.md` — stale jargon anchors
-
-**Next session should:**
-- Refresh plugin cache, then dogfood `/bx:webdesign` (Stitch MCP + `stitch-skills` install first)
-- `/bx:evolve` follow-ups: `CLAUDE_ENV_FILE` smoke-check + content review + 6 open findings in `docs/upstream/state.json`
+### Session 48 - 2026-06-10: Second skill-creator content review of `/bx:webdesign` (all 9 files; 13 findings — 1 high / 4 medium / 8 low, 12 fixed). High: phase1 referenced `bx/skills/seo/SKILL.md` by repo-rooted path, unresolvable from both the plugin-cache layout and the target repo's CWD (S39 `${CLAUDE_SKILL_DIR}` class) — now `../seo/SKILL.md` resolved against the skill base directory. Medium: phase3 skips null-`screen_id` states so one failed generation no longer bricks Phase 3; `KillShell` added to `allowed-tools` for the dev-server stop. (commit: 9b9c703)
 
 ### Session 49 - 2026-06-12
 **What happened:**
@@ -195,3 +178,25 @@
 **Next session should:**
 - Push the S52 fixes, `/plugin update bx`, then re-run `/bx:webdesign` on kaanarik past review into Phase 3 to exercise the latent fixes (Tailwind-v4 merge, clean-tree guards).
 - Consider the same real-run treatment for `/bx:seo`, `/bx:tests`, `/bx:arch`, `/bx:health` (all content-hardened, never run E2E).
+
+---
+
+### Session 53 - 2026-07-30
+**What happened:**
+- Ran **`/bx:evolve` scoped to `/bx:review` only**. The skill supports no per-skill scoping, so it was adapted: capability inventory built solely from `bx/skills/review/` (23 entries), pain-point list narrowed to the one review-relevant slug (repo-wide `plugin-cache-staleness` deliberately excluded so its 4 open findings wouldn't be dragged in), and **Step 6 watermark advance suppressed** — advancing on a single-skill audit would falsely record the other 10 skills as checked through v2.1.220.
+- Lanes: changelog `ok` (3 releases, 2.1.218→2.1.220), docs `ok` (9/9 pinned pages, **0 findings**), community `degraded` (1 fetch 429'd). The v2.1.218 `/code-review`-runs-in-background claim was verified verbatim against the release body per the S47 "digests aren't citation-grade" rule.
+- **The methodological result of the run:** the docs lane found nothing but flagged that two pages it needed (`checkpointing`, `code-review`) are not on its pinned allowlist. Direct orchestrator fetches of both produced **5 of the 7 findings**, including the only outright-wrong statement in the skill. The community lane separately handed off official URLs it couldn't emit as Tier-1; one was promoted to an official finding via orchestrator verification (same path as S50's `9aa8e1d0`).
+- `--fix` pass: **5 applied, 1 rejected, 1 skipped.** Applied — checkpoint-granularity correction; hedged `/loop` caveat; `effort: high` tradeoff callout; ladder prose in README + workflow; output-format Rule 8 ("verification bar"). Rejected — the lane's proposal to pad `when_to_use` with harness-version trivia (it is a *triggering* field; nothing in SKILL.md was invalidated, and the substance belonged in the human-facing ladder instead). Skipped — `ReportFindings` adoption, since the tool's contract is exclusive-of-text and wholesale adoption would silently delete the severity table, Convention Violations, and What's Good sections.
+- Two deliberate scope corrections worth remembering: `workflow.md:706/709` contain `/code-review → /bx:review` arrow chains but were **excluded** from the ladder edit because they sit inside a fenced block illustrating sample `/bx:health` *output*; and the `/loop` caveat was written to cover `/bx:clean` too, since `disable-model-invocation` is plugin-wide.
+
+**Files created/modified:**
+- `bx/skills/review/SKILL.md` — corrected the post-`--fix` checkpoint claim (per-prompt, not per-edit; `Esc Esc` only on an empty prompt; 30-day cleanup); added a "Why `effort: high`, and what it costs" callout routing users to `--verify`.
+- `bx/skills/review/references/output-format.md` — added Rule 8: Critical/Important findings must name a concrete failure scenario cited to `file:line`, else downgrade to Suggestion.
+- `README.md` — review-ladder rung 2 now carries the effort confidence/coverage tradeoff and v2.1.218 background-subagent behaviour.
+- `workflow.md` — added the unverified `disable-model-invocation` caveat under `/loop`; added the v2.1.218 note to the Tiering line.
+- `docs/upstream/state.json` — 7 new findings written as `open` (Checkpoint 1), then verdicts applied (Checkpoint 2): 5 applied, 1 rejected, 1 left open. Watermark untouched.
+
+**Next session should:**
+- Commit + push the 5 files, then `/plugin update bx` + `/reload-plugins`.
+- Add `checkpointing` + `code-review` to `scan-docs.md`'s allowlist (9 → 11), then run a **full** `/bx:evolve` — 2.1.218–2.1.220 remain unaudited for the other 10 skills.
+- Smoke-test `/loop /bx:review` to resolve the hedged caveat.

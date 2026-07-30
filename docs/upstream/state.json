@@ -246,6 +246,83 @@
       "class": "best_practice",
       "title": "Docs document only `Agent(<subagent-name>)` deny rules — the `Agent(model:opus)` tip applied 2026-07-05 is uncorroborated by the sub-agents/settings pages",
       "note": "APPLIED 2026-07-22, but the lane's PREMISE WAS WRONG — resolved by orchestrator verification against https://code.claude.com/docs/en/permissions#match-by-input-parameter (outside the docs lane's pinned allowlist, which is why the lane missed it). `Agent(model:opus)` IS real and documented under 'Match by input parameter'; the v2.1.178-sourced tip applied in finding 2d6b0e5f was NOT wrong about the syntax. The finding survived for a different and more serious reason: the same docs section states 'a parameter the model omits is never matched', and the S43 bug was a GENERIC subagent dispatched with no `model` param at all — so the deny rule would never have fired on the exact bug the tip claimed to guard. Rewrote workflow.md's 'Guarding subagent model routing' section: 'permission-layer backstop' → 'partial permission-layer backstop', and replaced the 'Belt-and-suspenders … stops a regression from ever spawning a non-Sonnet bx agent' overclaim with the omitted-parameter limit + two further caveats (literal-input comparison before normalization, so alias `opus` matches but a full model ID does not; parameter rules valid in deny/ask only, never allow) and a pointer back to frontmatter `model:` + dispatch-by-name as the durable guard. LESSON for scan-docs.md: the pinned allowlist lacks the permissions page, which owns permission-rule syntax — consider adding it. Orchestrator normalized the lane's `bx:*/agent-model-deny-rule-syntax` to `bx:agents/...` per the bx:<skill>/<area> capability-string form."
+    },
+    {
+      "finding_id": "282556d0e640d1562264172d91342ea4b71a68a9",
+      "decision": "rejected",
+      "date": "2026-07-30",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.218",
+      "affected_capability": "bx:review/builtin-code-review-ladder",
+      "source_content_hash": "00d54295dd67e129e09c2f5ce944e7bb83e63222",
+      "class": "best_practice",
+      "title": "Built-in `/code-review` now runs as a background subagent (v2.1.218) — /bx:review's ladder framing assumes it blocks the conversation",
+      "note": "REJECTED 2026-07-30 -- no invalidated text to fix, and the proposed edit site was wrong. The lane proposed appending v2.1.218 background-subagent detail to bx/skills/review/SKILL.md's when_to_use. Orchestrator check found nothing in SKILL.md that v2.1.218 makes false: 'fast diff scan, daily default' is still accurate and the body never claims the built-in blocks. when_to_use is a TRIGGERING field consumed to judge skill relevance, so harness-version trivia there can only dilute trigger accuracy. The substance was applied instead under finding d1219059 (README.md + workflow.md ladder prose), which is where the ladder is defined for humans. Per Rule 3 this re-raises only if a future run re-emits it with a CHANGED source_content_hash."
+    },
+    {
+      "finding_id": "d12190593f9f11d377a42ca31bf7fa821f1fd50a",
+      "decision": "applied",
+      "date": "2026-07-30",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.218",
+      "affected_capability": "bx:review/builtin-simplify-ladder",
+      "source_content_hash": "00d54295dd67e129e09c2f5ce944e7bb83e63222",
+      "class": "best_practice",
+      "title": "Ladder prose in README/workflow.md renders built-in `/code-review` as a synchronous step in arrow chains (v2.1.218 made it background)",
+      "note": "APPLIED 2026-07-30 across both ladder-definition sites, and absorbed the substance of rejected finding 282556d0. README.md review-ladder rung 2: added the effort confidence/coverage tradeoff and the v2.1.218 background-subagent behaviour (findings arrive asynchronously; a chained /code-review may still be in flight). workflow.md:310 Tiering line: added 'the arrows are a risk ladder, not a strict sequence' with the same v2.1.218 note. SCOPE CORRECTION: workflow.md:706/709 also contain /code-review -> /bx:review arrow chains but were deliberately EXCLUDED -- they sit inside a fenced block illustrating sample /bx:health OUTPUT, so editing them would corrupt an example of what the advisor prints rather than fix a ladder definition. This is a scope fix, not a partial application under the S45 sibling-echo rule."
+    },
+    {
+      "finding_id": "d148067023cb1d84f13cf9aaece8da08a6b064f3",
+      "decision": "applied",
+      "date": "2026-07-30",
+      "source_url": "https://code.claude.com/docs/en/code-review",
+      "affected_capability": "bx:review/single-agent-architecture",
+      "source_content_hash": "f20e2e519357531f6913566db1c979da1f9b3630",
+      "class": "opportunity",
+      "title": "Official Code Review runs a dedicated false-positive verification step; /bx:review has none",
+      "note": "PARTIALLY APPLIED 2026-07-30 -- READ THIS BEFORE ASSUMING THE GAP IS CLOSED. Only the cheap 'verification bar' half landed: bx/skills/review/references/output-format.md gained Rule 8 requiring Critical/Important findings to name a concrete failure scenario (input/state/call sequence producing the wrong behaviour) cited to file:line rather than inferred from naming, downgrading to Suggestion otherwise -- mirroring the REVIEW.md verification-bar pattern in Anthropic's Code Review docs. DELIBERATELY NOT DONE: the actual architectural fix, i.e. the dedicated verification/refutation PASS that filters candidate findings against real code behaviour before they are presented. /bx:review remains a single-orchestrator, single-pass skill with no independent verification stage, and that compounds with its effort: high setting (see finding 069c9442). Applying a multi-agent topology through a --fix diff gate was rejected as unsafe for a skill that has never had a skill-creator content review or an eval suite. NEXT: brainstorm -> spec -> plan, then measure with skill-creator's eval loop; re-register as a fresh finding if a future run re-emits the capability."
+    },
+    {
+      "finding_id": "0b6ef289b08869e88880bc9a218e692f7ed507f5",
+      "decision": "open",
+      "date": "2026-07-30",
+      "source_url": "https://code.claude.com/docs/en/code-review",
+      "affected_capability": "bx:review/output-format-severity",
+      "source_content_hash": "bfef238afb60339a85bfa4fd7d3641a8300ace0d",
+      "class": "opportunity",
+      "title": "`ReportFindings` tool (v2.1.218) renders findings as a host-native list — /bx:review emits markdown tables only",
+      "note": "SCOPED RUN (review-only). ORCHESTRATOR-VERIFIED. references/output-format.md specifies a hand-rolled markdown severity table; the host can render a typed findings list instead when it requests one. Note the official severity taxonomy (Important / Nit / Pre-existing) differs from bx:review's (Critical / Important / Suggestions / Convention Violations) — 'Pre-existing' has no bx equivalent though SKILL.md Step 0 covers the concept in prose. Evaluate adopting ReportFindings and whether to add a pre-existing marker."
+    },
+    {
+      "finding_id": "069c944227b0ac0cc66afec084cbba72cc466b82",
+      "decision": "applied",
+      "date": "2026-07-30",
+      "source_url": "https://code.claude.com/docs/en/code-review",
+      "affected_capability": "bx:review/effort-frontmatter",
+      "source_content_hash": "97ba3e061a0c6e53de08bbd9ef94ce67c34f7a1c",
+      "class": "best_practice",
+      "title": "`effort: high` widens the net and admits lower-confidence findings per official calibration — undocumented tradeoff in /bx:review",
+      "note": "APPLIED 2026-07-30. bx/skills/review/SKILL.md: added a 'Why effort: high, and what it costs' callout after the Fresh-session tip. States Anthropic's documented tradeoff (low/medium report only high-confidence findings; high through max cast a wider net and admit less certain ones), explicitly flags that whether a skill's effort: frontmatter inherits that exact calibration is NOT documented, and routes the user to --verify as the existing mitigation. The effort value itself was deliberately NOT changed -- high is correct for the thorough tier; the gap was that the cost went unstated."
+    },
+    {
+      "finding_id": "64d1a7ff330385f9ab1e3322a9e8a1c87e8960e7",
+      "decision": "applied",
+      "date": "2026-07-30",
+      "source_url": "https://code.claude.com/docs/en/code-review",
+      "affected_capability": "bx:review/disable-model-invocation",
+      "source_content_hash": "883156f6c14638ba39bd16dcb3fa9e73a6969d1c",
+      "class": "breakage",
+      "title": "`disable-model-invocation: true` may make the documented `/loop /bx:review` a no-op — official docs say a scheduled prompt reads as plain text",
+      "note": "APPLIED 2026-07-30 as a HEDGED caveat, deliberately NOT a removal (same treatment as S52 finding 313c3669). workflow.md: added an 'Unverified caveat' paragraph after the /loop caveats noting that all bx skills set disable-model-invocation: true and that Anthropic documents such a command being read as plain text when used as a SCHEDULED TASK's prompt. Both worked examples (/loop /bx:review and /loop /bx:clean --dry-run) left fully intact per the no-remove-manual-steps convention. SCOPE NOTE: the caveat covers /bx:clean too -- the flag is plugin-wide, not review-specific. STILL UNVERIFIED: /loop (ScheduleWakeup, session-scoped) and /schedule are different mechanisms; smoke-test and replace the hedge with a definitive statement."
+    },
+    {
+      "finding_id": "4ed0fc0c1903e2177418b06512d3127e2efe85ed",
+      "decision": "applied",
+      "date": "2026-07-30",
+      "source_url": "https://code.claude.com/docs/en/checkpointing",
+      "affected_capability": "bx:review/rewind-checkpoint-note",
+      "source_content_hash": "eec0ef3de8b9dabbf9004a8a274a5d0ae8f78e8b",
+      "class": "breakage",
+      "title": "Checkpoint claim is factually wrong: checkpoints are created before each USER PROMPT, not before each edit",
+      "note": "APPLIED 2026-07-30 (scoped review-only run). bx/skills/review/SKILL.md: rewrote the post---fix closing line. Corrected 'Checkpoints are created automatically before each edit' -> checkpoints are captured before each USER PROMPT, so one /rewind reverts the whole Step-6 batch rather than a single edit. Also fixed two rider errors in the same sentence: Esc Esc opens the rewind menu only on an EMPTY prompt (otherwise it clears the input), and 'persist across sessions' is now stated as surviving a resume but deleted after 30 days (cleanupPeriodDays)."
     }
   ]
 }

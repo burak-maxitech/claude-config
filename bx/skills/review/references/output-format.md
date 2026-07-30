@@ -42,6 +42,7 @@ Present this at the top of your response before any details:
 5. Don't rewrite large sections — point to problems and trust the developer to fix them
 6. For Critical/Important findings, include **git blame context** if it reveals intent (e.g., "This was introduced in commit abc123 as a workaround for X — may now be safe to remove")
 7. Mark findings that are **auto-fixable** with `[fixable]` tag if `--fix` is active
+8. **Critical and Important findings must name a concrete failure scenario** — the specific input, state, or call sequence that produces the wrong behavior, cited to `file:line` in the source rather than inferred from naming. If you cannot name one, downgrade it to a Suggestion. This is the cheapest false-positive filter there is: a bug you can't make fail on paper usually isn't one. (Mirrors the "verification bar" pattern in Anthropic's own Code Review guidance.)
 
 ## Verification Results (when --verify is active)
 

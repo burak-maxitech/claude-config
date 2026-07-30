@@ -14,6 +14,8 @@ Review this code like a senior engineer with 15+ years of experience. Be thoroug
 
 > **Fresh-session tip.** For non-trivial reviews — especially of code Claude just wrote in this same session — run `/clear` first or invoke `/bx:review` from a fresh `claude` session. Per the official best-practices doc's Writer/Reviewer pattern: *"a fresh context improves code review since Claude won't be biased toward code it just wrote."* Skip this for quick passes on diffs you wrote by hand or for `--last-commit` reviews where you genuinely want session context.
 
+> **Why `effort: high`, and what it costs.** The thorough tier deliberately runs at high reasoning effort. Anthropic documents the tradeoff for their own reviewer: `low`/`medium` "report only the findings it's most confident in," while `high` through `max` "cast a wider net and may include findings the review is less sure about." Whether a skill's `effort:` frontmatter inherits that exact calibration isn't documented — but treat the direction as real. Expect a tail of lower-confidence findings, and reach for `--verify` when you want them cross-checked against real test/lint behavior before acting.
+
 ---
 
 ## Step 0: Determine Review Target
@@ -140,7 +142,7 @@ After review (and verification if `--verify` also present), auto-fix **only simp
 
 After fixing, show a summary of what was changed and run tests again to confirm nothing broke. End the summary with this line:
 
-> **If anything looks wrong, press `Esc Esc` or run `/rewind` to undo these edits.** Checkpoints are created automatically before each edit and persist across sessions.
+> **If anything looks wrong, run `/rewind` — or press `Esc Esc` on an empty prompt — to undo these edits.** Claude Code checkpoints your code before each *user prompt*, not before each individual edit, so one rewind reverts this whole batch of fixes rather than one at a time. Checkpoints survive a session resume and are deleted after 30 days (`cleanupPeriodDays`).
 
 > **CI gating.** Not self-gating. To pause for approval in headless `claude -p` runs, configure a `PreToolUse` `defer` hook scoped (via the `if` field) to `Edit` or specific Bash patterns. Full recipe in README "Interop with Claude Code 2.1 features".
 
