@@ -347,7 +347,10 @@ claude-config/                         # marketplace repo
 ├── .claude/
 │   ├── scripts/                       # Launchers (not plugin components)
 │   │   ├── start-claude.sh            # Mac/Linux launcher
-│   │   └── start-claude.ps1           # Windows launcher (PowerShell)
+│   │   ├── start-claude.ps1           # Windows launcher (PowerShell)
+│   │   ├── session-color.sh           # Sticky per-project session color (bash)
+│   │   ├── session-color.ps1          # Sticky per-project session color (PowerShell)
+│   │   └── tests/                     # Allocator test suites (no test framework needed)
 │   └── settings.local.json            # Local Claude Code settings
 ├── docs/                              # Reference files (overflow from CLAUDE.md)
 │   ├── completed-work.md

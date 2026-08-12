@@ -27,6 +27,27 @@
 
 ### Session 11 - 2026-03-17: Enabled model invocation on plan-feature skill (`disable-model-invocation: false`). (commits: 734b13b, 1cffa6b)
 
+### Session 55 - 2026-08-12
+**What happened:**
+- Built per-project session naming + coloring for the `cc` launcher, brainstorm → spec → plan → subagent-driven execution (4 tasks, 1 fix round, task review after each, whole-branch review at the end). `cc <project>` now runs `claude -n "<project>" "/color <color>"`.
+- Verified the upstream surface first rather than assuming: `-n/--name` officially sets the name in the prompt box, `/resume` picker, and terminal tab title; there is **no** launch-time color flag or settings key (requests #44800, #47332, #40393 closed `not_planned`); `/color` passed as the initial prompt argument is handled as a local command — proved with `claude -p "/color blue"` → `Session color set to: blue`, exit 0, no model turn.
+- Rejected hashing for color assignment on measured evidence: the palette has 8 colors and the machine has 8 project folders, so any hash collides by the birthday paradox (djb2 and byte-sum both gave 4 distinct of 8 — identical partitions, because 33 mod 8 == 1). Chose sticky auto-assign persisted to `~/.claude/cc-session-colors`, which is distinct *and* stable.
+- Task 2's review caught a plan-mandated defect: bash `=` is case-sensitive while PowerShell `-eq` is not, so `cc Horowell` would duplicate `horowell` on macOS. User ruled to fix the bash side; fix round 1 added case-insensitive lookup preserving original casing, plus 3 covering assertions.
+- Whole-branch review (opus) returned **Ready to ship**, verifying parity empirically in bash 5.3, pwsh 7.6.4 and WinPS 5.1 with a 20-case adversarial parse differential (identical accept/reject on all 20), and surfacing a pre-existing defect: `start-claude.ps1` is BOM-less UTF-8 with seven non-ASCII characters, which Windows PowerShell 5.1 fails to parse (2 errors; 0 on pwsh 7). Two items left open — the human live gate, and one batched fix wave held until it reports.
+
+**Files created/modified:**
+- `.claude/scripts/session-color.ps1`, `.claude/scripts/session-color.sh` - new sticky color allocators, one per shell; sourceable with no side effects so they can be tested against a temp registry
+- `.claude/scripts/tests/test-session-color.ps1`, `.claude/scripts/tests/test-session-color.sh` - new zero-dependency test suites (hand-rolled assertions, no Pester); 9 and 12 assertions
+- `.claude/scripts/start-claude.ps1`, `.claude/scripts/start-claude.sh` - Step 5 now sources the allocator and launches named + colored, falling back to a plain `-n` launch if no color is available; `SCRIPT_DIR` hoisted above the `cd` in the shell version
+- `README.md` - paragraph documenting the behavior, the registry path, and delete-to-reshuffle
+- `.gitignore` - `.superpowers/` (subagent-driven-development scratch)
+- `docs/superpowers/specs/2026-08-12-cc-session-naming-design.md`, `docs/superpowers/plans/2026-08-12-cc-session-naming.md` - design spec and 4-task implementation plan
+
+**Next session should:**
+- Run the live gate first: `cc claude-config` — is the prompt bar colored, does the name chip / tab title read the project, and is no model turn consumed? Then `cc horowell` for a second color.
+- Dispatch the single fix wave (ASCII sweep of `start-claude.ps1`, `try/catch` around the helper call, `ToLowerInvariant()`, 0-byte-registry header, PS case-insensitivity assertion, plan/spec doc-drift sweep, README wording per the gate result).
+- If the gate fails, treat the `statusLine` fallback as a fresh design decision — do not patch the launcher.
+
 ### Session 12 - 2026-04-11: CC 2.1 feature audit — killed `--gated` skill flag after verifying `defer` PreToolUse only works on single-tool-call turns for external SDK callers; shipped README interop section + skill doc notes for CI gating / MCP `maxResultSizeChars` / plugin `bin/` detection. (commits: 56a5513, dd6a7ce, 644fb0c, 83f9bb1)
 
 ### Session 13 - 2026-04-11: External best-practice repo review — direct-fetch verification killed 2 of plan's Tier 2 candidates (`paths:`/`effort:` were doc-extrapolation, not observed in actual external skills); shipped 3 doc bullets (MCP setup in README, mid-session `/compact` in workflow, `/loop` reference); flagged `.claude/rules/` symlink-friendly rule files as future option. (commits: adf634e, 5f61209, 445c357)
@@ -109,24 +130,7 @@
 
 ### Session 49 - 2026-06-12: Repo private → public for teammate plugin install (marketplace add auto-clones; manual clone only powers `cc`); README reorganized teammate-first (Step-1-only callout, description+command-map lead, file tree → Repository Layout); visibility swept across CLAUDE.md/workflow.md/auto-memory; keep-public resolved same session (commits: 45c37ad, d808bb3, fd43e4b, 08d69da)
 
-### Session 50 - 2026-07-22
-**What happened:**
-- `/bx:resume` flagged CLAUDE.md as 39 days stale — two commits (`fc2fa7b` 2026-07-05 `/bx:evolve --fix` pass; `acff6b1` 2026-07-21 hook exec bit) were committed but never written into session history. No conversation record exists for them, so they are recorded here by reference rather than reconstructed as a fabricated session entry.
-- Ran `/bx:evolve` (default delta): 3 lanes — changelog `ok` (15 releases, `2.1.201 → 2.1.217`), docs `ok` (8/8 pinned pages), community `degraded` (1 fetch failed on a Medium interstitial). 8 findings consolidated, 0 breakage, 0 sentinels.
-- One consolidated finding collided with existing open entry `15742589` — same page + same pain slug ⇒ identical `finding_id` — from a *different* section of `plugins-reference`. Appended a dated addendum to the existing note instead of creating a duplicate; left `source_content_hash` anchored to the original excerpt (open entries have no hash-trigger semantics; Rules 3/5 cover rejected/deferred only).
-- Ran `/bx:evolve --fix`: 3 applied across 5 files, 1 rejected. Did NOT re-dispatch the lanes — the watermark had already advanced to today, so a re-run would have produced an empty eligible set. Gated the 6 findings still in context.
-- **The pinned-allowlist gap is the session's real finding.** The docs lane concluded `Agent(model:opus)` was undocumented from `sub-agents.md` + `settings.md` alone and proposed reverting the correct S47 fix; `code.claude.com/docs/en/permissions` — the page that actually owns permission-rule syntax — is not in `scan-docs.md`'s allowlist. Verified there: the syntax is real, but *"a parameter the model omits is never matched"*, so it cannot guard the S43 omitted-model dispatch it was written to guard.
-- **Closed that gap same-session:** added `code.claude.com/docs/en/permissions` to the pinned allowlist (8 → 9 pages) plus an **allowlist completeness rule** — a page belongs on the list when it is the canonical *owner* of a syntax bx depends on, not merely when it mentions it in passing; and any finding claiming "the docs don't document X" must first verify that X's owning page is listed at all, reporting an allowlist gap in `scan_note` rather than a finding against the plugin.
-
-**Files created/modified:**
-- `workflow.md` — "Guarding subagent model routing": `permission-layer backstop` → `partial`; replaced the belt-and-suspenders overclaim with the omitted-parameter limit + literal-input-comparison and deny/ask-only caveats
-- `bx/bin/gsc-parse-helper`, `bx/skills/seo/SKILL.md` — corrected the `${CLAUDE_SKILL_DIR}` "not a real substitution" claim; deliberately preserved the still-accurate `${CLAUDE_PLUGIN_ROOT}` half
-- `README.md`, `bx/skills/evolve/references/fix-mode-evolve.md` — hedged v2.1.216 slash-menu-refresh notes beside the manual `/plugin update` steps (manual steps kept fully visible)
-- `docs/upstream/state.json` — watermark advance + 5 new entries + 3 applied + 1 rejected (22 entries: 13 open / 8 applied / 1 rejected)
-- `bx/skills/evolve/references/scan-docs.md` — `permissions` added to the pinned allowlist (8 → 9 pages) + the allowlist completeness rule
-
-**Next session should:**
-- `/plugin update bx` + `/reload-plugins` (cache is at `08d69da`, 3+ commits behind), then smoke-check open finding `093df977` (fail-closed FD-redirects) alongside the pending `CLAUDE_ENV_FILE` UTF-8 check
+### Session 50 - 2026-07-22: `/bx:evolve` run (3 lanes, 8 findings, watermark `2.1.201 → 2.1.217`) + `--fix` applied 3 / rejected 1. The session's real finding was the **pinned-allowlist gap**: the docs lane proposed reverting the correct S47 `Agent(model:)` fix because `code.claude.com/docs/en/permissions` — the page that owns permission-rule syntax — wasn't in `scan-docs.md`'s allowlist; closed same session (8 → 9 pages) plus an allowlist completeness rule. Also corrected the `${CLAUDE_SKILL_DIR}` "not a real substitution" claim and recorded two orphaned commits (`fc2fa7b`, `acff6b1`) by reference rather than fabricating a session entry. (commits: 10566ae, e88b6ba)
 
 ### Session 51 - 2026-07-23
 **What happened:**

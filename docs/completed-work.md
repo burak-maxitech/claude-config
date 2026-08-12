@@ -5,6 +5,10 @@
 ---
 
 ## Skills
+- [x] S55: Designed per-project `cc` session naming + coloring — brainstorm → spec → plan; verified upstream constraints first (`-n` supported, no color flag, `/color` as prompt arg is local) — `docs/superpowers/specs/2026-08-12-cc-session-naming-design.md`, `docs/superpowers/plans/2026-08-12-cc-session-naming.md` (commits 8e7eb5e, d78105e)
+- [x] S55: Sticky session-color allocators for both shells + zero-dependency test suites, cross-shell parity proven — `.claude/scripts/session-color.{ps1,sh}`, `.claude/scripts/tests/test-session-color.{ps1,sh}` (commits 15bef13, b165b90, 600ea68)
+- [x] S55: Wired both `cc` launchers to launch `claude -n "<project>" "/color <color>"` with graceful fallback to an uncolored launch — `.claude/scripts/start-claude.{ps1,sh}` (commit aa39b9e)
+- [x] S55: Documented the naming/coloring behavior + registry reset in README — `README.md` (commit c9c26db)
 - [x] /bx:webdesign S52 self-review — /bx:review (2 fixes) + /simplify (11 refinements) on the dogfood hardening - bx/skills/webdesign/*
 - [x] `/resume-work` — Session startup with parallel doc reads, git scans, auto-memory, task hydration
 - [x] `/plan-feature` — Feature interview with greenfield/existing modes, Plan Mode, task hydration
