@@ -64,6 +64,8 @@ cc my-project    # launch a project directly
 
 `cc` refreshes the `bx` plugin from the marketplace, opens (and pulls) your chosen project, checks for Claude Code updates, and launches Claude Code.
 
+Each session is launched **named after the project and color-coded**, so parallel sessions stay distinguishable: the project name shows on the prompt bar, in the `/resume` picker, and in the terminal tab title, and the prompt bar takes a per-project color. Colors are assigned automatically on a project's first launch and remembered in `~/.claude/cc-session-colors` (a plain `name=color` file — delete it to reshuffle every project). `/color` supports eight colors, so past eight projects colors start repeating; the name is what stays unique.
+
 ### Updating to the latest version
 
 **Everyone** — to pull the latest skills after they change, run inside Claude Code:
