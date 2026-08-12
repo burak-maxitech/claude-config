@@ -34,6 +34,12 @@ printf '%s\n' '# header' '' 'garbage-no-separator' 'weird=notacolor' 'a=b=c' 'al
 assert_equal "cyan"  "$(cc_session_color alpha "$REG2")" "valid entry survives malformed neighbours"
 assert_equal "green" "$(cc_session_color beta  "$REG2")" "malformed lines do not consume colors"
 
+# --- Case-insensitive name matching ---
+REG_CASE="$TMP/registry-case"
+assert_equal "cyan"  "$(cc_session_color TestProj "$REG_CASE")" "mixed-case project gets cyan"
+assert_equal "cyan"  "$(cc_session_color testproj "$REG_CASE")" "lowercase lookup finds existing mixed-case entry"
+assert_equal "1" "$(grep -c '^TestProj=' "$REG_CASE")" "case-insensitive lookup preserves original casing in registry"
+
 # --- Palette exhausted: least-used wins, ties broken by palette order ---
 REG3="$TMP/registry-3"
 printf '%s\n' '# header' 'p1=cyan' 'p2=green' 'p3=blue' 'p4=purple' \

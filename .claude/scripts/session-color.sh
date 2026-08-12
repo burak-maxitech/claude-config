@@ -49,7 +49,7 @@ cc_session_color() {
     # --- A known project keeps its color, and the file is left untouched. ---
     i=0
     while [ "$i" -lt "${#names[@]}" ]; do
-        if [ "${names[$i]}" = "$project" ]; then
+        if [ "$(printf '%s' "${names[$i]}" | tr '[:upper:]' '[:lower:]')" = "$(printf '%s' "$project" | tr '[:upper:]' '[:lower:]')" ]; then
             printf '%s\n' "${colors[$i]}"
             return 0
         fi
