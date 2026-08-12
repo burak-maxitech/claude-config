@@ -89,7 +89,7 @@ User responses:
 - `y` — apply via `Edit` (delete the test block). Advance to next finding.
 - `n` — record "rejected" (do not re-show this run). Advance.
 - `skip` — record "skipped (revisit later)". Advance.
-- `abort` — stop the whole `--fix` pass. Already-applied edits stay; use `/rewind` to undo individually.
+- `abort` — stop the whole `--fix` pass. Already-applied edits stay; `/rewind` reverts the whole turn's batch (checkpoints are per user prompt, not per edit).
 
 ## Cascading prompts (after each deletion)
 
@@ -144,7 +144,7 @@ Auto-routed to --plan: 7
 Cascade-deleted empty parent blocks: 1
 Files flagged for /bx:clean follow-up: 0
 
-Per-edit undo: press Esc Esc twice or run /rewind to step back through individual edits.
+Undo: run /rewind (or Esc Esc on an empty prompt) — checkpoints are per user prompt, not per edit, so one rewind reverts this whole pass, not a single edit.
 Whole-pass undo: if you did this on a branch, `git checkout main && git branch -D <fix-branch>` discards all changes.
 
 Suggested follow-up:

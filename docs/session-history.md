@@ -107,23 +107,7 @@
 
 ### Session 48 - 2026-06-10: Second skill-creator content review of `/bx:webdesign` (all 9 files; 13 findings — 1 high / 4 medium / 8 low, 12 fixed). High: phase1 referenced `bx/skills/seo/SKILL.md` by repo-rooted path, unresolvable from both the plugin-cache layout and the target repo's CWD (S39 `${CLAUDE_SKILL_DIR}` class) — now `../seo/SKILL.md` resolved against the skill base directory. Medium: phase3 skips null-`screen_id` states so one failed generation no longer bricks Phase 3; `KillShell` added to `allowed-tools` for the dev-server stop. (commit: 9b9c703)
 
-### Session 49 - 2026-06-12
-**What happened:**
-- Resumed via `/bx:resume` (clean tree at `8d206df`; plugin cache still one commit behind per the S48 blocker).
-- User switched the claude-config repo from **private → public** (done on GitHub before the session) to make teammate plugin-install easier, and asked whether it was necessary, how teammates install, and to simplify README.
-- Clarified the install model with on-disk evidence: `/plugin marketplace add burak-maxitech/claude-config` auto-clones the repo into `~/.claude/plugins/marketplaces/` (and `/plugin install` caches `bx` under `~/.claude/plugins/cache/`) — teammates never `git clone` manually; the manual clone (README Step 2) only powers the `cc` launcher / skill editing. Public wasn't strictly required (private works for anyone with repo read access) but removes per-teammate access management; flagged that `docs/` session notes are now world-readable (no secrets, but internal narrative).
-- Simplified README for teammates: moved the "you only need Step 1" callout to the top of Setup, rewrote Step 1's private→public note, split "Updating" into Everyone vs Contributors, collapsed the symlink-migration block into a `<details>`, and renamed "Syncing Changes" → "Editing the skills (contributors only)". Then (follow-up, commit `fd43e4b`) reorganized the README top-level structure to lead with a description + grouped `/bx:*` command map → Setup, relocating the file tree to a bottom **Repository Layout** section (relocated byte-for-byte via script).
-- Swept stale `(private)` → `(public)` across CLAUDE.md, workflow.md, and auto-memory `MEMORY.md`. Resolved the keep-public question same session (commit `d808bb3`).
-
-**Files created/modified:**
-- `README.md` - teammate-facing setup simplification + public-install note + structural reorg (description-first lead, file tree → Repository Layout)
-- `CLAUDE.md` - repo line private→public (+ /bx:save session block, Last Updated)
-- `workflow.md` - repo visibility line
-- `~/.claude/projects/-Users-burakarik-Development-projects-claude-config/memory/MEMORY.md` - repo visibility fact (auto-memory)
-
-**Next session should:**
-- ~~Decide whether to keep the repo public~~ → **resolved: keep public** (decided 2026-06-12; privacy tradeoff on `docs/` notes accepted for easier teammate onboarding).
-- Dogfood `/bx:webdesign` (refresh plugin cache ≥`9b9c703`, install Stitch MCP + `stitch-skills` first).
+### Session 49 - 2026-06-12: Repo private → public for teammate plugin install (marketplace add auto-clones; manual clone only powers `cc`); README reorganized teammate-first (Step-1-only callout, description+command-map lead, file tree → Repository Layout); visibility swept across CLAUDE.md/workflow.md/auto-memory; keep-public resolved same session (commits: 45c37ad, d808bb3, fd43e4b, 08d69da)
 
 ### Session 50 - 2026-07-22
 **What happened:**
@@ -200,3 +184,26 @@
 - Commit + push the 5 files, then `/plugin update bx` + `/reload-plugins`.
 - Add `checkpointing` + `code-review` to `scan-docs.md`'s allowlist (9 → 11), then run a **full** `/bx:evolve` — 2.1.218–2.1.220 remain unaudited for the other 10 skills.
 - Smoke-test `/loop /bx:review` to resolve the hedged caveat.
+
+---
+
+### Session 54 - 2026-08-11
+**What happened:**
+- First full `/bx:evolve` since the S53 scoped-run freeze, after growing the docs-lane pinned allowlist 9 → 11 (`checkpointing`, `code-review`): 11 releases scanned (2.1.218 → 2.1.228), all 3 lanes ok, 4 Tier-1 findings + 3 community advisories; watermark advanced to 2.1.228 / 2026-08-11. The newly-pinned checkpointing page immediately produced the run's top finding.
+- `--fix` applied 4/4 behind the diff gate: the per-edit checkpoint-undo error S53 fixed in /bx:review alone survived at 9 sites across 8 files (clean/arch/tests SKILL.md closing lines, arch fix-mode.md, seo fix-allowlist.md, tests fix-mode-test.md ×2, evolve fix-mode-evolve.md, workflow.md) — all rewritten to per-user-prompt framing; README review ladder gained the v2.1.223 bare-`/review`-is-the-built-in disambiguation; fix-mode-evolve.md's refresh note carries the v2.1.221 "activate when safe" signal (hedged, manual steps intact); workflow.md's /loop caveat upgraded from "unverified" to "partially confirmed" quoting the code-review docs verbatim.
+- Explicit plugin versioning shipped on user request: plugin.json `version: 1.0.0` + displayName "bx — Burak's Engineering Toolkit"; CHANGELOG.md created with the cache-key rule + 1.0.0 entry; /bx:save Part 8 gained a mandatory bump-on-bx-change step (PATCH/MINOR/MAJOR ladder, --silent defaults PATCH); echo sweep corrected the stale "omitted version = every commit is a version" claims in README (×2) and CLAUDE.md (×2).
+- Community lane's best output was a handoff, not a finding: Anthropic's official auto-mode engineering post + auto-mode-config docs page confirm destructive-git blocking (the premise of open webdesign finding dadac845, to be verified live in the kaanarik Phase-3 run); recorded as an addendum on the finding and flagged auto-mode-config as an allowlist candidate.
+- Resume-time corrections: S53's Known-Issues "5 uncommitted files" claim was stale (committed in e1bd066, pushed, plugin cache current); the stray empty Key Decisions table header in CLAUDE.md removed.
+
+**Files created/modified:**
+- `bx/.claude-plugin/plugin.json` — version 1.0.0 + displayName
+- `CHANGELOG.md` — NEW; cache-key rule + 1.0.0 entry
+- `bx/skills/evolve/references/scan-docs.md` — allowlist 9 → 11 (checkpointing, code-review)
+- `bx/skills/save/references/mode-update.md` — Part-8 plugin-version-bump rule (new step 2)
+- `docs/upstream/state.json` — 4 findings registered → applied; watermark 2.1.228 / 2026-08-11; dadac845 addendum
+- checkpoint-undo sweep (9 sites): `bx/skills/clean/SKILL.md`, `bx/skills/arch/SKILL.md`, `bx/skills/arch/references/fix-mode.md`, `bx/skills/seo/references/fix-allowlist.md`, `bx/skills/tests/SKILL.md`, `bx/skills/tests/references/fix-mode-test.md`, `bx/skills/evolve/references/fix-mode-evolve.md`, `workflow.md`
+- `README.md` — /review-alias note, versioned-update instructions, contributors bump note; `workflow.md` — /loop caveat firmed
+
+**Next session should:**
+- Run the smoke-test batch: /loop /bx:review, /plugin update without /reload-plugins (v2.1.221), 2>/dev/null prompt check (093df977), CLAUDE_ENV_FILE UTF-8
+- Resume the kaanarik /bx:webdesign run through Phase 3 — and verify finding dadac845 (auto-mode vs. the Phase-3 rollback) live there

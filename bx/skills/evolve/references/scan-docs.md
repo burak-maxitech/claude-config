@@ -16,7 +16,7 @@ You have these tools available: Read, Grep, Glob, WebFetch. Use WebFetch for all
 
 ## Pinned URL allowlist
 
-Verified 2026-06-09; `permissions` added 2026-07-22 (S50). For each URL: the working form confirmed by WebFetch, the capability area it covers, and any redirect note.
+Verified 2026-06-09; `permissions` added 2026-07-22 (S50); `checkpointing` + `code-review` added 2026-08-11 (S54). For each URL: the working form confirmed by WebFetch, the capability area it covers, and any redirect note.
 
 | URL | Capability area | Notes |
 |-----|----------------|-------|
@@ -29,6 +29,8 @@ Verified 2026-06-09; `permissions` added 2026-07-22 (S50). For each URL: the wor
 | `https://code.claude.com/docs/en/sub-agents` | subagent configuration — system prompts, tool restrictions, model routing, persistent memory | loads directly |
 | `https://code.claude.com/docs/en/memory` | memory — CLAUDE.md authoring, auto memory, .claude/rules/, path-scoped rules, import syntax | loads directly |
 | `https://code.claude.com/docs/en/commands` | commands/slash-commands reference — built-in commands, bundled skills, workflow commands | candidate `/slash-commands` redirects to skills page; successor is this URL |
+| `https://code.claude.com/docs/en/checkpointing` | checkpointing — per-user-prompt checkpoint capture, `/rewind` restore semantics, `Esc Esc` behavior, subagent/background-fork edits not restored, bash-command changes untracked | loads directly |
+| `https://code.claude.com/docs/en/code-review` | code review — `/code-review` effort levels + remembered level, background/foreground runs, `--fix` edits outside checkpoints, `disable-model-invocation` scheduled-task caveat, `REVIEW.md`, ultra escalation | loads directly |
 
 This lane fetches ONLY these allowlisted URLs. Following a link is allowed only to an anchor on the **same page** (one hop to a `#fragment`). Never follow links to other pages or domains. Why: unbounded link-chasing turns this pinned lane into an open-research lane and destroys the authority guarantee — findings must be traceable to a specific canonical page.
 

@@ -218,7 +218,7 @@ For each qualifying finding:
 5. Move to next
 
 End with:
-> Done. Use `Esc Esc` or `/rewind` to undo any individual edit. If you ran this on a dedicated branch, `git checkout main && git branch -D <branch>` discards the whole pass.
+> Done. Run `/rewind` (or press `Esc Esc` on an empty prompt) to undo this pass — checkpoints are captured per user prompt, not per edit, so one rewind reverts the whole batch. If you ran this on a dedicated branch, `git checkout main && git branch -D <branch>` discards the whole pass.
 
 ---
 

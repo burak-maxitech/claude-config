@@ -134,7 +134,7 @@ If the user passes `--fix`, apply Quick Wins automatically:
 7. **Skip "Vulnerable Dependencies" entirely.** `--fix` never auto-runs `npm audit fix` / `pip-audit --fix` / `cargo audit fix` / equivalents — version bumps can break the app, transitive constraints get rewritten, and lockfile churn is project-policy. Vulnerable deps are report-only; the user runs the suggested `fix_command` themselves after reviewing.
 8. Stage all changes and commit: `chore: automated cleanup — [count] items removed`
 9. Show a summary diff with `git diff --stat HEAD~1`
-10. Tell the user: "Review the changes on the `cleanup/YYYYMMDD` branch. Merge when satisfied, or `git checkout main && git branch -D cleanup/YYYYMMDD` to discard the whole branch. For finer-grained undo (single deletion, single edit), press `Esc Esc` or run `/rewind` — Claude's edits are checkpointed automatically and `/rewind` persists across sessions."
+10. Tell the user: "Review the changes on the `cleanup/YYYYMMDD` branch. Merge when satisfied, or `git checkout main && git branch -D cleanup/YYYYMMDD` to discard the whole branch. To undo this session's edits, run `/rewind` (or press `Esc Esc` on an empty prompt) — checkpoints are captured before each user prompt, not each edit, so one rewind reverts the whole batch applied in a turn. Checkpoints survive a session resume and are deleted after 30 days."
 
 > **CI gating.** Not self-gating. To pause for approval in headless `claude -p` runs, configure a `PreToolUse` `defer` hook scoped (via the `if` field) to destructive Bash patterns. Full recipe in README "Interop with Claude Code 2.1 features".
 

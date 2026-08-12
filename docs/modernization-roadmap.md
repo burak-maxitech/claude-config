@@ -30,7 +30,7 @@ These corrected my initial assumptions and shape the plan:
    - [`ahonn/mcp-server-gsc`](https://github.com/ahonn/mcp-server-gsc) — search analytics (query/page/device filtering) + URL inspection + a `detectQuickWins` helper.
    - [`sarahpark/google-search-console-mcp`](https://mcpservers.org/servers/sarahpark/google-search-console-mcp) — **read-only**: search analytics + URL inspection + sitemaps. Read-only matches `bx-seo`'s needs exactly (it never writes to GSC).
 3. **This repo is not a plugin yet.** Skills/agents are symlinked into `~/.claude/`. The active marketplace is `claude-plugins-official`. Becoming a plugin is a genuine restructure (see #4), because **plugins can't reference files outside their own directory** (path-traversal is blocked; the symlink-into-`~/.claude` model doesn't carry over).
-4. **Plugin manifest schema** (`.claude-plugin/plugin.json`): only `name` required; component dirs (`skills/`, `agents/`, `hooks/hooks.json`, `.mcp.json`, `.lsp.json`) live at **plugin root**, not inside `.claude-plugin/`. Omitting `version` makes every git commit a new version (ideal for a private, fast-iterating personal toolkit).
+4. **Plugin manifest schema** (`.claude-plugin/plugin.json`): only `name` required; component dirs (`skills/`, `agents/`, `hooks/hooks.json`, `.mcp.json`, `.lsp.json`) live at **plugin root**, not inside `.claude-plugin/`. Omitting `version` makes every git commit a new version (ideal for a private, fast-iterating personal toolkit). *(Superseded S54, 2026-08-11: the plugin now sets explicit semver `version` — it's the update cache key, bumped on every `bx/**` change via `/bx:save` Part 8; see `CHANGELOG.md`.)*
 5. **`userConfig` with `sensitive: true`** prompts the user for secrets at enable-time and stores them in the keychain — the clean path for GSC credentials inside the plugin's `.mcp.json` (`${user_config.KEY}` substitution).
 6. **Plugin-shipped agents cannot declare `hooks`/`mcpServers`/`permissionMode`** (security). The 13 `bx` agents only use `name`/`description`/`model`/`tools`/`user-invocable` → they port cleanly (`user-invocable` is an unrecognized field → load-time warning only, harmless; can drop it).
 7. **Official LSP plugins already exist** (`pyright-lsp`, `typescript-lsp`, `rust-analyzer-lsp`) — installable from the marketplace. The dead-code/unused-export precision win (deferred item, see below) is mostly "install + reference," not "build."
@@ -94,7 +94,7 @@ claude-config/                      ← marketplace repo (already git)
 │   └── marketplace.json            ← { name, owner, plugins:[{ name:"bx", source:"./bx" }] }
 └── bx/                             ← the plugin
     ├── .claude-plugin/
-    │   └── plugin.json             ← { name:"bx", description, (version omitted → commit-SHA) }
+    │   └── plugin.json             ← { name:"bx", description, version (explicit semver since S54) }
     ├── skills/
     │   ├── arch/SKILL.md           ← was bx-arch  → invokes as /bx:arch
     │   ├── seo/SKILL.md            ← was bx-seo

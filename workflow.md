@@ -338,7 +338,7 @@ cd -
 
 **Output:** Architecture Map → Findings (Structure / Refactors / Performance, ranked) → Documented-Decision Conflicts (separate, requires confirmation) → Suggested Next Actions (chained skill recommendations + copy-pasteable `/bx:plan` snippets).
 
-**`--fix` is restricted to single-file, non-API-breaking refactors.** Anything cross-file or API-touching auto-routes to `--plan` instead. Each edit is gated by per-finding diff preview. Use `Esc Esc` or `/rewind` to undo.
+**`--fix` is restricted to single-file, non-API-breaking refactors.** Anything cross-file or API-touching auto-routes to `--plan` instead. Each edit is gated by per-finding diff preview. To undo, run `/rewind` (or `Esc Esc` on an empty prompt) — it reverts the whole turn's batch, since checkpoints are per user prompt, not per edit.
 
 **Useful chain:** `/bx:clean` → `/bx:arch` → `/bx:arch --plan` → `/bx:plan` per phase.
 
@@ -777,7 +777,7 @@ Claude Code ships a built-in `/loop` skill for running a prompt or slash command
 
 Two important caveats: `/loop` is **session-scoped** — it dies when the Claude Code session closes — and recurring jobs **auto-expire after 3 days** even if the session lives longer. Don't use it as a replacement for a real cron job or scheduled remote agent (see `/schedule` for persistent scheduling).
 
-**Unverified caveat — smoke-test before relying on this.** Every `bx` skill sets `disable-model-invocation: true`. Anthropic's docs state that a command with that flag, used as a *scheduled task's* prompt, is read as plain text instead of being run. `/loop` and `/schedule` are different mechanisms so this may not transfer — but if `/loop /bx:review` or `/loop /bx:clean --dry-run` appears to do nothing, that flag is the first thing to check.
+**Partially confirmed caveat — smoke-test `/loop` before relying on it.** Every `bx` skill sets `disable-model-invocation: true`. Anthropic's code-review docs now state this outright for scheduled tasks: "`/code-review` is marked `disable-model-invocation`, so if you set it as a scheduled task's prompt, Claude reads it as plain text instead of running the review" — for `/schedule`-style scheduled tasks this is documented behavior, not speculation. Whether `/loop` (session-scoped, a different mechanism) shares it is still unverified — but if `/loop /bx:review` or `/loop /bx:clean --dry-run` appears to do nothing, that flag is the first thing to check.
 
 **Do not build a custom `/loop` skill in this repo.** The built-in already covers this use case; re-implementing it in the `bx` plugin would be waste.
 

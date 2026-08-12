@@ -256,7 +256,7 @@ If user invoked `--fix` and no T01 findings surfaced, output:
 > No T01 (assertion-free) findings. Other test smells require human judgment — re-run with `--plan` for a phased rewrite brief.
 
 End with:
-> Done. Use `Esc Esc` or `/rewind` to undo any individual edit. If you ran this on a dedicated branch, `git checkout main && git branch -D <branch>` discards the whole pass.
+> Done. Run `/rewind` (or press `Esc Esc` on an empty prompt) to undo this pass — checkpoints are captured per user prompt, not per edit, so one rewind reverts the whole batch. If you ran this on a dedicated branch, `git checkout main && git branch -D <branch>` discards the whole pass.
 
 ---
 

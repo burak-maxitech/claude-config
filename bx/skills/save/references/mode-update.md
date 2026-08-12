@@ -676,11 +676,12 @@ After all documentation updates **and rollups** are complete, remind the user to
 **If `--skip-commit` is in `$ARGUMENTS`, skip this step entirely.**
 
 1. **Run `git status`** to show all uncommitted files (staged and unstaged)
-2. **If there are uncommitted changes:**
+2. **Plugin version bump (claude-config repo only — skip silently when `bx/.claude-plugin/plugin.json` doesn't exist).** If any uncommitted file is under `bx/`, the commit MUST also bump `version` in `bx/.claude-plugin/plugin.json` and add a matching entry to the repo-root `CHANGELOG.md` (newest first). The version is the plugin's update cache key: a pushed commit that doesn't bump it is never offered to users — `/plugin update` reports "already at the latest version". Semver: PATCH for fixes and doc corrections, MINOR for a new skill/agent/flag, MAJOR for breaking renames or removed behavior. In `--silent` mode, default to PATCH and derive the CHANGELOG line from the suggested commit message.
+3. **If there are uncommitted changes:**
    - Show the list of modified/untracked files
    - Suggest a conventional commit message based on what was done this session, e.g.:
      > Suggested commit: `docs: update session progress and documentation`
    - **If `--silent` is in `$ARGUMENTS`:** commit immediately with the suggested message — no prompt. This is the only path that commits without confirmation; the user opted in explicitly via the flag. Do NOT push.
    - **Otherwise, ask the user:** "Would you like to commit these changes?"
    - **Never auto-commit without `--silent`** — always wait for user confirmation
-3. **If there are no uncommitted changes**, skip silently
+4. **If there are no uncommitted changes**, skip silently

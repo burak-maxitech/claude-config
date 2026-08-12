@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Last Updated: 2026-07-30 (Session 53)
+Last Updated: 2026-08-11 (Session 54)
 
 ## Project Overview
 
@@ -17,7 +17,7 @@ Last Updated: 2026-07-30 (Session 53)
 |------|--------|
 | Skills (11) | Complete |
 | Subagents (18) | Complete |
-| Plugin packaging (`bx`) | Core complete (S37) — pending install smoke-test + symlink retirement |
+| Plugin packaging (`bx`) | Core complete (S37); explicit semver **v1.0.0** + CHANGELOG.md (S54) — pending install smoke-test + symlink retirement |
 | Startup scripts | Complete |
 | Cross-platform setup | Complete |
 | GitHub sync | Complete |
@@ -39,23 +39,19 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 
 ## Next Steps
 
-1. **Commit + push the S53 `/bx:review` fixes**, then `/plugin update bx` + `/reload-plugins` — 5 files uncommitted (`bx/skills/review/SKILL.md`, `bx/skills/review/references/output-format.md`, `README.md`, `workflow.md`, `docs/upstream/state.json`).
-2. **`/bx:evolve` follow-ups** — **add the `checkpointing` and `code-review` doc pages to `scan-docs.md`'s allowlist (9 → 11)**: S53 proved the gap, with orchestrator direct-fetches of those two pages producing 5 of 7 findings including the only factually-wrong one (2nd consecutive run the S50 allowlist-completeness rule fired). Then run a **full** `/bx:evolve` — the watermark is frozen at 2.1.217 by S53's scoped run, so releases 2.1.218–2.1.220 are unaudited for the other 10 skills. Also still pending: smoke-check open finding `093df977` (v2.1.214 fail-closed FD-redirects vs bx's pervasive `2>/dev/null`) together with the `CLAUDE_ENV_FILE` UTF-8 check; give the skill the S42 content-review treatment; act on the 14 `open` findings (top: `.claude/skills` / `@skills-dir` auto-load, 4 sources converging); v2 ideas: re-arm carried-forward findings for `--fix` from state, treat lane digest one-liners as non-citation-grade.
-3. **Smoke-test `/loop /bx:review`** — S53 added a *hedged* caveat to `workflow.md` because Anthropic documents `disable-model-invocation` commands being read as plain text when used as a **scheduled task's** prompt, and every bx skill sets that flag. `/loop` and `/schedule` are different mechanisms, so this is unverified. Confirm, then replace the hedge with a definitive statement (or drop the examples).
-4. **Design session: a verification pass for `/bx:review`** — S53 finding `d1480670` applied only its cheap half (output-format Rule 8, the "verification bar"). The skill is still single-pass with no independent false-positive filter, while running at `effort: high`, which Anthropic documents as casting a wider net. Anthropic's own reviewer runs parallel agents *plus* a verification step. Needs brainstorm → spec → skill-creator eval, not a `--fix` bolt-on.
-5. **Resume the `/bx:webdesign` kaanarik run past review** — refresh the plugin cache, re-run `/bx:webdesign` (resumes at `review_pending`), push through **Phase 3 inject+verify** to exercise the latent fixes the paused first run never reached (Tailwind-v4 `@theme` merge, `.gitignore`/`.playwright-mcp` clean-tree guards). Stitch MCP + `stitch-skills` already installed in the target repo.
-6. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
-7. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — all content-review-hardened in S46, never run end-to-end.
-8. **S37 plugin-packaging leftovers** — install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement.
-9. **`/bx:evolve` v2: extract shared `references/lane-contract.md`** — the three scan files share ~50% of their mass (inputs, filter, affected_files discipline, schema, addendum); flagged by all four `/simplify` agents, deferred for a fresh review cycle.
-10. **`/bx:seo` deferred items** — code-review leftovers (#5 redundant per-call token mints; #6 `_read_skill_config` CWD assumption; #7 `fetch-sa` subcommand) plus the S25/S27/S29 refactors (batched-Grep alternation; fix-mode + plan-mode scaffolding extraction).
+1. **Smoke-test batch (quick):** `/loop /bx:review` (docs now confirm the disable-model-invocation plain-text behavior for *scheduled tasks*; whether `/loop` shares it is the open half — workflow.md caveat is now "partially confirmed"); `/plugin update bx` without `/reload-plugins` (v2.1.221 "when safe", finding `fab78c6a`); a few `2>/dev/null` commands watching for new prompts (v2.1.214 fail-closed, finding `093df977`); `CLAUDE_ENV_FILE` UTF-8 persistence.
+2. **Design session: a verification pass for `/bx:review`** — still single-pass at `effort: high` with no false-positive filter; Anthropic's reviewer runs parallel agents + verification. Brainstorm → spec → skill-creator eval (finding `d1480670`, deliberately half-fixed in S53).
+3. **Resume the `/bx:webdesign` kaanarik run past review** — `/plugin update bx` first (picks up v1.0.0), re-run `/bx:webdesign` (resumes at `review_pending`), push through **Phase 3 inject+verify**. While there, VERIFY open finding `dadac845`: auto-mode blocks destructive git and Phase-3's rollback is exactly `git restore .` + `git clean -fd` — S54's community lane surfaced Anthropic's official auto-mode post confirming the premise.
+4. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
+5. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — all content-review-hardened in S46, never run end-to-end.
+6. **S37 plugin-packaging leftovers** — install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement.
+7. **`/bx:evolve` follow-ups** — evaluate adding `auto-mode-config` to the scan-docs allowlist (owns the auto-mode classifier contract; flagged S54); act on the 14 `open` findings (top: the skills-dir/activation-gap cluster, now 5 distinct sources); v2 ideas: extract shared `references/lane-contract.md` (three scan files share ~50% mass), treat lane digest one-liners as non-citation-grade.
+8. **`/bx:seo` deferred items** — code-review leftovers (#5 redundant per-call token mints; #6 `_read_skill_config` CWD assumption; #7 `fetch-sa` subcommand) plus the S25/S27/S29 refactors (batched-Grep alternation; fix-mode + plan-mode scaffolding extraction).
 
 ## Key Decisions
 
 | Decision | Rationale |
 |----------|-----------|
-
-| GSC MCP migration (roadmap #1) evaluated and declined (S37, 2026-05-28) | `mcp-search-console` (the `gsc` MCP server) has **no response caching** + caps `batch_url_inspection` at **10 URLs/call** — a full migration would regress the quota economics the S31/S35 cache layer protects (the skill inspects up to 200 URLs in parallel with a 7-day `ui-*` cache via `gsc-parse-helper.py`). **`/bx:seo` stays on gcloud ADC + the helper.** The `gsc` MCP server stays configured machine-local (`~/.config/bx-seo/`, portable OAuth `token.json`) for *ad-hoc interactive* GSC queries only — NOT wired into the skill. Git history across all branches/remotes/reflog confirms the skill was **never** on MCP; only the roadmap doc mentions it. `get_advanced_search_analytics` (clean JSON, 25k-row pagination) is the one tool worth revisiting if ever rebuilt — Performance queries only, never URL Inspection. Full: [docs/key-decisions.md](docs/key-decisions.md). |
 | `/bx:docs` → `/bx:save` rework — fast-by-default + Sonnet offload (S38, 2026-05-29) | The end-of-session save (paired with `/bx:resume`) routinely took >10 min so the user abandoned it. Root causes: Step 0 read all docs every run (~60k tokens incl. the 70k+53k append-only archives the update never reads *from*) even on `--fast`; the verification step echoed full file contents back; verbose prose. Fix: the lean session-save is now the **default** (drain tasks → CLAUDE.md session block → session-history append → commit), with README/docs sync + rollups moved to `--full`; a new `save-writer` Sonnet subagent does the big reads + all file writes off the main thread while the Opus orchestrator composes a small "update packet" + dispatches; full-file output dump → compact change report; prose caps on new entries; scoped Step-0 reads. Skill renamed `/bx:docs` → `/bx:save` (collision-proof pair-name with `/bx:resume`). Subagents 14 → 15. Built via superpowers brainstorm→spec→writing-plans→subagent-driven flow; specs in [docs/superpowers/](docs/superpowers/). Full: [docs/key-decisions.md](docs/key-decisions.md). |
 | `/bx:seo` GSC path+auth+sitemap repair (S39, 2026-05-29) | The skill's entire GSC path was dead since plugin packaging: `${CLAUDE_SKILL_DIR}` isn't a real Claude Code variable (→ helper file-not-found, silent heuristic-only), and the token-passing assumed shell state persists across Bash calls (it doesn't). Fixed with a `bin/` launcher on PATH + in-call stdlib refresh-token minting — ADC **as the user, NOT a service account** (open Google bug blocks adding SAs to GSC; multi-machine via `adc_credentials_path` in config.yaml). Also closed the sitemap-discovery gap: fetch the LIVE sitemap (GSC `sitemaps.list` → robots.txt → conventional) instead of globbing a repo-local file that's empty for generated sitemaps — which had silently starved sub-dim 14 deindex detection. Verified against live GSC (sites.list 200) + burakarik.com (2,892-URL sitemap). Full: [docs/key-decisions.md](docs/key-decisions.md). |
 | PowerShell `try/catch` can't gate native-exe failures — `cc` launcher git-pull fix (S40) | `start-claude.ps1` printed "Project synced." even when `git pull` failed: `try/catch` only catches terminating PowerShell errors, but native exes (git) signal failure via `$LASTEXITCODE`, so the `catch` was dead code (proved empirically). Fixed by gating the message on `$LASTEXITCODE` in all 3 spots + swapping `--quiet`/`2>/dev/null` for `--stat` so pulls are observable. Rule for future `.ps1`: never expect `try/catch` to catch a native command's exit code — check `$LASTEXITCODE`. |
@@ -75,6 +71,7 @@ See [docs/completed-work.md](docs/completed-work.md) for full checklist.
 | `/bx:webdesign` first dogfood + 15-fix hardening (S52) | First real end-to-end run (kaanarik) paused clean at `review_pending`; the safety architecture held and all 15 findings were in the delegation surface, not orchestration. Durable gotchas now encoded: `stitch-skills` install as `stitch-design:<name>` (NOT `stitch::`); Tailwind v4 has no config file (tokens in `@theme`, not `tailwind.config.js`); the init wizard prints its own `claude mcp add` (API-key `http` path, not a fixed `proxy`/`GOOGLE_CLOUD_PROJECT` command); Stitch color control is lossy (a light seed never resolves bright, overrides silently drop) → verify the palette via `get_project` before batch-generating. |
 | Scoped `/bx:evolve` runs must freeze the watermark (S53) | `/bx:evolve` has no per-skill scoping; its inventory spans all of `bx/`. When a run is deliberately narrowed to one skill, advancing `last_changelog_version` / `docs_checked_at` would record the *unexamined* skills as audited through that version, and those releases would never be re-scanned. A scoped run therefore suppresses Step 6 entirely and reports the frozen watermark, leaving a full run still owed. |
 | Checkpoints are per-user-prompt, not per-edit — and subagent edits aren't checkpointed at all (S53) | Any bx skill telling users how to undo its `--fix` edits must not promise per-edit granularity: Claude Code captures one checkpoint **before each user prompt**, so a batch fixing N findings in one turn has a single checkpoint and `/rewind` reverts all of it. Two riders: `Esc Esc` opens the menu only when the prompt input is empty, and edits applied by a *subagent* (or a background forked skill) land outside session checkpoints entirely — git is the only undo for those. Corrected in `/bx:review`; audit the other `--fix` skills for the same claim. |
+| Explicit semver plugin versioning replaces commit-SHA versioning (S54) | `version` in plugin.json is the plugin's **update cache key**: users receive an update only when it changes, so a `bx/**` push without a bump is invisible (`/plugin update` reports "already at the latest version"). Set v1.0.0 + `displayName`; `CHANGELOG.md` started; `/bx:save` Part 8 enforces bump-on-bx-change (PATCH fixes / MINOR new skill-agent-flag / MAJOR breaking; `--silent` defaults PATCH). Old "omitted version = every commit is a version" claims swept from README + CLAUDE.md. |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -85,7 +82,7 @@ claude-config/                         # marketplace repo
 ├── .claude-plugin/
 │   └── marketplace.json               # "burak-tools" marketplace catalog
 ├── bx/                                # the installable `bx` plugin (S37, see Key Decisions)
-│   ├── .claude-plugin/plugin.json     # manifest (commit-SHA versioned; skills → /bx:<name>)
+│   ├── .claude-plugin/plugin.json     # manifest (explicit semver `version` = update cache key; skills → /bx:<name>)
 │   ├── agents/                        # 18 subagents (Sonnet-routed) → bx:<agent>
 │   ├── hooks/hooks.json               # SessionStart project-orientation injection
 │   ├── scripts/                       # session-start-context.{sh,ps1}
@@ -108,7 +105,7 @@ claude-config/                         # marketplace repo
 └── workflow.md              # Personal workflow guide
 ```
 
-**Plugin approach (S37):** the toolkit installs as the `bx` plugin from the local `burak-tools` marketplace (`/plugin install bx@burak-tools`) — no symlinks. Skills are namespaced `/bx:<name>` and agents `bx:<agent>` by the plugin, which is the principled collision-proof fix that the S36 `bx-` prefix only worked around. `version` is omitted so each commit is a new version. (Old `~/.claude/skills`+`agents` symlinks are retired on adoption — see README "Migrating from the old symlink setup".)
+**Plugin approach (S37):** the toolkit installs as the `bx` plugin from the local `burak-tools` marketplace (`/plugin install bx@burak-tools`) — no symlinks. Skills are namespaced `/bx:<name>` and agents `bx:<agent>` by the plugin, which is the principled collision-proof fix that the S36 `bx-` prefix only worked around. `version` is explicit semver as of S54 (2026-08-11) — it is the plugin's update cache key, so every `bx/**` change must bump it (enforced by `/bx:save` Part 8; history in `CHANGELOG.md`). (Old `~/.claude/skills`+`agents` symlinks are retired on adoption — see README "Migrating from the old symlink setup".)
 
 **Skills** are directories under `bx/skills/` containing `SKILL.md` (YAML frontmatter) + a `references/` folder. Invocable as `/bx:<name>`.
 
@@ -118,7 +115,9 @@ claude-config/                         # marketplace repo
 
 **The S37 `/bx:seo` "messed up" breakage is RESOLVED (S39).** Root-caused to the `${CLAUDE_SKILL_DIR}` path bug (not a real Claude Code variable → the helper was never found → GSC silently fell back to heuristic-only) + an impossible "mint token once, reuse across Bash calls" auth model (shell state does not persist across Bash tool calls). Both fixed and verified against live GSC. See Session History S39 + Key Decisions.
 
-**Uncommitted S53 work:** the `/bx:review` edits from this session's scoped `/bx:evolve --fix` pass (5 files) are uncommitted — `/plugin update bx` + `/reload-plugins` won't carry them until they are committed and pushed. (The S52 `/bx:webdesign` hardening previously flagged here as unpushed **is** pushed, as of `4931ee7`.) The Stitch MCP + `stitch-skills` are already installed in the `kaanarik` target repo (S52 dogfood). **14 open upstream findings** live in `docs/upstream/state.json`, and the `/bx:evolve` watermark is deliberately frozen at changelog 2.1.217 / docs 2026-07-22 because S53's run was skill-scoped — a full run is still owed.
+**Plugin-versioning sharp edge (S54):** `version` in `bx/.claude-plugin/plugin.json` is the plugin's update cache key — a push that changes `bx/**` without bumping it is never offered to users (`/plugin update` reports "already at the latest version"). `/bx:save` Part 8 enforces the bump; manual committers follow the README contributors note. History in `CHANGELOG.md`.
+
+**14 open upstream findings** live in `docs/upstream/state.json`; the watermark is current again (changelog 2.1.228 · docs/community 2026-08-11 — S54's full run released the S53 freeze). Correction from resume: the S53 "5 uncommitted files" claim was stale — they were committed in `e1bd066` and pushed before this session, and the plugin cache already carried them.
 
 ## Environment Variables
 
@@ -128,11 +127,11 @@ None required. This is a pure configuration repo — no runtime dependencies or 
 
 > Full history: [docs/session-history.md](docs/session-history.md)
 
-### Last Session (Session 53) - 2026-07-30
-- Ran **`/bx:evolve` scoped to a single skill (`/bx:review`)** — a first. The skill has no per-skill scoping, so the capability inventory was narrowed to `bx/skills/review/` (23 entries) and the **watermark deliberately frozen**, since advancing it would have falsely recorded the other 10 skills as audited.
-- **The docs lane returned zero findings while correctly reporting two allowlist gaps.** Orchestrator direct-fetches of the unpinned `checkpointing` and `code-review` pages produced **5 of the 7 findings**, including the only factually-wrong claim in the skill — the 2nd consecutive run the S50 allowlist-completeness rule has fired.
-- **7 findings registered; `--fix` applied 5, rejected 1, skipped 1.** Top catch: `/bx:review` told users checkpoints are created "before each edit" when they are created **before each user prompt**, so one `/rewind` reverts a whole `--fix` batch, not a single edit.
-- Deliberately **half-fixed** the run's most valuable finding: `/bx:review` has no false-positive verification pass while Anthropic's own reviewer does. Only the cheap "verification bar" rule landed; the architecture is queued for a proper design session rather than a `--fix` bolt-on.
-- Corrected a stale CLAUDE.md claim — the S52 `/bx:webdesign` hardening was recorded as unpushed but is pushed at `4931ee7`.
+### Last Session (Session 54) - 2026-08-11
+- **Full `/bx:evolve` released the S53 watermark freeze** after growing the docs-lane allowlist 9 → 11 (`checkpointing` + `code-review` pinned — the S50 completeness rule's 3rd firing): 11 releases scanned (2.1.218 → 2.1.228), all 3 lanes ok, 4 Tier-1 findings + 3 advisories; watermark now 2.1.228 / 2026-08-11.
+- **`--fix` applied 4/4.** Top catch: the S53 per-edit checkpoint-undo error survived at **9 sites across 8 files** in every other `--fix` skill (clean/arch/tests/seo/evolve + workflow.md) — all swept to the per-user-prompt framing. Also: README's v2.1.223 `/review`-alias disambiguation; v2.1.221 activation signal (hedged); `/loop` caveat upgraded to "partially confirmed".
+- **Explicit plugin versioning shipped (user request):** `plugin.json` `version: 1.0.0` + `displayName`, `CHANGELOG.md` started, `/bx:save` Part 8 now mandates the bump (version = update cache key — a push without a bump reaches nobody), echo sweep over README/CLAUDE.md's old commit-SHA-versioning claims.
+- Community lane handed off Anthropic's **official** auto-mode sources confirming destructive-git blocking — addendum recorded on open webdesign finding `dadac845`; `auto-mode-config` flagged as the next allowlist candidate.
+- Resume-time corrections: S53's "5 uncommitted files" were actually committed (`e1bd066`) and pushed; stray empty Key Decisions table header removed.
 
-> Full session detail: [docs/session-history.md](docs/session-history.md) S53
+> Full session detail: [docs/session-history.md](docs/session-history.md) S54

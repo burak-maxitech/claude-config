@@ -104,12 +104,14 @@ Aborted-remaining: 0
 Next steps:
 - Run `/plugin update bx` then `/reload-plugins` (or relaunch `cc`) — the plugin cache does not
   pick up edits until refreshed. (Claude Code 2.1.216 fixed mid-session skill/command edits not
-  appearing in the slash menu until restart. That has NOT been verified to cover a plugin-cache
-  refresh, which is a different mechanism — keep running the refresh until someone confirms
-  otherwise.)
+  appearing in the slash menu until restart, and v2.1.221 made plugins installed from `/plugin`
+  activate immediately "when safe". Neither has been verified to cover a plugin-cache refresh
+  pulling a new marketplace commit — and "when safe" is undefined upstream — so keep running
+  the refresh until a smoke-test confirms otherwise.)
 - For any SKILL.md that received non-trivial edits, consider the S42 content-review treatment:
   invoke skill-creator's qualitative review on the updated skill before the next real run.
-- Use `Esc Esc` or `/rewind` to undo individual edits.
+- To undo, run `/rewind` (or `Esc Esc` on an empty prompt) — one rewind reverts the whole pass
+  applied this turn (checkpoints are per user prompt, not per edit).
 - If you ran this on a dedicated branch: `git checkout main && git branch -D <branch>` discards
   the entire pass.
 ```

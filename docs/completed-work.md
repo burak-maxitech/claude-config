@@ -227,3 +227,6 @@
 - [x] Fresh content review of /bx:webdesign (9 skill files) — 13 findings (1 high / 4 medium / 8 low), 12 fixed, 1 no-action (unused Agent grant) — commit 9b9c703 (bx/skills/webdesign/SKILL.md + 5 references)
 - [x] README teammate-install simplification + repo made public (S49) — README.md, CLAUDE.md, workflow.md, auto-memory
 - [x] /bx:webdesign dogfood-hardening — reviewed first kaanarik run, applied 15 findings across 7 skill files (S52) - bx/skills/webdesign/*
+- [x] S54: /bx:evolve scan-docs allowlist 9→11 (checkpointing + code-review) + first full run since the S53 freeze — watermark 2.1.217→2.1.228, 4 Tier-1 findings registered — `bx/skills/evolve/references/scan-docs.md`, `docs/upstream/state.json`
+- [x] S54: /bx:evolve --fix — 4/4 applied across 11 files (checkpoint-undo sweep at 9 sites/8 files; /review-alias README note; v2.1.221 hedge; /loop caveat firmed)
+- [x] S54: Explicit plugin versioning v1.0.0 — plugin.json version+displayName, CHANGELOG.md, /bx:save Part-8 bump rule, README/CLAUDE.md echo sweep

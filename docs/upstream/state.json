@@ -1,8 +1,8 @@
 {
   "watermark": {
-    "last_changelog_version": "2.1.217",
-    "docs_checked_at": "2026-07-22",
-    "community_checked_at": "2026-07-22"
+    "last_changelog_version": "2.1.228",
+    "docs_checked_at": "2026-08-11",
+    "community_checked_at": "2026-08-11"
   },
   "decisions": [
     {
@@ -124,7 +124,7 @@
       "source_content_hash": "8c4286f68f39951fe5da76f1e38e895c145d7bb3",
       "class": "breakage",
       "title": "Auto-mode now blocks destructive git (`git clean -fd`, `restore`, `reset --hard`) — /bx:webdesign Phase-3 rollback may be intercepted (v2.1.183)",
-      "note": "Lane finding, certainty 0.55 — NOT yet verified against a live run. /bx:webdesign Phase 3's documented per-page-failure rollback (`git restore .` + `git clean -fd`) and the git-safety invariant may be auto-blocked by the new classifier unless the session reads as an explicit request to discard local work. VERIFY during the pending webdesign dogfood before treating as confirmed breakage; if intercepted, make the cleanup legible as agent-initiated or add a user-confirmation step before Phase 3 first runs. Also relevant: new `autoMode.classifyAllShell` setting (v2.1.193)."
+      "note": "Lane finding, certainty 0.55 — NOT yet verified against a live run. /bx:webdesign Phase 3's documented per-page-failure rollback (`git restore .` + `git clean -fd`) and the git-safety invariant may be auto-blocked by the new classifier unless the session reads as an explicit request to discard local work. VERIFY during the pending webdesign dogfood before treating as confirmed breakage; if intercepted, make the cleanup legible as agent-initiated or add a user-confirmation step before Phase 3 first runs. Also relevant: new `autoMode.classifyAllShell` setting (v2.1.193). ADDENDUM 2026-08-11: community lane surfaced Anthropic's OFFICIAL auto-mode engineering post (anthropic.com/engineering/claude-code-auto-mode) + docs page (code.claude.com/docs/en/auto-mode-config) confirming the classifier 'blocks anything irreversible' incl. destructive git on the working branch unless explicitly requested — authority upgrade for this finding's premise; the auto-mode-config page is a scan-docs allowlist candidate (owns the autoMode classifier contract). Verification during the kaanarik Phase-3 dogfood still required."
     },
     {
       "finding_id": "15742589abb82a557a148d139f9f93e1783a0b14",
@@ -212,7 +212,7 @@
       "source_content_hash": "1d06738a540c75c71e5a7ec13798ab11f691c649",
       "class": "best_practice",
       "title": "v2.1.216 fixes Bash permission checking for compound statements with redirects inside `&&` lists — informational, covers patterns bx already uses",
-      "note": "REJECTED 2026-07-22 in the --fix pass — nothing to act on, which is the intended terminal state for an informational finding, not a disagreement with it. Upstream fixed a permission-classifier misjudgment in bx's favour: bx/bin/gsc-parse-helper (`command -v \"$cand\" >/dev/null 2>&1 && \"$cand\" -c '...'`) and bx/skills/seo/references/gsc-cache.md (`[ \"$NO_CACHE\" != \"1\" ] && [ -n \"$(find ... 2>/dev/null)\" ]`) use exactly the fixed compound-redirect shape. Rejected to clear it from the carried-forward list; per lifecycle Rule 3 it re-raises only if a future run re-emits it with a CHANGED source_content_hash. NOTE the tension with still-open finding 093df977 (v2.1.214) which pushes the opposite direction — fail-CLOSED on FD-redirect forms — and remains unverified; do not read this rejection as 'bx's redirect usage is confirmed safe'."
+      "note": "REJECTED 2026-07-22 in the --fix pass — nothing to act on, which is the intended terminal state for an informational finding, not a disagreement with it. Upstream fixed a permission-classifier misjudgment in bx's favour: bx/bin/gsc-parse-helper (`command -v \"$cand\" >/dev/null 2>&1 && \"$cand\" -c '...'`) and bx/skills/seo/references/gsc-cache.md (`[ \"$NO_CACHE\" != \"1\" ] && [ -n \"$(find ... 2>/dev/null)\" ]`) use exactly the fixed compound-redirect shape. Rejected to clear it from the carried-forward list; per lifecycle Rule 3 it re-raises only if a future run re-emits it with a CHANGED source_content_hash. NOTE the tension with still-open finding 093df977 (v2.1.214) which pushes the opposite direction — fail-CLOSED on FD-redirects — and remains unverified; do not read this rejection as 'bx's redirect usage is confirmed safe'."
     },
     {
       "finding_id": "093df977517e69b869dfe2939f98f59ccb9bed07",
@@ -323,6 +323,50 @@
       "class": "breakage",
       "title": "Checkpoint claim is factually wrong: checkpoints are created before each USER PROMPT, not before each edit",
       "note": "APPLIED 2026-07-30 (scoped review-only run). bx/skills/review/SKILL.md: rewrote the post---fix closing line. Corrected 'Checkpoints are created automatically before each edit' -> checkpoints are captured before each USER PROMPT, so one /rewind reverts the whole Step-6 batch rather than a single edit. Also fixed two rider errors in the same sentence: Esc Esc opens the rewind menu only on an EMPTY prompt (otherwise it clears the input), and 'persist across sessions' is now stated as surviving a resume but deleted after 30 days (cleanupPeriodDays)."
+    },
+    {
+      "finding_id": "afe42f6014fccf76d32707b4b330d15dfdbd80b4",
+      "decision": "applied",
+      "date": "2026-08-11",
+      "source_url": "https://code.claude.com/docs/en/checkpointing",
+      "affected_capability": "bx:workflow/checkpoint-rewind-guidance",
+      "source_content_hash": "995c2736b67fe5a2fa158a69ce09dc40a023cf19",
+      "class": "breakage",
+      "title": "Per-edit checkpoint-undo claim persists at 9 sites across 8 files (5 --fix skills + workflow.md) — S53 fixed only /bx:review",
+      "note": "APPLIED 2026-08-11 in the same-session --fix pass: all 9 sites edited across all 8 files (all-or-none per the S45 sibling-echo rule), each rewritten to the per-user-prompt framing modeled on review/SKILL.md:145. ORIGINAL FINDING: The exact wrong claim S53 corrected in bx/skills/review/SKILL.md:145 (finding 4ed0fc0c) survives everywhere else: checkpoints are per USER PROMPT, so one /rewind reverts a whole --fix batch, never a single edit. ORCHESTRATOR-VERIFIED sites via grep: clean/SKILL.md:137 ('finer-grained undo (single deletion, single edit)'), arch/SKILL.md:221 ('undo any individual edit'), arch/references/fix-mode.md:64 ('Per-edit undo ... step back through individual edits'), seo/references/fix-allowlist.md:338 ('Per-edit undo'), evolve/references/fix-mode-evolve.md:112 ('undo individual edits'), tests/SKILL.md:259 ('undo any individual edit'), tests/references/fix-mode-test.md:92 ('use /rewind to undo individually') + :147 ('Per-edit undo ... individual edits'), workflow.md:341 (implicit: 'Each edit is gated by per-finding diff preview. Use Esc Esc or /rewind to undo'). Model correction to copy: review/SKILL.md:145. Grep false positives excluded: seo/SKILL.md:522, save/references/mode-update.md:362 (unrelated 'individually'). This is exactly the S53 follow-up CLAUDE.md's Key Decisions predicted ('audit the other --fix skills for the same claim')."
+    },
+    {
+      "finding_id": "fab78c6a07c9db8a0fe6e7e081b955bd0e20179d",
+      "decision": "applied",
+      "date": "2026-08-11",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.221",
+      "affected_capability": "bx:plugin/marketplace-install",
+      "source_content_hash": "3b2b9737cd58130a2958328ad969c70572157718",
+      "class": "opportunity",
+      "title": "Plugins from `/plugin` now activate immediately 'when safe' (v2.1.221) — smoke-test whether the /reload-plugins step can be narrowed",
+      "note": "APPLIED 2026-08-11 as a HEDGED extension of fix-mode-evolve.md's /reload-plugins parenthetical (manual steps fully intact per the no-remove-manual-steps convention; the smoke-test is still owed before any wording is dropped). setup-stitch-mcp.md:48 checked and deliberately NOT edited — its /reload-plugins is MCP-server-reconnect context, correct as-is. ORIGINAL FINDING: v2.1.221: `/plugin install` refreshes a stale marketplace catalog and retries before reporting not-found, and installed plugins 'activate immediately when safe, instead of always requiring /reload-plugins'. Second upstream signal in the same direction as applied finding 313c3669 (v2.1.216, hedged). 'When safe' is undefined in the release note, so do NOT assume resolved: smoke-test whether `/plugin update bx` activates without `/reload-plugins` on current CC, then either drop the 'always requiring /reload-plugins' framing in fix-mode-evolve.md's next-steps note or narrow the caveat to the 'when safe' boundary. Spot-check setup-stitch-mcp.md's /reload-plugins instruction too (different trigger — MCP tool reconnect — worth a footnote only). Fifth distinct source bearing on the plugin-cache-staleness pain slug (19758d30, 0e4083ea, 15742589, 313c3669)."
+    },
+    {
+      "finding_id": "e15716add5c306d8554dfa7edaee68d1b3d99a5b",
+      "decision": "applied",
+      "date": "2026-08-11",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.223",
+      "affected_capability": "bx:builtins/code-review-simplify-ladder",
+      "source_content_hash": "cd257bb0f36e5f5db854f79b049b794a1579e6d6",
+      "class": "best_practice",
+      "title": "`/review` is now an alias of built-in `/code-review` (v2.1.223) — add a disambiguation vs /bx:review to README's ladder note",
+      "note": "APPLIED 2026-08-11: appended the /review-alias disambiguation to README.md's naming-churn sentence (review-ladder intro) — bare /review = built-in quick scan, not /bx:review. ORIGINAL FINDING: README.md's review-ladder block already tracks the built-in naming churn (/simplify→/code-review, reinstated /simplify, /ultrareview→/code-review ultra). v2.1.223 adds a third churn point: bare `/review` resolves to the lightweight built-in `/code-review` — a different tool from /bx:review (thorough custom skill). Since that block exists precisely to prevent naming confusion, add a one-line callout that `/review` (no prefix) = built-in quick scan, not /bx:review. Good low-effort --fix candidate."
+    },
+    {
+      "finding_id": "060ddae45708755eb02f0a2fcb77152517ebb013",
+      "decision": "applied",
+      "date": "2026-08-11",
+      "source_url": "https://code.claude.com/docs/en/code-review",
+      "affected_capability": "bx:builtins/loop-schedule-references",
+      "source_content_hash": "793f84a21e07b5bc62c49fd0615ee017bd946980",
+      "class": "opportunity",
+      "title": "code-review docs state the disable-model-invocation scheduled-prompt caveat as plain fact — firm up workflow.md's /loop hedge from 'speculative' to 'documented for the mechanism class'",
+      "note": "APPLIED 2026-08-11: workflow.md caveat retitled 'Partially confirmed' and now quotes the docs sentence verbatim — documented behavior for /schedule-style scheduled tasks; the /loop-specific half stays hedged and the smoke-test task remains open. ORIGINAL FINDING: The docs page now says outright: '/code-review is marked disable-model-invocation, so if you set it as a scheduled task's prompt, Claude reads it as plain text instead of running the review.' That upgrades the S53 hedge in workflow.md (~line 780) from speculation to officially-documented behavior for the mechanism class all bx skills fall into. STILL open: whether /loop (session-scoped ScheduleWakeup) is the same 'scheduled task' primitive as /schedule — the docs cross-reference a separate scheduled-tasks page not on the scan-docs allowlist. Proposed: cite the confirmation in the workflow.md caveat, keep the smoke-test recommendation (Next Steps task) until /loop specifically is verified. Companion to applied finding 64d1a7ff (same caveat, original registration)."
     }
   ]
 }

@@ -335,7 +335,7 @@ Score recovery if all applied: estimated +6 points
 
 ⚠️  Bulk-redirect / GSC-derived fixes are NOT applied by `--fix`. Run `/bx:seo --plan` to see those as user-confirmed snippets.
 
-Per-edit undo: press Esc Esc twice or run /rewind.
+Undo: run /rewind (or Esc Esc on an empty prompt) — one rewind reverts this whole pass (checkpoints are per user prompt, not per edit).
 Whole-pass undo: if you did this on a branch, `git checkout main && git branch -D <fix-branch>` discards all changes.
 ```
 
