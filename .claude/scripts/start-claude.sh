@@ -10,6 +10,8 @@
 
 set -uo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 PROJECTS_ROOT="$HOME/Development/projects"
 CONFIG_REPO="$PROJECTS_ROOT/claude-config"
 
@@ -114,7 +116,26 @@ if ! claude update 2>&1 | while read -r line; do echo -e "  ${GRAY}$line${RESET}
 fi
 
 # --- Step 5: Launch Claude Code ---
-echo -e "${YELLOW}[5/5] Launching Claude Code...${RESET}"
+# Name the session after the project (-n also sets the terminal tab title) and
+# color its prompt bar. There is no launch-time color flag, so /color rides in
+# as the initial prompt; it is handled locally and costs no model turn.
+SESSION_COLOR=""
+if [ -f "$SCRIPT_DIR/session-color.sh" ]; then
+    # shellcheck source=/dev/null
+    . "$SCRIPT_DIR/session-color.sh"
+    SESSION_COLOR="$(cc_session_color "$PROJECT_NAME")"
+fi
+
+if [ -n "$SESSION_COLOR" ]; then
+    echo -e "${YELLOW}[5/5] Launching Claude Code as \"$PROJECT_NAME\" ($SESSION_COLOR)...${RESET}"
+else
+    echo -e "${YELLOW}[5/5] Launching Claude Code as \"$PROJECT_NAME\"...${RESET}"
+fi
 echo -e "  ${GRAY}Tip: run /bx:resume to get up to speed.${RESET}"
 echo ""
-claude
+
+if [ -n "$SESSION_COLOR" ]; then
+    claude -n "$PROJECT_NAME" "/color $SESSION_COLOR"
+else
+    claude -n "$PROJECT_NAME"
+fi

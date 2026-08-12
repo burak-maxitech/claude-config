@@ -115,7 +115,26 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # --- Step 5: Launch Claude Code ---
-Write-Host "[5/5] Launching Claude Code..." -ForegroundColor Yellow
+# Name the session after the project (-n also sets the terminal tab title) and
+# color its prompt bar. There is no launch-time color flag, so /color rides in
+# as the initial prompt; it is handled locally and costs no model turn.
+$SessionColor = $null
+$ColorHelper = Join-Path $PSScriptRoot 'session-color.ps1'
+if (Test-Path $ColorHelper) {
+    . $ColorHelper
+    $SessionColor = Get-CcSessionColor -ProjectName $ProjectName
+}
+
+if ($SessionColor) {
+    Write-Host "[5/5] Launching Claude Code as `"$ProjectName`" ($SessionColor)..." -ForegroundColor Yellow
+} else {
+    Write-Host "[5/5] Launching Claude Code as `"$ProjectName`"..." -ForegroundColor Yellow
+}
 Write-Host "  Tip: run /bx:resume to get up to speed." -ForegroundColor Gray
 Write-Host ""
-claude
+
+if ($SessionColor) {
+    claude -n $ProjectName "/color $SessionColor"
+} else {
+    claude -n $ProjectName
+}
