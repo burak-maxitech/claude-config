@@ -8,3 +8,6 @@ __pycache__/
 
 # skill-creator eval scaffolding (fixtures, iteration runs, benchmarks) — throwaway
 .skill-creator-workspace/
+
+# subagent-driven-development scratch (ledger, task briefs, review packages) — throwaway
+.superpowers/
