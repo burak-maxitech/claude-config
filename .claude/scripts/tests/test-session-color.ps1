@@ -1,4 +1,4 @@
-# test-session-color.ps1 — unit checks for Get-CcSessionColor.
+# test-session-color.ps1 - unit checks for Get-CcSessionColor.
 # Run: pwsh -NoProfile -File .claude/scripts/tests/test-session-color.ps1
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '..\session-color.ps1')
@@ -34,6 +34,20 @@ try {
     Assert-Equal 'cyan'  (Get-CcSessionColor -ProjectName 'alpha' -RegistryPath $reg2) 'valid entry survives malformed neighbours'
     Assert-Equal 'green' (Get-CcSessionColor -ProjectName 'beta'  -RegistryPath $reg2) 'malformed lines do not consume colors'
 
+    # --- Case-insensitive name matching (parity with the bash allocator) ---
+    $regCase = Join-Path $tmp 'registry-case'
+    Assert-Equal 'cyan' (Get-CcSessionColor -ProjectName 'TestProj' -RegistryPath $regCase) 'mixed-case project gets cyan'
+    Assert-Equal 'cyan' (Get-CcSessionColor -ProjectName 'testproj' -RegistryPath $regCase) 'lowercase lookup finds existing mixed-case entry'
+    # -clike, not -like: -like is case-insensitive and would pass either way.
+    $caseLines = @(Get-Content -LiteralPath $regCase | Where-Object { $_ -clike 'TestProj=*' })
+    Assert-Equal 1 $caseLines.Count 'case-insensitive lookup preserves original casing in registry'
+
+    # --- A 0-byte registry is treated as missing, so it still gets a header ---
+    $regEmpty = Join-Path $tmp 'registry-empty'
+    New-Item -ItemType File -Path $regEmpty | Out-Null
+    Assert-Equal 'cyan' (Get-CcSessionColor -ProjectName 'alpha' -RegistryPath $regEmpty) 'empty registry assigns cyan'
+    Assert-Equal $true ((Get-Content -LiteralPath $regEmpty)[0].StartsWith('#')) '0-byte registry still gets a header'
+
     # --- Palette exhausted: least-used wins, ties broken by palette order ---
     $reg3 = Join-Path $tmp 'registry-3'
     Set-Content -LiteralPath $reg3 -Encoding utf8 -Value @(
@@ -48,6 +62,16 @@ try {
     Assert-Equal $null (Get-CcSessionColor -ProjectName 'alpha' -RegistryPath (Join-Path $blocker 'registry')) 'unwritable registry returns null'
 } finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# --- Regression guard: every .ps1 here must be pure ASCII ---
+# These files ship without a BOM, and Windows PowerShell 5.1 decodes a BOM-less
+# .ps1 as the ANSI codepage. A UTF-8 em-dash then becomes bytes ending in a
+# quote character, which terminates whatever string it sits inside.
+$scriptDir = Split-Path -Parent $PSScriptRoot
+foreach ($ps1 in @(Get-ChildItem -Path $scriptDir -Filter *.ps1 -Recurse)) {
+    $nonAscii = @([IO.File]::ReadAllBytes($ps1.FullName) | Where-Object { $_ -gt 127 }).Count
+    Assert-Equal 0 $nonAscii ("{0} is pure ASCII" -f $ps1.Name)
 }
 
 if ($script:Failures -gt 0) { Write-Host "`n$script:Failures check(s) failed." -ForegroundColor Red; exit 1 }

@@ -75,7 +75,9 @@ cc_session_color() {
     # --- Persist. Any failure here means "no color", not a broken launch. ---
     dir="$(dirname "$registry")"
     if [ ! -d "$dir" ]; then mkdir -p "$dir" 2>/dev/null || return 1; fi
-    if [ ! -e "$registry" ]; then
+    # -s, not -e: a 0-byte registry counts as missing, or an existing-but-empty
+    # file would skip the header forever and leave the file unexplained.
+    if [ ! -s "$registry" ]; then
         printf '%s\n' "$CC_REGISTRY_HEADER" > "$registry" 2>/dev/null || return 1
     fi
     printf '%s=%s\n' "$project" "$chosen" >> "$registry" 2>/dev/null || return 1

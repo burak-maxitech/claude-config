@@ -1,10 +1,15 @@
 # start-claude.ps1
 # Automates the full Claude Code session startup sequence.
-# Usage: .\start-claude.ps1 [project-name]   (no name → interactive project picker)
+# Usage: .\start-claude.ps1 [project-name]   (no name -> interactive project picker)
+#
+# NOTE: this file must stay pure ASCII. Windows PowerShell 5.1 decodes a BOM-less .ps1
+# as the ANSI codepage, so a UTF-8 em-dash becomes three bytes ending in a quote
+# character, which terminates any string it sits inside. Regression-guarded by
+# tests/test-session-color.ps1.
 #
 # NOTE: the bx toolkit is now a Claude Code PLUGIN (bx@burak-tools), not symlinks.
 # Step 1 refreshes the plugin from the GitHub marketplace so every launch has the
-# latest skills — the plugin-model equivalent of the old "git pull updates symlinks".
+# latest skills - the plugin-model equivalent of the old "git pull updates symlinks".
 # (Don't want auto-updates? Delete the two `claude plugin ...` lines in Step 1.)
 
 param(
@@ -30,7 +35,7 @@ if (-not $ProjectName) {
     if ($sel -match '^\d+$' -and [int]$sel -ge 1 -and [int]$sel -le $projects.Count) {
         $ProjectName = $projects[[int]$sel - 1].Name
     } elseif ($sel -and (Test-Path "$ProjectsRoot\$sel")) {
-        $ProjectName = $sel   # typed a name instead of a number — accept it
+        $ProjectName = $sel   # typed a name instead of a number - accept it
     } else {
         Write-Host "Invalid selection: '$sel'. Exiting." -ForegroundColor Red
         exit 1
@@ -47,14 +52,14 @@ if (-not (Test-Path $ProjectPath)) {
 # --- Step 1: Sync the bx toolkit (dev clone + installed plugin) ---
 Write-Host "`n[1/5] Syncing bx toolkit..." -ForegroundColor Yellow
 # 1a. Refresh the local dev clone if present (only matters when you edit skills)
-# NOTE: git is a native exe — failures surface via $LASTEXITCODE, NOT exceptions,
+# NOTE: git is a native exe - failures surface via $LASTEXITCODE, NOT exceptions,
 # so try/catch can't catch them. Gate the success message on $LASTEXITCODE instead.
 if (Test-Path "$ConfigRepo\.git") {
     git -C $ConfigRepo pull --stat
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  claude-config clone synced." -ForegroundColor Green
     } else {
-        Write-Host "  Could not pull claude-config clone (exit $LASTEXITCODE) — continuing." -ForegroundColor DarkGray
+        Write-Host "  Could not pull claude-config clone (exit $LASTEXITCODE) - continuing." -ForegroundColor DarkGray
     }
 }
 # 1b. Refresh the installed plugin from the GitHub marketplace (this is the live skills)
@@ -101,10 +106,10 @@ if (Test-Path "$ProjectPath\.git") {
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  Project synced." -ForegroundColor Green
     } else {
-        Write-Host "  Could not pull (exit $LASTEXITCODE) — continuing with local state." -ForegroundColor DarkYellow
+        Write-Host "  Could not pull (exit $LASTEXITCODE) - continuing with local state." -ForegroundColor DarkYellow
     }
 } else {
-    Write-Host "  Not a git repo — skipping pull." -ForegroundColor Gray
+    Write-Host "  Not a git repo - skipping pull." -ForegroundColor Gray
 }
 
 # --- Step 4: Update Claude Code ---
@@ -118,11 +123,17 @@ if ($LASTEXITCODE -ne 0) {
 # Name the session after the project (-n also sets the terminal tab title) and
 # color its prompt bar. There is no launch-time color flag, so /color rides in
 # as the initial prompt; it is handled locally and costs no model turn.
+# The color is a nicety, never a launch requirement: a helper that is missing,
+# unparseable, or throwing must degrade to an uncolored session, not abort here.
 $SessionColor = $null
 $ColorHelper = Join-Path $PSScriptRoot 'session-color.ps1'
 if (Test-Path $ColorHelper) {
-    . $ColorHelper
-    $SessionColor = Get-CcSessionColor -ProjectName $ProjectName
+    try {
+        . $ColorHelper
+        $SessionColor = Get-CcSessionColor -ProjectName $ProjectName
+    } catch {
+        $SessionColor = $null
+    }
 }
 
 if ($SessionColor) {

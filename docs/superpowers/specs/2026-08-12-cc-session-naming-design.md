@@ -86,7 +86,7 @@ project set is machine-specific: nothing to gitignore, nothing to sync, no merge
 Format — one `name=color` pair per line, so both PowerShell and bash parse it without `jq`:
 
 ```
-# cc session colors — auto-assigned, safe to delete (colors get reassigned)
+# cc session colors - auto-assigned, safe to delete (colors get reassigned)
 horowell=cyan
 kaanarik=green
 claude-config=blue
@@ -106,7 +106,10 @@ Given a project name:
 1. Read the registry if it exists. Skip blank lines, lines starting with `#`, lines without
    exactly one `=`, and lines whose color is not in the palette. A malformed file degrades to
    an empty registry — never a fatal error.
-2. If the project has a valid entry, use that color. Do not rewrite the file.
+2. If the project has a valid entry, use that color. Do not rewrite the file. Name matching is
+   **case-insensitive** and preserves the casing already in the registry: PowerShell `-eq` is
+   case-insensitive, so bash must lower both sides to match, or `cc Horowell` would append a
+   second entry alongside `horowell` on a case-sensitive filesystem.
 3. Otherwise assign:
    - the first palette color not used by any entry; or
    - if all 8 are in use, the least-used color, ties broken by palette order.

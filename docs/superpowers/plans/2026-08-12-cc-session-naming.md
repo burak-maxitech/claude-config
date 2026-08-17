@@ -10,6 +10,17 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-12-cc-session-naming-design.md`
 
+> **Status: executed (S55, 2026-08-12), amended (S56, 2026-08-17).** The shipped files under
+> `.claude/scripts/` are canonical — the code blocks below are the plan as executed, corrected
+> in place where they would otherwise mandate a known defect. Amendments applied after
+> execution, all verified on bash 5.3 / pwsh 7.6.4 / Windows PowerShell 5.1:
+> case-insensitive name lookup (bash side mandated a case-sensitive `=`);
+> `ToLowerInvariant()` over `ToLower()` (tr-TR maps `'PINK'` to `p<dotless-i>nk`, dropping the entry);
+> a 0-byte registry treated as missing when writing the header (both shells);
+> `try/catch` around the launcher's helper call; and an ASCII sweep of `start-claude.ps1`.
+> The shipped test suites have since gained checks beyond those listed here; read the files
+> for the current assertion set rather than the counts quoted below.
+
 ## Global Constraints
 
 - **Palette, in allocation order (verbatim):** `cyan, green, blue, purple, orange, pink, yellow, red`. These are the only values `/color` accepts besides `default`; any other string is invalid.
@@ -161,7 +172,7 @@ function Get-CcSessionColor {
             $parts = $trimmed -split '='
             if ($parts.Count -ne 2) { continue }          # zero or 2+ separators
             $name = $parts[0].Trim()
-            $color = $parts[1].Trim().ToLower()
+            $color = $parts[1].Trim().ToLowerInvariant()   # invariant: tr-TR breaks ToLower()
             if (-not $name) { continue }
             if ($CcColorPalette -notcontains $color) { continue }
             $entries += [pscustomobject]@{ Name = $name; Color = $color }
@@ -195,7 +206,12 @@ function Get-CcSessionColor {
         if ($dir -and -not (Test-Path -LiteralPath $dir)) {
             New-Item -ItemType Directory -Path $dir -Force -ErrorAction Stop | Out-Null
         }
-        if (-not (Test-Path -LiteralPath $RegistryPath)) {
+        # A 0-byte registry counts as missing, or it would never get a header.
+        $needsHeader = $true
+        if (Test-Path -LiteralPath $RegistryPath) {
+            $needsHeader = ((Get-Item -LiteralPath $RegistryPath -ErrorAction Stop).Length -eq 0)
+        }
+        if ($needsHeader) {
             Set-Content -LiteralPath $RegistryPath -Value $CcRegistryHeader -Encoding utf8 -ErrorAction Stop
         }
         Add-Content -LiteralPath $RegistryPath -Value ("{0}={1}" -f $ProjectName, $color) -Encoding utf8 -ErrorAction Stop
@@ -213,7 +229,7 @@ function Get-CcSessionColor {
 pwsh -NoProfile -File .claude/scripts/tests/test-session-color.ps1
 ```
 
-Expected: 8 `PASS` lines and `All checks passed.`, exit code 0. If the "ninth project" check returns `cyan` instead of `green`, the least-used comparison is using `<=` instead of `<`.
+Expected: every check `PASS`, `All checks passed.`, exit code 0 (17 checks as shipped; the count grew after execution). If the "ninth project" check returns `cyan` instead of `green`, the least-used comparison is using `<=` instead of `<`.
 
 - [ ] **Step 5: Commit**
 
@@ -231,7 +247,7 @@ git -C C:/Development/projects/claude-config commit -m "feat(cc): sticky per-pro
 - Test: `.claude/scripts/tests/test-session-color.sh`
 
 **Interfaces:**
-- Consumes: the registry format and palette order established in Task 1. Both shells must produce byte-identical registries for the same sequence of project names.
+- Consumes: the registry format and palette order established in Task 1. Both shells must produce the same *entries in the same order* for the same sequence of project names. **Not** byte-identical, as originally written: measured S56, bash writes no BOM + LF, pwsh 7 no BOM + CRLF, Windows PowerShell 5.1 a UTF-8 BOM + CRLF (5.1's `-Encoding utf8` emits a BOM; pwsh 7's does not). Both parsers tolerate this — bash strips a trailing `\r` and PowerShell `.Trim()`s it — and a BOM'd header survives only because the header line contains no `=`. Each shell reads its own and the others' files correctly; the divergence is cosmetic, not semantic.
 - Produces: `cc_session_color <project-name> [registry-path]` — prints the color to stdout and returns 0; prints nothing and returns 1 on failure. Also defines `$CC_COLOR_PALETTE` (space-separated string) and `$CC_REGISTRY_HEADER`. Task 3 sources this file and calls `cc_session_color`.
 
 - [ ] **Step 1: Write the failing test**
@@ -354,7 +370,9 @@ cc_session_color() {
     # --- A known project keeps its color, and the file is left untouched. ---
     i=0
     while [ "$i" -lt "${#names[@]}" ]; do
-        if [ "${names[$i]}" = "$project" ]; then
+        # Case-insensitive, to match PowerShell's -eq. A plain `=` here would let
+        # `cc Horowell` append a second entry alongside `horowell`.
+        if [ "$(printf '%s' "${names[$i]}" | tr '[:upper:]' '[:lower:]')" = "$(printf '%s' "$project" | tr '[:upper:]' '[:lower:]')" ]; then
             printf '%s\n' "${colors[$i]}"
             return 0
         fi
@@ -380,7 +398,8 @@ cc_session_color() {
     # --- Persist. Any failure here means "no color", not a broken launch. ---
     dir="$(dirname "$registry")"
     if [ ! -d "$dir" ]; then mkdir -p "$dir" 2>/dev/null || return 1; fi
-    if [ ! -e "$registry" ]; then
+    # -s, not -e: a 0-byte registry counts as missing, or it never gets a header.
+    if [ ! -s "$registry" ]; then
         printf '%s\n' "$CC_REGISTRY_HEADER" > "$registry" 2>/dev/null || return 1
     fi
     printf '%s=%s\n' "$project" "$chosen" >> "$registry" 2>/dev/null || return 1
@@ -396,7 +415,7 @@ cc_session_color() {
 bash .claude/scripts/tests/test-session-color.sh
 ```
 
-Expected: 8 `PASS` lines and `All checks passed.`, exit code 0.
+Expected: every check `PASS`, `All checks passed.`, exit code 0 (14 checks as shipped; the count grew after execution).
 
 - [ ] **Step 5: Prove cross-shell parity**
 

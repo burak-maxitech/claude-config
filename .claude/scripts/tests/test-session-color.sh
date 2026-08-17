@@ -40,6 +40,12 @@ assert_equal "cyan"  "$(cc_session_color TestProj "$REG_CASE")" "mixed-case proj
 assert_equal "cyan"  "$(cc_session_color testproj "$REG_CASE")" "lowercase lookup finds existing mixed-case entry"
 assert_equal "1" "$(grep -c '^TestProj=' "$REG_CASE")" "case-insensitive lookup preserves original casing in registry"
 
+# --- A 0-byte registry is treated as missing, so it still gets a header ---
+REG_EMPTY="$TMP/registry-empty"
+: > "$REG_EMPTY"
+assert_equal "cyan" "$(cc_session_color alpha "$REG_EMPTY")" "empty registry assigns cyan"
+assert_equal "1" "$(head -n 1 "$REG_EMPTY" | grep -c '^#')" "0-byte registry still gets a header"
+
 # --- Palette exhausted: least-used wins, ties broken by palette order ---
 REG3="$TMP/registry-3"
 printf '%s\n' '# header' 'p1=cyan' 'p2=green' 'p3=blue' 'p4=purple' \

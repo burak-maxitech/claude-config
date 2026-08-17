@@ -55,6 +55,8 @@ Unblock-File "C:\Development\projects\claude-config\.claude\scripts\start-claude
 Add-Content $PROFILE 'function cc { & "C:\Development\projects\claude-config\.claude\scripts\start-claude.ps1" @args }'
 ```
 
+The Windows launcher runs on both PowerShell 7 (`pwsh`) and the built-in Windows PowerShell 5.1.
+
 Then start any session with:
 
 ```bash

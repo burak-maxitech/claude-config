@@ -35,7 +35,10 @@ function Get-CcSessionColor {
             $parts = $trimmed -split '='
             if ($parts.Count -ne 2) { continue }          # zero or 2+ separators
             $name = $parts[0].Trim()
-            $color = $parts[1].Trim().ToLower()
+            # Invariant, not culture-sensitive: in a Turkish locale ToLower()
+            # maps 'I' to dotless 'i', so a hand-typed PINK would never match
+            # the palette and the entry would be silently dropped.
+            $color = $parts[1].Trim().ToLowerInvariant()
             if (-not $name) { continue }
             if ($CcColorPalette -notcontains $color) { continue }
             $entries += [pscustomobject]@{ Name = $name; Color = $color }
@@ -69,7 +72,13 @@ function Get-CcSessionColor {
         if ($dir -and -not (Test-Path -LiteralPath $dir)) {
             New-Item -ItemType Directory -Path $dir -Force -ErrorAction Stop | Out-Null
         }
-        if (-not (Test-Path -LiteralPath $RegistryPath)) {
+        # A 0-byte registry counts as missing: an existing-but-empty file would
+        # otherwise skip the header forever and leave the file unexplained.
+        $needsHeader = $true
+        if (Test-Path -LiteralPath $RegistryPath) {
+            $needsHeader = ((Get-Item -LiteralPath $RegistryPath -ErrorAction Stop).Length -eq 0)
+        }
+        if ($needsHeader) {
             Set-Content -LiteralPath $RegistryPath -Value $CcRegistryHeader -Encoding utf8 -ErrorAction Stop
         }
         Add-Content -LiteralPath $RegistryPath -Value ("{0}={1}" -f $ProjectName, $color) -Encoding utf8 -ErrorAction Stop
