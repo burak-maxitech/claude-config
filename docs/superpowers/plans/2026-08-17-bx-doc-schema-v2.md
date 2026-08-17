@@ -16,7 +16,7 @@
 - **State file path, verbatim:** `docs/STATUS.md`. Pointer line left in CLAUDE.md, verbatim: `> Session state: [docs/STATUS.md](docs/STATUS.md)`
 - **CLAUDE.md (v2) sections:** `## Project Overview`, `## Key Decisions`, `## Known Issues / Blockers`, and `## Environment Variables` *only when populated*.
 - **STATUS.md sections, in this order:** `## Current Status`, `## Completed`, `## In Progress`, `## Next Steps`, `## Session History`.
-- **"Populated" is mechanical, not judgmental:** `## Environment Variables` is empty iff its body contains no line matching `^[A-Z_][A-Z0-9_]*`. Anything else is kept verbatim.
+- **"Populated" is mechanical, not judgmental:** `## Environment Variables` is **populated iff its body contains a token matching `[A-Z][A-Z0-9_]{2,}` anywhere** (three or more consecutive uppercase/digit/underscore characters, unanchored). Populated means keep verbatim; otherwise drop. State this rule textually identically everywhere it appears, like the marker string. *(Corrected mid-execution — the original line-anchored `^[A-Z_][A-Z0-9_]*` was wrong in both directions: it classified `None required.` as populated, and classified a real bullet/table section such as ``- `DATABASE_URL` — …`` as empty, which would have silently dropped it. The rule deliberately errs toward keeping content: `None required. See README.` reads as populated, and that is the safe failure.)*
 - **Never introduce `@path` imports** into CLAUDE.md or STATUS.md. `@` imports load at launch and would invert the entire design. Offload links stay lazy markdown links.
 - **One version bump only, in Task 9** — `bx/.claude-plugin/plugin.json` goes `1.0.0` → `2.0.0` once at the end, not per-commit. The S54 bump-on-`bx/**`-change rule is satisfied by the branch's final state.
 - **Shell scripts must be LF.** Enforced by `.gitattributes` (`*.sh text eol=lf`); do not fight it.
@@ -285,8 +285,12 @@ and resume idempotently, never as complete.
 untouched for weeks while state churns daily; the staleness signal must follow the state or
 `/bx:resume` and the SessionStart hook report false freshness.
 
-`## Environment Variables` is **conditional**. It is empty iff its body contains no line
-matching `^[A-Z_][A-Z0-9_]*`. Empty means drop; anything else means keep verbatim.
+`## Environment Variables` is **conditional**. It is **populated iff its body contains a
+token matching `[A-Z][A-Z0-9_]{2,}` anywhere** — three or more consecutive uppercase, digit
+or underscore characters, unanchored, so variable names are found inside bullets, tables and
+backticks as well as at line start. Populated means keep verbatim; otherwise drop. The rule
+errs toward keeping: prose containing any acronym reads as populated, and retaining a noise
+section is strictly safer than dropping a real one.
 
 ## v1 layout (legacy)
 
@@ -846,8 +850,9 @@ Dispatch one subagent via the Agent tool with `subagent_type: "bx:doc-migrator"`
 
 - `project_root` — absolute repo path
 - `today` — resolved as in `mode-update.md` Step 0.2
-- `env_vars_disposition` — `drop` if the `## Environment Variables` body contains no line
-  matching `^[A-Z_][A-Z0-9_]*`, else `keep`
+- `env_vars_disposition` — `keep` if the `## Environment Variables` body contains a token
+  matching `[A-Z][A-Z0-9_]{2,}` anywhere (unanchored), else `drop`. See Global Constraints;
+  the rule must read identically here, in `doc-schema.md`, and in `assert-doc-schema.sh`.
 
 Await its change report.
 
