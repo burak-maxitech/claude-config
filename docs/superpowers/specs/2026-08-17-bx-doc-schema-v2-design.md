@@ -130,14 +130,20 @@ making the marker free at runtime while remaining greppable on disk.
 
 ## Detection predicate
 
-Evaluated in order. Lives once, in `references/doc-schema.md`, read by both skills.
+Evaluated in order. Lives once, in `references/doc-schema.md`, read by both skills. (An
+earlier draft of this predicate matched v1 on a 3-header subset — `## In Progress`,
+`## Next Steps`, `## Session History`; that list was illustrative only. The 5-header set
+below, matching `assert-doc-schema.sh`, is authoritative: it is a strict superset that also
+catches a CLAUDE.md holding only `## Current Status` / `## Completed`, so it detects more
+genuine v1 repos.)
 
-1. CLAUDE.md contains `<!-- bx-doc-schema: 2 -->` → **v2**; proceed normally.
-2. No marker, `docs/STATUS.md` absent, CLAUDE.md contains any of `## In Progress`,
-   `## Next Steps`, `## Session History` → **v1**; offer migration.
-3. No CLAUDE.md → **v0**; existing CREATE mode, which now emits v2 directly.
-4. `docs/STATUS.md` present but no marker → **partial**; a prior migration was interrupted.
+1. No CLAUDE.md → **v0**; existing CREATE mode, which now emits v2 directly.
+2. CLAUDE.md contains `<!-- bx-doc-schema: 2 -->` → **v2**; proceed normally.
+3. `docs/STATUS.md` present (marker absent) → **partial**; a prior migration was interrupted.
    Resume it idempotently rather than starting over.
+4. No marker, CLAUDE.md contains any of `## Current Status`, `## Completed`,
+   `## In Progress`, `## Next Steps`, `## Session History` → **v1**; offer migration.
+5. None of the above → **v0**; treat as CREATE mode.
 
 ## Migration flow
 

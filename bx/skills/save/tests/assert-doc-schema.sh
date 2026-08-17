@@ -25,7 +25,6 @@ MARKER='<!-- bx-doc-schema: 2 -->'
 CLAUDE_MD="$REPO/CLAUDE.md"
 STATUS_MD="$REPO/docs/STATUS.md"
 STATE_SECTIONS="Current Status|Completed|In Progress|Next Steps|Session History"
-INSTR_SECTIONS="Project Overview|Key Decisions|Known Issues / Blockers"
 
 FAILURES=0
 pass() { echo "  PASS  $1"; }
@@ -101,15 +100,31 @@ fi
 
 # --- Invariants 1 & 2 against the pre-migration snapshot ---
 if [ -n "$BEFORE" ] && [ -f "$BEFORE" ]; then
+    # ## Environment Variables is dropped only when its body has no line matching
+    # ^[A-Z_][A-Z0-9_]* (the same "populated" test doc-schema.md defines). Compute
+    # that once against the snapshot so the per-header loop below can enforce it.
+    env_body="$(awk '/^## Environment Variables/{f=1; next} /^## /{f=0} f' "$BEFORE")"
+    env_populated=0
+    if printf '%s\n' "$env_body" | grep -qE '^[A-Z_][A-Z0-9_]*'; then
+        env_populated=1
+    fi
+
     missing=""
     while IFS= read -r h; do
         # ## Architecture Summary relocates to docs/architecture.md;
-        # ## Environment Variables is dropped only when empty.
+        # ## Environment Variables is dropped only when empty (env_populated, above).
         case "$h" in
             "## Architecture Summary")
                 [ -f "$REPO/docs/architecture.md" ] || missing="$missing '$h'"
                 continue ;;
             "## Environment Variables")
+                if [ "$env_populated" -eq 1 ]; then
+                    if [ -f "$CLAUDE_MD" ] && grep -qxF "$h" "$CLAUDE_MD"; then
+                        :
+                    else
+                        missing="$missing '$h'"
+                    fi
+                fi
                 continue ;;
         esac
         found=0

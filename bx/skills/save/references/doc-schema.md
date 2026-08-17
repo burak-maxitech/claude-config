@@ -53,14 +53,16 @@ looked like before schema v2.
 
 ## Detection predicate
 
-Evaluate in order:
+Evaluate in order — this is the exact branch order `assert-doc-schema.sh` implements; a
+reader of this prose alone must be able to predict the script's answer for any input:
 
-1. CLAUDE.md contains the marker -> **v2**. Proceed normally.
-2. No marker, `docs/STATUS.md` absent, CLAUDE.md has any of `## In Progress`,
-   `## Next Steps`, `## Session History` -> **v1**. Offer migration.
-3. No CLAUDE.md -> **v0**. CREATE mode, which emits v2 directly.
-4. `docs/STATUS.md` present but no marker -> **partial**. A prior migration was
+1. No CLAUDE.md -> **v0**. CREATE mode, which emits v2 directly.
+2. CLAUDE.md contains the marker -> **v2**. Proceed normally.
+3. `docs/STATUS.md` present (marker absent) -> **partial**. A prior migration was
    interrupted; resume it idempotently rather than starting over.
+4. CLAUDE.md has any of `## Current Status`, `## Completed`, `## In Progress`,
+   `## Next Steps`, `## Session History` -> **v1**. Offer migration.
+5. None of the above -> **v0**. Treat as CREATE mode.
 
 ## Invariants
 
