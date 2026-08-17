@@ -119,9 +119,11 @@ or `/bx:resume` and the SessionStart hook both report false freshness.
 
 **`## Environment Variables` becomes conditional.** Anthropic's include-list covers "developer
 environment quirks (required env vars)", so it earns its place when populated and is noise
-when it reads "None required". *Empty* is defined mechanically, to keep the migration
-non-judgmental: the section body contains no line matching `^[A-Z_][A-Z0-9_]*` (i.e. names no
-variable). Anything else is treated as populated and kept verbatim.
+when it reads "None required". *Populated* is defined mechanically, to keep the migration
+non-judgmental: it is populated iff its body contains a token matching `[A-Z][A-Z0-9_]{2,}`
+anywhere — three or more consecutive uppercase/digit/underscore characters, erring toward
+keeping content when ambiguous (Invariant 2). It is empty otherwise. Empty means drop;
+anything else means keep verbatim.
 
 **The marker is versioned** (`2`, not a boolean) so a future v3 reuses this machinery.
 It is an HTML comment because

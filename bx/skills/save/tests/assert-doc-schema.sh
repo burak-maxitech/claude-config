@@ -100,12 +100,15 @@ fi
 
 # --- Invariants 1 & 2 against the pre-migration snapshot ---
 if [ -n "$BEFORE" ] && [ -f "$BEFORE" ]; then
-    # ## Environment Variables is dropped only when its body has no line matching
-    # ^[A-Z_][A-Z0-9_]* (the same "populated" test doc-schema.md defines). Compute
-    # that once against the snapshot so the per-header loop below can enforce it.
+    # ## Environment Variables is populated iff its body contains a token matching
+    # [A-Z][A-Z0-9_]{2,} anywhere -- three or more consecutive uppercase/digit/underscore
+    # characters, erring toward keeping content when ambiguous (Invariant 2). This is the
+    # same "populated" test doc-schema.md defines; unanchored so a variable name inside a
+    # bullet, a table cell, or a KEY=value line still counts. Compute it once against the
+    # snapshot so the per-header loop below can enforce it.
     env_body="$(awk '/^## Environment Variables/{f=1; next} /^## /{f=0} f' "$BEFORE")"
     env_populated=0
-    if printf '%s\n' "$env_body" | grep -qE '^[A-Z_][A-Z0-9_]*'; then
+    if printf '%s\n' "$env_body" | grep -qE '[A-Z][A-Z0-9_]{2,}'; then
         env_populated=1
     fi
 

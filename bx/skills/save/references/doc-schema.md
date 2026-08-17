@@ -43,8 +43,10 @@ and resume idempotently, never as complete.
 untouched for weeks while state churns daily; the staleness signal must follow the state or
 `/bx:resume` and the SessionStart hook report false freshness.
 
-`## Environment Variables` is **conditional**. It is empty iff its body contains no line
-matching `^[A-Z_][A-Z0-9_]*`. Empty means drop; anything else means keep verbatim.
+`## Environment Variables` is **conditional**. It is populated iff its body contains a token
+matching `[A-Z][A-Z0-9_]{2,}` anywhere — three or more consecutive uppercase/digit/underscore
+characters, erring toward keeping content when ambiguous (Invariant 2). It is empty otherwise.
+Empty means drop; anything else (populated) means keep verbatim.
 
 ## v1 layout (legacy)
 
