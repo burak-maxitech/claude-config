@@ -1642,21 +1642,58 @@ The first two are v1 repos with clean trees (`--expect v1` exits 0 on each); the
 Both guard properties that are specified in prose only, and both are places where two
 independent agents demonstrably produced different bytes while the checker passed either:
 
-1. **STATUS.md section order.** The five state sections must appear in canonical order
-   (Current Status, Completed, In Progress, Next Steps, Session History). The checker currently
-   tests presence and never order, so an appended-rather-than-inserted resume passes.
-2. **`Last Updated:` agreement.** CLAUDE.md's and STATUS.md's `Last Updated:` values must match
-   each other, including any trailing parenthetical such as `(Session 55)`. The checker
-   currently asserts only that STATUS.md *has* such a line — and one rehearsal silently dropped
-   the parenthetical while passing every assertion.
+1. **STATUS.md section order** — runs on every `--expect v2`. Collect `^## ` headers from
+   `docs/STATUS.md` in file order, keep those matching one of the five canonical names, and
+   require that filtered list to be in canonical **relative** order (Current Status, Completed,
+   In Progress, Next Steps, Session History). Use a **subsequence** check that tolerates extra
+   non-canonical headers a real repo may add — demanding exact equality with the canonical five
+   would turn a correct migration of a repo with its own extra STATUS.md section into a
+   verification failure. Name the first out-of-position header in the failure message.
 
-Keep both additions inside the existing v2 block so they run on every `--expect v2` invocation.
+2. **`Last Updated:` value agreement — ONLY when `--before` is supplied.**
+
+   > **This assertion must NOT run on every `--expect v2`.** An earlier draft of this plan item
+   > said the two files' values "must match each other" on every invocation. That is wrong and
+   > would fail on the steady state the schema is designed to produce: `doc-schema.md` gives
+   > CLAUDE.md and STATUS.md separate `Last Updated:` lines *precisely because they diverge* —
+   > "CLAUDE.md may sit untouched for weeks while state churns daily; the staleness signal must
+   > follow the state." Asserting equality in the general case contradicts the design.
+
+   With `--before`, the two values ARE equal by construction — that is the
+   migration-verification invocation, where Step 3 derives STATUS.md's value from CLAUDE.md's
+   and Step 7 stamps CLAUDE.md with the same date. So: when `--before` is supplied, assert
+   `docs/STATUS.md`'s `Last Updated:` value equals CLAUDE.md's byte-for-byte — one comparison
+   covering both the date and any `(Session N)` parenthetical. Guard on both lines existing, and
+   **skip rather than fail** when CLAUDE.md has no `Last Updated:` line at all, since the
+   migrator has a defined template fallback for that case.
+
+**Also align the authority**: `doc-schema.md`'s v2 layout diagram still shows STATUS.md's line
+as a bare `Last Updated: <date>` with no parenthetical, so the next reader re-derives the drop
+from the authority even though both consuming files were corrected. Show it as
+`Last Updated: <date> [(Session N)]`.
 
 **Also in Step 0: make `fx-v2` a true golden output of `fx-v1`.** They currently diverge —
 `## Next Steps` has one item vs two, and `fx-v2` has no `docs/architecture.md` even though
 `fx-v1` carries `## Architecture Summary`. Align `fx-v2` so it is exactly what a correct
 migration of `fx-v1` produces, including `docs/architecture.md`. This is what makes Step 1's
 `--before` assertion possible.
+
+- [ ] **Step 0b: Pin the delete-path rehearsal as a named acceptance item**
+
+The `fx-arch-preexisting` fixture is the *substrate*; the rehearsal is the *test*. What can
+regress on that path is prose, and no static fixture detects a prose regression — running
+`assert-doc-schema.sh fx-arch-preexisting --expect v1` only re-asserts layout detection.
+
+So run a rehearsal against it, both branches, and treat the result as an acceptance gate:
+give a fresh agent ONLY the contents of `bx/agents/doc-migrator.md` plus a task packet, no
+access to this plan, and have it migrate (a) a copy where `docs/architecture.md` matches its
+section — must proceed, leaving that file byte-identical — and (b) a copy where it has been
+hand-edited — must block, leave `## Architecture Summary` in CLAUDE.md, write no marker.
+
+Ask for a **verification trace**: for each removed section, did it re-read the destination from
+disk, or rely on having just written it? Tier 1's read-back is the one instruction whose
+compliance is invisible in the output — a compliant and a non-compliant agent produce identical
+files — so a transcript is the only instrument that can check it.
 
 - [ ] **Step 1: Run every fixture through the checker**
 
