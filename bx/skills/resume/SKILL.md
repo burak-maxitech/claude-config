@@ -236,6 +236,9 @@ Read the reference files for full context:
 - `docs/completed-work.md` -- complete task checklist
 - `docs/key-decisions.md` -- full decision log
 
+Rotated archive volumes under `docs/archive/` are NOT read even in deep mode — they are
+grep-on-demand history; open one only when chasing a specific old session or decision.
+
 Provide additional details:
 - Full architecture diagram
 - Complete file tree

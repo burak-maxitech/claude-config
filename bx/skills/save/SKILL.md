@@ -4,7 +4,7 @@ description: "Saves session state for the next /bx:resume — drains the task tr
 disable-model-invocation: true
 effort: low
 allowed-tools: Read, Edit, Write, Grep, Glob, Bash(git:*), Bash(ls:*), Bash(find:*), Bash(wc:*), Bash(awk:*), Bash(sort:*), Bash(bash:*), TaskList, TaskGet, AskUserQuestion, Agent
-argument-hint: "[scope] [--full] [--fast] [--silent] [--skip-memory] [--skip-tasks] [--skip-commit] [--skip-rollup] [--skip-decisions-rollup] [--skip-caps] [--skip-migrate]"
+argument-hint: "[scope] [--full] [--fast] [--silent] [--skip-memory] [--skip-tasks] [--skip-commit] [--skip-rollup] [--skip-decisions-rollup] [--skip-caps] [--skip-migrate] [--skip-rotation]"
 ---
 
 # /bx:save - Session Save & Documentation Skill

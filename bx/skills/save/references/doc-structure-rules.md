@@ -14,6 +14,7 @@ All projects should have this documentation system:
 | **docs/key-decisions.md** | docs/ | Full decision log (overflow from CLAUDE.md) | Reference |
 | **docs/session-history.md** | docs/ | Detailed session logs archive (overflow from CLAUDE.md) | Reference |
 | **docs/architecture.md** | docs/ | Architecture detail moved out of CLAUDE.md | Reference |
+| **docs/archive/** | docs/ | Rotated archive volumes (`<name>-<K>.md`) written by `/bx:save` Part 7.7 when a history archive exceeds 100k chars. Read by nothing automatic — grep on demand. | Reference |
 
 **Size targets:** CLAUDE.md ~7k chars; docs/STATUS.md ~10k chars. When either grows, offload detail to the reference files and keep summaries + links.
 
