@@ -7,6 +7,25 @@ precondition for a correct save, not a periodic sweep.
 **If `--skip-migrate` is in `$ARGUMENTS`, skip this mode entirely** and run UPDATE against
 the v1 layout.
 
+## Step 0: Eligibility pre-flight
+
+Before anything else — including the clean-tree guard — check whether this CLAUDE.md can
+actually reach a valid v2 shape. `doc-schema.md`'s v1 detection fires on **any one** of the
+five state sections, but `assert-doc-schema.sh` requires **all three** of
+`## Project Overview`, `## Key Decisions`, `## Known Issues / Blockers` in CLAUDE.md (plus
+the state sections, in STATUS.md, which Step 4 below can now scaffold if some are missing —
+see Step 4). Never ask permission for something that cannot succeed.
+
+- **If CLAUDE.md lacks any of the three instruction sections** (`## Project Overview`,
+  `## Key Decisions`, `## Known Issues / Blockers`) → **decline without prompting.** Emit one
+  line — "CLAUDE.md does not carry the sections schema v2 requires; migration skipped." —
+  and continue with a normal v1 UPDATE. No user prompt: this must not nag on every save for a
+  repo that can never pass verification.
+- **If those three are present**, regardless of how many of the five state sections are
+  present → eligible. Continue to Step 1. `doc-migrator` scaffolds any missing state section
+  as a bare header with a placeholder line, so partial state coverage does not block
+  migration (see `doc-migrator.md` Step 2).
+
 ## Step 1: Clean-tree guard
 
 Run `git status --porcelain`. If it emits **any** line:
@@ -47,24 +66,42 @@ Dispatch one subagent via the Agent tool with `subagent_type: "bx:doc-migrator"`
 
 - `project_root` — absolute repo path
 - `today` — resolved as in `mode-update.md` Step 0.2
-- `env_vars_disposition` — `keep` if the `## Environment Variables` body contains a token
-  matching `[A-Z][A-Z0-9_]{2,}` anywhere (unanchored), else `drop`. See Global Constraints;
-  the rule must read identically here, in `doc-schema.md`, and in `assert-doc-schema.sh`.
+- `env_vars_disposition` — `keep` if `## Environment Variables` is present in CLAUDE.md AND
+  its body contains a token matching `[A-Z][A-Z0-9_]{2,}` anywhere (unanchored); `drop`
+  otherwise, **including when the section is absent from CLAUDE.md entirely**. See Global
+  Constraints; the rule must read identically here, in `doc-schema.md`, and in
+  `assert-doc-schema.sh`.
 
 Await its change report.
 
-- `status: failed`, or a non-empty `warnings:` line -> go to Step 6 (failure handling).
+- `status: failed`, or a `warnings:` value other than the literal `none` -> go to Step 6
+  (failure handling).
 - `status: already-v2` -> detection was wrong; log it and fall through to UPDATE.
 - `status: migrated` or `resumed-partial` -> continue to Step 5.
 
 ## Step 5: Verify invariants
 
-Run the checker:
+Run the target-repo checker. Resolve `tests/assert-doc-schema.sh` against the base directory
+Claude Code announced for this skill when it loaded, and pass it to Bash as a literal
+absolute path — never let an unexpanded variable like `${CLAUDE_SKILL_DIR}` reach the shell,
+where it yields an empty string and the command silently fails to resolve (the exact
+S33/S39 bug class):
 
-    bash <skill_dir>/tests/assert-doc-schema.sh <project_root> --expect v2 --before <snapshot>
+    bash <absolute path to this skill's base dir>/tests/assert-doc-schema.sh <project_root> --expect v2 --before <snapshot>
 
-- Exit 0 -> continue to Step 6.
-- Exit 1 -> failure handling below.
+Also run the plugin's own self-consistency check. This is a **separate, second check** — it
+scans the bx/ plugin's own source tree, not `<project_root>`, and takes no arguments (it
+resolves its own tree from its own location). Run it because a drifted plugin source (the
+populated-rule regex or the schema marker stated differently in two of its own files) would
+make the check above untrustworthy too, even if it happens to pass:
+
+    bash <absolute path to this skill's base dir>/tests/check-doc-rule-consistency.sh
+
+- Both exit 0 -> continue to Step 6.
+- Either exits non-zero -> failure handling below. If it was the self-consistency check that
+  failed, say so explicitly in the report — that is a bx plugin defect independent of this
+  repo, worth reporting upstream, in addition to (not instead of) the recovery below, since
+  Step 4 may already have modified this repo regardless of which check caught the problem.
 
 ## Step 6: Commit, or fail cleanly
 
@@ -74,23 +111,27 @@ stays independently revertible:
     git add CLAUDE.md docs/STATUS.md docs/architecture.md
     git commit -m "docs: migrate to bx doc schema v2 (CLAUDE.md -> STATUS.md split)"
 
-(Include `docs/architecture.md` only if it was created.)
+(Include `docs/architecture.md` only if it was created.) Continue to Step 7.
 
-**On failure — no automatic rollback.** Report what failed, name the files left modified,
-and print the exact recovery command:
+**On failure — no automatic rollback, and STOP the mode here.** Report what failed, name the
+files left modified, and print the exact recovery command:
 
 > "Migration failed at [step]: [what]. The working tree was clean before this ran, so
->  `git restore . && git clean -fd docs/` restores it exactly. Nothing was committed."
+>  `git restore . && git clean -fd docs/` restores it exactly. Nothing was committed. This
+>  session's save did NOT run — recover first, then run `/bx:save` again; it will proceed
+>  normally against whichever layout the repo is then on."
 
 Do NOT run those commands yourself. Auto-running `git clean -fd` is precisely the trap the
-S42 `/bx:webdesign` review caught.
-
-Then run UPDATE against whatever layout the repo is now in.
+S42 `/bx:webdesign` review caught. **Do not fall through to UPDATE, Step 7, or Step 8.** A
+half-migrated tree is not a safe base for a save, and running UPDATE now would write more
+files on top of the unresolved failure — exactly what the recovery command above is supposed
+to undo. End the run here.
 
 ## Step 7: Offer the compression pass (optional, separate)
 
-Migration is mechanical. Rationale compression is authored and lossy, so it is a **separate
-consented pass** — never bundled, because mixing them makes the diff unreviewable.
+Reached only from Step 6's success path. Migration is mechanical. Rationale compression is
+authored and lossy, so it is a **separate consented pass** — never bundled, because mixing
+them makes the diff unreviewable.
 
 If CLAUDE.md's `## Key Decisions` section still exceeds 8000 chars after migration, offer:
 
@@ -103,5 +144,5 @@ Declining is free and re-offered next run. If `--silent`, treat as declined.
 
 ## Step 8: Fall through to UPDATE
 
-Continue into `mode-update.md` against the now-v2 layout. The session's actual save proceeds
-normally.
+Reached only from Step 6's success path. Continue into `mode-update.md` against the now-v2
+layout. The session's actual save proceeds normally.
