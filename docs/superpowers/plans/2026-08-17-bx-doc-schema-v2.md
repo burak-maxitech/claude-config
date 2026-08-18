@@ -1226,6 +1226,13 @@ the `## Architecture Summary` row entirely (that section no longer exists in CLA
 lives in `docs/architecture.md`, which is not size-managed). Update 7.1's re-measure to
 check CLAUDE.md against 12k and STATUS.md against 20k independently.
 
+**While converting Part 7, sweep its checklist counterpart.** Task 5 deliberately left one
+stale trigger in `verification-checklists.md:102` — "Size-pressure rollup (Part 7) ran when
+CLAUDE.md exceeded **35k**" — because correcting the checklist before the code would have made
+it misdescribe actual behaviour. That was the right call, and it is now yours: when Part 7's
+thresholds become per-file (CLAUDE.md 12k, docs/STATUS.md 20k), update that checklist line in
+the same commit so the two never disagree.
+
 - [ ] **Step 5: Widen Part 3's glob and rewrite Part 4**
 
 In Part 3.0 step 1, change `Glob docs/**/*.md` to:
