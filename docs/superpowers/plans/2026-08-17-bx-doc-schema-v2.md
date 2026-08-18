@@ -1577,6 +1577,20 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: everything above.
 
+- [ ] **Step 0: Extend `make-fixtures.sh` with the two eligibility fixtures**
+
+Ruling 11 (C3) added an eligibility pre-flight and placeholder scaffolding to
+`mode-migrate.md`. Neither path has a fixture, and both fail into a **half-migrated user
+repo** — the worst outcome this design has. Add:
+
+| Fixture | Shape | Must do |
+|---|---|---|
+| `fx-v1-sparse` | all three instruction sections, but only `## Next Steps` of the five state sections | migrate; STATUS.md ends with **all five** headers, the four absent ones carrying `_None recorded._`; `assert-doc-schema.sh --expect v2` exits 0 |
+| `fx-v1-ineligible` | state sections present, but **missing** `## Key Decisions` | **decline without prompting**; one-line note; layout stays v1; save still completes |
+
+Both are v1 repos with clean trees, so `--expect v1` must exit 0 on each before migration.
+Follow the existing helper pattern in `make-fixtures.sh`; do not restructure the script.
+
 - [ ] **Step 1: Run every fixture through the checker**
 
 ```bash
@@ -1587,11 +1601,13 @@ bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v1"          --expect v
 bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v1-envvars"  --expect v1
 bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v2"          --expect v2
 bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-partial"     --expect partial
-bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-dirty"       --expect v1
+bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-dirty"        --expect v1
+bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v1-sparse"    --expect v1
+bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v1-ineligible" --expect v1
 bash bx/skills/save/tests/test-hook-layout.sh
 bash bx/skills/save/tests/check-doc-rule-consistency.sh
 ```
-Expected: all eight exit 0. The last one lints the `bx/` tree itself rather than a target
+Expected: all ten exit 0. The last one lints the `bx/` tree itself rather than a target
 repo — it fails if the schema marker or the populated-rule regex has drifted between the
 files that restate them, which is the failure mode that silently loses content.
 
@@ -1615,6 +1631,8 @@ Expected: checker exits 0; the migration is its own commit, message beginning `d
 | `fx-partial` | `/bx:save`, accept | Marker added; `docs/STATUS.md` **not** recreated or duplicated; checker `--expect v2` exits 0 |
 | `fx-dirty` | `/bx:save` | Migration **skipped** with the dirty-tree message; the save still completes; layout still v1 |
 | `fx-v1-envvars` | `/bx:save`, accept | `## Environment Variables` **survives into CLAUDE.md** — the section lists real variables, so `env_vars_disposition` must resolve to `keep`. Verify with `assert-doc-schema.sh --expect v2 --before <snapshot>`, which now fails if a populated section is dropped |
+| `fx-v1-sparse` | `/bx:save`, accept | STATUS.md ends with all five headers; the four missing ones carry `_None recorded._`; checker exits 0. Proves scaffolding produces a *verifiable* v2 rather than a repo stuck failing verification with no rollback |
+| `fx-v1-ineligible` | `/bx:save` | **No migration prompt appears at all** — eligibility declines before consent. One-line note; layout stays v1; the session save still completes |
 
 These four are the cases a single dogfood run would never exercise. The last one guards the
 only path where migration can silently lose content, so it is not optional.
