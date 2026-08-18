@@ -38,6 +38,7 @@
 | `bx/skills/save/tests/assert-doc-schema.sh` | Create | Deterministic post-condition checker. Runs against any repo. |
 | `bx/skills/save/tests/make-fixtures.sh` | Create | Builds the five fixture repos. |
 | `bx/skills/save/tests/test-hook-layout.sh` | Create | Asserts the SessionStart hook reads the right file and stops at the right header. |
+| `bx/skills/save/tests/check-doc-rule-consistency.sh` | Create | Lints the `bx/` tree so the schema marker and the populated-rule regex stay byte-identical wherever they are restated. Run standalone; wired into Task 10 Step 1. |
 | `bx/skills/save/SKILL.md` | Modify | 4-state mode table; loads `doc-schema.md`; `--skip-migrate`. |
 | `bx/skills/save/references/mode-update.md` | Modify | Step 0 reads STATUS.md; packet split; Parts 1.2–1.8 re-homed; Part 3 glob widened; Part 4 rewritten. |
 | `bx/skills/save/references/claude-md-sections.md` | Modify | Defines BOTH files' required sections. |
@@ -760,15 +761,17 @@ for the canonical layouts and invariants before you begin.
 4. **Remove** the five state sections and `## Architecture Summary` from CLAUDE.md. If
    `env_vars_disposition` is `drop`, remove `## Environment Variables` too; if `keep`,
    leave it exactly where it is.
-5. **Insert the pointer line** into CLAUDE.md as the **last** element, matching
-   `doc-schema.md`'s v2 diagram: after `## Environment Variables` when that section is
-   kept, otherwise after `## Known Issues / Blockers`, otherwise at end of file.
+5. **Append the pointer line as the final line of CLAUDE.md, after all remaining content:**
 
        > Session state: [docs/STATUS.md](docs/STATUS.md)
 
-   (An earlier draft said "immediately after `## Known Issues / Blockers`" unconditionally,
-   which puts the pointer *above* a kept `## Environment Variables` and contradicts the
-   canonical layout. `doc-schema.md` is authoritative.)
+   Unconditional, with no branching on which section precedes it. This satisfies
+   `doc-schema.md`'s v2 diagram for every combination. Two earlier drafts got this wrong:
+   the first anchored it "immediately after `## Known Issues / Blockers`" (which puts the
+   pointer *above* a kept `## Environment Variables`), and the second branched on
+   `env_vars_disposition` (which still lands mid-file in any repo carrying a trailing
+   project-specific section such as `## Deployment`). Anchoring to a section is the defect;
+   appending is the fix.
 
 6. **Update CLAUDE.md's `Last Updated:` line** to `today`.
 7. **Write the marker LAST.** Prepend `<!-- bx-doc-schema: 2 -->` as the very first line of
@@ -1578,8 +1581,11 @@ bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v2"          --expect v
 bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-partial"     --expect partial
 bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-dirty"       --expect v1
 bash bx/skills/save/tests/test-hook-layout.sh
+bash bx/skills/save/tests/check-doc-rule-consistency.sh
 ```
-Expected: all seven exit 0.
+Expected: all eight exit 0. The last one lints the `bx/` tree itself rather than a target
+repo — it fails if the schema marker or the populated-rule regex has drifted between the
+files that restate them, which is the failure mode that silently loses content.
 
 - [ ] **Step 2: Run `/bx:save` against `fx-v1` and verify the migration**
 
