@@ -33,7 +33,7 @@ From the gathered context:
 - **Filtered commit list** (commits since Last Updated) → feeds the session entry + drift probes.
 - **Diff file list** → tells you whether README/`docs/` changed (drift signal; drives the `--full` recommendation).
 - **TaskList state** → drives the task drain (Part 0) and the In Progress / Next Steps deltas.
-- **CLAUDE.md size + docs/STATUS.md size + Key Decisions row count + session count** — cheap: `wc -c CLAUDE.md docs/STATUS.md` for size (omit `docs/STATUS.md` from the command on a v1 repo where it does not exist); count the Key Decisions table rows with the **Grep tool** (`output_mode: count`, pattern `^\| `); and (for the drift probe only) count sessions with the **Grep tool** (`output_mode: count`, pattern `^### Session`) on `docs/session-history.md` — not a full read. Use the Grep tool (not shell `grep`) for the two counts so no extra Bash permission is needed; `wc`/`awk`/`sort` are declared in `allowed-tools`. These drive the drift warnings and the `--full` rollup gates.
+- **CLAUDE.md size + docs/STATUS.md size + Key Decisions row count + session count** — cheap: `wc -c CLAUDE.md docs/STATUS.md docs/session-history.md docs/key-decisions.md docs/completed-work.md` for size (omit docs/STATUS.md — and any archive — from the command when the file does not exist); count the Key Decisions table rows with the **Grep tool** (`output_mode: count`, pattern `^\| `); and (for the drift probe only) count sessions with the **Grep tool** (`output_mode: count`, pattern `^### Session`) on `docs/session-history.md` — not a full read. Use the Grep tool (not shell `grep`) for the two counts so no extra Bash permission is needed; `wc`/`awk`/`sort` are declared in `allowed-tools`. These drive the drift warnings and the `--full` rollup gates.
 
 ## Step 0.1: Path Routing
 
@@ -100,7 +100,10 @@ Dispatch one `save-writer` subagent via the Agent tool with `subagent_type: "bx:
 >  - Key Decisions table in CLAUDE.md at [M] rows (cap 20)
 >  - README.md or `docs/*.md` touched in [K] commits since last full sweep
 >  - CLAUDE.md at [X]k chars (target ~7k, soft cap 12k) — Part 7 size-pressure rollup will fire on `--full`
->  - docs/STATUS.md at [Y]k chars (target ~10k, soft cap 20k) — Part 7 size-pressure rollup will fire on `--full`"
+>  - docs/STATUS.md at [Y]k chars (target ~10k, soft cap 20k) — Part 7 size-pressure rollup will fire on `--full`
+>  - docs/[archive].md at [Z]k chars (rotation threshold 100k) — Part 7.7 archive rotation will fire on `--full`"
+
+Show the archive line only for an archive at ≥90k chars (approaching or over the 100k rotation threshold).
 
 If no probe fires, omit the warning entirely.
 
@@ -453,6 +456,9 @@ Before iterating file-by-file, pre-load the whole `docs/` tree in one turn:
    sync inputs, and Part 3 never edits them — but they grow with project age, so reading
    them costs tokens linear in project history for zero benefit. (At 57 sessions this repo's
    archives already total ~196k chars.)
+   Also exclude **everything under `docs/archive/`** — rotated archive volumes (Part 7.7)
+   are read by no automatic path, ever; reading them here would reintroduce the exact
+   linear cost this exclusion exists to remove.
 3. Issue one `Read` tool call per remaining file — **all in the same turn** — so they execute in parallel rather than sequentially
 4. Analyze all files in a single pass and plan the Edits
 5. Apply all Edits in batched parallel calls where the targets don't conflict
@@ -642,7 +648,7 @@ After the count-based rollups in Parts 5 and 6 finish, re-measure CLAUDE.md and 
 
 Compute `claude_md_size` = char count of CLAUDE.md, and `status_md_size` = char count of docs/STATUS.md, both as they stand post-rollups.
 
-- If `claude_md_size <= 12000` **and** `status_md_size <= 20000` → skip the rest of Part 7 silently. The count-based rollups did the job.
+- If `claude_md_size <= 12000` **and** `status_md_size <= 20000` → skip 7.2-7.6 silently (the count-based rollups did the job) and go directly to **7.7 (archive rotation)**, which runs regardless: its trigger is archive size, not live-file size.
 - Otherwise proceed — but **per file, independently**: a file under its own soft cap is neither diagnosed nor shrunk in 7.2-7.3, even when the other file is over.
 
 ### 7.2 Section size diagnostic
@@ -717,7 +723,94 @@ After all consented shrinkers complete, re-measure each file that was diagnosed:
 
 If a file is still over its soft cap after all consents: log a final warning for that file, do not block the commit.
 
-### 7.7 Idempotency
+### 7.7 Archive rotation
+
+The three history archives grow forever by design — `docs/session-history.md` (one line per
+rolled-up session plus 5 full entries), `docs/key-decisions.md` (one row per decision),
+`docs/completed-work.md` (several lines per session). No automatic path reads them in full
+(Part 3.0 excludes them; save-writer appends via tail reads), so growth is disk-only — but
+deliberate reads (deep resume, a human opening the file, a 2000-line Read page) get clumsy
+past ~100k chars. Rotation moves the oldest entries, byte-verbatim, into numbered volumes
+under `docs/archive/`. `docs/next-steps-backlog.md` is NOT rotated: it grows only when a
+7.3 shrinker fires and shrinks when items ship — if it exceeds 100k, report that as a
+symptom and take no action.
+
+**If `--skip-rotation` is in `$ARGUMENTS`, skip this step entirely.** (Note `--skip-size-pressure`
+skips all of Part 7, this step included; 7.1's early exit does NOT skip this step.)
+
+Measure the three archives (`wc -c`, omitting any that do not exist). For each file over
+**100k chars**, independently:
+
+1. **Consent (first rotation on this project only).** The sentinel is the rotation note in
+   the live file's header — search for the literal substring `Entries are rotated to`. If
+   present, proceed silently. If absent: **if `--silent` is in `$ARGUMENTS`, treat as
+   declined without asking** (skip this file, write no sentinel — the next interactive
+   `--full` run asks as usual). Otherwise ask via `AskUserQuestion` (numbered fallback):
+
+   > "`docs/<name>.md` is [N]k chars. Rotating moves its oldest entries, byte-for-byte,
+   >  into `docs/archive/<name>-1.md` (a new `docs/archive/` directory), leaving the
+   >  newest content where it is. Nothing is deleted or reworded, and volumes are read by
+   >  nothing automatic — they are grep-on-demand history. Rotate now? (y/n)"
+
+   Declined → skip this file, write no sentinel, re-offer next `--full` run.
+
+2. **Ensure `docs/archive/` exists — implicitly.** The Write tool creates the directory
+   when writing the volume file in step 5. Do NOT shell out to `mkdir`; it is not in this
+   skill's `allowed-tools`.
+
+3. **Volume number:** `Glob docs/archive/<name>-*.md`; K = highest existing number + 1, or
+   1 if none. **Filenames only — never read a volume's contents.**
+
+4. **Move the oldest entries, byte-verbatim,** from the top of the file's entry region
+   (all three archives order oldest-first) into the new volume, cutting only at whole-entry
+   boundaries — a `### Session` header line, a complete `|` table row, a whole checklist
+   line — until the live file is at or under **50k chars** (half the threshold, so rotation
+   does not re-fire every run). The protected tail never moves: the 5 most recent sessions
+   (session-history, matching Part 5's window), the newest 20 rows (key-decisions, matching
+   Part 6's target), this session's just-appended items (completed-work). Never compress,
+   reword, or reorder anything — Part 5 owns compression and has already run.
+
+5. **Write the volume** with this header above the moved content — omit the
+   previous-volume line when K = 1; for key-decisions, repeat the
+   `| Decision | Rationale |` and `|----------|-----------|` table-header lines before the
+   moved rows so the volume renders standalone:
+
+   ```markdown
+   # <Title> — Archive Volume <K>
+
+   > Rotated from [<name>.md](../<name>.md) by `/bx:save` on <date>.
+   > Previous volume: [<name>-<K-1>.md](<name>-<K-1>.md)
+   > Newer content: [<name>.md](../<name>.md)
+
+   ---
+   ```
+
+6. **Write or update the live file's rotation note** (the consent sentinel), inserted
+   after the file's existing header note(s) or updated in place to point at the newest
+   volume:
+
+   ```markdown
+   > **Note:** Entries are rotated to [docs/archive/<name>-<K>.md](archive/<name>-<K>.md)
+   > when this file exceeds 100k chars. Older volumes chain from there.
+   ```
+
+7. **Verify byte conservation before touching the next file.** With B = the live file's
+   `wc -c` before rotation and A = live-file-after + volume-after: require
+   **B ≤ A ≤ B + 600** (rotation only adds bytes — volume header ~250, sentinel ~160,
+   key-decisions table-header repeat ~45, plus margin). A below B means content was lost;
+   A above the ceiling means content was rewritten. On violation: report loudly, leave both
+   files exactly as they stand for inspection, and do NOT rotate any further files this run.
+
+8. **Report:** `"docs/<name>.md: rotated [N]k chars → docs/archive/<name>-<K>.md; live
+   file now [M]k ([V] volumes total)."`
+
+Volumes are permanent — there is no count cap. Rotated volumes cost nothing at runtime
+(nothing automatic reads them), and deleting history to reclaim ~100KB would break the
+schema's "nothing is deleted — content moves" promise. If a user wants to prune, the
+escape hatch is manual: `git rm docs/archive/<name>-1.md` — the content still survives in
+git history.
+
+### 7.8 Idempotency
 
 Part 7 is safe to re-run. The shrinkers detect already-shrunk state via the `> Full [thing]:` sentinel link and skip those sections. The only way a re-shrunk section grows again is user editing — which is fine, and Part 7 will catch it next run.
 
