@@ -27,6 +27,7 @@
 - **Cross-skill reference reads resolve as `../save/references/...` against the skill base directory** Claude Code announces at skill load — never repo-rooted paths (S48).
 - **Repo commit convention:** end every commit message with the trailer `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
 - **Migration is opportunistic, never blocking.** A dirty tree, a declined consent, or `--skip-migrate` must all still allow the session's normal save to complete.
+- **Line numbers in this plan are as-of authoring — anchor every edit to surrounding CONTENT, not to a line number.** Several tasks modify multiple regions of one file, and an earlier step's insertion shifts every line below it. Where a step cites `file.md:12-34`, treat it as "roughly here, find it by its text". Verify by re-reading the region before editing, never by trusting the number.
 
 ## File Structure
 
@@ -1021,7 +1022,9 @@ In the Target State table (lines 5–16), add two rows and change CLAUDE.md's pu
 
 Change the "Size targets" line to: `CLAUDE.md ~7k chars; docs/STATUS.md ~10k chars. When either grows, offload detail to the reference files and keep summaries + links.`
 
-Then append to the "Pruning Is Preservation" section (after line 56):
+Then append to the **end of the "Pruning Is Preservation" section** — anchor on the final
+sentence of that section, not on a line number: Step 2 above adds two table rows to the same
+file first, which shifts every line below it.
 
 ```markdown
 - **Moving session state from CLAUDE.md to `docs/STATUS.md` is preservation.** The v1 -> v2
@@ -1173,8 +1176,13 @@ Add this routing table immediately under the Part 1 "Plan-then-batch" note:
 | 1.8 Session History | docs/STATUS.md (+ append to docs/session-history.md) |
 ```
 
-Delete sub-section **1.1 Documentation Links** (it duplicates the pointer line) and
-**1.9's** CLAUDE.md-only size check, replacing 1.9 with:
+**Keep sub-section 1.1 Documentation Links unchanged.** (An earlier draft said to delete it
+"because it duplicates the pointer line" — that is false. 1.1 maintains the **Key
+Documentation** list of PRD/spec/sample files in CLAUDE.md's Project Overview, which v2 still
+carries; the pointer line only names `docs/STATUS.md`. Deleting 1.1 would drop a real
+function on a wrong rationale.)
+
+Replace **1.9's** CLAUDE.md-only size check with:
 
 ```markdown
 ### 1.9 Size Check (early advisory)
