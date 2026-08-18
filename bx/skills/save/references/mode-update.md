@@ -9,7 +9,11 @@ Gather only what the orchestrator needs to *route* and *compose the packet*. The
 ### 0.1 Single parallel turn — issue these together
 
 **Reads (parallel):**
-- `CLAUDE.md` — the only doc the orchestrator reads in full.
+- `CLAUDE.md` — read in full.
+- `docs/STATUS.md` — the session-state file (schema v2). On a v1 repo this does not exist;
+  MIGRATE runs first, so by the time UPDATE executes the repo is always v2 unless migration
+  was skipped or declined. Handle both: if STATUS.md is absent, target CLAUDE.md's state
+  sections exactly as v1 did.
 - Auto-memory `MEMORY.md` — usually already in conversation context; read explicitly only if absent.
 
 **Bash (parallel):**
@@ -29,7 +33,7 @@ From the gathered context:
 - **Filtered commit list** (commits since Last Updated) → feeds the session entry + drift probes.
 - **Diff file list** → tells you whether README/`docs/` changed (drift signal; drives the `--full` recommendation).
 - **TaskList state** → drives the task drain (Part 0) and the In Progress / Next Steps deltas.
-- **CLAUDE.md size + Key Decisions row count + session count** — cheap: `wc -c CLAUDE.md` for size; count the Key Decisions table rows with the **Grep tool** (`output_mode: count`, pattern `^\| `); and (for the drift probe only) count sessions with the **Grep tool** (`output_mode: count`, pattern `^### Session`) on `docs/session-history.md` — not a full read. Use the Grep tool (not shell `grep`) for the two counts so no extra Bash permission is needed; `wc`/`awk`/`sort` are declared in `allowed-tools`. These drive the drift warnings and the `--full` rollup gates.
+- **CLAUDE.md size + docs/STATUS.md size + Key Decisions row count + session count** — cheap: `wc -c CLAUDE.md docs/STATUS.md` for size (omit `docs/STATUS.md` from the command on a v1 repo where it does not exist); count the Key Decisions table rows with the **Grep tool** (`output_mode: count`, pattern `^\| `); and (for the drift probe only) count sessions with the **Grep tool** (`output_mode: count`, pattern `^### Session`) on `docs/session-history.md` — not a full read. Use the Grep tool (not shell `grep`) for the two counts so no extra Bash permission is needed; `wc`/`awk`/`sort` are declared in `allowed-tools`. These drive the drift warnings and the `--full` rollup gates.
 
 ## Step 0.1: Path Routing
 
@@ -47,17 +51,17 @@ The old behavior (full sweep by default) is inverted: the daily save is fast; th
 New entries are capped — this keeps writing fast and keeps `/bx:resume` lean. Existing entries are never rewritten to fit.
 
 - **Session-history entry:** ≤5 "What happened" bullets. Detail that doesn't fit becomes a commit-hash reference (`see commit abc1234`), not prose.
-- **CLAUDE.md last-session block:** ≤5 bullets, the most architecturally significant.
+- **docs/STATUS.md last-session block:** ≤5 bullets, the most architecturally significant.
 - **Key Decision rationale:** ≤2–3 sentences. Longer context goes only into `docs/key-decisions.md`, referenced by commit hash.
 - **In Progress / Next Steps items:** one line each + file paths; no multi-paragraph narration.
 
 ## Save Path (default)
 
-The orchestrator owns everything that needs conversation context or user input; the `save-writer` subagent owns the file reads/writes. The orchestrator does NOT edit `CLAUDE.md`, `session-history.md`, `completed-work.md`, or `key-decisions.md` itself — it composes the packet and dispatches.
+The orchestrator owns everything that needs conversation context or user input; the `save-writer` subagent owns the file reads/writes. The orchestrator does NOT edit `CLAUDE.md`, `docs/STATUS.md`, `session-history.md`, `completed-work.md`, or `key-decisions.md` itself — it composes the packet and dispatches.
 
 **Sequence:**
 
-1. **Drain the task list (Part 0 logic).** Run the Part 0 / Drain Validation rules below to reconcile `TaskList` against CLAUDE.md. Respect `--skip-tasks`. The result (completed → completed-work items; in-progress → In Progress; new pending → Next Steps) becomes part of the packet, NOT inline edits.
+1. **Drain the task list (Part 0 logic).** Run the Part 0 / Drain Validation rules below to reconcile `TaskList` against docs/STATUS.md (CLAUDE.md's state sections on a v1 repo). Respect `--skip-tasks`. The result (completed → completed-work items; in-progress → In Progress; new pending → Next Steps) becomes part of the packet, NOT inline edits.
 2. **Compose the update packet** (see "Update Packet" below) from: the conversation (what happened this session — only the orchestrator knows this), the filtered commit list, the diff file list, and the drained task state. Apply the Prose Caps.
 3. **Dispatch the `save-writer` subagent** (see "Dispatch" below) and await its change report.
 4. **Drift probes** (cheap, on already-gathered data — no new reads): emit the drift warning block if anything fired. Do NOT enforce.
@@ -72,8 +76,9 @@ Compose this structure and pass it to `save-writer` as the task prompt (fill eve
 
 - `project_root` — absolute repo path.
 - `today` — current date (e.g. `2026-05-29`). Resolve it from the session's current date supplied by the environment; if that's unavailable, fall back to the most recent commit date from the Step 0.1 `git log` (`git log -1 --date=short`). Do not invoke a bare `date` command — it isn't in `allowed-tools`.
-- `claude_md_deltas` — exact `old → new` string pairs (or "replace block under `## Section` with: …") for every CLAUDE.md section the session changed: the `Last Updated:` line, Current Status rows (Part 1.2), the `## Completed` summary line if the drain changed the completed count (Part 0 / Part 1.3), In Progress (Part 1.4), Next Steps (Part 1.5), and `## Known Issues / Blockers` (Part 1.7 — a blocker resolved or added this session). Source the *old* strings verbatim from the CLAUDE.md you read in Step 0.
-- `claude_md_session_block` — the full replacement text for the `## Session History` last-session block (Part 1.8 format, ≤5 bullets).
+- `claude_md_deltas` — exact `old → new` string pairs (or "replace block under `## Section` with: …") for CLAUDE.md sections the session changed: the `Last Updated:` line, `## Key Decisions` (Part 1.6) and `## Known Issues / Blockers` (Part 1.7 — a blocker resolved or added this session). **Instructions only** — no state sections. Source the *old* strings verbatim from the CLAUDE.md you read in Step 0.
+- `status_md_deltas` — the same, for `docs/STATUS.md`: its `Last Updated:` line, Current Status rows (Part 1.2), the `## Completed` summary line if the drain changed the completed count (Part 0 / Part 1.3), In Progress (Part 1.4) and Next Steps (Part 1.5). Source the *old* strings verbatim from the docs/STATUS.md you read in Step 0 (or, on a v1 repo where STATUS.md is absent, from CLAUDE.md's state sections, per Step 0.1).
+- `status_md_session_block` — the full replacement text for STATUS.md's `## Session History` last-session block (Part 1.8 format, ≤5 bullets). New field name under schema v2 — the block lives in STATUS.md now, not CLAUDE.md.
 - `session_history_entry` — the detailed entry for `docs/session-history.md` (Part 1.8 format, capped).
 - `completed_items` — `- [x] …` lines from the task drain (may be empty).
 - `decision_rows` — a list of `| decision | rationale |` rows, **one per** genuinely architectural decision made this session (Part 1.6 criteria); empty list if none. Most sessions have 0–1, but a session that locks in several architectural decisions lists each as its own row (don't drop the extras).
@@ -82,10 +87,10 @@ Compose this structure and pass it to `save-writer` as the task prompt (fill eve
 
 Dispatch one `save-writer` subagent via the Agent tool with `subagent_type: "bx:save-writer"`, passing the packet as the prompt (serialize as labeled sections). Await its change report.
 
-Handling its `warnings:` line:
-- **Density-cap warning** (a field exceeded the prose caps) → tighten the offending field, note it in your report, do NOT re-dispatch.
-- **Delta-not-found warning** (an `old_string` didn't match, so that CLAUDE.md section was left un-updated) → re-source the exact current string from the CLAUDE.md you read in Step 0 (or re-read the affected lines) and re-dispatch **only** those deltas. This is the one case where re-dispatch IS warranted — silently leaving a section stale is the failure mode this guards against.
-- No warning / write succeeded → done, no re-dispatch.
+`save-writer` reports on two channels, matching `doc-migrator.md`'s convention: `notes:` is advisory, `warnings:` is the channel that compels action. Handle each:
+- **`notes:` non-`none`** (a density-cap: a field exceeded the prose caps) → tighten the offending field, note it in your report, do NOT re-dispatch.
+- **`warnings:` non-`none`** (an unmatched delta — an `old_string` didn't match, so that CLAUDE.md or docs/STATUS.md section was left un-updated) → re-source the exact current string from the CLAUDE.md / docs/STATUS.md you read in Step 0 (or re-read the affected lines) and re-dispatch **only** those deltas. This is the one case where re-dispatch IS warranted — silently leaving a section stale is the failure mode this guards against.
+- Both `notes:` and `warnings:` read `none` → done, no re-dispatch.
 
 ### Drift warning format (show only lines whose probe fires)
 
@@ -93,7 +98,8 @@ Handling its `warnings:` line:
 >  - [N] sessions in `docs/session-history.md` ready for rollup (count > 5)
 >  - Key Decisions table in CLAUDE.md at [M] rows (cap 20)
 >  - README.md or `docs/*.md` touched in [K] commits since last full sweep
->  - CLAUDE.md at [X]k chars (target 17k, soft cap 35k) — Part 7 size-pressure rollup will fire on `--full`"
+>  - CLAUDE.md at [X]k chars (target ~7k, soft cap 12k) — Part 7 size-pressure rollup will fire on `--full`
+>  - docs/STATUS.md at [Y]k chars (target ~10k, soft cap 20k) — Part 7 size-pressure rollup will fire on `--full`"
 
 If no probe fires, omit the warning entirely.
 
@@ -118,22 +124,22 @@ The remaining Parts (0.5, 2, 3, 4, 5, 6, 7) run on the **orchestrator**, not the
    - Other supporting docs
 3. **Update relevant files** based on code changes
 
-## Part 0: Drain Task List into CLAUDE.md
+## Part 0: Drain Task List into docs/STATUS.md
 
 Before updating documentation, **capture any task progress from the current session's live task tracker:**
 
 1. **Run `TaskList`** to get all tasks and their statuses
 2. **For each completed task:**
    - Add it to `docs/completed-work.md` as `- [x] [task subject] - [files modified]`
-   - Update CLAUDE.md's `## Completed` summary line (increment count)
+   - Update docs/STATUS.md's `## Completed` summary line (increment count)
    - Remove it from `## In Progress` or `## Next Steps` if it appears there
 3. **For each in-progress task:**
    - Ensure it's listed in `## In Progress` with current state
 4. **For pending tasks that were created during the session:**
    - Add them to `## Next Steps` in priority order
-5. **Skip tasks that already exist in CLAUDE.md** — don't duplicate
+5. **Skip tasks that already exist in docs/STATUS.md** — don't duplicate
 
-This ensures work tracked via TaskCreate/TaskUpdate during the session is persisted back to CLAUDE.md for the next session's `/bx:resume`.
+This ensures work tracked via TaskCreate/TaskUpdate during the session is persisted back to docs/STATUS.md for the next session's `/bx:resume`.
 
 **If `--skip-tasks` is in `$ARGUMENTS`, skip this step entirely.**
 
@@ -142,9 +148,9 @@ This ensures work tracked via TaskCreate/TaskUpdate during the session is persis
 After draining, verify completeness:
 
 1. **Run `TaskList`** again to confirm all tasks have been processed
-2. **Ad-hoc tasks** (tasks created during the session that don't map to existing CLAUDE.md sections):
+2. **Ad-hoc tasks** (tasks created during the session that don't map to existing docs/STATUS.md sections):
    - If completed → add to `docs/completed-work.md`
-   - If pending/in-progress → add to `## Next Steps` in CLAUDE.md
+   - If pending/in-progress → add to `## Next Steps` in docs/STATUS.md
 3. **Report drain summary** to the user:
    > "Task drain complete: [N] completed, [M] in-progress, [K] pending synced to docs."
 
@@ -173,7 +179,7 @@ After draining, verify completeness:
 3. Append all extracted items to `docs/completed-work.md`
 4. Replace CLAUDE.md's `## Completed` content with:
    ```markdown
-   [N] tasks completed across [areas]. See [docs/completed-work.md](docs/completed-work.md) for full checklist.
+   [N] tasks completed across [areas]. See [completed-work.md](completed-work.md) for full checklist.
    ```
 
 ### Migrate Key Decisions
@@ -204,7 +210,7 @@ After draining, verify completeness:
 3. Append ALL session entries to `docs/session-history.md` (in chronological order, skip duplicates)
 4. Replace CLAUDE.md's `## Session History` with only the last session as a 3-5 bullet summary:
    ```markdown
-   > Full history: [docs/session-history.md](docs/session-history.md)
+   > Full history: [session-history.md](session-history.md)
 
    ### Last Session (Session [N]) - [DATE]
    - [3-5 bullet points from the most recent session]
@@ -214,12 +220,31 @@ After draining, verify completeness:
 
 ---
 
-## Part 1: Update CLAUDE.md
+## Part 1: Update CLAUDE.md and docs/STATUS.md
 
-> **Plan-then-batch (applies to Full Path):** Walk through 1.0–1.10 (and Part 6 row removals, if Part 6 fires) and gather every change you intend to make from the evidence cached in Step 0. Then apply all changes to CLAUDE.md in a **single Write** of the full file, or as non-overlapping parallel Edits in one turn. Do NOT issue one Edit per sub-section — that's the dominant turn-count cost.
+> **Plan-then-batch (applies to Full Path):** Walk through 1.0–1.10 (and Part 6 row removals, if Part 6 fires) and gather every change you intend to make from the evidence cached in Step 0. Then apply all changes to each file in a **single Write** of its full contents, or as non-overlapping parallel Edits in one turn — per the routing table below, some sub-sections target CLAUDE.md and some target docs/STATUS.md; batch each file's edits separately. Do NOT issue one Edit per sub-section — that's the dominant turn-count cost.
+
+**Target file per sub-section (schema v2):**
+
+| Sub-section | Target |
+|---|---|
+| 1.0 Last Updated | **both** CLAUDE.md and docs/STATUS.md |
+| 1.1 Documentation Links | CLAUDE.md |
+| 1.2 Current Status | docs/STATUS.md |
+| 1.3 Completed | docs/STATUS.md (+ append to docs/completed-work.md) |
+| 1.4 In Progress | docs/STATUS.md |
+| 1.5 Next Steps | docs/STATUS.md |
+| 1.6 Key Decisions | CLAUDE.md (+ append to docs/key-decisions.md) |
+| 1.7 Known Issues / Blockers | CLAUDE.md |
+| 1.8 Session History | docs/STATUS.md (+ append to docs/session-history.md) |
+
+1.1 Documentation Links stays in CLAUDE.md and is unrelated to the `> Session state:` pointer
+line: 1.1 maintains the **Key Documentation** list of PRD/spec/sample files inside CLAUDE.md's
+Project Overview, which schema v2 still carries there; the pointer line only names
+`docs/STATUS.md` itself. The two do not duplicate each other.
 
 ### 1.0 Update Timestamp
-**Always update the "Last Updated" field** at the top:
+**Always update the "Last Updated" field at the top of BOTH files** — CLAUDE.md and docs/STATUS.md carry independent `Last Updated:` lines (doc-schema.md), and the staleness signal must follow the state:
 ```markdown
 **Last Updated:** [CURRENT DATE AND TIME]
 ```
@@ -234,13 +259,13 @@ Update the "Key Documentation" section with actual files:
 ```
 
 ### 1.2 Current Status Table
-Update phase/task statuses based on code changes:
+Target: **docs/STATUS.md's `## Current Status` table.** Update phase/task statuses based on code changes:
 - Change Not Started -> In Progress when work starts
 - Change In Progress -> Complete when work completes
 - Add new rows for new components
 
 ### 1.3 Completed Section
-When items are completed:
+Target: **docs/STATUS.md's `## Completed` section**, plus the `docs/completed-work.md` archive. When items are completed:
 1. **Append the detailed entry to `docs/completed-work.md`:**
    - If the file doesn't exist, create it with header:
      ```markdown
@@ -251,29 +276,29 @@ When items are completed:
      ---
      ```
    - Append: `- [x] [What was finished] - [files modified]`
-2. **Keep CLAUDE.md's `## Completed` section as a brief summary:**
+2. **Keep docs/STATUS.md's `## Completed` section as a brief summary:**
    ```markdown
    ## Completed
 
-   [N] tasks completed across [areas]. See [docs/completed-work.md](docs/completed-work.md) for full checklist.
+   [N] tasks completed across [areas]. See [completed-work.md](completed-work.md) for full checklist.
    ```
-   Update the count and areas description as needed. Do NOT maintain a full checkbox list in CLAUDE.md.
+   Update the count and areas description as needed. Do NOT maintain a full checkbox list in docs/STATUS.md.
 
 ### 1.4 In Progress Section
-Update current work state:
+Target: **docs/STATUS.md's `## In Progress` section.** Update current work state:
 ```markdown
 - [ ] [Current task] - [files being modified]
 ```
 
 ### 1.5 Next Steps Section
-Refresh prioritized task list:
+Target: **docs/STATUS.md's `## Next Steps` section.** Refresh prioritized task list:
 - Remove completed items
 - Add new tasks discovered
 - Reorder by priority
 - Include relevant file paths
 
 ### 1.6 Key Decisions Made
-When adding new decisions:
+Target: **CLAUDE.md's `## Key Decisions` table** (unchanged from v1 — this stays in CLAUDE.md under schema v2), plus the `docs/key-decisions.md` archive. When adding new decisions:
 1. **Always append to `docs/key-decisions.md`:**
    - If the file doesn't exist, create it with header:
      ```markdown
@@ -291,13 +316,13 @@ When adding new decisions:
    - Include a link at the bottom: `> Full decision log: [docs/key-decisions.md](docs/key-decisions.md)`
 
 ### 1.7 Known Issues / Blockers
-Update with any new issues found:
+Target: **CLAUDE.md's `## Known Issues / Blockers` section** (unchanged from v1). Update with any new issues found:
 - Add new issues discovered
 - Remove resolved issues
 - Mark "None currently" if empty
 
 ### 1.8 Session History
-Session history is split between CLAUDE.md (brief) and docs/session-history.md (detailed).
+Target: **docs/STATUS.md's `## Session History` section** (brief), plus the `docs/session-history.md` archive (detailed). Session history is split between docs/STATUS.md (brief) and docs/session-history.md (detailed).
 
 **1. Write the DETAILED session log to `docs/session-history.md`:**
    - If the file doesn't exist, create it with this header:
@@ -325,32 +350,31 @@ Session history is split between CLAUDE.md (brief) and docs/session-history.md (
      - [Priority 2 for next time]
      ```
 
-**2. Write only a brief summary to CLAUDE.md's `## Session History`:**
+**2. Write only a brief summary to docs/STATUS.md's `## Session History`:**
    - Replace (not append) the previous last-session block with the new one:
      ```markdown
      ## Session History
 
-     > Full history: [docs/session-history.md](docs/session-history.md)
+     > Full history: [session-history.md](session-history.md)
 
      ### Last Session (Session [N]) - [DATE]
      - [3-5 bullet points summarizing key accomplishments and state]
      ```
-   - CLAUDE.md should only ever contain ONE session block (the most recent).
+   - docs/STATUS.md should only ever contain ONE session block (the most recent).
    - All previous sessions live exclusively in `docs/session-history.md`.
 
 ### 1.9 Size Check (early advisory)
-After all updates to CLAUDE.md sections, check file size:
-1. If CLAUDE.md exceeds **35k characters**, warn the user:
-   > "CLAUDE.md is [X]k chars — approaching the 40k limit. Part 7 (Size-Pressure Rollup) will run after the count-based rollups to actively shrink over-threshold sections."
-2. Target is ~17k chars. If significantly over, suggest specific sections to trim.
 
-This is the early advisory only — active enforcement happens in **Part 7 (Size-Pressure Rollup)** after Parts 5/6 have had a chance to bring the file under threshold via count-based rollups. If 1.9 fires, expect Part 7 to also fire.
+Measure both files. CLAUDE.md target ~7k, soft cap 12k. docs/STATUS.md target ~10k, soft
+cap 20k. Warn per file when over its soft cap and name which Part 7 shrinker will fire.
+
+This is the early advisory only — active enforcement happens in **Part 7 (Size-Pressure Rollup)** after Parts 5/6 have had a chance to bring the files under threshold via count-based rollups. If 1.9 fires for a file, expect Part 7 to also fire for that file.
 
 ### 1.10 Cap Enforcement
 
-Active per-section caps on CLAUDE.md. Part 1.9 warns; this step enforces. Runs every UPDATE.
+Active per-section caps on docs/STATUS.md (Current Status, Next Steps, In Progress — 1.10.1-1.10.3 below) and CLAUDE.md (Key Decisions, handled separately by Part 6, not here). Part 1.9 warns; this step enforces. Runs every UPDATE.
 
-The biggest source of bloat — the Key Decisions table — is handled by the rollup in Part 6 because it requires moving rows to a reference file with a first-run consent gate. Part 1.10 handles the smaller in-CLAUDE.md sections only.
+The biggest source of bloat — CLAUDE.md's Key Decisions table — is handled by the rollup in Part 6 because it requires moving rows to a reference file with a first-run consent gate. Part 1.10 handles the smaller docs/STATUS.md sections only.
 
 **If `--skip-caps` is in `$ARGUMENTS`, skip this step entirely.**
 
@@ -372,7 +396,7 @@ Target: ≤5 items. If over cap, warn only — do not move:
 > "In Progress has [N] items (target ≤5). Fragmented work often means stalled tasks — consider consolidating before continuing."
 
 #### 1.10.4 Pruning Is Preservation
-When 1.10.1 collapses rows into a summary line, the collapsed rows must land in `docs/completed-work.md` (with any unique notes) before they leave CLAUDE.md. This is the **pruning-as-preservation** rule: content moves, it does not disappear. See `doc-structure-rules.md` for the full statement.
+When 1.10.1 collapses rows into a summary line, the collapsed rows must land in `docs/completed-work.md` (with any unique notes) before they leave docs/STATUS.md. This is the **pruning-as-preservation** rule: content moves, it does not disappear. See `doc-structure-rules.md` for the full statement.
 
 ## Part 2: Update README.md
 
@@ -408,7 +432,9 @@ Update to reflect actual docs/ contents:
 
 Before iterating file-by-file, pre-load the whole `docs/` tree in one turn:
 
-1. List docs with `Glob docs/**/*.md` (single call)
+1. List docs with `Glob docs/**/*.md` **and** root-level docs with `Glob *.md` (single turn,
+   two calls). Root docs other than README.md and CLAUDE.md — `workflow.md`, contributor
+   guides — are otherwise maintained by nothing and drift silently.
 2. Issue one `Read` tool call per file — **all in the same turn** — so they execute in parallel rather than sequentially
 3. Analyze all files in a single pass and plan the Edits
 4. Apply all Edits in batched parallel calls where the targets don't conflict
@@ -440,32 +466,31 @@ This replaces a sequential read-analyze-edit loop (N turns) with a single parall
 
 ## Part 4: Sync Auto-Memory
 
-Claude Code maintains a persistent auto-memory directory (`~/.claude/projects/<project-path>/memory/`) that is automatically loaded into every conversation. Use it as a **stable quick-reference layer** alongside CLAUDE.md's evolving status.
+Claude Code maintains a persistent auto-memory directory (`~/.claude/projects/<project-path>/memory/`) that is automatically loaded into every conversation. Use it as a **stable quick-reference layer** alongside CLAUDE.md's instructions and docs/STATUS.md's evolving status.
 
 **If `--skip-memory` is in `$ARGUMENTS`, skip this step entirely.**
 
-### 4.1 What to Sync to Auto-Memory `MEMORY.md`
-Extract **stable, slow-changing facts** from the project and write/update them:
-- Project name, repo, one-line description
-- Tech stack and key framework versions
-- Common commands (build, test, run, lint)
-- Key file paths and entry points
-- Architecture pattern (e.g., "Next.js app router + Prisma + PostgreSQL")
-- Environment variable names (not values)
-- Project-specific conventions (naming, folder structure patterns)
+### 4.1 What auto-memory is for
 
-### 4.2 What NOT to Sync
-Do not duplicate evolving state — that stays in CLAUDE.md:
-- Session history, in-progress items, next steps
-- Blockers, decisions log, completion status
-- Anything that changes every session
+Auto memory is written **by Claude**, from its own corrections and learnings, and is loaded
+into every session (first 200 lines **or 25KB, whichever comes first**). CLAUDE.md is
+written by you. Do not use `/bx:save` to author memory entries that Claude did not learn.
 
-### 4.3 Sync Rules
-1. **Read existing auto-memory first** — check `~/.claude/projects/` for this project's memory directory
-2. **Update, don't overwrite** — merge new facts into existing memory, don't replace the whole file
-3. **Keep it concise** — auto-memory MEMORY.md is truncated after 200 lines; prioritize density
-4. **Only sync when facts change** — if tech stack, commands, or structure haven't changed, skip this step
-5. **Create topic files** for detailed notes (e.g., `debugging.md`, `patterns.md`) and link from MEMORY.md
+### 4.2 What this step actually does
+
+Only two things:
+
+1. **Prune contradictions.** If a memory file states something this session proved wrong,
+   correct or delete that file. A stale memory is worse than a missing one.
+2. **Check the index budget.** If `MEMORY.md` is near 200 lines or 25KB, move detail into
+   topic files and keep one line per entry in the index. Over either limit, everything past
+   it is silently dropped at next load.
+
+### 4.3 What NOT to write
+
+Do not sync tech stack, common commands, key paths, architecture patterns or env var names.
+That content is derivable from the repo, duplicates CLAUDE.md and README, and is exactly
+what `/doctor`'s trim check removes. Do not sync session state — that is STATUS.md's job.
 
 ## Part 5: Roll Up Old Sessions in session-history.md
 
@@ -584,36 +609,41 @@ If 0 rows were moved, skip the report.
 
 ## Part 7: Size-Pressure Rollup
 
-After the count-based rollups in Parts 5 and 6 finish, re-measure CLAUDE.md. If still over the soft cap, this part is the active-enforcement counterpart to Part 1.9's advisory. Where Parts 5/6 trigger on **row count** (≥5 sessions, ≥20 decisions), Part 7 triggers on **char size per section** — closes the gap where each row or item is at-cap-by-count but massive-by-content.
+After the count-based rollups in Parts 5 and 6 finish, re-measure CLAUDE.md and docs/STATUS.md, independently. If either is still over its soft cap, this part is the active-enforcement counterpart to Part 1.9's advisory. Where Parts 5/6 trigger on **row count** (≥5 sessions, ≥20 decisions), Part 7 triggers on **char size per section** — closes the gap where each row or item is at-cap-by-count but massive-by-content.
 
 **If `--skip-size-pressure` is in `$ARGUMENTS`, skip this step entirely.**
 
 ### 7.1 Re-measure after Parts 5/6
 
-Compute `claude_md_size` = char count of CLAUDE.md as it stands post-rollups.
+Compute `claude_md_size` = char count of CLAUDE.md, and `status_md_size` = char count of docs/STATUS.md, both as they stand post-rollups.
 
-- If `claude_md_size <= 35000` → skip the rest of Part 7 silently. The count-based rollups did the job.
-- Otherwise proceed.
+- If `claude_md_size <= 12000` **and** `status_md_size <= 20000` → skip the rest of Part 7 silently. The count-based rollups did the job.
+- Otherwise proceed — but **per file, independently**: a file under its own soft cap is neither diagnosed nor shrunk in 7.2-7.3, even when the other file is over.
 
 ### 7.2 Section size diagnostic
 
-Compute per-section char counts (sections delimited by `^## ` headers):
+For each file that is over its own soft cap, compute its per-section char counts (sections delimited by `^## ` headers):
 
 ```bash
 awk 'BEGIN{section="HEADER"; size=0} /^## /{if(section)printf "%6d  %s\n", size, section; section=$0; size=0; next} {size+=length($0)+1} END{printf "%6d  %s\n", size, section}' CLAUDE.md | sort -rn
+awk 'BEGIN{section="HEADER"; size=0} /^## /{if(section)printf "%6d  %s\n", size, section; section=$0; size=0; next} {size+=length($0)+1} END{printf "%6d  %s\n", size, section}' docs/STATUS.md | sort -rn
 ```
 
-Display the top-5 sections to the user as a single table:
+Run only the command for whichever file(s) are over cap. Display the top-5 sections per over-cap file to the user as a single table each:
 
-> CLAUDE.md is [X]k chars after Parts 5/6 rollups (over the 35k soft cap). Top sections:
+> CLAUDE.md is [X]k chars after Parts 5/6 rollups (over the 12k soft cap). Top sections:
 > 
 > | Section | Chars | % | Over threshold? |
 > |---|---|---|---|
-> | Architecture Summary | 12,929 | 27% | YES (4000) |
-> | Key Decisions | 12,750 | 27% | YES (8000) |
-> | In Progress | 6,439 | 14% | YES (3000) |
-> | Next Steps | 5,206 | 11% | YES (3000) |
-> | Session History | 3,896 |  8% | — |
+> | Key Decisions | 9,750 | 65% | YES (8000) |
+>
+> docs/STATUS.md is [Y]k chars after Parts 5/6 rollups (over the 20k soft cap). Top sections:
+>
+> | Section | Chars | % | Over threshold? |
+> |---|---|---|---|
+> | In Progress | 6,439 | 27% | YES (3000) |
+> | Next Steps | 5,206 | 22% | YES (3000) |
+> | Session History | 3,896 | 16% | — |
 
 ### 7.3 Per-section thresholds + shrinkers
 
@@ -621,14 +651,13 @@ For each section over its threshold, propose a specific shrinker. The thresholds
 
 | Section | Threshold | Shrinker action |
 |---|---|---|
-| `## Key Decisions` (any variant: `(condensed)` etc.) | 8000 chars | **Size-based rollup** — move oldest rows (FIFO from top, same anchor rule as Part 6.3) to `docs/key-decisions.md` until section is under 6000 chars. Runs even when row count is ≤20. Adds `Rolled up from CLAUDE.md → docs/key-decisions.md in S<N> by size pressure` suffix to each moved row's rationale. |
-| `## Architecture Summary` | 4000 chars | **Extract to `docs/architecture.md`** — create file if missing with header (`# Architecture\n\n> Full architecture detail. Referenced from [CLAUDE.md](../CLAUDE.md).\n\n---`); append current full content; replace CLAUDE.md section with a 1-paragraph summary (200-400 chars) + `> Full architecture: [docs/architecture.md](docs/architecture.md)` link. The 1-paragraph summary is user-authored when consent prompt fires (skill proposes a draft from the current content's first paragraph; user can accept or rewrite). |
-| `## In Progress` | 3000 chars | **Per-item collapse** — for each bullet, trim prose to 2-3 sentences + commit hash refs / file paths preserved. Move completed sub-bullets (`✅`, "Done", "Shipped", strikethrough) to `docs/completed-work.md`. Do NOT delete items entirely — collapse text only. |
-| `## Next Steps` | 3000 chars | **Flatten + extract detail** — collapse sub-section headers (`### High Priority`, `### Queued`, `### Nice to Have`) into a flat top-10 priority-ordered list. For items with 3+ sentences of detail, move detail to `docs/next-steps-backlog.md` (create if missing); keep 1-sentence summary + `→ docs/next-steps-backlog.md#<anchor>` link. |
-| `## Session History` (last-session block) | 2000 chars | **Bullet trim** — if the last-session block has >5 bullets, trim to top 3 (most architecturally significant) + append `> Full session detail: docs/session-history.md S<N>` reference. |
-| `## Completed` (foregrounded feature paragraph) | 1500 chars | **Paragraph trim** — replace foregrounded multi-sentence paragraph with a single bullet pointing at `docs/completed-work.md`. Keep the count summary line. |
+| CLAUDE.md `## Key Decisions` (any variant: `(condensed)` etc.) | 8000 chars | **Size-based rollup** — move oldest rows (FIFO from top, same anchor rule as Part 6.3) to `docs/key-decisions.md` until section is under 6000 chars. Runs even when row count is ≤20. Adds `Rolled up from CLAUDE.md → docs/key-decisions.md in S<N> by size pressure` suffix to each moved row's rationale. |
+| docs/STATUS.md `## In Progress` | 3000 chars | **Per-item collapse** — for each bullet, trim prose to 2-3 sentences + commit hash refs / file paths preserved. Move completed sub-bullets (`✅`, "Done", "Shipped", strikethrough) to `docs/completed-work.md`. Do NOT delete items entirely — collapse text only. |
+| docs/STATUS.md `## Next Steps` | 3000 chars | **Flatten + extract detail** — collapse sub-section headers (`### High Priority`, `### Queued`, `### Nice to Have`) into a flat top-10 priority-ordered list. For items with 3+ sentences of detail, move detail to `docs/next-steps-backlog.md` (create if missing); keep 1-sentence summary + `→ docs/next-steps-backlog.md#<anchor>` link. |
+| docs/STATUS.md `## Session History` (last-session block) | 2000 chars | **Bullet trim** — if the last-session block has >5 bullets, trim to top 3 (most architecturally significant) + append `> Full session detail: session-history.md S<N>` reference. |
+| docs/STATUS.md `## Completed` (foregrounded feature paragraph) | 1500 chars | **Paragraph trim** — replace foregrounded multi-sentence paragraph with a single bullet pointing at `completed-work.md`. Keep the count summary line. |
 
-Sections not in this table (project-specific like `## Quick Commands`, `## Don't Modify`, `## Environment Variables`) are **tolerated as-is** — Part 7 only acts on known shrinkable sections. If a project-specific section is the dominant bloat source, Part 7 reports it but takes no action, deferring to user judgment.
+`## Architecture Summary` is not in this table: that section no longer exists in CLAUDE.md under schema v2 — it lives in `docs/architecture.md`, which Part 7 does not size-manage. Sections not in this table (project-specific like `## Quick Commands`, `## Don't Modify`, `## Environment Variables` in CLAUDE.md) are **tolerated as-is** — Part 7 only acts on known shrinkable sections. If a project-specific section is the dominant bloat source, Part 7 reports it but takes no action, deferring to user judgment.
 
 ### 7.4 Per-section consent gate
 
@@ -636,13 +665,13 @@ Sections not in this table (project-specific like `## Quick Commands`, `## Don't
 
 For each over-threshold section, ask via `AskUserQuestion` (or numbered fallback):
 
-> "Section `## [name]` is [N] chars (threshold [T]). Proposed shrinker: [one-line action description]. Apply? (yes / no / skip-all)"
+> "Section `## [name]` in [file] is [N] chars (threshold [T]). Proposed shrinker: [one-line action description]. Apply? (yes / no / skip-all)"
 
 - **yes** → execute the shrinker for this section
 - **no** → leave this section alone this run (re-ask next run if still over)
 - **skip-all** → exit Part 7 entirely; the rest of the run proceeds to Part 8 unchanged
 
-`AskUserQuestion` cap is 4 questions per turn. If 5+ sections are over threshold, batch as: first 4 in one turn, remainder in a second turn after the first batch's actions complete.
+`AskUserQuestion` cap is 4 questions per turn. If 5+ sections (across both files) are over threshold, batch as: first 4 in one turn, remainder in a second turn after the first batch's actions complete.
 
 Default action is `no` if user dismisses without explicit choice (don't apply destructive trims without consent).
 
@@ -650,18 +679,18 @@ Default action is `no` if user dismisses without explicit choice (don't apply de
 
 When executing any shrinker:
 
-1. **Move, never delete.** Every shrinker writes the trimmed content to a reference file before removing from CLAUDE.md. The `docs/architecture.md`, `docs/next-steps-backlog.md`, and `docs/completed-work.md` files are the destinations. If a destination doesn't exist, create it with a standard header.
+1. **Move, never delete.** Every shrinker writes the trimmed content to a reference file before removing from its source file (CLAUDE.md or docs/STATUS.md, per 7.3). The `docs/architecture.md`, `docs/next-steps-backlog.md`, and `docs/completed-work.md` files are the destinations. If a destination doesn't exist, create it with a standard header.
 2. **Preserve commit refs.** Specific commit hashes (`abc1234`, `commit X`), file paths, and links MUST survive into either the trimmed summary or the extracted detail file — these are search anchors users rely on.
-3. **Surface the destination.** Every shrinker's output in CLAUDE.md gains a `> Full [thing]: [docs/path.md](docs/path.md)` link so future `/bx:resume` sessions can chase the detail.
+3. **Surface the destination.** Every shrinker's output gains a `> Full [thing]: [path.md](path.md)` link (relative to the file the shrinker ran on) so future `/bx:resume` sessions can chase the detail.
 4. **Don't compound losses.** If a section was already shrunk to a summary in a prior run (detectable by the `> Full [thing]:` link), Part 7 does NOT trim further. Re-prompt only fires when the user has manually re-grown the section.
 
 ### 7.6 Report
 
-After all consented shrinkers complete, re-measure:
+After all consented shrinkers complete, re-measure each file that was diagnosed:
 
-> "CLAUDE.md: [old-size]k → [new-size]k chars. [N] sections shrunk: [list]. [M] sections still over threshold (skipped per user choice)."
+> "CLAUDE.md: [old-size]k → [new-size]k chars. docs/STATUS.md: [old-size]k → [new-size]k chars. (Omit either line for a file that was never over its soft cap.) [N] sections shrunk: [list]. [M] sections still over threshold (skipped per user choice)."
 
-If still over 40k hard cap after all consents: log a final warning, do not block the commit.
+If a file is still over its soft cap after all consents: log a final warning for that file, do not block the commit.
 
 ### 7.7 Idempotency
 

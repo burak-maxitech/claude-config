@@ -100,7 +100,7 @@ For UPDATE mode the change report is assembled from the `save-writer` subagent's
 - [ ] CLAUDE.md and docs/STATUS.md have all required sections intact
 - [ ] CLAUDE.md is ~7k chars; docs/STATUS.md is ~10k chars (warn if either grows well past target)
 - [ ] Cap enforcement (Part 1.10) ran — Current Status ≤10, Next Steps ≤10, In Progress ≤5 (or warnings issued)
-- [ ] Size-pressure rollup (Part 7) ran when CLAUDE.md exceeded 35k post-Parts 5/6, or skipped silently when under threshold
+- [ ] Size-pressure rollup (Part 7) ran when CLAUDE.md exceeded 12k or docs/STATUS.md exceeded 20k post-Parts 5/6 (checked independently, per file), or skipped silently when both were under threshold
 - [ ] (Fast path) `save-writer` subagent was dispatched with the update packet and returned a change report — no full-file contents echoed in the response
 - [ ] (Fast path) README.md / docs/*.md / rollups were NOT touched (those are `--full` only) — drift warnings surfaced instead
 - [ ] (`--full` only) README sync, docs/*.md sync, and rollups ran on the orchestrator after the writer returned
