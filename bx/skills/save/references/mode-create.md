@@ -55,7 +55,8 @@ never runs on them.
 
 ## Documentation
 
-- [CLAUDE.md](CLAUDE.md) - Development context and session notes
+- [CLAUDE.md](CLAUDE.md) - Instructions and key decisions for AI coding sessions
+- [docs/STATUS.md](docs/STATUS.md) - Current status and session notes
 - [docs/PRD.md](docs/PRD.md) - Full specifications and architecture
 
 ## License

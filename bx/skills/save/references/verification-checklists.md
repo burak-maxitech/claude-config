@@ -36,8 +36,8 @@
 - [ ] All files created (CREATE)
 - [ ] All files consistent (UPDATE)
 - [ ] Links in README.md point to actual files
-- [ ] Links in CLAUDE.md point to actual files
-- [ ] CLAUDE.md has all required sections for /bx:resume
+- [ ] Links in CLAUDE.md and docs/STATUS.md point to actual files
+- [ ] CLAUDE.md and docs/STATUS.md have all required sections for /bx:resume
 ```
 
 ### 2. Change Report (NOT file contents)
@@ -46,7 +46,8 @@
 
 ```
 Saved session [N] ([mode], [path]):
-  CLAUDE.md            — session block + [N] section updates ([old]k → [new]k)
+  docs/STATUS.md       — session block + [N] section updates ([old]k → [new]k)
+  CLAUDE.md             — [N] section updates ([old]k → [new]k)  (omit if unchanged)
   session-history.md   — appended S[N] (+[X] lines)
   completed-work.md    — +[M] items          (omit if none)
   key-decisions.md     — +N rows              (omit if none)
