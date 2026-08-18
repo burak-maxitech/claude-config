@@ -27,7 +27,7 @@ and resume idempotently, never as complete.
       > Session state: [docs/STATUS.md](docs/STATUS.md)
 
     docs/STATUS.md               read on demand by /bx:resume
-      Last Updated: <date>
+      Last Updated: <date> [(Session N)]
       ## Current Status
       ## Completed                summary + link to docs/completed-work.md
       ## In Progress

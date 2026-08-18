@@ -29,6 +29,7 @@ STATE_SECTIONS="Current Status|Completed|In Progress|Next Steps|Session History"
 FAILURES=0
 pass() { echo "  PASS  $1"; }
 fail() { echo "  FAIL  $1"; FAILURES=$((FAILURES + 1)); }
+skip() { echo "  SKIP  $1"; }
 
 detect() {
     if [ ! -f "$CLAUDE_MD" ]; then echo v0; return; fi
@@ -96,6 +97,38 @@ if [ "$LAYOUT" = "v2" ]; then
         if [ -z "$dupes" ]; then pass "no header appears in both files"
         else fail "headers duplicated across files: $(printf '%s' "$dupes" | tr '\n' ' ')"; fi
     fi
+
+    # --- STATUS.md section order: the five canonical headers, in file order,
+    # must be a SUBSEQUENCE in canonical relative order (Current Status,
+    # Completed, In Progress, Next Steps, Session History). Non-canonical
+    # headers a real repo may add (e.g. "## Deployment") are simply skipped,
+    # not required to sort anywhere -- exact-equality with the canonical five
+    # would turn a correct migration of a repo with its own extra STATUS.md
+    # section into a verification failure. ---
+    if [ -f "$STATUS_MD" ]; then
+        order_bad=""
+        last_rank=0
+        while IFS= read -r h; do
+            case "$h" in
+                "## Current Status")  rank=1 ;;
+                "## Completed")       rank=2 ;;
+                "## In Progress")     rank=3 ;;
+                "## Next Steps")      rank=4 ;;
+                "## Session History") rank=5 ;;
+                *) rank=0 ;;
+            esac
+            [ "$rank" -eq 0 ] && continue
+            if [ -z "$order_bad" ] && [ "$rank" -lt "$last_rank" ]; then
+                order_bad="$h"
+            fi
+            [ "$rank" -gt "$last_rank" ] && last_rank="$rank"
+        done < <(grep -oE '^## .*' "$STATUS_MD")
+        if [ -z "$order_bad" ]; then
+            pass "STATUS.md canonical sections in relative order"
+        else
+            fail "STATUS.md section order violated: '$order_bad' is out of position"
+        fi
+    fi
 fi
 
 # --- Invariants 1 & 2 against the pre-migration snapshot ---
@@ -154,6 +187,26 @@ if [ -n "$BEFORE" ] && [ -f "$BEFORE" ]; then
         pass "no content loss ($before_bytes -> $after_bytes bytes across files)"
     else
         fail "content loss: $before_bytes -> $after_bytes bytes"
+    fi
+
+    # --- Last Updated: value agreement -- ONLY under --before, where the two
+    # values ARE equal by construction (Step 3 derives STATUS.md's value from
+    # CLAUDE.md's, Step 7 stamps CLAUDE.md with the same date). This must NEVER
+    # run outside --before: doc-schema.md gives CLAUDE.md and STATUS.md separate
+    # Last Updated lines precisely because they diverge in steady state (CLAUDE.md
+    # may sit untouched for weeks while state churns daily). Skip -- do not fail --
+    # when CLAUDE.md carries no Last Updated: line at all; the migrator has a
+    # defined template fallback for that case. ---
+    claude_lu="$([ -f "$CLAUDE_MD" ] && grep -m1 -E '^Last Updated:' "$CLAUDE_MD")"
+    status_lu="$([ -f "$STATUS_MD" ] && grep -m1 -E '^Last Updated:' "$STATUS_MD")"
+    if [ -z "$claude_lu" ]; then
+        skip "Last Updated agreement (CLAUDE.md has no Last Updated: line; migrator's template fallback applies)"
+    elif [ -z "$status_lu" ]; then
+        skip "Last Updated agreement (docs/STATUS.md has no Last Updated: line to compare)"
+    elif [ "$claude_lu" = "$status_lu" ]; then
+        pass "Last Updated agrees between CLAUDE.md and STATUS.md ($claude_lu)"
+    else
+        fail "Last Updated mismatch: CLAUDE.md has '$claude_lu', STATUS.md has '$status_lu'"
     fi
 fi
 
