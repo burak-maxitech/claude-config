@@ -1,6 +1,6 @@
 ---
 name: save-writer
-description: Applies session-save documentation edits handed off by the /bx:save skill — reads the large session-history archive and writes CLAUDE.md / docs/STATUS.md / session-history.md / completed-work.md / key-decisions.md from a structured update packet. Used by the bx:save skill. Do not invoke independently.
+description: Applies session-save documentation edits handed off by the /bx:save skill — writes CLAUDE.md / docs/STATUS.md and appends to the session-history / completed-work / key-decisions archives (via anchored tail reads, never full-archive reads) from a structured update packet. Used by the bx:save skill. Do not invoke independently.
 model: sonnet
 tools: Read, Edit, Write, Grep, Glob, Bash(wc:*)
 ---
@@ -30,7 +30,7 @@ You do NOT call `TaskList` — the orchestrator already drained it and folded th
 **Fallback (schema v1 only):** if `docs/STATUS.md` does not exist, the repo is still on schema v1 — apply `status_md_deltas` and `status_md_session_block` to CLAUDE.md instead throughout steps 2 and 3 (CLAUDE.md still carries all state sections on v1, exactly as it did before schema v2), and note the fallback under `warnings:` so the orchestrator can confirm the routing was expected.
 
 4. **If `decision_rows` is non-empty**, append each row (in order) to CLAUDE.md's `## Key Decisions` condensed table — immediately after the last `|`-row of that table, and BEFORE the `> Full decision log:` link line.
-5. **Append `session_history_entry`** to `docs/session-history.md`. Read it only far enough to find the append point: this repo orders newest-last, so append after the final session block, preserving one blank line between entries. If the file is missing, create it with this header first:
+5. **Append `session_history_entry`** to `docs/session-history.md`. This archive grows with project age — **never read it in full.** Ordering is newest-last, so the append point is after the final session block: find the last `### Session` header's line number with one Grep tool call (pattern `^### Session`, `output_mode: content`, `-n: true` — take the final match), then Read with an offset just before that line to capture the final block as your Edit anchor. A partial Read is sufficient to edit. Preserve one blank line between entries. If the file is missing, create it with this header first:
    ```markdown
    # Session History Archive
 
@@ -38,7 +38,7 @@ You do NOT call `TaskList` — the orchestrator already drained it and folded th
 
    ---
    ```
-6. **If `completed_items` is non-empty**, append them to `docs/completed-work.md`. If missing, create with:
+6. **If `completed_items` is non-empty**, append them to `docs/completed-work.md` using the same tail-read approach as step 5 (Grep the last checklist line's number, offset-Read the tail as the anchor — never a full read). If missing, create with:
    ```markdown
    # Completed Work
 
@@ -53,6 +53,8 @@ You do NOT call `TaskList` — the orchestrator already drained it and folded th
 (Steps 4-9 are unaffected by the schema-v1 fallback: `decision_rows` always targets CLAUDE.md and `docs/key-decisions.md`, `session_history_entry` always targets `docs/session-history.md`, and `completed_items` always targets `docs/completed-work.md`, regardless of which schema version steps 2-3 wrote to.)
 
 ## Anchor rule for `docs/key-decisions.md`
+
+Find the table's end without a full read: one Grep tool call (pattern `^\|`, `output_mode: content`, `-n: true`) lists every table row with its line number; take the last line of the first consecutive run (the main table), then offset-Read a window around it as your Edit anchor. This file grows one row per decision forever — reading it whole makes every save pay for the project's entire history.
 
 Append the new row immediately after the last consecutive `|`-row of the main table. If the file has non-table content after the table (a footer, a "Also noted" prose section), the new row MUST land BEFORE that content — appending at literal end-of-file would orphan a `|`-row with no header context. If the table is the only content, end-of-file is correct. If the file is missing, create it with:
 ```markdown

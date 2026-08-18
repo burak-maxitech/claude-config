@@ -2,6 +2,19 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.0.1 — 2026-08-18
+
+### Fixed
+
+- `/bx:save` no longer pays costs that grow with project age. The three linear read paths
+  are closed: Part 3.0's `--full` doc sweep excludes the four auto-managed archives
+  (`session-history.md`, `key-decisions.md`, `completed-work.md`, `next-steps-backlog.md` —
+  the skill's own outputs, never sync inputs); `save-writer` appends to the archives via
+  Grep-anchored tail reads instead of full-file reads; Part 5's rollup locates its
+  compressible window by line number. Archive growth is now disk-only — no hot path reads
+  an archive in full. (The live files were already capped: CLAUDE.md ~7k/12k,
+  docs/STATUS.md ~10k/20k, enforced by Parts 1.9/5/6/7.)
+
 ## 2.0.0 — 2026-08-18
 
 ### Breaking

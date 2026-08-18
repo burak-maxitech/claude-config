@@ -447,9 +447,15 @@ Before iterating file-by-file, pre-load the whole `docs/` tree in one turn:
 1. List docs with `Glob docs/**/*.md` **and** root-level docs with `Glob *.md` (single turn,
    two calls). Root docs other than README.md and CLAUDE.md — `workflow.md`, contributor
    guides — are otherwise maintained by nothing and drift silently.
-2. Issue one `Read` tool call per file — **all in the same turn** — so they execute in parallel rather than sequentially
-3. Analyze all files in a single pass and plan the Edits
-4. Apply all Edits in batched parallel calls where the targets don't conflict
+2. **Exclude the auto-managed archives from the read set:** `docs/session-history.md`,
+   `docs/key-decisions.md`, `docs/completed-work.md`, `docs/next-steps-backlog.md`. They are
+   this skill's own append-only outputs (save-writer and Parts 5-7 maintain them), never
+   sync inputs, and Part 3 never edits them — but they grow with project age, so reading
+   them costs tokens linear in project history for zero benefit. (At 57 sessions this repo's
+   archives already total ~196k chars.)
+3. Issue one `Read` tool call per remaining file — **all in the same turn** — so they execute in parallel rather than sequentially
+4. Analyze all files in a single pass and plan the Edits
+5. Apply all Edits in batched parallel calls where the targets don't conflict
 
 This replaces a sequential read-analyze-edit loop (N turns) with a single parallel gather + batched writes, which is the dominant runtime cost on projects with 5+ doc files.
 
@@ -531,6 +537,13 @@ The presence of the rollup-format note (see Step 5.4) acts as a "this project ha
 4. **Use `AskUserQuestion` if available** for a cleaner y/n/skip-this-time prompt; fall back to a numbered chat question otherwise.
 
 ### 5.3 Compress Each Older Session
+
+**Locate the compressible window without reading the whole archive.** One Grep tool call on
+`docs/session-history.md` (pattern `^### Session`, `output_mode: content`, `-n: true`)
+returns every session header with its line number. Already-compressed sessions are single
+lines (header and summary are the same line); the compressible ones are the full-prose
+entries older than the 5 most recent. Read only that line range (offset/limit) — the archive
+grows with project age, and a full read makes every rollup pay for the whole history.
 
 For each session needing compression:
 
