@@ -73,6 +73,45 @@ updated in the same commit as the threshold conversion.
   no-ops and prints `integer expression expected` to stderr (which the hook shows the user).
   Fix: `git -C "$repo_root"` plus an empty-var guard, both scripts.
 
+## Task 6 landed after the pause — findings folded in here
+
+Task 6's report arrived after this file was first written. Its implementation is commit
+`0148113` (already recorded above); **its review is still the resume point**. Four things from
+its report:
+
+1. **The brief contradicted itself.** Step 2's suggested wording said "Renamed from
+   `claude_md_session_block`" while Step 7's done-check required 0 occurrences of that string.
+   The implementer resolved toward the done-check and reworded to describe the rename without
+   naming the old identifier. Correct call — my defect, not its.
+2. **Deferred, verified, needs routing (see below).**
+3. It extended the v1-fallback line to cover `status_md_session_block` as well as
+   `status_md_deltas`, since on a repo with no STATUS.md the session block would otherwise have
+   nowhere to go. Deliberate, disclosed, correct.
+4. Several beyond-brief internal-consistency fixes once Part 1/Part 7 became per-file (Part 0's
+   heading, the Sequence's TaskList line, the "orchestrator does NOT edit" file list, the Prose
+   Caps bullet, the Drift warning's stale 17k/35k target).
+
+### Route into the final whole-branch fix wave — Task 6 correctly declined both as out of scope
+
+- **Archive-file header text still points at CLAUDE.md — 10 occurrences across 3 files.**
+  `bx/agents/save-writer.md:37,45,61`, `bx/skills/save/references/mode-update.md:175,191,206,274,307,332`,
+  `bx/agents/doc-migrator.md:163`.
+  **This is NOT a blanket find-and-replace, and a `sed` over it would be wrong:**
+  - `docs/key-decisions.md` -> "Referenced from CLAUDE.md" is **still correct**;
+    `## Key Decisions` stays in CLAUDE.md under v2.
+  - `docs/completed-work.md` -> should say `docs/STATUS.md`; `## Completed` moved there.
+  - `docs/session-history.md` -> "Last session summary is in CLAUDE.md" should say
+    `docs/STATUS.md`; the session block moved there.
+  - `docs/architecture.md` -> "Referenced from CLAUDE.md" is now questionable: under v2
+    CLAUDE.md has no `## Architecture Summary`, so nothing points at that file. Decide whether
+    STATUS.md, CLAUDE.md, or neither should carry the reference.
+  Also note the relative depth stays `../CLAUDE.md` for archives in `docs/`, but a pointer to
+  `docs/STATUS.md` from a file already inside `docs/` is `STATUS.md`, not `docs/STATUS.md`.
+- **Part 0.5's legacy pre-v2 migration block** (`mode-update.md:157`) still describes CLAUDE.md
+  as holding the state sections, and its trigger at `:165` is a stale "CLAUDE.md is over 25k
+  characters". That block handles the old v0->v1 migration and is now the only place in the file
+  still written in v1 terms.
+
 ## Two decisions waiting on the user
 
 1. **Ruling 2 — Task 10's skill-invocation steps are deferred to post-merge**, because
