@@ -701,6 +701,34 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 ### Task 4: `doc-migrator` subagent + MIGRATE mode
 
+> **⚠ The two content blocks below are SUPERSEDED. The shipped files are canonical.**
+>
+> Task 4's review found 3 Critical and 7 Important defects **in the text drafted below**, and
+> a second round found 5 more. The drafts here are preserved as the record of what was
+> originally intended; **do not re-apply them.** If re-running this task, read the shipped
+> `bx/agents/doc-migrator.md` and `bx/skills/save/references/mode-migrate.md` instead.
+>
+> What the drafts below get wrong, all fixed in the shipped files:
+> - **The `partial` resume path says "do not recreate STATUS.md" with no per-step predicates** —
+>   an interrupted run with a half-written STATUS.md proceeds to removal and deletes CLAUDE.md
+>   sections never written anywhere. The shipped version has explicit predicates for every step
+>   plus a gate: remove a section only after confirming that header exists in STATUS.md.
+> - **Verification failure falls through to UPDATE**, which makes the printed recovery command
+>   destructive by the time the user runs it. The shipped version stops the run.
+> - **No eligibility pre-flight.** v1 detection fires on any one state section while the checker
+>   demands all five plus three instruction sections, so an ineligible repo gets consented,
+>   rewritten, and fails verification with no rollback. The shipped version has a Step 0 that
+>   declines *before* prompting, and scaffolds missing sections with `_None recorded._`.
+> - **`warnings: none` is a non-empty line**, so as drafted every successful migration routes to
+>   failure and never commits. The shipped version splits advisory `notes:` from blocking
+>   `warnings:`.
+> - **No fenced-code-block carve-out** on link rewriting, no rule for `docs/architecture.md`,
+>   and no definition of where a section body ends (so `###` subsections get truncated).
+> - **Pointer line anchored to a section.** It appends unconditionally as the final line.
+>
+> The shipped files also add a link-rewriting case table and a section-body boundary rule that
+> have no counterpart below.
+
 **Files:**
 - Create: `bx/agents/doc-migrator.md`
 - Create: `bx/skills/save/references/mode-migrate.md`
