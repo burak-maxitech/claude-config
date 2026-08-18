@@ -1632,9 +1632,25 @@ repo** — the worst outcome this design has. Add:
 | `fx-v1-sparse` | all three instruction sections, but only `## Next Steps` of the five state sections | migrate; STATUS.md ends with **all five** headers, the four absent ones carrying `_None recorded._`; `assert-doc-schema.sh --expect v2` exits 0 |
 | `fx-v1-ineligible` | state sections present, but **missing** `## Key Decisions` | **decline without prompting**; one-line note; layout stays v1; save still completes |
 | `fx-partial-conflict` | `docs/STATUS.md` with the canonical header block, a `## Current Status` whose body is a **truncated variant** of CLAUDE.md's, an `## Architecture Summary` in CLAUDE.md, marker absent | detects `partial`; migration must **block** with a named blocking warning and remove nothing — never merge, never overwrite |
+| `fx-arch-preexisting` | v1 layout, but `docs/architecture.md` **already exists** and matches the `## Architecture Summary` body | detects `v1`; migration proceeds and leaves `docs/architecture.md` byte-identical. This is the one gate path where a mistake **deletes** rather than blocks, and it has no committed regression coverage — it was closed in round 5 against scratch fixtures only |
 
 The first two are v1 repos with clean trees (`--expect v1` exits 0 on each); the third is
 `partial`. Follow the existing helper pattern in `make-fixtures.sh`; do not restructure it.
+
+**Also in Step 0: give `assert-doc-schema.sh` two assertions it currently lacks.**
+
+Both guard properties that are specified in prose only, and both are places where two
+independent agents demonstrably produced different bytes while the checker passed either:
+
+1. **STATUS.md section order.** The five state sections must appear in canonical order
+   (Current Status, Completed, In Progress, Next Steps, Session History). The checker currently
+   tests presence and never order, so an appended-rather-than-inserted resume passes.
+2. **`Last Updated:` agreement.** CLAUDE.md's and STATUS.md's `Last Updated:` values must match
+   each other, including any trailing parenthetical such as `(Session 55)`. The checker
+   currently asserts only that STATUS.md *has* such a line — and one rehearsal silently dropped
+   the parenthetical while passing every assertion.
+
+Keep both additions inside the existing v2 block so they run on every `--expect v2` invocation.
 
 **Also in Step 0: make `fx-v2` a true golden output of `fx-v1`.** They currently diverge —
 `## Next Steps` has one item vs two, and `fx-v2` has no `docs/architecture.md` even though
