@@ -760,10 +760,15 @@ for the canonical layouts and invariants before you begin.
 4. **Remove** the five state sections and `## Architecture Summary` from CLAUDE.md. If
    `env_vars_disposition` is `drop`, remove `## Environment Variables` too; if `keep`,
    leave it exactly where it is.
-5. **Insert the pointer line** into CLAUDE.md, immediately after the
-   `## Known Issues / Blockers` section (or at end of file if that section is absent):
+5. **Insert the pointer line** into CLAUDE.md as the **last** element, matching
+   `doc-schema.md`'s v2 diagram: after `## Environment Variables` when that section is
+   kept, otherwise after `## Known Issues / Blockers`, otherwise at end of file.
 
        > Session state: [docs/STATUS.md](docs/STATUS.md)
+
+   (An earlier draft said "immediately after `## Known Issues / Blockers`" unconditionally,
+   which puts the pointer *above* a kept `## Environment Variables` and contradicts the
+   canonical layout. `doc-schema.md` is authoritative.)
 
 6. **Update CLAUDE.md's `Last Updated:` line** to `today`.
 7. **Write the marker LAST.** Prepend `<!-- bx-doc-schema: 2 -->` as the very first line of
