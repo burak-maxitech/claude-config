@@ -2,6 +2,35 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.0.0 — 2026-08-18
+
+### Breaking
+
+- **Doc schema v2.** Session state moves out of `CLAUDE.md` into `docs/STATUS.md`.
+  CLAUDE.md now holds only always-loaded instructions: Project Overview, Key Decisions,
+  Known Issues, and Environment Variables when populated. Repos on the old layout are
+  migrated by `/bx:save` on first run, after an explicit prompt, on a clean tree, as one
+  revertible commit. Nothing is deleted — content moves.
+- `## Architecture Summary` relocates to `docs/architecture.md`.
+- `## Environment Variables` is now conditional rather than mandatory.
+
+### Added
+
+- `MIGRATE` mode, `references/doc-schema.md` (the shared layout contract read by both
+  skills), and the `bx:doc-migrator` subagent.
+- `--skip-migrate` flag on `/bx:save`.
+- `bx/skills/save/tests/` — post-condition checker, fixture builder, hook tests.
+
+### Fixed
+
+- SessionStart hook read `## Current Status` with a range that could not stop at
+  `## Completed` and ran into `## In Progress`; only `head -12` hid it.
+- `/bx:resume` re-read `CLAUDE.md`, which the platform already loads in full (~7k tokens
+  per resume).
+- `/bx:save` Part 3 maintained only `docs/*.md`, leaving root-level docs to drift.
+- Part 4 instructed writing derivable facts into auto-memory, and stated its limit as
+  200 lines rather than 200 lines **or 25KB**.
+
 ## 1.0.0 — 2026-08-11
 
 First explicitly-versioned release. The plugin previously used commit-SHA versioning (no `version` field in the manifest), so users saw commit hashes as version identifiers.

@@ -242,16 +242,16 @@ The `bx/agents/` folder contains 18 subagent definitions used by skills (namespa
 
 ## Optional: SessionStart hook for auto-orientation
 
-The repo ships `.claude/scripts/session-start-context.{sh,ps1}` — a cheap (<1s) read-only script that emits project orientation as system context at the start of every Claude Code session, before the user's first prompt. It eliminates the need to type `/bx:resume` for routine starts (deep orientation still works via the explicit slash command).
+The repo ships `bx/scripts/session-start-context.{sh,ps1}` — a cheap (<1s) read-only script that emits project orientation as system context at the start of every Claude Code session, before the user's first prompt. It eliminates the need to type `/bx:resume` for routine starts (deep orientation still works via the explicit slash command).
 
 **What it emits:**
 - Branch + uncommitted-file count + age of last commit
 - 5 most recent commit subjects
-- CLAUDE.md `## Current Status` table + `Last Updated` line
-- Stale-doc warning if commits are newer than CLAUDE.md by >2 days
+- `docs/STATUS.md` (or `CLAUDE.md` on the pre-v2 layout) `## Current Status` table + `Last Updated` line
+- Stale-doc warning if commits are newer than the status file by >2 days
 - Open-PR title/number (best-effort via `gh`)
 
-**Silent fallbacks:** emits nothing if outside a git repo; emits less when `gh` or `CLAUDE.md` are missing.
+**Silent fallbacks:** emits nothing if outside a git repo; emits less when `gh` or the status file (`docs/STATUS.md`/`CLAUDE.md`) is missing.
 
 ### Install (per-project)
 
@@ -266,7 +266,7 @@ Add to the target project's `.claude/settings.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "~/Development/projects/claude-config/.claude/scripts/session-start-context.sh",
+            "command": "~/Development/projects/claude-config/bx/scripts/session-start-context.sh",
             "timeout": 3
           }
         ]
@@ -276,7 +276,7 @@ Add to the target project's `.claude/settings.json`:
 }
 ```
 
-On Windows, swap to `.ps1` and prefix with `pwsh -NoProfile -File `.
+The plugin hook (`bx/hooks/hooks.json`) wires only the `.sh`. On Windows, swap to `.ps1` and prefix with `pwsh -NoProfile -File ` — that's the manual alternative for Windows users without Git Bash; it carries the same dual-layout logic as the `.sh` and parses cleanly on both PowerShell 7 and Windows PowerShell 5.1.
 
 ### Install (global, all projects)
 
@@ -371,8 +371,28 @@ claude-config/                         # marketplace repo
 | File | Purpose |
 |------|---------|
 | [README.md](README.md) | Public overview, setup instructions (this file) |
-| [CLAUDE.md](CLAUDE.md) | AI session context, status tracking, architecture |
+| [CLAUDE.md](CLAUDE.md) | AI session context — overview, key decisions, known issues (schema v2; see below) |
 | [Workflow.md](Workflow.md) | Detailed personal workflow guide |
-| [docs/](docs/) | Reference files (session history, decisions, completed work) |
+| [docs/](docs/) | Reference files (session state, session history, decisions, completed work) |
 
 See `Workflow.md` for full usage guide.
+
+### Documentation layout (schema v2)
+
+`CLAUDE.md` holds instructions Claude should have in every session — overview, key
+decisions, known blockers. It is loaded in full on every session, so it stays small.
+
+`docs/STATUS.md` holds session state — current status, in progress, next steps, last
+session. `/bx:resume` reads it on demand; it is not auto-loaded.
+
+Repos created before v2.0.0 keep working. The first `/bx:save` after updating detects the
+old layout and offers to migrate: it needs a clean working tree, asks before changing
+anything, and lands the move as a single commit you can `git revert`. Decline and it asks
+again next time; `--skip-migrate` skips it permanently.
+
+**Working across machines:** if you migrate a repo on one machine and then open it on
+another whose `bx` plugin is still on 1.x, the old skill will not find the sections it
+expects. It degrades safely — `save-writer` refuses to guess at a missing anchor and reports
+a warning instead of writing to the wrong place — but that session's save will be
+incomplete. Update the plugin (`/plugin update bx`) on the second machine. The `cc` launcher
+does this automatically on every launch.
