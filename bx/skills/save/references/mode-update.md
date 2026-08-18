@@ -87,9 +87,10 @@ Compose this structure and pass it to `save-writer` as the task prompt (fill eve
 
 Dispatch one `save-writer` subagent via the Agent tool with `subagent_type: "bx:save-writer"`, passing the packet as the prompt (serialize as labeled sections). Await its change report.
 
-`save-writer` reports on two channels, matching `doc-migrator.md`'s convention: `notes:` is advisory, `warnings:` is the channel that compels action. Handle each:
+`save-writer` reports on two channels, matching `doc-migrator.md`'s convention: `notes:` is advisory, `warnings:` is the channel that compels action. `warnings:` itself carries two distinct sub-cases (see `save-writer.md`'s Output section) that call for different responses — do not treat every non-`none` `warnings:` as a re-dispatch trigger. Handle each:
 - **`notes:` non-`none`** (a density-cap: a field exceeded the prose caps) → tighten the offending field, note it in your report, do NOT re-dispatch.
-- **`warnings:` non-`none`** (an unmatched delta — an `old_string` didn't match, so that CLAUDE.md or docs/STATUS.md section was left un-updated) → re-source the exact current string from the CLAUDE.md / docs/STATUS.md you read in Step 0 (or re-read the affected lines) and re-dispatch **only** those deltas. This is the one case where re-dispatch IS warranted — silently leaving a section stale is the failure mode this guards against.
+- **`warnings:` non-`none`, unmatched delta** (an `old_string` didn't match, so that CLAUDE.md or docs/STATUS.md section was left un-updated) → re-source the exact current string from the CLAUDE.md / docs/STATUS.md you read in Step 0 (or re-read the affected lines) and re-dispatch **only** those deltas. This is the one case where re-dispatch IS warranted — silently leaving a section stale is the failure mode this guards against.
+- **`warnings:` non-`none`, schema-v1 `docs/STATUS.md`-absent fallback** (save-writer routed `status_md_deltas` and `status_md_session_block` to CLAUDE.md because `docs/STATUS.md` doesn't exist yet) → confirm the v1 routing was expected (migration hasn't run on this repo), log it in your report, do NOT re-dispatch.
 - Both `notes:` and `warnings:` read `none` → done, no re-dispatch.
 
 ### Drift warning format (show only lines whose probe fires)
