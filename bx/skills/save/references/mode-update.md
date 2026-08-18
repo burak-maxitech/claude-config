@@ -24,7 +24,7 @@ Gather only what the orchestrator needs to *route* and *compose the packet*. The
 **Other:**
 - `TaskList`
 
-**Deferred to `--full` only:** `README.md`, `docs/*.md` archive reads. If routing lands on `--full`, read those at the top of the Full Path (Step 0.3), not here.
+**Deferred to `--full` only:** `README.md`, `docs/*.md` archive reads. If routing lands on `--full`, read those at the top of the Full Path (Step 0.3), not here — still excluding the auto-managed archives and `docs/archive/`, which no path reads.
 
 ### 0.2 Derive
 
@@ -101,7 +101,7 @@ Dispatch one `save-writer` subagent via the Agent tool with `subagent_type: "bx:
 >  - README.md or `docs/*.md` touched in [K] commits since last full sweep
 >  - CLAUDE.md at [X]k chars (target ~7k, soft cap 12k) — Part 7 size-pressure rollup will fire on `--full`
 >  - docs/STATUS.md at [Y]k chars (target ~10k, soft cap 20k) — Part 7 size-pressure rollup will fire on `--full`
->  - docs/[archive].md at [Z]k chars (rotation threshold 100k) — Part 7.7 archive rotation will fire on `--full`"
+>  - docs/[archive].md at [Z]k chars — rotation fires at 100k on `--full` (Part 7.7)"
 
 Show the archive line only for an archive at ≥90k chars (approaching or over the 100k rotation threshold).
 
@@ -113,7 +113,7 @@ Runs the **Save Path** above first (so the fast result is identical), then the h
 
 ### Step 0.3 Full-sweep reads (parallel)
 
-Read `README.md` and all `docs/*.md` (`Glob docs/**/*.md`, then one Read per file in the same turn). These feed Parts 2, 3, 5, 6, 7.
+Read `README.md` and all `docs/*.md` **except the auto-managed archives and everything under `docs/archive/`** (Part 3.0's exclusion list, which applies to this read too — rotated volumes are read by no automatic path, ever; via `Glob docs/**/*.md`, then one Read per file in the same turn). These feed Parts 2, 3, 5, 6, 7.
 
 The remaining Parts (0.5, 2, 3, 4, 5, 6, 7) run on the **orchestrator**, not the subagent, because Parts 5/6/7 can require an `AskUserQuestion` consent prompt and a subagent cannot prompt the user. The commit checkpoint (Part 8) already ran as the final Save-Path step — on `--full`, defer the commit to after the rollups instead (so rollup changes land in the same commit), exactly as the current Part 8 note specifies.
 
@@ -700,7 +700,7 @@ For each over-threshold section, ask via `AskUserQuestion` (or numbered fallback
 
 - **yes** → execute the shrinker for this section
 - **no** → leave this section alone this run (re-ask next run if still over)
-- **skip-all** → exit Part 7 entirely; the rest of the run proceeds to Part 8 unchanged
+- **skip-all** → skip the rest of Part 7's shrinkers — then proceed to 7.7 (archive rotation), which still runs: it carries its own per-file consent. The rest of the run then proceeds to Part 8 unchanged.
 
 `AskUserQuestion` cap is 4 questions per turn. If 5+ sections (across both files) are over threshold, batch as: first 4 in one turn, remainder in a second turn after the first batch's actions complete.
 
@@ -741,8 +741,8 @@ skips all of Part 7, this step included; 7.1's early exit does NOT skip this ste
 Measure the three archives (`wc -c`, omitting any that do not exist). For each file over
 **100k chars**, independently:
 
-1. **Consent (first rotation on this project only).** The sentinel is the rotation note in
-   the live file's header — search for the literal substring `Entries are rotated to`. If
+1. **Consent (first rotation of each archive).** The sentinel is the rotation note in
+   the live file's header region (the lines before the first entry) — search only that region for the literal substring `Entries are rotated to`. If
    present, proceed silently. If absent: **if `--silent` is in `$ARGUMENTS`, treat as
    declined without asking** (skip this file, write no sentinel — the next interactive
    `--full` run asks as usual). Otherwise ask via `AskUserQuestion` (numbered fallback):
@@ -764,7 +764,8 @@ Measure the three archives (`wc -c`, omitting any that do not exist). For each f
 4. **Move the oldest entries, byte-verbatim,** from the top of the file's entry region
    (all three archives order oldest-first) into the new volume, cutting only at whole-entry
    boundaries — a `### Session` header line, a complete `|` table row, a whole checklist
-   line — until the live file is at or under **50k chars** (half the threshold, so rotation
+   line — until the live file is at or under **50k chars** — moving the minimum number of
+   whole entries needed to reach that target (half the threshold, so rotation
    does not re-fire every run). The protected tail never moves: the 5 most recent sessions
    (session-history, matching Part 5's window), the newest 20 rows (key-decisions, matching
    Part 6's target), this session's just-appended items (completed-work). Never compress,
