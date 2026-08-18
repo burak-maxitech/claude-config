@@ -2,6 +2,19 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.1.0 — 2026-08-18
+
+### Added
+
+- **Archive rotation** (`/bx:save` Part 7.7, `--full` only): when a history archive
+  (`session-history.md`, `key-decisions.md`, `completed-work.md`) exceeds 100k chars, its
+  oldest entries move byte-verbatim into numbered volumes under `docs/archive/`, leaving
+  the live file at ≤50k with the newest content intact. First rotation asks for consent;
+  a header note is the sentinel. Volumes are read by nothing automatic — not deep resume,
+  not the `--full` doc sweep — they are grep-on-demand history. No volume-count cap:
+  pruning is a manual `git rm` (content survives in git history). `--skip-rotation` skips
+  the Part.
+
 ## 2.0.1 — 2026-08-18
 
 ### Fixed
