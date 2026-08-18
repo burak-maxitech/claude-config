@@ -44,7 +44,7 @@ After Step 0:
 
 The old behavior (full sweep by default) is inverted: the daily save is fast; the heavy sweep is opt-in. Drift warnings (emitted at the end of the Save Path) tell the user when a `--full` is due.
 
-**`--silent` (combinable with any path):** zero user prompts for the entire run. Part 8 auto-commits with the suggested message instead of asking; every consent prompt in Parts 5/6/7 resolves to its safe default — first-run rollup consent (5.2, 6.2) is treated as *declined* (the Part is skipped and no sentinel note is written, so the next interactive run asks as usual), and the Part 7.4 consent gate is treated as *skip-all*. `--silent` never answers "yes" on the user's behalf to anything except the commit, which is the one prompt the flag exists to bypass.
+**`--silent` (combinable with any path):** zero user prompts for the entire run. Part 8 auto-commits with the suggested message instead of asking; every consent prompt in Parts 5/6/7 resolves to its safe default — first-run rollup consent (5.2, 6.2) is treated as *declined* (the Part is skipped and no sentinel note is written, so the next interactive run asks as usual), the Part 7.4 consent gate is treated as *skip-all*, and the Part 7.7 per-file rotation consent is treated as *declined* (no sentinel written, so the next interactive `--full` run asks as usual). `--silent` never answers "yes" on the user's behalf to anything except the commit, which is the one prompt the flag exists to bypass.
 
 ## Prose Caps (apply when composing any new entry)
 
@@ -692,7 +692,7 @@ For each section over its threshold, propose a specific shrinker. The thresholds
 
 ### 7.4 Per-section consent gate
 
-**If `--silent` is in `$ARGUMENTS`, treat as `skip-all` without asking** — exit Part 7 after the 7.2 diagnostic report; no shrinkers run.
+**If `--silent` is in `$ARGUMENTS`, treat as `skip-all` without asking** — exit Part 7 after the 7.2 diagnostic report; no shrinkers run — then proceed to 7.7 (archive rotation), which is unaffected: it carries its own `--silent` handling.
 
 For each over-threshold section, ask via `AskUserQuestion` (or numbered fallback):
 
