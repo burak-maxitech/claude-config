@@ -177,6 +177,8 @@ MD
     cat > "$1/docs/STATUS.md" <<'MD'
 # Project Status
 
+> Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
+
 Last Updated: 2026-08-01 (Session 1)
 
 ## Current Status
@@ -199,7 +201,7 @@ Last Updated: 2026-08-01 (Session 1)
 
 ## Session History
 
-> Full history: [session-history.md](session-history.md)
+> Full history: [docs/session-history.md](session-history.md)
 
 ### Last Session (Session 1) - 2026-08-01
 - Built the widget

@@ -34,6 +34,14 @@
 #     shape-sweep hit and pass silently. The shape sweeps below catch variants
 #     of the two established forms, not arbitrary new forms.
 #   - A file outside the `*.md`/`*.sh`/`*.ps1` include patterns.
+#   - The deprecated star-form sweep flags ANY occurrence of that shape under
+#     bx/, including one that legitimately DOCUMENTS the old form in prose
+#     (a historical note referencing 79b2411's fix, or this very comment
+#     block if it ever quotes the shape directly) -- it cannot distinguish
+#     "this is the rule, restated wrong" from "this is prose describing what
+#     used to be wrong". A false positive here is an accepted cost of
+#     catching the real regression; read a FAIL from this sweep before
+#     treating it as a bug.
 # bash 3.2 compatible.
 
 set -uo pipefail

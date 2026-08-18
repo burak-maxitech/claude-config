@@ -44,7 +44,7 @@ target only, never the link text:
 | `../sibling.md`                               | `../../sibling.md` (one more level up)              |
 | `/docs/foo.md` (root-relative, e.g. a site path) | unchanged — not filesystem-relative              |
 | `https://...`, `mailto:...`, any absolute URL | unchanged                                           |
-| `#some-anchor` (same-file anchor)             | unchanged target, but if the heading it pointed to moved to a *different* file, the anchor is now dangling. You cannot fix this silently — add one line to `warnings:` naming the anchor and its old and new files. |
+| `#some-anchor` (same-file anchor)             | unchanged target, but if the heading it pointed to moved to a *different* file, the anchor is now dangling. You cannot fix this silently — add one line to `notes:` naming the anchor and its old and new files. This is advisory, not blocking: report it and continue. |
 
 ## What you do, in this order
 
@@ -59,12 +59,17 @@ target only, never the link text:
 
        Last Updated: <today>
 
+   On a resumed run where `docs/STATUS.md` already exists, complete this header block first
+   if it is missing or incomplete (the title, the pointer line, or `Last Updated:`) — these
+   lines are migration metadata, safe to write or overwrite unconditionally, unlike a section
+   body (see Step 4's content-match gate).
+
    For each section **present** in CLAUDE.md, copy its body byte-for-byte (tables, code
    fences, everything), applying the link rewriting rules above. For a section **absent**
    from CLAUDE.md, still append its header, followed by one placeholder line:
    `_None recorded._` — this is scaffolding, not invention, and is what makes a
-   partially-populated v1 CLAUDE.md verifiable in v2 shape. Note in `files:` (not
-   `warnings:`) which sections, if any, were placeholder-scaffolded this way.
+   partially-populated v1 CLAUDE.md verifiable in v2 shape. Report the count under `files:`
+   and name the scaffolded sections in `notes:`.
 3. **If CLAUDE.md has `## Architecture Summary`**, create
    `<project_root>/docs/architecture.md` with this header and append that section's body,
    applying the same link rewriting rules:
@@ -76,13 +81,26 @@ target only, never the link text:
        ---
 
 4. **Remove** each state section and `## Architecture Summary` from CLAUDE.md — but gate
-   every removal individually: before removing a state section's `## ` header and body,
-   confirm that exact header now exists in `docs/STATUS.md`; before removing
-   `## Architecture Summary`, confirm `docs/architecture.md` exists. **If a destination write
-   cannot be confirmed for a section, do NOT remove it** — stop and report (see Hard Rules).
+   every removal individually on a **content match, not just a header's existence**: before
+   removing a state section's `## ` header and body from CLAUDE.md, confirm both that the
+   exact header exists in `docs/STATUS.md` AND that its body there is byte-for-byte what
+   CLAUDE.md's current section produces under the link rewriting rules above. Check this even
+   for a section you just wrote in Step 2 of this same run (it will trivially match). The
+   case this actually guards is different: a `docs/STATUS.md` that already existed *before*
+   this run — a hand-edit, or a write truncated by an earlier interrupted attempt — can hold a
+   canonical header over DIFFERENT or truncated content, and Step 2 never rewrites a section
+   already present, so nothing else catches this. Apply the same content-match confirmation to
+   `## Architecture Summary` against `docs/architecture.md`.
+
+   **If the header is absent, or its body does not match, do NOT remove that section from
+   CLAUDE.md and do NOT rewrite the STATUS.md/architecture.md copy.** This is a genuine
+   content conflict, not something to resolve silently — merging or picking one side is worse
+   than stopping. Add one line to `warnings:` naming the conflicting section and its two
+   locations, and stop (see Hard Rules); a human needs to look at it.
+
    Remove a section's full body per the section-body rule above — never leave a `### `
    subsection behind. If `env_vars_disposition` is `drop`, also remove
-   `## Environment Variables` (no destination check needed — it is a deletion, not a
+   `## Environment Variables` (no content-match check needed — it is a deletion, not a
    relocation, and `drop` is only chosen when the section is empty or absent in the first
    place); if `keep`, leave it exactly where it is.
 5. **Append the pointer line** as the final line of CLAUDE.md, after all remaining content:
@@ -100,32 +118,39 @@ If CLAUDE.md already contains the marker, change nothing and return `status: alr
 Otherwise — whether this is a fresh run or a resumed `partial` run (`docs/STATUS.md` exists
 but the marker does not) — evaluate each step by its own predicate below and complete only
 what is outstanding. **Never treat "STATUS.md exists" alone as license to skip to removal** —
-Step 4's per-section gate above applies on every run, resumed or not, and is what actually
-prevents content loss on a resumed run.
+Step 4's per-section content-match gate above applies on every run, resumed or not, and is
+what actually prevents content loss on a resumed run.
 
-- **Step 2** outstanding iff `docs/STATUS.md` is missing, or is missing any of the five state
-  headers. Never rewrite a section already present — append only the missing ones (copied or
-  placeholder-scaffolded, as it requires), in canonical order.
+- **Step 2** outstanding iff `docs/STATUS.md` is missing; its header block (the
+  `# Project Status` title, the `> Session state for /bx:resume...` pointer line, and the
+  `Last Updated:` line) is missing or incomplete; or it is missing any of the five state
+  headers. Complete the header block first if outstanding — it is safe to overwrite, being
+  metadata rather than section content — then append only the missing state sections (copied
+  or placeholder-scaffolded, as it requires), in canonical order. Never rewrite a section
+  already present; Step 4's content-match gate is what governs whether it may later be
+  removed from CLAUDE.md.
 - **Step 3** outstanding iff CLAUDE.md still has `## Architecture Summary` and
   `docs/architecture.md` is absent.
 - **Step 4** outstanding iff any state header (or `## Architecture Summary`, or
   `## Environment Variables` when `env_vars_disposition` is `drop`) remains in CLAUDE.md.
-  Apply its per-section gate to each remaining header individually — a header whose
-  destination write cannot yet be confirmed stays in CLAUDE.md.
+  Apply its per-section content-match gate to each remaining header individually — a header
+  whose destination body cannot be confirmed to match stays in CLAUDE.md and blocks (see
+  Step 4).
 - **Step 5** outstanding iff the pointer line is absent from CLAUDE.md.
 - **Step 6** outstanding iff CLAUDE.md's `Last Updated:` line does not already read `today`.
 - **Step 7** outstanding iff the marker is absent — always true on this path, since its
   presence is exactly what routes a run to `already-v2` instead.
 
-Report which steps you completed vs. found already satisfied under `files:` in your change
-report, not `warnings:` (see Output below).
+Report which steps you completed vs. found already satisfied, and any placeholder
+scaffolding, under `notes:` in your change report — never `warnings:` (see Output below).
 
 ## Hard rules
 
 - **Never delete content.** Every section you remove from CLAUDE.md must already have been
-  written into STATUS.md or architecture.md — confirmed by the gate in Step 4, not assumed.
-  If a destination write failed or cannot be confirmed, stop and report — do not continue to
-  the removal step for that section.
+  written, with matching content, into STATUS.md or architecture.md — confirmed by Step 4's
+  content-match gate, never assumed from a header's mere presence. If a destination write
+  failed, cannot be confirmed, or does not match, stop and report — do not continue to the
+  removal step for that section.
 - **Never introduce an `@path` import.** Links stay as markdown links.
 - **Never compress or reword.** Rationale compression is a separate, separately-consented
   pass that is not your job.
@@ -139,12 +164,21 @@ report, not `warnings:` (see Output below).
       docs/STATUS.md: created (<M> sections, <X> lines[, <P> placeholder-scaffolded])
       docs/architecture.md: created            # omit if no Architecture Summary
     env_vars: kept | dropped
-    warnings: <any warnings, or the literal "none">
+    notes: <advisory info, or the literal "none">
+    warnings: <blocking problems, or the literal "none">
 
-`warnings:` is reserved for problems that need the orchestrator's attention — a destination
-write that could not be confirmed, a link that could not be confidently rewritten, a
-same-file anchor left dangling by the split. It is never routine narrative: resumed-run step
-status and placeholder scaffolding belong under `files:` instead. Use the literal string
-`none` when there is nothing to flag — the orchestrator routes any other value straight to
-failure handling, so a stray sentence here stops an otherwise-clean migration from ever
-committing.
+Two different channels, do not conflate them:
+
+- **`notes:` is advisory.** Dangling same-file anchors, links you could not confidently
+  rewrite, and resume observations (which of Steps 2-7 were already satisfied vs. completed
+  this run, and which sections were placeholder-scaffolded). The orchestrator reports these
+  and continues — nothing in `notes:` ever blocks a commit.
+- **`warnings:` is blocking.** Reserved ONLY for a condition that must stop the run before it
+  commits anything: a destination write that could not be confirmed, a pre-existing
+  `docs/STATUS.md` (or `docs/architecture.md`) section whose body does not match CLAUDE.md's
+  current copy (Step 4's content-match gate), or any other step that could not complete.
+
+Use the literal string `none` for each when there is nothing to report. The orchestrator
+routes any `warnings:` value other than `none` straight to failure handling — never put
+routine narrative there; that is exactly what `notes:` exists for. A stray sentence in the
+wrong field either hides a real problem or discards a clean migration.

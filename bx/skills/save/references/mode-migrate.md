@@ -13,8 +13,8 @@ Before anything else — including the clean-tree guard — check whether this C
 actually reach a valid v2 shape. `doc-schema.md`'s v1 detection fires on **any one** of the
 five state sections, but `assert-doc-schema.sh` requires **all three** of
 `## Project Overview`, `## Key Decisions`, `## Known Issues / Blockers` in CLAUDE.md (plus
-the state sections, in STATUS.md, which Step 4 below can now scaffold if some are missing —
-see Step 4). Never ask permission for something that cannot succeed.
+the five state sections, in STATUS.md — `doc-migrator` can scaffold any that are missing, see
+the next bullet). Never ask permission for something that cannot succeed.
 
 - **If CLAUDE.md lacks any of the three instruction sections** (`## Project Overview`,
   `## Key Decisions`, `## Known Issues / Blockers`) → **decline without prompting.** Emit one
@@ -75,33 +75,31 @@ Dispatch one subagent via the Agent tool with `subagent_type: "bx:doc-migrator"`
 Await its change report.
 
 - `status: failed`, or a `warnings:` value other than the literal `none` -> go to Step 6
-  (failure handling).
+  (failure handling). `warnings:` is blocking-only by contract (see `doc-migrator.md`'s
+  Output section) — a destination write that could not be confirmed, or a content conflict
+  in an already-present `docs/STATUS.md` section.
 - `status: already-v2` -> detection was wrong; log it and fall through to UPDATE.
-- `status: migrated` or `resumed-partial` -> continue to Step 5.
+- `status: migrated` or `resumed-partial` -> continue to Step 5. Carry any `notes:` value
+  into the session's eventual report, but it is advisory only — it never changes this
+  routing or blocks the commit.
 
 ## Step 5: Verify invariants
 
-Run the target-repo checker. Resolve `tests/assert-doc-schema.sh` against the base directory
-Claude Code announced for this skill when it loaded, and pass it to Bash as a literal
-absolute path — never let an unexpanded variable like `${CLAUDE_SKILL_DIR}` reach the shell,
-where it yields an empty string and the command silently fails to resolve (the exact
-S33/S39 bug class):
+Run the checker. Resolve `tests/assert-doc-schema.sh` against the base directory Claude Code
+announced for this skill when it loaded, and pass it to Bash as a literal absolute path —
+never let an unexpanded variable like `${CLAUDE_SKILL_DIR}` reach the shell, where it yields
+an empty string and the command silently fails to resolve (the exact S33/S39 bug class):
 
     bash <absolute path to this skill's base dir>/tests/assert-doc-schema.sh <project_root> --expect v2 --before <snapshot>
 
-Also run the plugin's own self-consistency check. This is a **separate, second check** — it
-scans the bx/ plugin's own source tree, not `<project_root>`, and takes no arguments (it
-resolves its own tree from its own location). Run it because a drifted plugin source (the
-populated-rule regex or the schema marker stated differently in two of its own files) would
-make the check above untrustworthy too, even if it happens to pass:
+This checks `<project_root>` — the repo being migrated. `check-doc-rule-consistency.sh` is a
+**separate, development-time lint over the bx/ plugin's own source tree**, not a check on any
+user's repository; it does not belong here (a plugin-authoring concern must never gate or
+roll back a user's migration, especially one running after Step 4 has already touched their
+files). It is exercised in Task 10's verification loop instead — never wire it into this mode.
 
-    bash <absolute path to this skill's base dir>/tests/check-doc-rule-consistency.sh
-
-- Both exit 0 -> continue to Step 6.
-- Either exits non-zero -> failure handling below. If it was the self-consistency check that
-  failed, say so explicitly in the report — that is a bx plugin defect independent of this
-  repo, worth reporting upstream, in addition to (not instead of) the recovery below, since
-  Step 4 may already have modified this repo regardless of which check caught the problem.
+- Exit 0 -> continue to Step 6.
+- Exit 1 -> failure handling below.
 
 ## Step 6: Commit, or fail cleanly
 
