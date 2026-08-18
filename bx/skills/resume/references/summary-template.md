@@ -11,11 +11,12 @@ Present this summary after completing Steps 0-3. Fill in all bracketed placehold
 - [ ] Pulled latest? (`git pull`)
 - [ ] Commands synced? (`cd ~/Development/projects/claude-config && git pull`)
 - [ ] Uncommitted changes? [Yes: N files / No]
+- Doc schema: [v2 / v1 — migration available via `/bx:save`]
 
 ### Staleness Warning (if applicable)
-> ⚠ CLAUDE.md was last updated [date], but there are [N] commits since then. Documentation may be stale. Consider running `/bx:save` after reviewing.
+> ⚠ `docs/STATUS.md` (v1: CLAUDE.md) was last updated [date], but there are [N] commits since then. Documentation may be stale. Consider running `/bx:save` after reviewing.
 
-*(Only show this section if commits are newer than CLAUDE.md's "Last Updated" date. Remove entirely if docs are fresh.)*
+*(Only show this section if commits are newer than the state file's "Last Updated" date. Remove entirely if docs are fresh.)*
 
 ### Health Check (deep mode only)
 - Tests: [PASS / FAIL / Skipped]

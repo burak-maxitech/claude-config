@@ -1,6 +1,8 @@
 # Task Hydration Rules
 
-After presenting the summary, load CLAUDE.md tasks into the live task tracker using TaskCreate.
+After presenting the summary, load the state file's tasks into the live task tracker using
+TaskCreate. The state file is `docs/STATUS.md` in schema v2, CLAUDE.md in v1.
+`Known Issues / Blockers` remains in CLAUDE.md in both layouts.
 
 ---
 
@@ -12,22 +14,22 @@ Before creating any new tasks, check for stale tasks from a previous session:
 2. **If tasks exist:**
    - These are leftover from a previous session (task state does not persist across sessions unless drained by `/bx:save`)
    - **Warn the user:**
-     > "Found [N] stale tasks from a previous session. These may contain progress not yet saved to CLAUDE.md."
+     > "Found [N] stale tasks from a previous session. These may contain progress not yet saved."
    - **Show the stale tasks** with their statuses (completed, in-progress, pending)
-   - **Ask the user:** "Should I drain these into CLAUDE.md first, or discard them?"
-     - **Drain:** Follow the drain logic from `/bx:save` Part 0 — completed tasks → `docs/completed-work.md`, in-progress → `## In Progress`, pending → `## Next Steps`
+   - **Ask the user:** "Should I drain these into the state file first, or discard them?"
+     - **Drain:** Follow the drain logic from `/bx:save` Part 0 — completed tasks → `docs/completed-work.md`, in-progress → `## In Progress`, pending → `## Next Steps` (these two land in `docs/STATUS.md` in v2, CLAUDE.md in v1)
      - **Discard:** Proceed without saving (tasks will be overwritten by fresh hydration)
 3. **If no tasks exist**, proceed directly to hydration below
 
 ---
 
 ## From "In Progress"
-For each item in CLAUDE.md's `## In Progress` section:
+For each item in the state file's `## In Progress` section:
 - Create a task with `TaskCreate` (subject = the task description, status starts as `pending`)
 - Include relevant file paths in the task description
 
 ## From "Next Steps"
-For each item in CLAUDE.md's `## Next Steps` section:
+For each item in the state file's `## Next Steps` section:
 - Create a task with `TaskCreate`
 - Use the priority order to set `blockedBy` dependencies where tasks are sequential (e.g., task 2 blocked by task 1 if they depend on each other)
 - Skip items that are clearly future/aspirational -- only hydrate actionable tasks

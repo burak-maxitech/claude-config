@@ -25,37 +25,43 @@ You are resuming work on this project after a break (hours, days, or weeks). You
 
 ---
 
-## Step 0: Check Auto-Memory
+## Step 0: What Is Already In Context
 
-Claude Code's auto-memory (`~/.claude/projects/<project-path>/memory/MEMORY.md`) is **automatically loaded** into your context at session start. Before reading project docs:
+Claude Code loads two things into your context automatically, **before this skill runs**:
 
-1. **Check if auto-memory already has project context** -- it may contain tech stack, key paths, common commands, and architecture patterns synced by `/bx:save`
-2. **If auto-memory has good coverage**, you can skim README.md rather than deep-reading it -- focus your attention on CLAUDE.md for evolving state
-3. **If auto-memory is empty or missing**, proceed normally and note that `/bx:save` should be run at end of session to populate it
+- **CLAUDE.md** — loaded in full at session start, and re-injected from disk after `/compact`
+- **Auto-memory `MEMORY.md`** — first 200 lines or 25KB, whichever comes first
+
+**Do not re-read either one.** They are already in your context; reading them again
+duplicates roughly 7k tokens per resume for zero new information. Read them explicitly only
+if they are genuinely absent from your context.
+
+What is NOT auto-loaded, and is therefore this skill's actual job to read:
+`docs/STATUS.md`, the `docs/` reference archives, and README.md.
 
 ---
 
-## Step 1: Read Documentation (Parallel)
+## Step 1: Read Session State (Parallel)
 
-**Read all core documentation files in a single parallel call:**
+First determine the layout using the detection predicate in
+`../save/references/doc-schema.md` (resolve against this skill's base directory, not a
+repo-rooted path).
 
-Use parallel tool calls to read these simultaneously:
-- `CLAUDE.md` -- primary context file (lean ~17k chars: project overview, status, last session summary, next steps, condensed decisions, blockers, architecture)
-- `README.md` -- project purpose, tech stack, structure, setup instructions (skim if auto-memory already covers this)
-- `docs/` folder listing -- identify what documentation files exist
+**Schema v2** — read in a single parallel turn:
+- `docs/STATUS.md` — the session state. This is the primary read.
+- `docs/` folder listing.
 
-This is a single turn -- do NOT read these sequentially.
+**Schema v1** (no marker, no STATUS.md) — the state sections are still inside CLAUDE.md,
+which is already in your context. Read nothing extra; use what you have, and surface the
+migration notice in Step 4.
 
-### After the parallel read:
-- If CLAUDE.md references specific docs/ files in "Key Documentation," read those next
-- PRD files (contain detailed requirements) -- read if present
-- **Do NOT read these reference files by default** (only read if specifically needed):
-  - `docs/session-history.md` -- detailed session logs archive (only read if you need context older than the last session summary in CLAUDE.md)
-  - `docs/completed-work.md` -- full completed task checklist (only read if you need to verify what was done)
-  - `docs/key-decisions.md` -- full decision log (only read if you need decision context beyond the condensed table in CLAUDE.md)
-- Skip sample/example data files unless needed
+**README.md is conditional in both layouts.** Read it only when CLAUDE.md's Project Overview
+leaves the tech stack or setup genuinely unclear. It is typically the largest doc in the
+repo and rarely changes; re-reading it every session is the single most expensive habit
+this skill can have.
 
-**Note:** CLAUDE.md now contains only summaries + links for Completed, Key Decisions, and Session History. The detailed content lives in the reference files above. The last session summary in CLAUDE.md (3-5 bullets) is usually sufficient context.
+**Do NOT read by default:** `docs/session-history.md`, `docs/completed-work.md`,
+`docs/key-decisions.md`, `docs/architecture.md`. These are archives; `deep` mode reads them.
 
 ---
 
@@ -84,7 +90,8 @@ ls -1 2>/dev/null | head -30
 ```
 
 ### After reading the snapshots above:
-Based on CLAUDE.md "In Progress" and "Next Steps," identify and briefly review:
+Based on the state file's "In Progress" and "Next Steps" (`docs/STATUS.md` in v2, CLAUDE.md
+in v1), identify and briefly review:
 - Files currently being worked on
 - Files that need modification next
 - Entry points (main.py, index.js, etc.)
@@ -118,22 +125,24 @@ Keep this fast: use `--no-build` or equivalent flags where possible. The goal is
 Based on your analysis, determine:
 
 ### 3.0 Context Freshness Check
-Compare CLAUDE.md's "Last Updated" date with the latest git commit:
-- Run `git log -1 --format=%ci` to get the latest commit date
-- Parse the "Last Updated" date from CLAUDE.md
-- **If commits are newer than the "Last Updated" date**, flag a warning:
-  > "CLAUDE.md was last updated [date], but there are [N] commits since then. Documentation may be stale."
-- Suggest: "Consider running `/bx:save` after reviewing to refresh documentation."
-- **If dates match or CLAUDE.md is newer**, no warning needed
+Compare the **state file's** `Last Updated` date with the latest commit — `docs/STATUS.md`
+in schema v2, `CLAUDE.md` in v1. After the split CLAUDE.md may legitimately sit untouched
+for weeks while state churns daily, so comparing against CLAUDE.md reports false freshness.
+
+- Run `git log -1 --format=%ci` for the latest commit date
+- Parse `Last Updated` from the state file
+- If commits are newer, warn: "docs/STATUS.md was last updated [date], but there are [N]
+  commits since then."
 
 ### 3.1 What Was Last Worked On
-From CLAUDE.md's last session summary (3-5 bullet points):
+From the state file's last session summary (3-5 bullet points) — `## Session History` in
+`docs/STATUS.md` for v2, the last-session section of CLAUDE.md for v1:
 - Last session's accomplishments
 - Any incomplete work
 - If more detail is needed, read `docs/session-history.md`
 
 ### 3.2 What's Next
-From CLAUDE.md "Next Steps":
+From the state file's "Next Steps" (`docs/STATUS.md` in v2, CLAUDE.md in v1):
 - Priority 1 task (immediate)
 - Priority 2-3 tasks (upcoming)
 - Any blockers to address first
@@ -153,13 +162,26 @@ Read `references/summary-template.md` and present the summary to the user using 
 
 ## Step 5: Hydrate Task List
 
-Read `references/task-hydration.md` and follow its rules to load CLAUDE.md tasks into the live task tracker.
+Read `references/task-hydration.md` and follow its rules to load the state file's tasks into the live task tracker.
 
 ---
 
-## Step 6: Validate CLAUDE.md Structure
+## Step 6: Validate Structure
 
-Cross-reference CLAUDE.md against the section contract at `../save/references/claude-md-sections.md`. If sections are missing or malformed, note this in the summary and suggest running `/bx:save` to fix it.
+Read `../save/references/doc-schema.md` and `../save/references/claude-md-sections.md`
+(resolved against this skill's base directory).
+
+- **Schema v2** — check CLAUDE.md and `docs/STATUS.md` carry their required sections. Note
+  any missing ones in the summary and suggest `/bx:save`.
+- **Schema v1 or partial** — report, in the summary:
+
+  > "This repo uses doc schema v1. `/bx:save` will offer to migrate it to v2, which moves
+  >  session state out of CLAUDE.md into `docs/STATUS.md` and cuts always-loaded context.
+  >  Nothing is deleted."
+
+**`/bx:resume` never migrates and never writes.** Migration belongs at session end, where
+doc writing already happens and the diff can be reviewed before committing — not at session
+start, before any work has been done.
 
 ---
 
@@ -208,7 +230,7 @@ Provide additional details:
 - Complete file tree
 - All environment variables needed
 - Detailed breakdown of each component's state
-- Full session history from `docs/session-history.md` combined with CLAUDE.md's last session
+- Full session history from `docs/session-history.md` combined with the state file's last session
 
 ---
 
@@ -235,16 +257,16 @@ Once you've presented the summary and user confirms direction:
 
 | If... | Then... |
 |-------|---------|
-| CLAUDE.md exists | Read it first, it has everything you need |
+| Doc schema v2 (marker present) | State lives in `docs/STATUS.md`; CLAUDE.md is already in context, don't re-read it |
+| Doc schema v1 (no marker) | State is still inside CLAUDE.md, already in context; note migration is available via `/bx:save` |
 | CLAUDE.md missing | Suggest running `/bx:save` first |
-| Last session was recent | Focus on "In Progress" and "Next Steps" |
+| Last session was recent | Focus on the state file's "In Progress" and "Next Steps" |
 | Last session was weeks ago | Read more thoroughly, verify code state |
 | User specifies task | Skip recommendation, focus on their request |
 | Blockers exist | Surface them immediately before starting work |
 | Need older context | Check `docs/session-history.md` for archived sessions |
 | Need full completed list | Check `docs/completed-work.md` |
 | Need full decision log | Check `docs/key-decisions.md` |
-| CLAUDE.md seems too lean | That's intentional — detail lives in docs/ reference files |
 
 ---
 
