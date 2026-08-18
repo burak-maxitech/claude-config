@@ -1,4 +1,4 @@
-# session-start-context.ps1 — emit cheap project orientation context for Claude
+# session-start-context.ps1 - emit cheap project orientation context for Claude
 #
 # Wired to Claude Code's SessionStart hook on Windows. Stdout is injected into
 # the session as system context before the user's first prompt.
@@ -13,7 +13,7 @@
 
 $ErrorActionPreference = 'SilentlyContinue'
 
-# Persist session-wide env vars (CC 2.1.152+) — see .sh sibling for rationale
+# Persist session-wide env vars (CC 2.1.152+) - see .sh sibling for rationale
 if ($env:CLAUDE_ENV_FILE) {
     Add-Content -Path $env:CLAUDE_ENV_FILE -Value 'export PYTHONIOENCODING=utf-8'
     Add-Content -Path $env:CLAUDE_ENV_FILE -Value 'export PYTHONUTF8=1'
@@ -35,7 +35,7 @@ if (-not $branch) { $branch = 'unknown' }
 $dirtyCount = (git status --porcelain 2>$null | Measure-Object -Line).Lines
 $lastCommitAge = git log -1 --format=%cr 2>$null
 if (-not $lastCommitAge) { $lastCommitAge = 'unknown' }
-Write-Output "- Branch: ``$branch`` · $dirtyCount uncommitted files · last commit $lastCommitAge"
+Write-Output "- Branch: ``$branch`` | $dirtyCount uncommitted files | last commit $lastCommitAge"
 
 # Recent commits (5 lines max)
 Write-Output ""
@@ -45,35 +45,50 @@ $log = git log --oneline -5 2>$null
 if ($log) { Write-Output $log } else { Write-Output "(no commits)" }
 Write-Output '```'
 
-# CLAUDE.md Current Status table (if present)
+# Current Status + freshness. Schema v2 keeps state in docs/STATUS.md; v1 keeps
+# it in CLAUDE.md. Read whichever holds it, or the banner goes silently empty.
+$statusMd = Join-Path $repoRoot 'docs/STATUS.md'
 $claudeMd = Join-Path $repoRoot 'CLAUDE.md'
-if (Test-Path $claudeMd) {
-    Write-Output ""
-    Write-Output "**CLAUDE.md status:**"
+$stateFile = $null
+$stateFilePath = $null
+if (Test-Path $statusMd) {
+    $stateFile = 'docs/STATUS.md'
+    $stateFilePath = $statusMd
+} elseif (Test-Path $claudeMd) {
+    $stateFile = 'CLAUDE.md'
+    $stateFilePath = $claudeMd
+}
 
-    $content = Get-Content $claudeMd -ErrorAction SilentlyContinue
+if ($stateFile) {
+    Write-Output ""
+    Write-Output "**Project status** (from ``$stateFile``):"
+
+    $content = Get-Content $stateFilePath -ErrorAction SilentlyContinue
     if ($content) {
         # Last Updated line
         $lastUpdated = $content | Select-String -Pattern '^Last Updated' | Select-Object -First 1
         if ($lastUpdated) { Write-Output $lastUpdated.Line }
 
-        # Current Status section (12 lines max)
+        # Single-section extractor: a flag that turns on at "## Current Status"
+        # and off at the very next "## " header. The old range match
+        # ('^## [^C]' as the end pattern) could never stop at "## Completed"
+        # and ran on into "## In Progress".
         $inSection = $false
         $emitted = 0
         foreach ($line in $content) {
             if ($line -match '^## Current Status') { $inSection = $true; Write-Output $line; $emitted++; continue }
-            if ($inSection -and $line -match '^## [^C]') { break }
+            if ($inSection -and $line -match '^## ') { break }
             if ($inSection) { Write-Output $line; $emitted++; if ($emitted -ge 12) { break } }
         }
 
-        # Stale-doc check
-        $claudeMdCommit = git log -1 --format=%ct -- CLAUDE.md 2>$null
+        # Stale-doc check against the file that actually carries the state.
+        $stateCommit = git log -1 --format=%ct -- $stateFile 2>$null
         $headCommit = git log -1 --format=%ct 2>$null
-        if ($claudeMdCommit -and $headCommit -and ([int]$headCommit -gt [int]$claudeMdCommit)) {
-            $ageDays = [int](([int]$headCommit - [int]$claudeMdCommit) / 86400)
+        if ($stateCommit -and $headCommit -and ([int]$headCommit -gt [int]$stateCommit)) {
+            $ageDays = [int](([int]$headCommit - [int]$stateCommit) / 86400)
             if ($ageDays -gt 2) {
                 Write-Output ""
-                Write-Output "_(CLAUDE.md last updated $ageDays days before the latest commit — may be stale. Run ``/bx:resume`` to verify.)_"
+                Write-Output "_($stateFile last updated $ageDays days before the latest commit - may be stale. Run ``/bx:resume`` to verify.)_"
             }
         }
     }
@@ -86,7 +101,7 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
         $prJson = $prInfo | ConvertFrom-Json -ErrorAction SilentlyContinue
         if ($prJson -and $prJson.number) {
             Write-Output ""
-            Write-Output "- Open PR: #$($prJson.number) — $($prJson.title)"
+            Write-Output "- Open PR: #$($prJson.number) - $($prJson.title)"
         }
     }
 }

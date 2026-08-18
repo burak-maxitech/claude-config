@@ -49,22 +49,32 @@ echo '```'
 git log --oneline -5 2>/dev/null || echo "(no commits)"
 echo '```'
 
-# CLAUDE.md Current Status table (if present)
-if [ -f "$repo_root/CLAUDE.md" ]; then
-  echo ""
-  echo "**CLAUDE.md status:**"
-  # Extract Last Updated line + Current Status table (capped at 12 lines)
-  grep -i "^Last Updated" "$repo_root/CLAUDE.md" | head -1
-  awk '/^## Current Status/,/^## [^C]/' "$repo_root/CLAUDE.md" 2>/dev/null | head -12 || true
+# Current Status + freshness. Schema v2 keeps state in docs/STATUS.md; v1 keeps
+# it in CLAUDE.md. Read whichever holds it, or the banner goes silently empty.
+state_file=""
+if [ -f "$repo_root/docs/STATUS.md" ]; then
+  state_file="docs/STATUS.md"
+elif [ -f "$repo_root/CLAUDE.md" ]; then
+  state_file="CLAUDE.md"
+fi
 
-  # Stale-doc check: warn if commits exist newer than CLAUDE.md
-  claude_md_mtime="$(git log -1 --format=%ct -- CLAUDE.md 2>/dev/null || echo 0)"
+if [ -n "$state_file" ]; then
+  echo ""
+  echo "**Project status** (from \`$state_file\`):"
+  grep -i "^Last Updated" "$repo_root/$state_file" | head -1
+  # Single-section extractor. The old range /^## Current Status/,/^## [^C]/
+  # could not stop at "## Completed" and ran on into "## In Progress".
+  awk '/^## Current Status/{f=1; print; next} /^## /{f=0} f' \
+      "$repo_root/$state_file" 2>/dev/null | head -12 || true
+
+  # Stale-doc check against the file that actually carries the state.
+  state_mtime="$(git log -1 --format=%ct -- "$state_file" 2>/dev/null || echo 0)"
   head_commit_mtime="$(git log -1 --format=%ct 2>/dev/null || echo 0)"
-  if [ "$claude_md_mtime" -gt 0 ] && [ "$head_commit_mtime" -gt "$claude_md_mtime" ]; then
-    age_days=$(( (head_commit_mtime - claude_md_mtime) / 86400 ))
+  if [ "$state_mtime" -gt 0 ] && [ "$head_commit_mtime" -gt "$state_mtime" ]; then
+    age_days=$(( (head_commit_mtime - state_mtime) / 86400 ))
     if [ "$age_days" -gt 2 ]; then
       echo ""
-      echo "_(CLAUDE.md last updated $age_days days before the latest commit — may be stale. Run \`/bx:resume\` to verify.)_"
+      echo "_($state_file last updated $age_days days before the latest commit - may be stale. Run \`/bx:resume\` to verify.)_"
     fi
   fi
 fi
