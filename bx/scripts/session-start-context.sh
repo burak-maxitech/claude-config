@@ -70,11 +70,10 @@ if [ -n "$state_file" ]; then
   # Stale-doc check against the file that actually carries the state.
   # Run git from the repo root: $state_file is a repo-root-relative pathspec, so
   # from a subdirectory git resolves it against CWD, matches nothing, and prints
-  # nothing -- while still exiting 0, so `|| echo 0` never fires and the empty
-  # string reaches `[ -gt ]` as "integer expression expected" on user-visible
-  # stderr. The -C plus the defaults below close both halves.
-  state_mtime="$(git -C "$repo_root" log -1 --format=%ct -- "$state_file" 2>/dev/null || echo 0)"
-  head_commit_mtime="$(git -C "$repo_root" log -1 --format=%ct 2>/dev/null || echo 0)"
+  # nothing while still exiting 0. The := defaults below cover every empty case
+  # (pathspec miss or git failure), so no empty string reaches `[ -gt ]`.
+  state_mtime="$(git -C "$repo_root" log -1 --format=%ct -- "$state_file" 2>/dev/null)"
+  head_commit_mtime="$(git -C "$repo_root" log -1 --format=%ct 2>/dev/null)"
   : "${state_mtime:=0}"
   : "${head_commit_mtime:=0}"
   if [ "$state_mtime" -gt 0 ] && [ "$head_commit_mtime" -gt "$state_mtime" ]; then

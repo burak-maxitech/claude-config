@@ -2,6 +2,33 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.1.1 — 2026-08-18
+
+### Fixed
+
+- **`/simplify` cleanup wave over the v2.0.0–v2.1.0 range** (reuse, simplification,
+  efficiency, altitude — no behavior additions):
+  - `save-writer`'s anchored tail reads now return line numbers only (`-o`, no
+    `head_limit` truncation) instead of echoing ~98% of the archive content back; Part 5.1
+    no longer full-reads `session-history.md` before the windowed rollup.
+  - Part 7.7 rotation moves bytes with one byte-exact shell split instead of a
+    Read→Write round trip through model context; consent prompts batch when several
+    archives qualify; the sentinel phrase is explicitly marked un-rewordable.
+  - Part 3.0's `--full` sweep also excludes dated planning records
+    (`YYYY-MM-DD-*` plans/specs, e.g. `docs/superpowers/`) — immutable history it never
+    rewrites (~356KB in this repo).
+  - `--silent` is now a normative default rule (every consent gate, present or future,
+    resolves to its safe default; the Part 8 commit is the sole exception) instead of a
+    per-site enumeration.
+  - `doc-schema.md` gains the canonical **Archives** section (archive set + access rule);
+    Part 3.0, save/resume SKILL.md, and the README now point at their owners instead of
+    restating them. `mode-migrate` Step 3 uses a declared `Bash(cp:*)` grant instead of a
+    `bash -c` wrapper.
+  - `assert-doc-schema.sh` derives all section checks from the single `STATE_SECTIONS`
+    constant; `make-fixtures.sh` gains a `stub_docs` helper replacing five copy-pasted
+    blocks (fixture output verified byte-identical); `session-start-context.sh` drops its
+    redundant `|| echo 0` defaulting.
+
 ## 2.1.0 — 2026-08-18
 
 ### Added

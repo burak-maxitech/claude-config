@@ -24,7 +24,7 @@ Gather only what the orchestrator needs to *route* and *compose the packet*. The
 **Other:**
 - `TaskList`
 
-**Deferred to `--full` only:** `README.md`, `docs/*.md` archive reads. If routing lands on `--full`, read those at the top of the Full Path (Step 0.3), not here — still excluding the auto-managed archives and `docs/archive/`, which no path reads.
+**Deferred to `--full` only:** `README.md`, `docs/*.md` archive reads. If routing lands on `--full`, read those at the top of the Full Path (Step 0.3, which applies Part 3.0's exclusions), not here.
 
 ### 0.2 Derive
 
@@ -44,7 +44,7 @@ After Step 0:
 
 The old behavior (full sweep by default) is inverted: the daily save is fast; the heavy sweep is opt-in. Drift warnings (emitted at the end of the Save Path) tell the user when a `--full` is due.
 
-**`--silent` (combinable with any path):** zero user prompts for the entire run. Part 8 auto-commits with the suggested message instead of asking; every consent prompt in Parts 5/6/7 resolves to its safe default — first-run rollup consent (5.2, 6.2) is treated as *declined* (the Part is skipped and no sentinel note is written, so the next interactive run asks as usual), the Part 7.4 consent gate is treated as *skip-all*, and the Part 7.7 per-file rotation consent is treated as *declined* (no sentinel written, so the next interactive `--full` run asks as usual). `--silent` never answers "yes" on the user's behalf to anything except the commit, which is the one prompt the flag exists to bypass.
+**`--silent` (combinable with any path):** zero user prompts for the entire run. **The binding rule: every consent prompt anywhere in this skill — present or future — resolves to its safe default (declined / skip) with no sentinel written, so the next interactive run asks as usual. The Part 8 commit is the sole exception:** it auto-commits with the suggested message, the one prompt the flag exists to bypass. Concretely today: first-run rollup consent (5.2, 6.2) → declined; the Part 7.4 consent gate → skip-all; the Part 7.7 per-file rotation consent → declined. A consent gate added to any Part later inherits this rule without needing its own clause.
 
 ## Prose Caps (apply when composing any new entry)
 
@@ -451,14 +451,20 @@ Before iterating file-by-file, pre-load the whole `docs/` tree in one turn:
    two calls). Root docs other than README.md and CLAUDE.md — `workflow.md`, contributor
    guides — are otherwise maintained by nothing and drift silently.
 2. **Exclude the auto-managed archives from the read set:** `docs/session-history.md`,
-   `docs/key-decisions.md`, `docs/completed-work.md`, `docs/next-steps-backlog.md`. They are
-   this skill's own append-only outputs (save-writer and Parts 5-7 maintain them), never
-   sync inputs, and Part 3 never edits them — but they grow with project age, so reading
-   them costs tokens linear in project history for zero benefit. (At 57 sessions this repo's
-   archives already total ~196k chars.)
+   `docs/key-decisions.md`, `docs/completed-work.md`, `docs/next-steps-backlog.md` — the
+   canonical set is defined in `doc-schema.md`'s Archives section; this list follows it.
+   They are this skill's own append-only outputs (save-writer and Parts 5-7 maintain them),
+   never sync inputs, and Part 3 never edits them — but they grow with project age, so
+   reading them costs tokens linear in project history for zero benefit. (At 57 sessions
+   this repo's archives already total ~196k chars.)
    Also exclude **everything under `docs/archive/`** — rotated archive volumes (Part 7.7)
    are read by no automatic path, ever; reading them here would reintroduce the exact
    linear cost this exclusion exists to remove.
+   Also exclude **dated planning records** — files whose names carry a date stamp
+   (`YYYY-MM-DD-…`, e.g. anything under `docs/superpowers/`): they are immutable history of
+   past plans and specs, they can outweigh the archives combined, and Part 3 never rewrites
+   them as a matter of course. Opt one in explicitly only when this run's sweep must touch
+   it.
 3. Issue one `Read` tool call per remaining file — **all in the same turn** — so they execute in parallel rather than sequentially
 4. Analyze all files in a single pass and plan the Edits
 5. Apply all Edits in batched parallel calls where the targets don't conflict
@@ -524,11 +530,10 @@ Keep `docs/session-history.md` bounded by compressing sessions older than the 5 
 
 ### 5.1 Detect Compressible Sessions
 
-1. Read `docs/session-history.md`
-2. Grep for `^### Session` headers and count them
-3. **If count ≤ 5, skip silently** — nothing to compress
-4. The 5 highest-numbered sessions stay in full prose; everything older is a candidate for compression
-5. Identify which older entries are still in multi-line "What happened / Files / Next session" format. Skip any already in one-line format (idempotent — running this part repeatedly is safe)
+1. Count `^### Session` headers with one Grep tool call (`output_mode: count`) on `docs/session-history.md` — do NOT read the file; 5.3 locates and reads only the compressible window
+2. **If count ≤ 5, skip silently** — nothing to compress
+3. The 5 highest-numbered sessions stay in full prose; everything older is a candidate for compression
+4. Identify which older entries are still in multi-line "What happened / Files / Next session" format via 5.3's header Grep. Skip any already in one-line format (idempotent — running this part repeatedly is safe)
 
 ### 5.2 First-Run Confirmation (per-project)
 
@@ -616,7 +621,7 @@ For each row to roll up:
 
 1. **Append to `docs/key-decisions.md`** preserving the existing row order (topmost row of the CLAUDE.md table becomes next row in the reference file).
    - If the file doesn't exist, create it first with the header block from `mode-update.md` Part 1.6 (`# Key Decisions` → `> Full decision log. Referenced from [CLAUDE.md](../CLAUDE.md).` → table header).
-   - **Anchor at the end of the table block, NOT at end-of-file.** Before appending, scan `docs/key-decisions.md` and find the last consecutive `|`-row in the main table. Insert the new row(s) immediately after that line. If the file has non-table content after the table (e.g., a bulleted "Also noted during verification" section, a footer, or any other prose), the new rows MUST land BEFORE that content — appending at literal end-of-file would create an orphan table fragment (a `|`-row with no header context). Implementation: Edit using `(last existing table row)\n\n(first line of trailing non-table content)` as `old_string`, splice the new rows in between. If the table is the only content in the file, end-of-file is the correct anchor.
+   - **Anchor at the end of the table block, NOT at end-of-file.** Before appending, find the last consecutive `|`-row in the main table — without a full read: the same Grep (`^\|`, `-n`) + offset-Read technique as `save-writer.md`'s anchor rule. Insert the new row(s) immediately after that line. If the file has non-table content after the table (e.g., a bulleted "Also noted during verification" section, a footer, or any other prose), the new rows MUST land BEFORE that content — appending at literal end-of-file would create an orphan table fragment (a `|`-row with no header context). Implementation: Edit using `(last existing table row)\n\n(first line of trailing non-table content)` as `old_string`, splice the new rows in between. If the table is the only content in the file, end-of-file is the correct anchor.
 2. **Remove the row from CLAUDE.md's `## Key Decisions` table.**
 3. **Do NOT deduplicate.** If the same row already exists in `docs/key-decisions.md` (because an earlier session mirrored it there), leave both — dedup requires judgment. The cost is a duplicate line in the reference file, which is harmless.
 4. Preserve the trailing `> Full decision log: [docs/key-decisions.md](docs/key-decisions.md)` link in CLAUDE.md; that link is the whole point of keeping the section lean.
@@ -692,7 +697,7 @@ For each section over its threshold, propose a specific shrinker. The thresholds
 
 ### 7.4 Per-section consent gate
 
-**If `--silent` is in `$ARGUMENTS`, treat as `skip-all` without asking** — exit Part 7 after the 7.2 diagnostic report; no shrinkers run — then proceed to 7.7 (archive rotation), which is unaffected: it carries its own `--silent` handling.
+**If `--silent` is in `$ARGUMENTS`, treat as `skip-all` without asking** — the 7.2 diagnostic report still prints; the skip-all bullet below covers the rest, including the hand-off to 7.7.
 
 For each over-threshold section, ask via `AskUserQuestion` (or numbered fallback):
 
@@ -754,6 +759,10 @@ Measure the three archives (`wc -c`, omitting any that do not exist). For each f
 
    Declined → skip this file, write no sentinel, re-offer next `--full` run.
 
+   When more than one archive needs consent, batch the prompts into a single
+   `AskUserQuestion` turn (7.4's batching cap applies); rotation itself stays one file at a
+   time — step 7 verifies each file before the next is touched.
+
 2. **Ensure `docs/archive/` exists — implicitly.** The Write tool creates the directory
    when writing the volume file in step 5. Do NOT shell out to `mkdir`; it is not in this
    skill's `allowed-tools`.
@@ -761,20 +770,22 @@ Measure the three archives (`wc -c`, omitting any that do not exist). For each f
 3. **Volume number:** `Glob docs/archive/<name>-*.md`; K = highest existing number + 1, or
    1 if none. **Filenames only — never read a volume's contents.**
 
-4. **Move the oldest entries, byte-verbatim,** from the top of the file's entry region
-   (all three archives order oldest-first) into the new volume, cutting only at whole-entry
+4. **Choose the cut.** The oldest entries move from the top of the file's entry region
+   (all three archives order oldest-first), cutting only at whole-entry
    boundaries — a `### Session` header line, a complete `|` table row, a whole checklist
-   line — until the live file is at or under **50k chars** — moving the minimum number of
+   line — until the live file would be at or under **50k chars** — the minimum number of
    whole entries needed to reach that target (half the threshold, so rotation
    does not re-fire every run). The protected tail never moves: the 5 most recent sessions
    (session-history, matching Part 5's window), the newest 20 rows (key-decisions, matching
    Part 6's target), this session's just-appended items (completed-work). Never compress,
-   reword, or reorder anything — Part 5 owns compression and has already run.
+   reword, or reorder anything — Part 5 owns compression and has already run. Locate the
+   boundaries by line number with Grep (`-n`); call **H** the last line of the live file's
+   header region and **L** the last line of the final entry being moved.
 
-5. **Write the volume** with this header above the moved content — omit the
-   previous-volume line when K = 1; for key-decisions, repeat the
-   `| Decision | Rationale |` and `|----------|-----------|` table-header lines before the
-   moved rows so the volume renders standalone:
+5. **Write the volume header** (Write tool — this also creates `docs/archive/`, per
+   step 2) — omit the previous-volume line when K = 1; for key-decisions, repeat the
+   `| Decision | Rationale |` and `|----------|-----------|` table-header lines at the end
+   so the moved rows render standalone:
 
    ```markdown
    # <Title> — Archive Volume <K>
@@ -786,6 +797,17 @@ Measure the three archives (`wc -c`, omitting any that do not exist). For each f
    ---
    ```
 
+   Then move the bytes with one `bash -c` call (a compound pipeline genuinely needs a
+   shell; covered by the `Bash(bash:*)` grant), substituting H, L, and both paths as
+   literals:
+
+       bash -c 'sed -n "<H+1>,<L>p" <live> >> <volume> && { head -n <H> <live>; tail -n +<L+1> <live>; } > <live>.tmp && mv <live>.tmp <live>'
+
+   This is byte-verbatim by construction — the shell re-partitions the same bytes. Never
+   move the content through a Read→Write round trip: re-encoding drift is exactly what
+   step 7's bound exists to catch, and shuttling ~50k chars through context is the
+   expensive way to fail it.
+
 6. **Write or update the live file's rotation note** (the consent sentinel), inserted
    after the file's existing header note(s) or updated in place to point at the newest
    volume:
@@ -794,6 +816,9 @@ Measure the three archives (`wc -c`, omitting any that do not exist). For each f
    > **Note:** Entries are rotated to [docs/archive/<name>-<K>.md](archive/<name>-<K>.md)
    > when this file exceeds 100k chars. Older volumes chain from there.
    ```
+
+   The first line of this note is the consent sentinel step 1 greps for (`Entries are
+   rotated to`) — never reword that phrase.
 
 7. **Verify byte conservation before touching the next file.** With B = the live file's
    `wc -c` before rotation and A = live-file-after + volume-after: require

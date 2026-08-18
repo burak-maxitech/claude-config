@@ -2,7 +2,7 @@
 
 > Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
 
-Last Updated: 2026-08-18 (Session 56)
+Last Updated: 2026-08-18 (Session 57)
 
 ## Current Status
 
@@ -10,7 +10,7 @@ Last Updated: 2026-08-18 (Session 56)
 |------|--------|
 | Skills (11) | Complete |
 | Subagents (19) | Complete — `doc-migrator` added S56 |
-| Plugin packaging (`bx`) | **v2.1.0 published S56** (doc schema v2 + archive rotation); install smoke-test + symlink retirement still pending |
+| Plugin packaging (`bx`) | **v2.1.1 ready S57** (simplify cleanup wave over v2.0.0–v2.1.0); push + install smoke-test + symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate still pending |
 | Cross-platform setup | Complete |
@@ -19,7 +19,7 @@ Last Updated: 2026-08-18 (Session 56)
 
 ## Completed
 
-All 11 skills, 18 subagents, cross-platform setup, and documentation system are complete.
+All 11 skills, 19 subagents, cross-platform setup, and documentation system are complete.
 
 See [completed-work.md](completed-work.md) for full checklist.
 
@@ -27,7 +27,7 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## In Progress
 
-**Doc schema v2 post-merge verification (S56).** The dogfood migration of this repo is DONE (commits `9e47f42` migration, `72c505a` Key Decisions compression). Still owed from the deferred Task 10 skill-steps: live `/bx:save` runs against the fixtures (fx-v2 no-op, fx-partial resume, fx-dirty skip, fx-v1-envvars keep path, fx-v1-sparse scaffold, fx-v1-ineligible decline) and the first `/bx:save --full` on this repo — which will hit two first-run rollup consents, Part 7 shrinker offers, and likely the **first real archive rotation** (`docs/key-decisions.md` is ~96k and this save's appended rows push it toward the 100k trigger). Post-merge minors parked in both plans: backlog symptom measurement (7.7's clause is unreachable), checker fence-strip/CR robustness, mode-migrate declines-bullet v1-only phrasing, resume Quick Reference partial row, structure-rules cell wording.
+**Doc schema v2 post-merge verification (S56–57).** The first `/bx:save --full` on schema v2 ran S57: Part 5 found all older sessions already compressed, Parts 6/7 under caps, and rotation did NOT fire — `docs/key-decisions.md` sits at ~98k, just under the 100k trigger, so the first real rotation lands on an upcoming `--full`. Still owed from the deferred Task 10 skill-steps: live `/bx:save` runs against the fixtures (fx-v2 no-op, fx-partial resume, fx-dirty skip, fx-v1-envvars keep path, fx-v1-sparse scaffold, fx-v1-ineligible decline). Post-merge minors parked in both plans: backlog symptom measurement (7.7's clause is unreachable), checker fence-strip/CR robustness, mode-migrate declines-bullet v1-only phrasing, resume Quick Reference partial row, structure-rules cell wording.
 
 **Per-project `cc` session naming + coloring — built, 2 items open (S55).** Unchanged from S55: the human live gate (`cc claude-config`: prompt bar colored? name chip + tab title? no model turn?) and one batched fix wave held until the gate reports (ASCII-sweep `start-claude.ps1`, `try/catch` guard, `ToLowerInvariant()`, 0-byte registry handling, case-insensitivity assertion, stale plan/spec sweep). Spec: `docs/superpowers/specs/2026-08-12-cc-session-naming-design.md`.
 
@@ -37,23 +37,24 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## Next Steps
 
-1. **`/bx:save --full` first run (S56 follow-up)** — expect: first-run rollup consents for session-history (57+ sessions) and Key Decisions, Part 7 shrinker offers, and likely the first real `docs/key-decisions.md` rotation into `docs/archive/`. Review its diff carefully; it exercises the v2.1.0 machinery end-to-end.
+1. **First real archive rotation** — `docs/key-decisions.md` is ~98k chars; upcoming decision rows cross the 100k trigger, so a near-future `/bx:save --full` fires the first Part 7.7 rotation into `docs/archive/`. Review its diff carefully.
 2. **Finish the `cc` session naming/coloring rollout (S55)** — run the live gate, then dispatch the single fix wave listed in `## In Progress`.
 3. **Doc-schema v2 fixture verification** — the deferred live `/bx:save` runs against the six fixture cases (see `## In Progress`), plus the post-merge minors batch from both plans.
-4. **Resume the `/bx:webdesign` kaanarik run past review** — push through Phase 3 inject+verify; verify finding `dadac845`.
-5. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
-6. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — hardened S46, never run end-to-end.
-7. **S37 plugin-packaging leftovers** — install smoke-test, symlink retirement, `Skill(bx-*)` → `Skill(bx:*)`.
-8. **`/bx:evolve` follow-ups** — scan-docs allowlist candidate (`auto-mode-config`); 14 open findings; v2 ideas (shared `references/lane-contract.md`).
-9. **`/bx:seo` deferred items** — code-review leftovers (#5/#6/#7) + S25/S27/S29 refactors.
+4. **/simplify follow-up: move Part 7.7 rotation out of Part 7** into its own sibling Part — deletes the five "except 7.7" carve-outs; requires a blind rehearsal before shipping (deliberately skipped S57).
+5. **Resume the `/bx:webdesign` kaanarik run past review** — push through Phase 3 inject+verify; verify finding `dadac845`.
+6. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
+7. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — hardened S46, never run end-to-end.
+8. **S37 plugin-packaging leftovers** — install smoke-test, symlink retirement, `Skill(bx-*)` → `Skill(bx:*)`.
+9. **`/bx:evolve` follow-ups** — scan-docs allowlist candidate (`auto-mode-config`); 14 open findings; v2 ideas (shared `references/lane-contract.md`).
+10. **`/bx:seo` deferred items** — code-review leftovers (#5/#6/#7) + S25/S27/S29 refactors.
 
 ## Session History
 
 > Full history: [session-history.md](session-history.md)
 
-### Last Session (Session 56) - 2026-08-18
-- **Shipped doc schema v2 (bx v2.0.0):** resumed the `feat/doc-schema-v2` branch at Task 6's review, completed Tasks 7-10 (12-invocation fixture gate, 4 more blind doc-migrator rehearsals incl. both delete-path branches), final whole-branch review + a 17-finding fix wave + one bounded correction, merged to main — 38 commits.
-- **Closed the three archive read paths that grew with project age (v2.0.1):** Part 3.0 archive exclusion, save-writer Grep-anchored tail appends, Part 5 windowed rollup — after a scalability audit measured ~196k chars of archives being re-read per `--full`.
-- **Built archive rotation (v2.1.0):** spec → plan → subagent-driven; Part 7.7 rotates >100k history archives into `docs/archive/` volumes byte-verbatim (consent + sentinel, B ≤ A ≤ B+600 conservation); blind rehearsal on a 136k fixture passed with exact protected-tail md5.
-- **Published and adopted:** pushed main (49 commits), `/plugin update` to 2.1.0 mid-session (hot-reload confirmed working), then migrated THIS repo to schema v2 (`9e47f42`) and compressed Key Decisions 16k→8k (`72c505a`) — the first production run of the migration machinery.
-- **Next:** `/bx:save --full` (rollups + likely the first real key-decisions rotation).
+### Last Session (Session 57) - 2026-08-18
+- **`/simplify` over the v2.0.0→v2.1.0 diff (17 commits):** 4 parallel reviewers (reuse / simplification / efficiency / altitude) → 17 fixes across 13 files; 6 findings deliberately skipped (biggest: the 7.7-out-of-Part-7 restructure, deferred behind a blind rehearsal).
+- **Efficiency wins:** save-writer anchor Greps no longer echo ~98% of the archives back (`-o` + `head_limit: 0`); Part 7.7 moves bytes via a byte-exact shell split instead of Read→Write; `--full` stops reading dated planning records (~356KB); Part 5.1's full-archive read deleted.
+- **Ownership consolidation:** doc-schema.md gains the canonical Archives section; `--silent` promoted to a normative default rule; satellites (save/resume SKILL.md, README) now cite owners instead of restating; assert-doc-schema.sh derives all section checks from one constant; make-fixtures.sh `stub_docs` helper (fixtures verified byte-identical).
+- **v2.1.1** bumped + CHANGELOG entry; all checkers pass (assert-doc-schema against repo + fixtures incl. negative order tests, check-doc-rule-consistency).
+- **Next:** first real key-decisions rotation (~98k, near the 100k trigger); fixture live runs; `cc` live gate.

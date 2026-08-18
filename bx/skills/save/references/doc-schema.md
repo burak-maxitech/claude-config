@@ -38,6 +38,7 @@ and resume idempotently, never as complete.
     docs/completed-work.md       unchanged archive
     docs/key-decisions.md        unchanged archive
     docs/session-history.md      unchanged archive
+    docs/archive/                rotated volumes — see Archives below
 
 `Last Updated:` is deliberately present in BOTH files. After the split CLAUDE.md may sit
 untouched for weeks while state churns daily; the staleness signal must follow the state or
@@ -51,6 +52,20 @@ verbatim. **Unpopulated means drop, whether or not the body has text in it** —
 is not an "empty section" rule and must never be restated as one. That deletion is the single
 exception to *content moves, nothing is deleted*: it is named and quoted in the migration's
 consent prompt, and quoted verbatim again in the run's report.
+
+## Archives
+
+The canonical set of **auto-managed archives**: `docs/session-history.md`,
+`docs/key-decisions.md`, `docs/completed-work.md`, plus `docs/next-steps-backlog.md`
+(created on demand by a size-pressure shrinker). Exclusion lists elsewhere — `mode-update.md`
+Steps 0.3/3.0, the resume skill's do-not-read list — follow this set; extend it here first.
+
+Access rule: archives are append-only outputs, never sync inputs. Writers append via
+anchored tail reads (Grep the anchor's line number, then offset-Read a window); **no
+automatic path reads an archive in full**, so growth is disk-only. Rotation — procedure and
+thresholds owned by `mode-update.md` Part 7.7 — moves the oldest entries of an oversized
+archive byte-verbatim into numbered volumes under `docs/archive/`; volumes are read by
+nothing automatic, ever — they are grep-on-demand history.
 
 ## v1 layout (legacy)
 

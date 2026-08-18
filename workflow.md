@@ -207,12 +207,10 @@ git push
 cd -
 ```
 
-**What `/bx:save` does:**
-- Drains live task list — syncs completed/in-progress/pending tasks back to `docs/STATUS.md`
-- Updates CLAUDE.md (instructions) + `docs/STATUS.md` (state) + `docs/session-history.md` via the `save-writer` subagent
-- On a pre-v2 repo, offers the one-time schema migration (state moves out of CLAUDE.md into `docs/STATUS.md`)
-- `--full` adds: README/docs sync, rollups (sessions older than the 5 newest compress to one-liners; Key Decisions >20 rows move to the archive), size-pressure shrinkers, and archive rotation (>100k history archives rotate into `docs/archive/` volumes)
-- Prunes auto-memory contradictions (never syncs facts derivable from the repo)
+**What `/bx:save` does:** drains the live task list, updates CLAUDE.md + `docs/STATUS.md` +
+the session archive via the `save-writer` subagent, and offers the one-time schema migration
+on pre-v2 repos. The full breakdown — including what `--full` adds — lives in
+[Command Reference → /bx:save](#bxsave); this section doesn't repeat it.
 
 ---
 

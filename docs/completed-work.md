@@ -238,3 +238,5 @@
 - [x] /bx:save archive-read scalability: three linear paths closed (v2.0.1, `3bf748d`)
 - [x] Archive rotation Part 7.7 + registrations + blind-rehearsal acceptance (v2.1.0, merged `dd5c7fe`)
 - [x] This repo migrated to doc schema v2 + Key Decisions compressed 16k→8k (`9e47f42`, `72c505a`)
+- [x] /simplify cleanup wave over v2.0.0–v2.1.0: 17 fixes across 13 files (efficiency, dedup, altitude) + v2.1.1 bump - bx/skills/save/**, bx/agents/*, bx/scripts/session-start-context.sh, README.md, workflow.md
+- [x] First /bx:save --full on doc schema v2 (S57) - rollup/rotation machinery exercised end-to-end; no rotation fired (key-decisions ~98k < 100k trigger)

@@ -210,3 +210,23 @@
 - Process notes: rehearsals (blind agents executing only the instruction text) remained the decisive instrument — they caught the harness's read-back discouragement, the atomic-write ambiguity, and both gate directions that reviews reading the text could not; the fix-wave-introduces-a-regression pattern fired twice (tier-2 freshness; Part 0.5 headers) and was caught both times by scoped re-review.
 
 (commits: 2b1ef2e, 1d3af59, 3afbbab, b93bfc7, 9f2e328, 53e19ec, b3d607c, 0eedfe2, 3bf748d, 0865cd4, 2f86f36, 91da560, 5ce65d7, 8f4407f, ec2002d, dd5c7fe, 9e47f42, 72c505a)
+
+### Session 57 - 2026-08-18
+**What happened:**
+- Ran built-in `/simplify` over the whole v2.0.0→v2.1.0 range (17 commits): 4 parallel reviewers (reuse / simplification / efficiency / altitude); after dedup, 17 fixes across 13 files; 6 findings deliberately skipped — 7.7-out-of-Part-7 restructure (needs a blind rehearsal), make-fixtures full section-emitter refactor (literal heredocs are a golden-fixture feature), rotation-constants meta-lint (prose variants don't fit the byte-identical model), Part 5.3 content-mode Grep (content genuinely used), migrate dirty-tree blockquote merge (house-style verbatim prompts), 7.7's 7.1-reinforcement (compensating mechanism while rotation stays inside Part 7).
+- Efficiency: save-writer anchor Greps → `-o: true` + `head_limit: 0` (they were re-importing ~120k chars/save — 98% of key-decisions.md came back as match content — and the 250-line default silently drops the final anchor past 250 matches); Part 5.1's full-read deleted; Part 7.7 moves bytes via one byte-exact `bash -c` sed/head/tail split instead of shuttling ~50k chars through context; Part 3.0 excludes dated planning records (`docs/superpowers/**`, ~356KB); 7.7 consent prompts batched.
+- Ownership/altitude: doc-schema.md gains the canonical **Archives** section (archive set + access rule); `--silent` is now a normative default (safe default for every present-and-future consent gate; Part 8 commit sole exception — closes the gap class 5ce65d7 patched per-site); mode-migrate's `bash -c 'cp'` permission dodge replaced by declared `Bash(cp:*)` per the S45 decision; v0-routing rationale deduped to doc-schema.md; doc-migrator's split harness-decline rule flattened into one statement; workflow.md/README restatements now point at their owners.
+- Tests: assert-doc-schema.sh derives presence + order checks from the single `STATE_SECTIONS` constant (was 3 hand-copies in one script); make-fixtures.sh `stub_docs` helper replaces 5 copy-paste stub blocks — regenerated fixtures verified byte-identical, negative order/duplicate tests still FAIL correctly, check-doc-rule-consistency passes.
+- Bumped plugin to **v2.1.1** (PATCH: fixes and doc corrections) + CHANGELOG entry; the first `/bx:save --full` on schema v2 ran this session — Part 5 had nothing left to compress, Parts 6/7 under caps, rotation not triggered (key-decisions ~98k, just under 100k).
+
+**Files created/modified:**
+- `bx/skills/save/references/mode-update.md` — --silent normative rule; 5.1 / 3.0 / 6.3 / 7.4 / 7.7 fixes
+- `bx/skills/save/references/doc-schema.md` — Archives section; `mode-migrate.md` — declared `cp`
+- `bx/agents/save-writer.md`, `bx/agents/doc-migrator.md` — anchor Grep specs; flattened freshness rule
+- `bx/skills/save/tests/assert-doc-schema.sh`, `make-fixtures.sh` — single-source sections; `stub_docs`
+- `bx/skills/save/SKILL.md`, `bx/skills/resume/SKILL.md`, `bx/scripts/session-start-context.sh`, `README.md`, `workflow.md`, `CHANGELOG.md`, `bx/.claude-plugin/plugin.json` (2.1.1)
+
+**Next session should:**
+- Watch for the first real key-decisions rotation on the next `--full` (file at ~98k now)
+- Run the deferred fixture live `/bx:save` runs; then the `cc` live gate + S55 fix wave
+- Take the 7.7-out-of-Part-7 restructure through a blind rehearsal before shipping

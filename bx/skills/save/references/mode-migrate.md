@@ -101,13 +101,12 @@ a stray file in the repo would defeat the clean-tree guard on the next run.
 
 **Use this exact form**, with both paths substituted as literal absolutes:
 
-    bash -c 'cp "<project_root>/CLAUDE.md" "<scratch>/claude-md-before.md"'
+    cp "<project_root>/CLAUDE.md" "<scratch>/claude-md-before.md"
 
-A bare `cp` is not in this skill's `allowed-tools` and would prompt on every migration;
-wrapping it in `bash -c` is covered by the existing `Bash(bash:*)` grant. `cp` is also
-byte-faithful, which a Read-then-Write round trip is not — and the snapshot is what Step 5's
-no-content-loss byte floor is measured against, so a re-encoded copy would corrupt the
-verification rather than the repo. Do not improvise a different mechanism.
+`cp` is declared in this skill's `allowed-tools`, and it is byte-faithful — which a
+Read-then-Write round trip is not. The snapshot is what Step 5's no-content-loss byte floor
+is measured against, so a re-encoded copy would corrupt the verification rather than the
+repo. Do not improvise a different mechanism.
 
 ## Step 4: Dispatch `doc-migrator`
 

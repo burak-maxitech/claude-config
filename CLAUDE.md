@@ -1,7 +1,7 @@
 <!-- bx-doc-schema: 2 -->
 # CLAUDE.md
 
-Last Updated: 2026-08-18 (Session 56)
+Last Updated: 2026-08-18 (Session 57)
 
 ## Project Overview
 
@@ -36,6 +36,7 @@ Last Updated: 2026-08-18 (Session 56)
 | Doc schema v2 — CLAUDE.md/STATUS.md split with consented migration (S56, 2026-08-18) | Always-loaded instructions stay in CLAUDE.md; state moves to `docs/STATUS.md`; `/bx:save` gained MIGRATE (eligibility → consent → `doc-migrator` → invariant checker → isolated commit), proven by 10 fixtures + 7 blind rehearsals. v2.0.0, merged `0eedfe2`. |
 | Archives are disk-only and rotate at 100k (S56) | v2.0.1 closed the three linear archive-read paths (Part 3.0 exclusion, tail-anchored appends, windowed rollup); v2.1.0's Part 7.7 rotates >100k archives byte-verbatim into `docs/archive/` volumes (consent + sentinel, B ≤ A ≤ B+600, no count cap — manual `git rm` is the escape hatch). Nothing automatic reads a volume. |
 | Blind rehearsals are the acceptance instrument for instruction files (S56) | Agents executing only the instruction text caught what 12+ readings could not (harness conflicts, gate holes, nondeterminism); the decision-log ambiguity count is the regression metric (doc-migrator 5→2; Part 7.7 started at 2). |
+| Doc contracts get a named owner; satellites reference, not restate (S57) | /simplify found the archive set restated in 4 files and rotation constants in 5; doc-schema.md's new Archives section is canonical and drift-prone copies now cite their owner. Moving 7.7 out of Part 7 deferred until it can be blind-rehearsed. (v2.1.1) |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 

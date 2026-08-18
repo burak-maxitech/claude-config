@@ -182,6 +182,7 @@ From the review of https://github.com/shanraisshan/claude-code-best-practice. Th
 | PowerShell `try/catch` can't gate native-exe failures — `cc` launcher git-pull fix (S40) | `try/catch` only catches terminating PS errors; native exes signal via `$LASTEXITCODE` — gate on it (proved empirically, fixed in all 3 spots). |
 | `/bx:webdesign` — Stitch-driven web design refactor skill (S41, 2026-06-06) | Reuse Google's `stitch-skills` + a thin orchestrator (detection, preserve-aware briefs, tokens-first restyle, verification); 3 resumable phases on a `webdesign/<date>` branch. Merged `d5e98ab`. |
 | Pre-dogfood review-hardening of `/bx:webdesign` + `/bx:save` (S42, 2026-06-06) | Content-review both before any real run; durable rules: every root artifact gitignored-or-staged before `git add -A`/`clean -fd`, and `allowed-tools` must declare every Bash helper. (`d6681e8`) |
+| Doc contracts get a named owner; satellites reference, not restate (S57) | /simplify found the archive set restated in 4 files and rotation constants in 5; doc-schema.md's new Archives section is canonical and drift-prone copies now cite their owner. Moving 7.7 out of Part 7 deferred until it can be blind-rehearsed. (v2.1.1) |
 
 **Also noted during verification (not in the original research, not adopted, flagged for future):**
 

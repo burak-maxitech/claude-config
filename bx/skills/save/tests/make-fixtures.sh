@@ -18,6 +18,22 @@ commit_all() {  # <path> <message>
     git -C "$1" add -A && git -C "$1" commit -q -m "$2"
 }
 
+stub_docs() {   # <path> <name>...  -- create docs/ with one-line stub files.
+    # Each fixture names ONLY the stubs it intends to have: a name absent from a
+    # call is a deliberate omission (e.g. fx-v1-ineligible carries no
+    # key-decisions stub), not drift.
+    _p="$1"; shift
+    mkdir -p "$_p/docs"
+    for _n in "$@"; do
+        case "$_n" in
+            completed-work)  echo "# Completed Work"          > "$_p/docs/completed-work.md" ;;
+            key-decisions)   echo "# Key Decisions"           > "$_p/docs/key-decisions.md" ;;
+            session-history) echo "# Session History Archive" > "$_p/docs/session-history.md" ;;
+            *) echo "stub_docs: unknown stub '$_n'" >&2; exit 2 ;;
+        esac
+    done
+}
+
 write_v1_claude_md() {  # <path>
     cat > "$1/CLAUDE.md" <<'MD'
 # CLAUDE.md
@@ -317,7 +333,9 @@ MD
 write_partial_conflict_pair() {  # <path>
     # docs/STATUS.md exists (marker absent -> detects `partial`), but its
     # ## Current Status body is a TRUNCATED variant of CLAUDE.md's (missing the
-    # "Gadgets" row). This is the removal gate's second tier (doc-migrator.md
+    # "Gadgets" row). The CLAUDE.md here is itself a deliberate variant of
+    # write_v1_claude_md's body (different Project Overview sentence, the extra
+    # Gadgets row, one-item Next Steps) -- intentional deltas, not drift. This is the removal gate's second tier (doc-migrator.md
     # Step 5, "Already there when the run began"): a destination present before
     # the run must be compared against CLAUDE.md's current body, and a genuine
     # content mismatch must BLOCK -- never merge, never overwrite.
@@ -401,10 +419,7 @@ echo "fx-v0          (no CLAUDE.md)"
 # fx-v1: the legacy layout, clean tree
 init_repo "$DEST/fx-v1"
 write_v1_claude_md "$DEST/fx-v1"
-mkdir -p "$DEST/fx-v1/docs"
-echo "# Completed Work" > "$DEST/fx-v1/docs/completed-work.md"
-echo "# Key Decisions" > "$DEST/fx-v1/docs/key-decisions.md"
-echo "# Session History Archive" > "$DEST/fx-v1/docs/session-history.md"
+stub_docs "$DEST/fx-v1" completed-work key-decisions session-history
 commit_all "$DEST/fx-v1" "init"
 echo "fx-v1          (legacy layout, clean)"
 
@@ -414,10 +429,7 @@ echo "fx-v1          (legacy layout, clean)"
 # empty under the populated-token rule).
 init_repo "$DEST/fx-v1-envvars"
 write_v1_envvars_claude_md "$DEST/fx-v1-envvars"
-mkdir -p "$DEST/fx-v1-envvars/docs"
-echo "# Completed Work" > "$DEST/fx-v1-envvars/docs/completed-work.md"
-echo "# Key Decisions" > "$DEST/fx-v1-envvars/docs/key-decisions.md"
-echo "# Session History Archive" > "$DEST/fx-v1-envvars/docs/session-history.md"
+stub_docs "$DEST/fx-v1-envvars" completed-work key-decisions session-history
 commit_all "$DEST/fx-v1-envvars" "init"
 echo "fx-v1-envvars  (legacy layout, POPULATED Environment Variables, clean)"
 
@@ -451,8 +463,7 @@ echo "fx-dirty       (legacy layout, DIRTY tree)"
 # doc-migrator must scaffold the four missing state sections.
 init_repo "$DEST/fx-v1-sparse"
 write_v1_sparse_claude_md "$DEST/fx-v1-sparse"
-mkdir -p "$DEST/fx-v1-sparse/docs"
-echo "# Key Decisions" > "$DEST/fx-v1-sparse/docs/key-decisions.md"
+stub_docs "$DEST/fx-v1-sparse" key-decisions
 commit_all "$DEST/fx-v1-sparse" "init"
 echo "fx-v1-sparse   (legacy layout, only Next Steps present, clean)"
 
@@ -460,9 +471,7 @@ echo "fx-v1-sparse   (legacy layout, only Next Steps present, clean)"
 # the eligibility pre-flight must decline without prompting.
 init_repo "$DEST/fx-v1-ineligible"
 write_v1_ineligible_claude_md "$DEST/fx-v1-ineligible"
-mkdir -p "$DEST/fx-v1-ineligible/docs"
-echo "# Completed Work" > "$DEST/fx-v1-ineligible/docs/completed-work.md"
-echo "# Session History Archive" > "$DEST/fx-v1-ineligible/docs/session-history.md"
+stub_docs "$DEST/fx-v1-ineligible" completed-work session-history
 commit_all "$DEST/fx-v1-ineligible" "init"
 echo "fx-v1-ineligible (legacy layout, missing Key Decisions, clean)"
 
@@ -471,9 +480,7 @@ echo "fx-v1-ineligible (legacy layout, missing Key Decisions, clean)"
 # rehearsal (Step 0b, not this script), block rather than merge or overwrite.
 init_repo "$DEST/fx-partial-conflict"
 write_partial_conflict_pair "$DEST/fx-partial-conflict"
-echo "# Completed Work" > "$DEST/fx-partial-conflict/docs/completed-work.md"
-echo "# Key Decisions" > "$DEST/fx-partial-conflict/docs/key-decisions.md"
-echo "# Session History Archive" > "$DEST/fx-partial-conflict/docs/session-history.md"
+stub_docs "$DEST/fx-partial-conflict" completed-work key-decisions session-history
 commit_all "$DEST/fx-partial-conflict" "init"
 echo "fx-partial-conflict (interrupted migration, conflicting STATUS.md)"
 
@@ -484,10 +491,7 @@ echo "fx-partial-conflict (interrupted migration, conflicting STATUS.md)"
 # not this script -- this fixture is only the substrate.
 init_repo "$DEST/fx-arch-preexisting"
 write_v1_claude_md "$DEST/fx-arch-preexisting"
-mkdir -p "$DEST/fx-arch-preexisting/docs"
-echo "# Completed Work" > "$DEST/fx-arch-preexisting/docs/completed-work.md"
-echo "# Key Decisions" > "$DEST/fx-arch-preexisting/docs/key-decisions.md"
-echo "# Session History Archive" > "$DEST/fx-arch-preexisting/docs/session-history.md"
+stub_docs "$DEST/fx-arch-preexisting" completed-work key-decisions session-history
 write_architecture_md "$DEST/fx-arch-preexisting"
 commit_all "$DEST/fx-arch-preexisting" "init"
 echo "fx-arch-preexisting (legacy layout, docs/architecture.md pre-existing & matching)"

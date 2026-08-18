@@ -402,6 +402,12 @@ session. `/bx:resume` reads it on demand; it is not auto-loaded.
 | `docs/archive/` | Rotated volumes (`<name>-<K>.md`). When a history archive exceeds 100k chars, `--full` offers to move its oldest entries here **byte-verbatim**, leaving the live file at ≤50k with the newest content in place. No volume-count cap — prune manually with `git rm` if you ever want to (content survives in git history). | `--full` only, first time with consent. | **Never — not even in `deep` mode.** Volumes are grep-on-demand history; no automatic path reads them, so they cost nothing at runtime. |
 | Auto-memory `MEMORY.md` (outside the repo, under `~/.claude/projects/<project>/memory/`) | Claude's own corrections-and-learnings layer, auto-loaded into every session (first 200 lines / 25KB). | `--full` prunes entries the session proved wrong and checks the size budget; it never syncs facts derivable from the repo. | Auto-loaded; resume only checks it is present. |
 
+This table is a reader's map, not the contract: the canonical schema definition lives at
+[`bx/skills/save/references/doc-schema.md`](bx/skills/save/references/doc-schema.md), and
+the rollup windows and rotation thresholds are owned by
+[`bx/skills/save/references/mode-update.md`](bx/skills/save/references/mode-update.md).
+Where they disagree, those files win.
+
 **The flow in one breath:** a session starts with CLAUDE.md and auto-memory loaded for free and `/bx:resume` reading `docs/STATUS.md`; it ends with `/bx:save` composing an update packet from the conversation and the `save-writer` subagent writing CLAUDE.md + `docs/STATUS.md` and appending to the three history archives — via anchored tail reads, so no read path grows with the project's age. `--full` adds the README/docs sync, the rollups, and archive rotation.
 
 Repos created before v2.0.0 keep working. The first `/bx:save` after updating detects the

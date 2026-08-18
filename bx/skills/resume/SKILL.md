@@ -51,12 +51,11 @@ repo-rooted path).
 - `docs/STATUS.md` — the session state. This is the primary read.
 - `docs/` folder listing.
 
-**Schema v1** (no marker, no STATUS.md) — the state sections are still inside CLAUDE.md,
-which is already in your context. Read nothing extra; use what you have, and surface the
-migration notice in Step 4.
+**Schema v1** — the state sections are still inside CLAUDE.md, which is already in your
+context. Read nothing extra; use what you have, and surface the migration notice in Step 4.
 
-**Schema partial** (`docs/STATUS.md` exists but the marker does not — the migration never
-completed) — read `docs/STATUS.md` for whatever it already holds; CLAUDE.md, already in your
+**Schema partial** (an interrupted migration) — read `docs/STATUS.md` for whatever it
+already holds; CLAUDE.md, already in your
 context, still carries any state sections that were not moved yet. Expect the same section to
 appear in neither file or in both, and prefer `docs/STATUS.md` where they disagree. Surface
 the interrupted-migration notice in Step 4.

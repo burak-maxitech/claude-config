@@ -26,6 +26,15 @@ CLAUDE_MD="$REPO/CLAUDE.md"
 STATUS_MD="$REPO/docs/STATUS.md"
 STATE_SECTIONS="Current Status|Completed|In Progress|Next Steps|Session History"
 
+# The five canonical headers, one per line -- STATE_SECTIONS is the ONLY
+# enumeration; every check below derives from it.
+canonical_sections() { printf '%s\n' "$STATE_SECTIONS" | tr '|' '\n'; }
+
+# "## Header" -> its 1-based canonical position, or 0 if not canonical.
+rank_of() {
+    canonical_sections | awk -v h="$1" 'h == "## " $0 {print NR; found=1; exit} END {if (!found) print 0}'
+}
+
 FAILURES=0
 pass() { echo "  PASS  $1"; }
 fail() { echo "  FAIL  $1"; FAILURES=$((FAILURES + 1)); }
@@ -79,10 +88,10 @@ if [ "$LAYOUT" = "v2" ]; then
     # --- STATUS.md holds state ---
     if [ -f "$STATUS_MD" ]; then
         pass "docs/STATUS.md exists"
-        for s in "Current Status" "Completed" "In Progress" "Next Steps" "Session History"; do
+        while IFS= read -r s; do
             if grep -qF "## $s" "$STATUS_MD"; then pass "STATUS.md has ## $s"
             else fail "STATUS.md missing ## $s"; fi
-        done
+        done < <(canonical_sections)
         if grep -qE '^Last Updated' "$STATUS_MD"; then pass "STATUS.md has a Last Updated line"
         else fail "STATUS.md missing Last Updated (staleness signal must follow the state)"; fi
     else
@@ -96,36 +105,25 @@ if [ "$LAYOUT" = "v2" ]; then
             <(grep -oE '^## .*' "$STATUS_MD" | sort -u))"
         if [ -z "$dupes" ]; then pass "no header appears in both files"
         else fail "headers duplicated across files: $(printf '%s' "$dupes" | tr '\n' ' ')"; fi
-    fi
 
-    # --- STATUS.md section order: the five canonical headers, in file order,
-    # must be a SUBSEQUENCE in canonical relative order (Current Status,
-    # Completed, In Progress, Next Steps, Session History). Non-canonical
-    # headers a real repo may add (e.g. "## Deployment") are simply skipped,
-    # not required to sort anywhere -- exact-equality with the canonical five
-    # would turn a correct migration of a repo with its own extra STATUS.md
-    # section into a verification failure.
-    # The comparison is -le, not -lt, so a REPEATED canonical header (equal rank)
-    # also fails: an append-instead-of-insert on a resumed run duplicates a
-    # section, and a valid file has each rank exactly once (strictly increasing),
-    # so legitimate sequences still pass. ---
-    if [ -f "$STATUS_MD" ]; then
+        # --- STATUS.md section order: the five canonical headers, in file order,
+        # must be a SUBSEQUENCE in canonical relative order (rank = position in
+        # STATE_SECTIONS). Non-canonical headers a real repo may add (e.g.
+        # "## Deployment") are simply skipped, not required to sort anywhere --
+        # exact-equality with the canonical five would turn a correct migration
+        # of a repo with its own extra STATUS.md section into a verification
+        # failure.
+        # The comparison is -le, not -lt, so a REPEATED canonical header (equal
+        # rank) also fails: an append-instead-of-insert on a resumed run
+        # duplicates a section, and a valid file has each rank exactly once
+        # (strictly increasing), so legitimate sequences still pass. ---
         order_bad=""
         last_rank=0
         while IFS= read -r h; do
-            case "$h" in
-                "## Current Status")  rank=1 ;;
-                "## Completed")       rank=2 ;;
-                "## In Progress")     rank=3 ;;
-                "## Next Steps")      rank=4 ;;
-                "## Session History") rank=5 ;;
-                *) rank=0 ;;
-            esac
+            rank="$(rank_of "$h")"
             [ "$rank" -eq 0 ] && continue
-            if [ -z "$order_bad" ] && [ "$rank" -le "$last_rank" ]; then
-                order_bad="$h"
-            fi
-            [ "$rank" -gt "$last_rank" ] && last_rank="$rank"
+            if [ "$rank" -le "$last_rank" ]; then order_bad="$h"; break; fi
+            last_rank="$rank"
         done < <(grep -oE '^## .*' "$STATUS_MD")
         if [ -z "$order_bad" ]; then
             pass "STATUS.md canonical sections in relative order"
