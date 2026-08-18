@@ -149,6 +149,9 @@ MD
 }
 
 write_v2_pair() {  # <path>
+    # STATUS.md's links here are the golden output of the link-rewriting rules in
+    # agents/doc-migrator.md -- see its "Link text" table for which of the two shapes
+    # (path-as-text vs prose-as-text) rewrites the text as well as the target.
     mkdir -p "$1/docs"
     cat > "$1/CLAUDE.md" <<'MD'
 <!-- bx-doc-schema: 2 -->
@@ -189,7 +192,7 @@ Last Updated: 2026-08-01 (Session 1)
 
 ## Completed
 
-2 tasks completed. See [docs/completed-work.md](completed-work.md) for full checklist.
+2 tasks completed. See [completed-work.md](completed-work.md) for full checklist.
 
 ## In Progress
 
@@ -201,7 +204,7 @@ Last Updated: 2026-08-01 (Session 1)
 
 ## Session History
 
-> Full history: [docs/session-history.md](session-history.md)
+> Full history: [session-history.md](session-history.md)
 
 ### Last Session (Session 1) - 2026-08-01
 - Built the widget

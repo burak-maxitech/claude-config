@@ -24,7 +24,7 @@ the following bullets). Never ask permission for something that cannot succeed.
 - **If those three are present**, regardless of how many of the five state sections are
   present → eligible. Continue to Step 1. `doc-migrator` scaffolds any missing state section
   as a bare header with a placeholder line, so partial state coverage does not block
-  migration (see `doc-migrator.md` Step 2).
+  migration (see `doc-migrator.md` Step 3).
 
 ## Step 1: Clean-tree guard
 
@@ -43,13 +43,33 @@ Reuses the Part 5.2 / 6.2 sentinel semantics exactly. **If `--silent` is in `$AR
 treat as declined without asking** — skip the mode, write no marker, and let the next
 interactive run ask again.
 
-Otherwise ask via `AskUserQuestion` (numbered fallback if unavailable). State the concrete
-delta, computed from the CLAUDE.md already read in Step 0:
+First resolve `env_vars_disposition` from the CLAUDE.md already read in Step 0, because the
+prompt has to disclose it: **`keep` if `## Environment Variables` is present in CLAUDE.md AND
+its body contains a token matching `[A-Z][A-Z0-9_]{2,}` anywhere (unanchored); `drop`
+otherwise, including when the section is absent from CLAUDE.md entirely.** The rule must read
+identically here, in `doc-schema.md`, and in `assert-doc-schema.sh` —
+`check-doc-rule-consistency.sh` is what enforces that. Step 4 passes this same value on; do
+not recompute it there.
+
+Then ask via `AskUserQuestion` (numbered fallback if unavailable). State the concrete delta,
+computed from the same CLAUDE.md:
 
 > "This repo uses doc schema v1. Migrating moves 5 state sections from CLAUDE.md into
 >  `docs/STATUS.md`, and the architecture tree into `docs/architecture.md`. CLAUDE.md
->  drops from [X]k to ~[Y]k chars of always-loaded context. **Nothing is deleted — content
->  moves**, and it lands as one commit you can `git revert`. Migrate now?"
+>  drops from [X]k to ~[Y]k chars of always-loaded context. **Content moves rather than being
+>  deleted**, and it lands as one commit you can `git revert`. Migrate now?"
+
+**If `env_vars_disposition` is `drop` AND `## Environment Variables` is present in CLAUDE.md,
+the prompt MUST also name that removal and quote the body being removed.** It is the one thing
+the migration deletes rather than moves, so a bare "nothing is deleted" reassurance would be
+false, and consent must attach to this specific removal rather than to a generic promise:
+
+> "One section is removed rather than moved: `## Environment Variables`, whose body reads:
+>
+>      [the section's body, quoted verbatim]
+>
+>  It names no environment variable, so schema v2 drops it. That text is repeated in the run's
+>  report, and the commit is revertible."
 
 - **Declines** -> skip the rest of this mode, write no marker, run UPDATE on v1. Re-ask next run.
 - **Accepts** -> continue.
@@ -66,24 +86,24 @@ Dispatch one subagent via the Agent tool with `subagent_type: "bx:doc-migrator"`
 
 - `project_root` — absolute repo path
 - `today` — resolved as in `mode-update.md` Step 0.2
-- `env_vars_disposition` — `keep` if `## Environment Variables` is present in CLAUDE.md AND
-  its body contains a token matching `[A-Z][A-Z0-9_]{2,}` anywhere (unanchored); `drop`
-  otherwise, **including when the section is absent from CLAUDE.md entirely**. See Global
-  Constraints; the rule must read identically here, in `doc-schema.md`, and in
-  `assert-doc-schema.sh`.
+- `env_vars_disposition` — the value already resolved and disclosed in Step 2. Pass it
+  unchanged; the rule is stated there, once.
 
-Await its change report.
+Await its change report. Read `warnings:` as a top-level field only — a report may carry
+multi-line values (`inventory:`, or a quoted dropped `## Environment Variables` body under
+`notes:`), and an indented line belongs to the field above it, never a new field.
 
 - `status: failed`, or a `warnings:` value other than the literal `none` -> go to Step 6
-  (failure handling). `warnings:` is blocking-only by contract (see `doc-migrator.md`'s
-  Output section) — a destination write that could not be confirmed, or a content conflict
-  in an already-present `docs/STATUS.md` section. **A report with no `warnings:` line at all
-  is treated as blocking, the same as a non-`none` value** — never read a missing line as
+  (failure handling). `warnings:` is blocking-only by contract; `doc-migrator.md`'s Output
+  section defines what qualifies, and this file deliberately does not restate that list —
+  a restatement here would drift out of sync with it. **A report with no `warnings:` line at
+  all is treated as blocking, the same as a non-`none` value** — never read a missing line as
   "nothing to report."
 - `status: already-v2` -> detection was wrong; log it and fall through to UPDATE.
 - `status: migrated` or `resumed-partial` -> continue to Step 5. Carry any `notes:` value
   into the session's eventual report, but it is advisory only — it never changes this
-  routing or blocks the commit.
+  routing or blocks the commit. `inventory:` is informational in the same way: record it with
+  the run, act on nothing in it.
 
 ## Step 5: Verify invariants
 
@@ -112,10 +132,14 @@ files). It is exercised by the plugin's own test suite instead — never wire it
 **On success**, commit the migration **on its own**, separate from the session save, so it
 stays independently revertible:
 
-    git add CLAUDE.md docs/STATUS.md docs/architecture.md
+    git add CLAUDE.md docs/STATUS.md
+    git add docs/architecture.md          # ONLY if doc-migrator reported creating it
     git commit -m "docs: migrate to bx doc schema v2 (CLAUDE.md -> STATUS.md split)"
 
-(Include `docs/architecture.md` only if it was created.) Continue to Step 7.
+The second `git add` is a separate command precisely so it can be omitted: naming a
+nonexistent `docs/architecture.md` in the first one makes git fail the whole `add` on a
+`pathspec did not match any files` error, leaving nothing staged. Run it only when the change
+report lists `docs/architecture.md: created`. Continue to Step 7.
 
 **On failure — no automatic rollback, and STOP the mode here.** Report what failed, name the
 files left modified, and print the exact recovery command:
