@@ -1264,6 +1264,14 @@ what `/doctor`'s trim check removes. Do not sync session state — that is STATU
 
 - [ ] **Step 6: Update `save-writer.md` to match**
 
+**First, resolve a field-name collision.** `save-writer.md:63,74` uses `warnings:` as an
+**advisory** channel (density caps), consumed non-blockingly at `mode-update.md:85-88`. Task 4
+redefined `warnings:` in `doc-migrator.md` as **blocking-only**, with advisories moved to a
+separate `notes:` field. Same skill, same field name, opposite semantics — a future editor
+copying one contract into the other lands on a real bug. Align `save-writer.md` to the same
+two-channel convention: `notes:` for advisories (density caps, skipped deltas), `warnings:`
+for conditions that must stop the caller. Update `mode-update.md`'s consumption to match.
+
 In the Inputs list, rename `claude_md_session_block` to `status_md_session_block` and add
 `status_md_deltas`. In "What you do", change step 2 to apply `claude_md_deltas` to CLAUDE.md
 and `status_md_deltas` to `docs/STATUS.md`; change step 3 so the session block is replaced in
@@ -1615,9 +1623,16 @@ repo** — the worst outcome this design has. Add:
 |---|---|---|
 | `fx-v1-sparse` | all three instruction sections, but only `## Next Steps` of the five state sections | migrate; STATUS.md ends with **all five** headers, the four absent ones carrying `_None recorded._`; `assert-doc-schema.sh --expect v2` exits 0 |
 | `fx-v1-ineligible` | state sections present, but **missing** `## Key Decisions` | **decline without prompting**; one-line note; layout stays v1; save still completes |
+| `fx-partial-conflict` | `docs/STATUS.md` with the canonical header block, a `## Current Status` whose body is a **truncated variant** of CLAUDE.md's, an `## Architecture Summary` in CLAUDE.md, marker absent | detects `partial`; migration must **block** with a named blocking warning and remove nothing — never merge, never overwrite |
 
-Both are v1 repos with clean trees, so `--expect v1` must exit 0 on each before migration.
-Follow the existing helper pattern in `make-fixtures.sh`; do not restructure the script.
+The first two are v1 repos with clean trees (`--expect v1` exits 0 on each); the third is
+`partial`. Follow the existing helper pattern in `make-fixtures.sh`; do not restructure it.
+
+**Also in Step 0: make `fx-v2` a true golden output of `fx-v1`.** They currently diverge —
+`## Next Steps` has one item vs two, and `fx-v2` has no `docs/architecture.md` even though
+`fx-v1` carries `## Architecture Summary`. Align `fx-v2` so it is exactly what a correct
+migration of `fx-v1` produces, including `docs/architecture.md`. This is what makes Step 1's
+`--before` assertion possible.
 
 - [ ] **Step 1: Run every fixture through the checker**
 
@@ -1632,10 +1647,24 @@ bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-partial"     --expect p
 bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-dirty"        --expect v1
 bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v1-sparse"    --expect v1
 bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v1-ineligible" --expect v1
+bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-partial-conflict" --expect partial
 bash bx/skills/save/tests/test-hook-layout.sh
 bash bx/skills/save/tests/check-doc-rule-consistency.sh
+
+# --- The --before path, which has NEVER executed on this branch ---
+# fx-v2 is now the exact golden output of fx-v1, so this exercises header
+# conservation and the no-content-loss byte floor: the two invariants that
+# defend against the failure this entire design exists to prevent.
+bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v2" \
+     --expect v2 --before "$DEST/fx-v1/CLAUDE.md"
 ```
-Expected: all ten exit 0. The last one lints the `bx/` tree itself rather than a target
+Expected: all twelve exit 0.
+
+**The last invocation is not optional.** Every prior run of this pipeline omitted `--before`,
+so `assert-doc-schema.sh`'s header-conservation and no-content-loss checks had never run at
+all — the checker's most important code was itself untested. If this assertion fails, either
+`fx-v2` is not a faithful golden output of `fx-v1` (fix the fixture) or the invariant logic is
+wrong (fix the checker); do not weaken the assertion to make it pass. The last one lints the `bx/` tree itself rather than a target
 repo — it fails if the schema marker or the populated-rule regex has drifted between the
 files that restate them, which is the failure mode that silently loses content.
 
@@ -1662,8 +1691,8 @@ Expected: checker exits 0; the migration is its own commit, message beginning `d
 | `fx-v1-sparse` | `/bx:save`, accept | STATUS.md ends with all five headers; the four missing ones carry `_None recorded._`; checker exits 0. Proves scaffolding produces a *verifiable* v2 rather than a repo stuck failing verification with no rollback |
 | `fx-v1-ineligible` | `/bx:save` | **No migration prompt appears at all** — eligibility declines before consent. One-line note; layout stays v1; the session save still completes |
 
-These four are the cases a single dogfood run would never exercise. The last one guards the
-only path where migration can silently lose content, so it is not optional.
+These are the cases a single dogfood run would never exercise. Several guard paths where
+migration can silently lose content, so none of them is optional.
 
 - [ ] **Step 4: Verify idempotency**
 
