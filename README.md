@@ -389,6 +389,21 @@ decisions, known blockers. It is loaded in full on every session, so it stays sm
 `docs/STATUS.md` holds session state — current status, in progress, next steps, last
 session. `/bx:resume` reads it on demand; it is not auto-loaded.
 
+#### Every file: purpose, who writes it, who reads it
+
+| File | Purpose | `/bx:save` writes | `/bx:resume` reads |
+|------|---------|-------------------|--------------------|
+| `CLAUDE.md` | Always-loaded instructions: `## Project Overview`, `## Key Decisions` (newest ~20 rows as one-liners), `## Known Issues / Blockers`, `## Environment Variables` (only when populated), plus the schema marker and a pointer to STATUS.md. Target ~7k chars — it is paid for on every request of every session. | Every save: the `Last Updated` line, new Key Decision rows, Known Issues changes. On `--full`, rows past 20 move out to `docs/key-decisions.md`. | **Never re-read.** Claude Code auto-loads it at session start (and after `/compact`); re-reading would double-pay ~7k tokens for nothing. |
+| `docs/STATUS.md` | Session state: `## Current Status` (status table), `## Completed` (one-line summary + link), `## In Progress`, `## Next Steps`, `## Session History` (the last session only, ≤5 bullets). Target ~10k chars. | Every save: all five sections plus its own `Last Updated` (the staleness signal follows the state, so the two files' dates deliberately diverge). | **The primary read, every resume.** The SessionStart hook also extracts its `Current Status` table for the free orientation banner. |
+| `docs/session-history.md` | Append-only archive of every session ever. Entries older than the 5 newest are compressed to one-liners with commit hashes — the full prose stays recoverable in git history. | Appends the detailed session entry each save (via an anchored tail read, never a full-file read); `--full` compresses newly-aged entries. | `deep` mode only. |
+| `docs/completed-work.md` | Append-only checklist of everything ever finished. | Appends `- [x]` items from the task drain. | `deep` mode only. |
+| `docs/key-decisions.md` | The full decision log — every decision with its complete rationale. CLAUDE.md's table keeps only the newest ~20 as one-liners; this file keeps everything, forever. | Appends each new decision row; `--full` also moves CLAUDE.md's overflow rows here. | `deep` mode only. |
+| `docs/architecture.md` | Architecture detail (directory tree, component roles) moved out of CLAUDE.md by the v2 migration. | Created once by the migration; synced on `--full` when the structure changed. | `deep` mode only. |
+| `docs/archive/` | Rotated volumes (`<name>-<K>.md`). When a history archive exceeds 100k chars, `--full` offers to move its oldest entries here **byte-verbatim**, leaving the live file at ≤50k with the newest content in place. No volume-count cap — prune manually with `git rm` if you ever want to (content survives in git history). | `--full` only, first time with consent. | **Never — not even in `deep` mode.** Volumes are grep-on-demand history; no automatic path reads them, so they cost nothing at runtime. |
+| Auto-memory `MEMORY.md` (outside the repo, under `~/.claude/projects/<project>/memory/`) | Claude's own corrections-and-learnings layer, auto-loaded into every session (first 200 lines / 25KB). | `--full` prunes entries the session proved wrong and checks the size budget; it never syncs facts derivable from the repo. | Auto-loaded; resume only checks it is present. |
+
+**The flow in one breath:** a session starts with CLAUDE.md and auto-memory loaded for free and `/bx:resume` reading `docs/STATUS.md`; it ends with `/bx:save` composing an update packet from the conversation and the `save-writer` subagent writing CLAUDE.md + `docs/STATUS.md` and appending to the three history archives — via anchored tail reads, so no read path grows with the project's age. `--full` adds the README/docs sync, the rollups, and archive rotation.
+
 Repos created before v2.0.0 keep working. The first `/bx:save` after updating detects the
 old layout and offers to migrate: it needs a clean working tree, asks before changing
 anything, and lands the move as a single commit you can `git revert`. Decline and it asks
