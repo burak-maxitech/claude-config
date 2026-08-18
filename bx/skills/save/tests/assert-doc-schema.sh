@@ -115,7 +115,9 @@ if [ -n "$BEFORE" ] && [ -f "$BEFORE" ]; then
     missing=""
     while IFS= read -r h; do
         # ## Architecture Summary relocates to docs/architecture.md;
-        # ## Environment Variables is dropped only when empty (env_populated, above).
+        # ## Environment Variables is dropped whenever it is UNPOPULATED (env_populated,
+        # above) -- which is not the same as empty: an unpopulated body is usually prose
+        # that simply names no variable, e.g. "None required." It is still dropped.
         case "$h" in
             "## Architecture Summary")
                 [ -f "$REPO/docs/architecture.md" ] || missing="$missing '$h'"
@@ -146,7 +148,8 @@ if [ -n "$BEFORE" ] && [ -f "$BEFORE" ]; then
         [ -f "$f" ] && after_bytes=$((after_bytes + $(wc -c < "$f" | tr -d ' ')))
     done
     # v2 adds a marker, a pointer line and a second Last Updated, so after >= before
-    # minus a possible empty Environment Variables stub (generously, 200 bytes).
+    # minus a possibly-dropped UNPOPULATED Environment Variables section (generously,
+    # 200 bytes -- such a section is normally a sentence of prose, not an empty stub).
     if [ "$after_bytes" -ge $((before_bytes - 200)) ]; then
         pass "no content loss ($before_bytes -> $after_bytes bytes across files)"
     else

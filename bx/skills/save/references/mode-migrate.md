@@ -142,7 +142,11 @@ nonexistent `docs/architecture.md` in the first one makes git fail the whole `ad
 report lists `docs/architecture.md: created`. Continue to Step 7.
 
 **On failure — no automatic rollback, and STOP the mode here.** Report what failed, name the
-files left modified, and print the exact recovery command:
+files left modified, **carry the change report's `notes:` value into your report verbatim**
+(the success branch is not the only route that owes the user their `notes:` — a run that fails
+after `doc-migrator` returned still has to surface everything advisory it observed, and
+`notes:` is where a dropped `## Environment Variables` body would be quoted), and print the
+exact recovery command:
 
 > "Migration failed at [step]: [what]. The working tree was clean before this ran, so
 >  `git restore . && git clean -fd docs/` restores it exactly. Nothing was committed. This

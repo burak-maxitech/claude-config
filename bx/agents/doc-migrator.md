@@ -90,13 +90,18 @@ target no longer does:
        ## In Progress          : CLAUDE.md yes|no   STATUS.md yes|no
        ## Next Steps           : CLAUDE.md yes|no   STATUS.md yes|no
        ## Session History      : CLAUDE.md yes|no   STATUS.md yes|no
-       ## Architecture Summary : CLAUDE.md yes|no   architecture.md yes|no
+       ## Architecture Summary : CLAUDE.md yes|no
        ## Environment Variables: CLAUDE.md yes|no
 
-   A section counts as present in a file iff that file contains its `## ` header on a line of
-   its own. Steps 3, 4 and 5 read their answers **off this written-out table**, never off the
-   disk as it stands at that later moment. Reproduce it verbatim in your change report under
-   `inventory:`.
+   The two `docs/...` rows are plain **file existence**. In the `## `-prefixed rows, a section
+   counts as present in a file iff that file contains its `## ` header on a line of its own.
+   Note that `## Architecture Summary` has no destination cell, deliberately: that header never
+   appears in `docs/architecture.md` by construction (Step 4 writes the body without it), so a
+   header-presence cell there would read `no` on every run and would answer the wrong question.
+   The state of that destination is the `docs/architecture.md` file row, and nothing else.
+
+   Steps 3, 4 and 5 read their answers **off this written-out table**, never off the disk as it
+   stands at that later moment. Reproduce it verbatim in your change report under `inventory:`.
 
 3. **Create or complete `<project_root>/docs/STATUS.md`.** Write this header block, then the
    five state sections, **in this order**: `## Current Status`, `## Completed`,
@@ -110,10 +115,15 @@ target no longer does:
 
    The `Last Updated:` value follows Step 7's rule: `<today>` replaces the date, and any
    trailing parenthetical on CLAUDE.md's own `Last Updated:` line (`(Session 55)`) is carried
-   over verbatim. All three header-block lines are migration metadata, not section content, so
-   they are safe to write unconditionally: on a resumed run, add whichever are missing and
-   bring an already-present `Last Updated:` up to `today` by that same date-only rule. This is
-   the only part of `docs/STATUS.md` you may write over.
+   over verbatim. Its **target value** is therefore CLAUDE.md's whole `Last Updated:` value with
+   the date replaced by `today` — parenthetical included — and the header block counts as
+   complete only when STATUS.md's line matches that target exactly. A line carrying today's date
+   but no parenthetical is incomplete, not finished.
+
+   All three header-block lines are migration metadata, not section content, so they are safe to
+   write unconditionally: on a resumed run, add whichever are missing and bring an
+   already-present `Last Updated:` up to the target value. This is the only part of
+   `docs/STATUS.md` you may write over.
 
    **Write only the sections the Step 2 inventory recorded as absent from STATUS.md.** A
    section the inventory recorded as already present is never rewritten, reformatted, or
@@ -121,12 +131,25 @@ target no longer does:
    is good enough to allow removing CLAUDE.md's copy is decided by the removal gate in Step 5,
    and overwriting it here would destroy the very evidence that gate reads.
 
-   For a section present in CLAUDE.md, write its `## ` header, a blank line, then copy its
-   **body** byte-for-byte (tables, code fences, everything), applying the link rewriting rules
-   above. For a section **absent** from CLAUDE.md, still write its header, a blank line, then
-   one placeholder line: `_None recorded._` — this is scaffolding, not invention, and is what
-   makes a partially-populated v1 CLAUDE.md verifiable in v2 shape. Name the scaffolded
-   sections in `notes:`.
+   **Canonical order wins over append order.** Put each section you write at its canonical
+   position in the five-section order above — *insert* it between the sections already there,
+   rather than appending it at the end because the ones already present happen to come earlier.
+   Inserting a section between two existing ones neither rewrites nor reformats either of them,
+   so it does not touch the prohibition in the previous paragraph: that prohibition is about a
+   section's **content**, never about which neighbours it ends up between. (Two agents that
+   read this differently produce two byte-different files, and the checker tests presence, not
+   order — so it will not catch the disagreement for you.)
+
+   For a section present in CLAUDE.md **with a non-empty body**, write its `## ` header, a
+   blank line, then copy its **body** byte-for-byte (tables, code fences, everything), applying
+   the link rewriting rules above. For a section **absent from CLAUDE.md, or present with a
+   body that is empty or blank-only**, still write its header, a blank line, then one
+   placeholder line: `_None recorded._` — this is scaffolding, not invention, and is what makes
+   a partially-populated v1 CLAUDE.md verifiable in v2 shape. An empty section is itself
+   information — "this is tracked, and right now there is nothing in it" — so it moves rather
+   than vanishing; and a literally empty destination body would fail the removal gate's
+   non-empty check, blocking a legitimate repo on every run with no way forward. Name the
+   scaffolded sections in `notes:`, distinguishing absent from empty.
 
    Separate consecutive sections with exactly one blank line, and end the file with a single
    newline.
@@ -155,9 +178,9 @@ target no longer does:
 
    | Destination state (read off the Step 2 inventory) | Confirmation required before CLAUDE.md's section may be removed | On failure |
    |---|---|---|
-   | **Written by you this run** — the inventory recorded it *absent* | It is present, non-empty, and not truncated (does not end mid-sentence, mid-table, or mid-fence). Nothing more. Do **not** re-derive the link rewriting and byte-compare it against your first pass: those rules contain a judgment call, so a second derivation can legitimately disagree with the first, and that disagreement must never block a migration you just performed correctly. | **Blocking.** Leave the section in CLAUDE.md and add one `warnings:` line naming it and its destination; then see *When a row blocks*, below. |
+   | **Written by you this run** — the inventory recorded it *absent* | **Read the destination file back now** — an actual Read, not your memory of having written it — and confirm the copy is present, non-empty, and not truncated (does not end mid-sentence, mid-table, or mid-fence). Nothing more. Memory is not observation, and this is the last check standing between a correct write and an irreversible deletion; two tool calls are cheap against that. Do **not** re-derive the link rewriting and byte-compare it against your first pass: those rules contain a judgment call, so a second derivation can legitimately disagree with the first, and that disagreement must never block a migration you just performed correctly. | **Blocking.** Leave the section in CLAUDE.md and add one `warnings:` line naming it and its destination; then see *When a row blocks*, below. |
    | **Already there when the run began** — the inventory recorded it *present* | The existing copy still carries this section's prose. Compare it against what CLAUDE.md's current body produces under the link rewriting rules, **with links normalized out of both sides** (below) and leading/trailing blank lines ignored. You are detecting truncation and hand-edits, nothing finer: **a link rendered differently is NOT a conflict**, and neither is different blank-line padding. | **Blocking.** Leave the section in CLAUDE.md, do **not** overwrite the existing copy, add one `warnings:` line naming the section and both file paths; then see *When a row blocks*, below. Merging or picking a side is worse than stopping — a human needs to look at it. |
-   | **`docs/architecture.md`** — whichever of the two tiers above the inventory puts it in | That tier's confirmation, with one difference: the destination text is the file's content **after its `---` line**. That file never contains an `## Architecture Summary` header (Step 4 writes `# Architecture`, the pointer line, `---`, then the body alone), so confirmation is file-existence-plus-content, **never header presence**. | **Blocking**, exactly as that tier states. |
+   | **`docs/architecture.md`** — tier set by the inventory's **`docs/architecture.md : present \| absent`** line, and by nothing else: *absent* there means you wrote the file this run (first row); *present* means it was already there (second row) | That tier's confirmation, with one difference: the destination text is the file's content **after its `---` line**. Never look for an `## Architecture Summary` header to decide this — that header does not exist in that file by construction, so header presence answers `no` on every run and would silently route a pre-existing, never-compared file into the first row and delete against it. | **Blocking**, exactly as that tier states. |
 
    **Normalizing links out of a comparison** (second tier only): in both texts, replace every
    markdown link — inline `[text](target)`, and every `[label]: target` definition line — with
@@ -165,14 +188,16 @@ target no longer does:
    was rendered are a match. Two bodies whose prose differs are not.
 
    **When a row blocks:** finish evaluating the remaining sections and remove the ones that
-   pass — their destinations are confirmed — then stop. Do **not** run Steps 6, 7 or 8. With
-   the marker unwritten the repo reads as `partial`, so the run is resumable and the
-   orchestrator's failure path can restore the tree. Return `status: failed` with every
-   blocked section named in `warnings:`.
+   pass — their destinations are confirmed — then stop. **Skip the `## Environment Variables`
+   drop entirely**: it is the one deletion with no destination, and nothing gets deleted on a
+   run that is going to fail. Do **not** run Steps 6, 7 or 8. With the marker unwritten the
+   repo reads as `partial`, so the run is resumable and the orchestrator's failure path can
+   restore the tree. Return `status: failed` with every blocked section named in `warnings:`.
 
    `## Environment Variables` is a deletion, not a relocation: it has no destination, so the
-   gate does not apply to it and there is nothing to confirm. When `env_vars_disposition` is
-   `drop`, remove the section outright. **`drop` does not mean the section is textless** — the
+   gate does not apply to it and there is nothing to confirm. **Evaluate every gate row first,
+   and drop it only once you know none of them blocked** (above). When `env_vars_disposition`
+   is `drop`, remove the section outright. **`drop` does not mean the section is textless** — the
    orchestrator sets it whenever the body names no environment variable, and such a body is
    usually ordinary prose, e.g. `None required. This is a pure configuration repo.` Removing
    that is intended and consented; do not keep the section merely because it has words in it.
@@ -181,9 +206,12 @@ target no longer does:
    label, so the text survives in the run's own output and is recoverable without archaeology.
    When `env_vars_disposition` is `keep`, leave the section exactly where it is.
 
-6. **Append the pointer line** as the final line of CLAUDE.md, preceded by one blank line,
-   after all remaining content — whatever section now happens to end the file, never
-   conditioned on which one that is:
+6. **Append the pointer line** as the final line of CLAUDE.md, after all remaining content —
+   whatever section now happens to end the file, never conditioned on which one that is.
+   **Ensure exactly one blank line precedes it**: removing sections often leaves the file
+   ending in one or more blank lines already, and "append a blank line, then the pointer"
+   would then produce two or more. Trim or add as needed until exactly one separates the
+   pointer from the last line of content:
 
        > Session state: [docs/STATUS.md](docs/STATUS.md)
 
@@ -200,7 +228,9 @@ target no longer does:
 8. **Write the marker LAST.** Prepend `<!-- bx-doc-schema: 2 -->` as the very first line of
    CLAUDE.md, with no blank line between it and what was the first line. This is the final
    write of the entire migration — if anything above failed or the removal gate blocked, the
-   marker must not exist, so the run reads as `partial` and can be resumed.
+   marker must not exist, so the run reads as `partial` and can be resumed. Once it is written,
+   set `status:` to `migrated` or `resumed-partial` by the rule in the Output section — the
+   Step 2 inventory's `docs/STATUS.md` line decides which.
 
 ## Idempotency
 
@@ -215,10 +245,12 @@ thing that can, so it is never the step you skip.
 
 - **Step 3** outstanding iff `docs/STATUS.md` is missing; its header block (the
   `# Project Status` title, the `> Session state for /bx:resume...` pointer line, and the
-  `Last Updated:` line) is missing, incomplete, or carries a `Last Updated:` date other than
-  `today`; or it is missing any of the five state headers. Complete the header block first —
-  it is metadata, safe to overwrite — then append only the sections the inventory recorded as
-  absent (copied or placeholder-scaffolded, as it requires), in canonical order.
+  `Last Updated:` line) is missing, incomplete, or carries a `Last Updated:` value other than
+  the target value Step 3 defines (CLAUDE.md's own value with the date replaced by `today`,
+  trailing parenthetical included); or it is missing any of the five state headers. Complete
+  the header block first — it is metadata, safe to overwrite — then write only the sections the
+  inventory recorded as absent (copied or placeholder-scaffolded, as it requires), each
+  **inserted at its canonical position**, never appended at the end.
 - **Step 4** outstanding iff CLAUDE.md still has `## Architecture Summary` and
   `docs/architecture.md` is absent.
 - **Step 5** outstanding iff any state header (or `## Architecture Summary`, or
@@ -259,6 +291,22 @@ scaffolding, under `notes:` in your change report — never `warnings:` (see Out
     env_vars: kept | dropped
     notes: <advisory info, or the literal "none">
     warnings: <blocking problems, or the literal "none">
+
+**The four `status:` values, and who assigns them.** Exactly one applies to any run:
+
+- **`already-v2`** — CLAUDE.md contained the marker when you read it. Assigned by the
+  Idempotency check, before Step 1; nothing on disk is touched and no other field matters.
+- **`migrated`** — the run reached the end of Step 8, and the Step 2 inventory recorded
+  `docs/STATUS.md` as **absent**: a fresh migration, start to finish, this run. Assigned at
+  Step 8.
+- **`resumed-partial`** — the run reached the end of Step 8, and the Step 2 inventory recorded
+  `docs/STATUS.md` as **present**: an earlier interrupted attempt's work was found and
+  completed. Assigned at Step 8. The inventory line is the whole discriminator — how much was
+  left to do does not enter into it, so a resumed run that turned out to need only the marker
+  is still `resumed-partial`.
+- **`failed`** — any gate row blocked (*When a row blocks*, Step 5), or any step could not
+  complete. Steps 6-8 did not run and the marker was not written. Assigned by whichever step
+  stopped.
 
 **Report only what you can observe.** Never state a file size, a character count, or a line
 count: your tools are Read, Write, Edit, Grep and Glob — none of them measures length, and a

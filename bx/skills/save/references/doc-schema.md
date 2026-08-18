@@ -45,8 +45,12 @@ untouched for weeks while state churns daily; the staleness signal must follow t
 
 `## Environment Variables` is **conditional**. It is populated iff its body contains a token
 matching `[A-Z][A-Z0-9_]{2,}` anywhere — three or more consecutive uppercase/digit/underscore
-characters, erring toward keeping content when ambiguous (Invariant 2). It is empty otherwise.
-Empty means drop; anything else (populated) means keep verbatim.
+characters, erring toward keeping content when ambiguous (Invariant 2). Populated means keep
+verbatim. **Unpopulated means drop, whether or not the body has text in it** — a body reading
+`None required. This is a pure configuration repo.` names no variable and is dropped, so this
+is not an "empty section" rule and must never be restated as one. That deletion is the single
+exception to *content moves, nothing is deleted*: it is named and quoted in the migration's
+consent prompt, and quoted verbatim again in the run's report.
 
 ## v1 layout (legacy)
 
@@ -72,7 +76,8 @@ Any migration or save must preserve all four:
 
 1. Every `## ` header present before appears in exactly ONE file after — no silent drops,
    no duplication.
-2. No content loss: concatenated body bytes >= original, minus only a dropped empty stub.
+2. No content loss: concatenated body bytes >= original, minus only a dropped unpopulated
+   `## Environment Variables` section (which is prose more often than it is empty).
 3. No `@path` imports in CLAUDE.md or STATUS.md. `@` imports load at launch and would
    invert the whole design; offload links stay lazy markdown links.
 4. The marker is written last.
