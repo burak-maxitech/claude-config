@@ -184,7 +184,7 @@ behind. Because the repo is on the legacy layout, every link written back into C
    ```markdown
    # Completed Work
 
-   > Full checklist of completed tasks. Referenced from [STATUS.md](STATUS.md).
+   > Full checklist of completed tasks. Referenced from [CLAUDE.md](../CLAUDE.md).
 
    ---
    ```
@@ -215,7 +215,7 @@ behind. Because the repo is on the legacy layout, every link written back into C
    ```markdown
    # Session History Archive
 
-   > Auto-managed by `/bx:save`. Last session summary is in [STATUS.md](STATUS.md).
+   > Auto-managed by `/bx:save`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
 
    ---
    ```
