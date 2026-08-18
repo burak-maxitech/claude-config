@@ -1594,6 +1594,29 @@ incomplete. Update the plugin (`/plugin update bx`) on the second machine. The `
 does this automatically on every launch.
 ```
 
+- [ ] **Step 3b: Fix README's SessionStart hook paths — broken since the S37 plugin migration**
+
+Verified: README documents the hook scripts at `.claude/scripts/session-start-context.{sh,ps1}`
+(line ~245) and its install recipe points at
+`~/Development/projects/claude-config/.claude/scripts/session-start-context.sh` (line ~269).
+**Neither path exists.** Both scripts live at `bx/scripts/` — the S37 plugin migration moved
+them and README was never swept. A teammate following the README today installs a hook that
+cannot run. This predates the doc-schema work entirely; it surfaced while assessing the
+severity of the `.ps1`'s parse errors in Task 3.
+
+Fix the two paths. Then resolve the `.ps1`'s status, which is the reason nobody noticed:
+
+`bx/hooks/hooks.json` wires **only** the `.sh`. Nothing references the `.ps1`, which is why it
+accumulated 8 parse errors under Windows PowerShell 5.1 undetected until Task 3 fixed them.
+Two defensible options — pick one and say which in the commit message:
+- **Document it as the manual alternative** for Windows users without Git Bash, with the
+  corrected `bx/scripts/` path, and state plainly that the plugin hook uses the `.sh`.
+- **Delete it** as dead weight, since the plugin never invokes it and Git Bash covers Windows.
+
+Recommended: keep and document. It is now correct, ASCII-clean, parses on both PowerShell
+hosts, and carries the same dual-layout logic as the `.sh` — deleting a just-repaired file to
+avoid documenting one path is the wrong trade.
+
 - [ ] **Step 4: Verify the version is the only one and is well-formed**
 
 ```bash
