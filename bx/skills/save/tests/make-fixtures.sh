@@ -161,7 +161,7 @@ Last Updated: 2026-08-01 (Session 1)
 
 ## Project Overview
 
-Fixture project, already migrated.
+Fixture project for doc-schema migration tests.
 
 ## Key Decisions
 

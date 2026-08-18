@@ -19,7 +19,7 @@ and resume idempotently, never as complete.
 
     CLAUDE.md                    always loaded   ~7k target
       <!-- bx-doc-schema: 2 -->
-      Last Updated: <date>
+      Last Updated: <date> [(Session N)]
       ## Project Overview
       ## Key Decisions            ~20 rows + link to docs/key-decisions.md
       ## Known Issues / Blockers
