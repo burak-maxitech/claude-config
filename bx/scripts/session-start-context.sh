@@ -68,8 +68,15 @@ if [ -n "$state_file" ]; then
       "$repo_root/$state_file" 2>/dev/null | head -12 || true
 
   # Stale-doc check against the file that actually carries the state.
-  state_mtime="$(git log -1 --format=%ct -- "$state_file" 2>/dev/null || echo 0)"
-  head_commit_mtime="$(git log -1 --format=%ct 2>/dev/null || echo 0)"
+  # Run git from the repo root: $state_file is a repo-root-relative pathspec, so
+  # from a subdirectory git resolves it against CWD, matches nothing, and prints
+  # nothing -- while still exiting 0, so `|| echo 0` never fires and the empty
+  # string reaches `[ -gt ]` as "integer expression expected" on user-visible
+  # stderr. The -C plus the defaults below close both halves.
+  state_mtime="$(git -C "$repo_root" log -1 --format=%ct -- "$state_file" 2>/dev/null || echo 0)"
+  head_commit_mtime="$(git -C "$repo_root" log -1 --format=%ct 2>/dev/null || echo 0)"
+  : "${state_mtime:=0}"
+  : "${head_commit_mtime:=0}"
   if [ "$state_mtime" -gt 0 ] && [ "$head_commit_mtime" -gt "$state_mtime" ]; then
     age_days=$(( (head_commit_mtime - state_mtime) / 86400 ))
     if [ "$age_days" -gt 2 ]; then

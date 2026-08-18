@@ -55,6 +55,12 @@ repo-rooted path).
 which is already in your context. Read nothing extra; use what you have, and surface the
 migration notice in Step 4.
 
+**Schema partial** (`docs/STATUS.md` exists but the marker does not — the migration never
+completed) — read `docs/STATUS.md` for whatever it already holds; CLAUDE.md, already in your
+context, still carries any state sections that were not moved yet. Expect the same section to
+appear in neither file or in both, and prefer `docs/STATUS.md` where they disagree. Surface
+the interrupted-migration notice in Step 4.
+
 **README.md is conditional in both layouts.** Read it only when CLAUDE.md's Project Overview
 leaves the tech stack or setup genuinely unclear. It is typically the largest doc in the
 repo and rarely changes; re-reading it every session is the single most expensive habit
@@ -173,11 +179,16 @@ Read `../save/references/doc-schema.md` and `../save/references/claude-md-sectio
 
 - **Schema v2** — check CLAUDE.md and `docs/STATUS.md` carry their required sections. Note
   any missing ones in the summary and suggest `/bx:save`.
-- **Schema v1 or partial** — report, in the summary:
+- **Schema v1** — report, in the summary:
 
   > "This repo uses doc schema v1. `/bx:save` will offer to migrate it to v2, which moves
   >  session state out of CLAUDE.md into `docs/STATUS.md` and cuts always-loaded context.
   >  Nothing is deleted."
+
+- **Schema partial** — report, in the summary:
+
+  > "A previous migration to doc schema v2 was interrupted; `/bx:save` will resume it
+  >  idempotently. Nothing is deleted."
 
 **`/bx:resume` never migrates and never writes.** Migration belongs at session end, where
 doc writing already happens and the diff can be reviewed before committing — not at session

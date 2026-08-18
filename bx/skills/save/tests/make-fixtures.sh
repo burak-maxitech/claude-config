@@ -82,10 +82,12 @@ MD
 
 write_v1_envvars_claude_md() {  # <path>
     # Identical to write_v1_claude_md, except ## Environment Variables is
-    # POPULATED (real vars in bullet form). The schema drops that section
-    # only when it's empty and keeps it verbatim otherwise -- this fixture
-    # exercises the "keep" path, which none of the other fixtures do since
-    # they all carry "None required." (reads as empty).
+    # POPULATED: its body contains a token matching [A-Z][A-Z0-9_]{2,}, which is
+    # the rule doc-schema.md defines. Populated means keep verbatim; unpopulated
+    # means drop, whether or not the body has text in it -- so this is NOT an
+    # "empty section" rule. This fixture exercises the "keep" path, which none of
+    # the other fixtures do: they all carry "None required.", which names no
+    # variable and is therefore dropped.
     cat > "$1/CLAUDE.md" <<'MD'
 # CLAUDE.md
 
@@ -223,7 +225,7 @@ write_architecture_md() {  # <path>
     cat > "$1/docs/architecture.md" <<'MD'
 # Architecture
 
-> Full architecture detail. Referenced from [CLAUDE.md](../CLAUDE.md).
+> Full architecture detail, moved out of CLAUDE.md (doc schema v2). Read on demand.
 
 ---
 

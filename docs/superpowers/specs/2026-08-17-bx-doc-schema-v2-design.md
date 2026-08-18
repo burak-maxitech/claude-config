@@ -145,7 +145,14 @@ genuine v1 repos.)
    Resume it idempotently rather than starting over.
 4. No marker, CLAUDE.md contains any of `## Current Status`, `## Completed`,
    `## In Progress`, `## Next Steps`, `## Session History` → **v1**; offer migration.
-5. None of the above → **v0**; treat as CREATE mode.
+5. None of the above → **v0**; a CLAUDE.md exists but carries no schema signal.
+
+**v0 routing (cases 1 and 5 detect alike, route differently).** Case 1 has no CLAUDE.md, so
+CREATE is safe. Case 5 has one — hand-written, or `/init`-generated — so it routes to
+**UPDATE, never CREATE**: CREATE against an existing CLAUDE.md risks overwriting it, while
+UPDATE degrades loudly through `save-writer`'s v1 fallback and its unmatched-delta warnings.
+`references/doc-schema.md` states this rule once, as the authority; `SKILL.md`'s pseudocode
+implements it in its final `ELSE`.
 
 ## Migration flow
 
@@ -155,7 +162,7 @@ the fast path and `--full` — it is a precondition, not a sweep.
 | State | Condition | Action |
 |---|---|---|
 | REFACTOR | only README.md | split; emits v2 |
-| CREATE | no docs | create from scratch; emits v2 |
+| CREATE | no docs (no CLAUDE.md at all) | create from scratch; emits v2 |
 | MIGRATE | v1 per `doc-schema.md` | migrate, then fall through to UPDATE |
 | UPDATE | v2 | normal save |
 

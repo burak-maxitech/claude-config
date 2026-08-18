@@ -68,7 +68,7 @@ The orchestrator owns everything that needs conversation context or user input; 
 5. **Commit checkpoint (Part 8).** Run Part 8 as written; respects `--skip-commit` and `--silent` (auto-commit, no prompt). The git diff is the user's review surface.
 6. **Report** using the Change Report format from `verification-checklists.md` — assembled from the subagent's report + drift warnings. Never echo file contents.
 
-**Skipped on the Save Path** (these are `--full` only): Part 0.5 (migration), Part 2 (README), Part 3 (`docs/*.md`), Part 4 (auto-memory), Parts 5/6/7 (rollups), Part 1.10 cap enforcement (replaced by drift warnings).
+**Skipped on the Save Path** (these are `--full` only): Part 0.5 (legacy-layout archive split), Part 2 (README), Part 3 (`docs/*.md`), Part 4 (auto-memory), Parts 5/6/7 (rollups), Part 1.10 cap enforcement (replaced by drift warnings).
 
 ### Update Packet
 
@@ -155,35 +155,46 @@ After draining, verify completeness:
 3. **Report drain summary** to the user:
    > "Task drain complete: [N] completed, [M] in-progress, [K] pending synced to docs."
 
-## Part 0.5: One-Time Migration (if needed)
+## Part 0.5: Legacy-Layout Archive Split (v1 repos only)
 
-**Check if CLAUDE.md still has the old bloated format.** This migration runs once per project to transition from the old structure (full checklists, full decision tables, multiple session entries) to the new lean structure.
+**This is the maintenance path for a repo still on doc schema v1** — one whose migration to v2
+was declined or skipped (`--skip-migrate`), so CLAUDE.md still carries the five state sections
+itself. It never runs on a v2 repo: there the state lives in `docs/STATUS.md` and MIGRATE
+(`mode-migrate.md`) has already done the split.
 
-**Detection:** Run this migration if ANY of these are true:
+Its job is the older, coarser split: move the bulky archives (full checklists, full decision
+tables, multiple session entries) out of the **un-split CLAUDE.md** and leave a summary + link
+behind. Because the repo is on the legacy layout, every link written back into CLAUDE.md is
+**repo-root-relative** (`docs/…`) — CLAUDE.md sits at the repo root, so a bare
+`completed-work.md` there would resolve to a file that does not exist.
+
+**Detection:** Run this split if ANY of these are true:
 - `## Completed` section contains more than 2 `- [x]` checkbox lines
 - `## Key Decisions` table has more than 25 rows
 - `## Session History` contains more than 1 `### Session` entry
-- CLAUDE.md is over 25k characters
+- The un-split CLAUDE.md is over 32k characters — the v1-layout equivalent of this file's
+  per-file soft caps (CLAUDE.md 12k + `docs/STATUS.md` 20k), which a v1 CLAUDE.md carries
+  together in one file
 
-**Migration steps:**
+**Split steps:**
 
-### Migrate Completed Section
+### Split the Completed Section
 1. Extract all `- [x]` items from CLAUDE.md's `## Completed`
 2. Create `docs/completed-work.md` (if it doesn't exist) with header:
    ```markdown
    # Completed Work
 
-   > Full checklist of completed tasks. Referenced from [CLAUDE.md](../CLAUDE.md).
+   > Full checklist of completed tasks. Referenced from [STATUS.md](STATUS.md).
 
    ---
    ```
 3. Append all extracted items to `docs/completed-work.md`
 4. Replace CLAUDE.md's `## Completed` content with:
    ```markdown
-   [N] tasks completed across [areas]. See [completed-work.md](completed-work.md) for full checklist.
+   [N] tasks completed across [areas]. See [docs/completed-work.md](docs/completed-work.md) for full checklist.
    ```
 
-### Migrate Key Decisions
+### Split the Key Decisions Table
 1. Extract all rows from CLAUDE.md's `## Key Decisions` table
 2. Create `docs/key-decisions.md` (if it doesn't exist) with header:
    ```markdown
@@ -198,26 +209,26 @@ After draining, verify completeness:
 4. Keep only the ~20 most important architectural decisions in CLAUDE.md (API gotchas, naming conventions, critical tech choices). Remove implementation details.
 5. Add link: `> Full decision log: [docs/key-decisions.md](docs/key-decisions.md)`
 
-### Migrate Session History
+### Split the Session History
 1. Extract all `### Session` entries from CLAUDE.md's `## Session History`
 2. Create `docs/session-history.md` (if it doesn't exist) with header:
    ```markdown
    # Session History Archive
 
-   > Auto-managed by `/bx:save`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
+   > Auto-managed by `/bx:save`. Last session summary is in [STATUS.md](STATUS.md).
 
    ---
    ```
 3. Append ALL session entries to `docs/session-history.md` (in chronological order, skip duplicates)
 4. Replace CLAUDE.md's `## Session History` with only the last session as a 3-5 bullet summary:
    ```markdown
-   > Full history: [session-history.md](session-history.md)
+   > Full history: [docs/session-history.md](docs/session-history.md)
 
    ### Last Session (Session [N]) - [DATE]
    - [3-5 bullet points from the most recent session]
    ```
 
-**After migration, continue with the normal update process below.**
+**After the split, continue with the normal update process below.**
 
 ---
 
@@ -272,7 +283,7 @@ Target: **docs/STATUS.md's `## Completed` section**, plus the `docs/completed-wo
      ```markdown
      # Completed Work
 
-     > Full checklist of completed tasks. Referenced from [CLAUDE.md](../CLAUDE.md).
+     > Full checklist of completed tasks. Referenced from [STATUS.md](STATUS.md).
 
      ---
      ```
@@ -330,7 +341,7 @@ Target: **docs/STATUS.md's `## Session History` section** (brief), plus the `doc
      ```markdown
      # Session History Archive
 
-     > Auto-managed by `/bx:save`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
+     > Auto-managed by `/bx:save`. Last session summary is in [STATUS.md](STATUS.md).
 
      ---
      ```
@@ -467,7 +478,7 @@ This replaces a sequential read-analyze-edit loop (N turns) with a single parall
 
 ## Part 4: Sync Auto-Memory
 
-Claude Code maintains a persistent auto-memory directory (`~/.claude/projects/<project-path>/memory/`) that is automatically loaded into every conversation. Use it as a **stable quick-reference layer** alongside CLAUDE.md's instructions and docs/STATUS.md's evolving status.
+Claude Code maintains a persistent auto-memory directory (`~/.claude/projects/<project-path>/memory/`) that is automatically loaded into every conversation. It is **Claude's own corrections-and-learnings layer**, distinct from CLAUDE.md's instructions and docs/STATUS.md's evolving status. This Part prunes and budgets that layer; it never syncs facts derivable from the repo (see 4.3).
 
 **If `--skip-memory` is in `$ARGUMENTS`, skip this step entirely.**
 
@@ -654,7 +665,7 @@ For each section over its threshold, propose a specific shrinker. The thresholds
 |---|---|---|
 | CLAUDE.md `## Key Decisions` (any variant: `(condensed)` etc.) | 8000 chars | **Size-based rollup** — move oldest rows (FIFO from top, same anchor rule as Part 6.3) to `docs/key-decisions.md` until section is under 6000 chars. Runs even when row count is ≤20. Adds `Rolled up from CLAUDE.md → docs/key-decisions.md in S<N> by size pressure` suffix to each moved row's rationale. |
 | docs/STATUS.md `## In Progress` | 3000 chars | **Per-item collapse** — for each bullet, trim prose to 2-3 sentences + commit hash refs / file paths preserved. Move completed sub-bullets (`✅`, "Done", "Shipped", strikethrough) to `docs/completed-work.md`. Do NOT delete items entirely — collapse text only. |
-| docs/STATUS.md `## Next Steps` | 3000 chars | **Flatten + extract detail** — collapse sub-section headers (`### High Priority`, `### Queued`, `### Nice to Have`) into a flat top-10 priority-ordered list. For items with 3+ sentences of detail, move detail to `docs/next-steps-backlog.md` (create if missing); keep 1-sentence summary + `→ docs/next-steps-backlog.md#<anchor>` link. |
+| docs/STATUS.md `## Next Steps` | 3000 chars | **Flatten + extract detail** — collapse sub-section headers (`### High Priority`, `### Queued`, `### Nice to Have`) into a flat top-10 priority-ordered list. For items with 3+ sentences of detail, move detail to `docs/next-steps-backlog.md` (create if missing); keep 1-sentence summary + `→ next-steps-backlog.md#<anchor>` link (STATUS.md-relative — it already sits in `docs/`). |
 | docs/STATUS.md `## Session History` (last-session block) | 2000 chars | **Bullet trim** — if the last-session block has >5 bullets, trim to top 3 (most architecturally significant) + append `> Full session detail: session-history.md S<N>` reference. |
 | docs/STATUS.md `## Completed` (foregrounded feature paragraph) | 1500 chars | **Paragraph trim** — replace foregrounded multi-sentence paragraph with a single bullet pointing at `completed-work.md`. Keep the count summary line. |
 

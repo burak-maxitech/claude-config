@@ -82,9 +82,14 @@ if ($stateFile) {
         }
 
         # Stale-doc check against the file that actually carries the state.
-        $stateCommit = git log -1 --format=%ct -- $stateFile 2>$null
-        $headCommit = git log -1 --format=%ct 2>$null
-        if ($stateCommit -and $headCommit -and ([int]$headCommit -gt [int]$stateCommit)) {
+        # Run git from the repo root: $stateFile is a repo-root-relative pathspec,
+        # so from a subdirectory git resolves it against CWD, matches nothing, and
+        # returns empty. Default both results before any integer comparison.
+        $stateCommit = git -C $repoRoot log -1 --format=%ct -- $stateFile 2>$null
+        $headCommit = git -C $repoRoot log -1 --format=%ct 2>$null
+        if (-not $stateCommit) { $stateCommit = 0 }
+        if (-not $headCommit) { $headCommit = 0 }
+        if (([int]$stateCommit -gt 0) -and ([int]$headCommit -gt [int]$stateCommit)) {
             $ageDays = [int](([int]$headCommit - [int]$stateCommit) / 86400)
             if ($ageDays -gt 2) {
                 Write-Output ""

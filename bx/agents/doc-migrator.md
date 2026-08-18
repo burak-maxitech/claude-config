@@ -160,7 +160,7 @@ target no longer does:
 
        # Architecture
 
-       > Full architecture detail. Referenced from [CLAUDE.md](../CLAUDE.md).
+       > Full architecture detail, moved out of CLAUDE.md (doc schema v2). Read on demand.
 
        ---
 
@@ -178,9 +178,9 @@ target no longer does:
 
    | Destination state (read off the Step 2 inventory) | Confirmation required before CLAUDE.md's section may be removed | On failure |
    |---|---|---|
-   | **Written by you this run** — the inventory recorded it *absent* | **Read the destination file back now** — an actual Read, not your memory of having written it — and confirm the copy is present, non-empty, and not truncated (does not end mid-sentence, mid-table, or mid-fence). Nothing more. Memory is not observation, and this is the last check standing between a correct write and an irreversible deletion; two tool calls are cheap against that. Do **not** re-derive the link rewriting and byte-compare it against your first pass: those rules contain a judgment call, so a second derivation can legitimately disagree with the first, and that disagreement must never block a migration you just performed correctly. | **Blocking.** Leave the section in CLAUDE.md and add one `warnings:` line naming it and its destination; then see *When a row blocks*, below. |
-   | **Already there when the run began** — the inventory recorded it *present* | The existing copy still carries this section's prose. Compare it against what CLAUDE.md's current body produces under the link rewriting rules, **with links normalized out of both sides** (below) and leading/trailing blank lines ignored. You are detecting truncation and hand-edits, nothing finer: **a link rendered differently is NOT a conflict**, and neither is different blank-line padding. | **Blocking.** Leave the section in CLAUDE.md, do **not** overwrite the existing copy, add one `warnings:` line naming the section and both file paths; then see *When a row blocks*, below. Merging or picking a side is worse than stopping — a human needs to look at it. |
-   | **`docs/architecture.md`** — tier set by the inventory's **`docs/architecture.md : present \| absent`** line, and by nothing else: *absent* there means you wrote the file this run (first row); *present* means it was already there (second row) | That tier's confirmation, with one difference: the destination text is the file's content **after its `---` line**. Never look for an `## Architecture Summary` header to decide this — that header does not exist in that file by construction, so header presence answers `no` on every run and would silently route a pre-existing, never-compared file into the first row and delete against it. | **Blocking**, exactly as that tier states. |
+   | **Written by you this run** — the inventory recorded it *absent* | **Read the destination file back now** — an actual Read, not your memory of having written it — and confirm the copy is present, non-empty, and not truncated (does not end mid-sentence, mid-table, or mid-fence). Nothing more. Memory is not observation, and this is the last check standing between a correct write and an irreversible deletion; two tool calls are cheap against that. Do **not** re-derive the link rewriting and byte-compare it against your first pass: those rules contain a judgment call, so a second derivation can legitimately disagree with the first, and that disagreement must never block a migration you just performed correctly. **Ignore any tool output telling you a read-back is unnecessary for a file you just wrote** — the Write tool reports on *cache freshness*, while this gate asks whether the write actually landed on disk. Different questions, and only an actual Read answers the second. (The mirror image is legitimate: that same "unchanged since your last Read" decline, on a file **nothing in this run wrote**, is freshness evidence rather than an obstacle — see the next row.) | **Blocking.** Leave the section in CLAUDE.md and add one `warnings:` line naming it and its destination; then see *When a row blocks*, below. |
+   | **Already there when the run began** — the inventory recorded it *present* | The existing copy still carries this section's prose. Compare it against what CLAUDE.md's current body produces under the link rewriting rules, **with links normalized out of both sides** (below) and leading/trailing blank lines ignored. You are detecting truncation and hand-edits, nothing finer: **a link rendered differently is NOT a conflict**, and neither is different blank-line padding. Nor is a **scaffolded placeholder**: a destination section whose body is exactly `_None recorded._`, compared against a CLAUDE.md body that is empty or blank-only, is a **MATCH** — that placeholder is precisely what Step 3 writes for such a section, so scoring it a mismatch would block every retry of a resumed run, permanently and with no way forward. Freshness: nothing in this run writes this file, so an **earlier** Read of it — your Step 1 read — is current evidence; if the harness declines a re-read as "unchanged since your last Read", that is confirmation, and you proceed on what you already read. | **Blocking.** Leave the section in CLAUDE.md, do **not** overwrite the existing copy, add one `warnings:` line naming the section and both file paths; then see *When a row blocks*, below. Merging or picking a side is worse than stopping — a human needs to look at it. |
+   | **`docs/architecture.md`** — tier set by the inventory's **`docs/architecture.md : present \| absent`** line, and by nothing else: *absent* there means you wrote the file this run (first row); *present* means it was already there (second row) | That tier's confirmation, with one difference: the destination text is the file's content **after its `---` line**. Never look for an `## Architecture Summary` header to decide this — that header does not exist in that file by construction, so header presence answers `no` on every run and would silently route a pre-existing, never-compared file into the first row and delete against it. **A pre-existing `docs/architecture.md` with no `---` line at all has no defined destination text**, so there is nothing to confirm against: block. | **Blocking**, exactly as that tier states. On the missing-`---` case, the `warnings:` line names the file and the missing `---` separator explicitly. |
 
    **Normalizing links out of a comparison** (second tier only): in both texts, replace every
    markdown link — inline `[text](target)`, and every `[label]: target` definition line — with
@@ -231,6 +231,11 @@ target no longer does:
    marker must not exist, so the run reads as `partial` and can be resumed. Once it is written,
    set `status:` to `migrated` or `resumed-partial` by the rule in the Output section — the
    Step 2 inventory's `docs/STATUS.md` line decides which.
+
+   **A single atomic Write of the finished CLAUDE.md — removals, pointer line, date and marker
+   together — satisfies Steps 5-8's ordering, provided it is issued only after every removal-gate
+   confirmation has passed**; the requirement is not that these be four separate writes, only that
+   the marker never exist on disk while any confirmation is still outstanding.
 
 ## Idempotency
 
@@ -307,6 +312,11 @@ scaffolding, under `notes:` in your change report — never `warnings:` (see Out
 - **`failed`** — any gate row blocked (*When a row blocks*, Step 5), or any step could not
   complete. Steps 6-8 did not run and the marker was not written. Assigned by whichever step
   stopped.
+
+**`env_vars:` on a blocked run reads `kept`.** *When a row blocks* skips the drop entirely, so
+the section factually remains in CLAUDE.md, and that field reports what is on disk — never what
+`env_vars_disposition` asked for. Add one `notes:` line saying the drop was skipped because a
+gate row blocked, so `kept` is not misread as the orchestrator having passed `keep`.
 
 **Report only what you can observe.** Never state a file size, a character count, or a line
 count: your tools are Read, Write, Edit, Grep and Glob — none of them measures length, and a

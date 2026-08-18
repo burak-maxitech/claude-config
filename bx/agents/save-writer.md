@@ -34,7 +34,7 @@ You do NOT call `TaskList` — the orchestrator already drained it and folded th
    ```markdown
    # Session History Archive
 
-   > Auto-managed by `/bx:save`. Last session summary is in [CLAUDE.md](../CLAUDE.md).
+   > Auto-managed by `/bx:save`. Last session summary is in [STATUS.md](STATUS.md).
 
    ---
    ```
@@ -42,7 +42,7 @@ You do NOT call `TaskList` — the orchestrator already drained it and folded th
    ```markdown
    # Completed Work
 
-   > Full checklist of completed tasks. Referenced from [CLAUDE.md](../CLAUDE.md).
+   > Full checklist of completed tasks. Referenced from [STATUS.md](STATUS.md).
 
    ---
    ```

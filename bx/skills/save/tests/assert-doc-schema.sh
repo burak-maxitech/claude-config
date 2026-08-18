@@ -104,7 +104,11 @@ if [ "$LAYOUT" = "v2" ]; then
     # headers a real repo may add (e.g. "## Deployment") are simply skipped,
     # not required to sort anywhere -- exact-equality with the canonical five
     # would turn a correct migration of a repo with its own extra STATUS.md
-    # section into a verification failure. ---
+    # section into a verification failure.
+    # The comparison is -le, not -lt, so a REPEATED canonical header (equal rank)
+    # also fails: an append-instead-of-insert on a resumed run duplicates a
+    # section, and a valid file has each rank exactly once (strictly increasing),
+    # so legitimate sequences still pass. ---
     if [ -f "$STATUS_MD" ]; then
         order_bad=""
         last_rank=0
@@ -118,7 +122,7 @@ if [ "$LAYOUT" = "v2" ]; then
                 *) rank=0 ;;
             esac
             [ "$rank" -eq 0 ] && continue
-            if [ -z "$order_bad" ] && [ "$rank" -lt "$last_rank" ]; then
+            if [ -z "$order_bad" ] && [ "$rank" -le "$last_rank" ]; then
                 order_bad="$h"
             fi
             [ "$rank" -gt "$last_rank" ] && last_rank="$rank"
@@ -126,7 +130,7 @@ if [ "$LAYOUT" = "v2" ]; then
         if [ -z "$order_bad" ]; then
             pass "STATUS.md canonical sections in relative order"
         else
-            fail "STATUS.md section order violated: '$order_bad' is out of position"
+            fail "STATUS.md section order violated: '$order_bad' is out of position or duplicated"
         fi
     fi
 fi
@@ -195,12 +199,18 @@ if [ -n "$BEFORE" ] && [ -f "$BEFORE" ]; then
     # run outside --before: doc-schema.md gives CLAUDE.md and STATUS.md separate
     # Last Updated lines precisely because they diverge in steady state (CLAUDE.md
     # may sit untouched for weeks while state churns daily). Skip -- do not fail --
-    # when CLAUDE.md carries no Last Updated: line at all; the migrator has a
-    # defined template fallback for that case. ---
+    # when CLAUDE.md carries no Last Updated: line at all AND the snapshot had
+    # none either -- that is the migrator's defined template-fallback case. If
+    # the snapshot DID carry one, its absence afterwards is a migration
+    # regression (Step 7 lost the line), and that must FAIL rather than skip. ---
     claude_lu="$([ -f "$CLAUDE_MD" ] && grep -m1 -E '^Last Updated:' "$CLAUDE_MD")"
     status_lu="$([ -f "$STATUS_MD" ] && grep -m1 -E '^Last Updated:' "$STATUS_MD")"
     if [ -z "$claude_lu" ]; then
-        skip "Last Updated agreement (CLAUDE.md has no Last Updated: line; migrator's template fallback applies)"
+        if grep -qE '^Last Updated:' "$BEFORE"; then
+            fail "Last Updated lost in migration: the --before snapshot carries a 'Last Updated:' line but CLAUDE.md no longer has one"
+        else
+            skip "Last Updated agreement (neither the snapshot nor CLAUDE.md has a Last Updated: line; migrator's template fallback applies)"
+        fi
     elif [ -z "$status_lu" ]; then
         skip "Last Updated agreement (docs/STATUS.md has no Last Updated: line to compare)"
     elif [ "$claude_lu" = "$status_lu" ]; then

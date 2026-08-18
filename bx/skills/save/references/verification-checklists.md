@@ -109,7 +109,7 @@ For UPDATE mode the change report is assembled from the `save-writer` subagent's
 - [ ] Relevant docs/*.md files updated
 - [ ] All files consistent with each other
 - [ ] No valuable context removed
-- [ ] Auto-memory synced with stable project facts (if changed)
+- [ ] Auto-memory pass ran per Part 4 — contradictions pruned, `MEMORY.md` index budget checked; nothing derivable from the repo (tech stack, commands, key paths, architecture patterns, env var names) and no session state was written (Part 4.3)
 - [ ] Task list drained — completed/in-progress/pending tasks synced back
 - [ ] Session-history rollup considered (unless --skip-rollup) — older entries compressed when count > 5
 - [ ] Key Decisions rollup considered (unless --skip-decisions-rollup) — oldest rows moved to docs/key-decisions.md when CLAUDE.md table > 20

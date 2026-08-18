@@ -37,7 +37,7 @@
 | `bx/skills/save/references/mode-migrate.md` | Create | MIGRATE mode: clean-tree guard, consent copy, packet spec, dispatch, verify, commit, fall-through. |
 | `bx/agents/doc-migrator.md` | Create | Sonnet subagent. Mechanical file surgery only; no judgment, no rewriting. |
 | `bx/skills/save/tests/assert-doc-schema.sh` | Create | Deterministic post-condition checker. Runs against any repo. |
-| `bx/skills/save/tests/make-fixtures.sh` | Create | Builds the five fixture repos. |
+| `bx/skills/save/tests/make-fixtures.sh` | Create | Builds the ten fixture repos. |
 | `bx/skills/save/tests/test-hook-layout.sh` | Create | Asserts the SessionStart hook reads the right file and stops at the right header. |
 | `bx/skills/save/tests/check-doc-rule-consistency.sh` | Create | Lints the `bx/` tree so the schema marker and the populated-rule regex stay byte-identical wherever they are restated. Run standalone; wired into Task 10 Step 1. |
 | `bx/skills/save/SKILL.md` | Modify | 4-state mode table; loads `doc-schema.md`; `--skip-migrate`. |
@@ -1762,6 +1762,7 @@ bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-dirty"        --expect 
 bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v1-sparse"    --expect v1
 bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v1-ineligible" --expect v1
 bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-partial-conflict" --expect partial
+bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-arch-preexisting" --expect v1
 bash bx/skills/save/tests/test-hook-layout.sh
 bash bx/skills/save/tests/check-doc-rule-consistency.sh
 
@@ -1772,15 +1773,18 @@ bash bx/skills/save/tests/check-doc-rule-consistency.sh
 bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v2" \
      --expect v2 --before "$DEST/fx-v1/CLAUDE.md"
 ```
-Expected: all twelve exit 0.
+Expected: all thirteen exit 0.
 
-**The last invocation is not optional.** Every prior run of this pipeline omitted `--before`,
-so `assert-doc-schema.sh`'s header-conservation and no-content-loss checks had never run at
-all — the checker's most important code was itself untested. If this assertion fails, either
-`fx-v2` is not a faithful golden output of `fx-v1` (fix the fixture) or the invariant logic is
-wrong (fix the checker); do not weaken the assertion to make it pass. The last one lints the `bx/` tree itself rather than a target
-repo — it fails if the schema marker or the populated-rule regex has drifted between the
-files that restate them, which is the failure mode that silently loses content.
+**The `--before` invocation at the end of the block is not optional.** Every prior run of this
+pipeline omitted `--before`, so `assert-doc-schema.sh`'s header-conservation and
+no-content-loss checks had never run at all — the checker's most important code was itself
+untested. If that assertion fails, either `fx-v2` is not a faithful golden output of `fx-v1`
+(fix the fixture) or the invariant logic is wrong (fix the checker); do not weaken the
+assertion to make it pass.
+
+**`check-doc-rule-consistency.sh` is the odd one out** — it lints the `bx/` tree itself rather
+than a target repo. It fails if the schema marker or the populated-rule regex has drifted
+between the files that restate them, which is the failure mode that silently loses content.
 
 - [ ] **Step 2: Run `/bx:save` against `fx-v1` and verify the migration**
 

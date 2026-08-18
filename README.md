@@ -388,7 +388,7 @@ session. `/bx:resume` reads it on demand; it is not auto-loaded.
 Repos created before v2.0.0 keep working. The first `/bx:save` after updating detects the
 old layout and offers to migrate: it needs a clean working tree, asks before changing
 anything, and lands the move as a single commit you can `git revert`. Decline and it asks
-again next time; `--skip-migrate` skips it permanently.
+again next time; `--skip-migrate` skips it for that run (the next save offers again).
 
 **Working across machines:** if you migrate a repo on one machine and then open it on
 another whose `bx` plugin is still on 1.x, the old skill will not find the sections it

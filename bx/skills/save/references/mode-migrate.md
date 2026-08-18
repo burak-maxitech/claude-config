@@ -34,8 +34,16 @@ Run `git status --porcelain`. If it emits **any** line:
 >  Migration needs a clean tree so it can land as one revertible commit. Commit or stash,
 >  then run `/bx:save` again. Continuing with a normal save for now."
 
-Then **skip the rest of this mode and run UPDATE against the v1 layout**. Migration is
-opportunistic and must never block the work the user came to do.
+Then **skip the rest of this mode and run UPDATE against the pre-migration layout** —
+CLAUDE.md's state sections on a v1 repo, and on a `partial` repo whichever sections the
+interrupted run had not yet moved out of CLAUDE.md. Migration is opportunistic and must never
+block the work the user came to do.
+
+On a `partial` repo, say so in the message instead of calling the layout v1:
+
+> "A previous migration to doc schema v2 was interrupted, and the working tree has [N]
+>  uncommitted files. Resuming it needs a clean tree so it can land as one revertible commit.
+>  Commit or stash, then run `/bx:save` again. Continuing with a normal save for now."
 
 ## Step 2: Consent gate
 
@@ -52,12 +60,23 @@ identically here, in `doc-schema.md`, and in `assert-doc-schema.sh` —
 not recompute it there.
 
 Then ask via `AskUserQuestion` (numbered fallback if unavailable). State the concrete delta,
-computed from the same CLAUDE.md:
+computed from the same CLAUDE.md. **The opening sentence is layout-aware** — the detection
+predicate already told you which of `v1` and `partial` you are on, and telling a
+half-migrated repo that it "uses doc schema v1" misdescribes what the user is consenting to:
+
+**On `v1`:**
 
 > "This repo uses doc schema v1. Migrating moves 5 state sections from CLAUDE.md into
 >  `docs/STATUS.md`, and the architecture tree into `docs/architecture.md`. CLAUDE.md
 >  drops from [X]k to ~[Y]k chars of always-loaded context. **Content moves rather than being
 >  deleted**, and it lands as one commit you can `git revert`. Migrate now?"
+
+**On `partial`:**
+
+> "A previous migration to doc schema v2 was interrupted; resuming completes it. Nothing is
+>  deleted. It finishes moving the state sections still in CLAUDE.md into `docs/STATUS.md`
+>  (and the architecture tree into `docs/architecture.md`), leaving CLAUDE.md at ~[Y]k chars
+>  of always-loaded context, as one commit you can `git revert`. Resume now?"
 
 **If `env_vars_disposition` is `drop` AND `## Environment Variables` is present in CLAUDE.md,
 the prompt MUST also name that removal and quote the body being removed.** It is the one thing
@@ -79,6 +98,16 @@ false, and consent must attach to this specific removal rather than to a generic
 Copy the current CLAUDE.md to a scratch path (outside the repo) so Step 5 can check header
 conservation against it. Use the session scratchpad, never a path inside `project_root` —
 a stray file in the repo would defeat the clean-tree guard on the next run.
+
+**Use this exact form**, with both paths substituted as literal absolutes:
+
+    bash -c 'cp "<project_root>/CLAUDE.md" "<scratch>/claude-md-before.md"'
+
+A bare `cp` is not in this skill's `allowed-tools` and would prompt on every migration;
+wrapping it in `bash -c` is covered by the existing `Bash(bash:*)` grant. `cp` is also
+byte-faithful, which a Read-then-Write round trip is not — and the snapshot is what Step 5's
+no-content-loss byte floor is measured against, so a re-encoded copy would corrupt the
+verification rather than the repo. Do not improvise a different mechanism.
 
 ## Step 4: Dispatch `doc-migrator`
 

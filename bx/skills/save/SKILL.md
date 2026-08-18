@@ -40,6 +40,12 @@ ELSE:
     ELSE                       -> UPDATE
 ```
 
+The final `ELSE` deliberately swallows the `v0`-with-a-CLAUDE.md case (a hand-written or
+`/init` file: no marker, no `docs/STATUS.md`, no state headers). `doc-schema.md`'s "v0 mode
+routing" rule is the authority there and requires UPDATE, never CREATE — CREATE would risk
+overwriting an existing CLAUDE.md, while UPDATE degrades loudly via `save-writer`'s v1
+fallback and its unmatched-delta warnings.
+
 **Announce the mode** at the start of your response:
 > "Documentation Mode: [REFACTOR/CREATE/MIGRATE/UPDATE]"
 

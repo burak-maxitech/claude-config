@@ -68,7 +68,25 @@ reader of this prose alone must be able to predict the script's answer for any i
    interrupted; resume it idempotently rather than starting over.
 4. CLAUDE.md has any of `## Current Status`, `## Completed`, `## In Progress`,
    `## Next Steps`, `## Session History` -> **v1**. Offer migration.
-5. None of the above -> **v0**. Treat as CREATE mode.
+5. None of the above -> **v0**. A CLAUDE.md exists but carries no schema signal at all; see
+   the v0 mode-routing rule below — it routes to UPDATE, not CREATE.
+
+### v0 mode routing (this file is the authority)
+
+Cases 1 and 5 both **detect** as `v0` — that is what `assert-doc-schema.sh` reports for
+either — but they must not **route** the same way:
+
+- **No CLAUDE.md at all** (case 1) -> **CREATE**. There is nothing on disk to overwrite, and
+  CREATE emits v2 directly.
+- **CLAUDE.md present, matching no other case** (case 5 — a hand-written or `/init`-generated
+  CLAUDE.md: no marker, no `docs/STATUS.md`, none of the five state headers) -> **UPDATE,
+  never CREATE**. CREATE against an existing CLAUDE.md risks overwriting a file somebody wrote
+  by hand. UPDATE degrades *loudly* instead: `save-writer`'s v1 fallback routes the state
+  deltas at CLAUDE.md, and any delta whose `old_string` does not match is reported as an
+  unmatched-delta warning rather than guessed at — so the run ends with a visible warning, not
+  a silent overwrite.
+
+`/bx:save`'s SKILL.md pseudocode implements this: its final `ELSE` lands on UPDATE.
 
 ## Invariants
 
