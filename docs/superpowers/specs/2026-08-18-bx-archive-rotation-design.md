@@ -51,7 +51,11 @@ surface to the user, not a file to rotate — rotating it would bury still-live 
 ## Mechanics — new Part 7.7 in `mode-update.md`
 
 Runs on `--full` only, **after** Part 7's shrinkers (they are what append to archives), per
-over-threshold file independently:
+over-threshold file independently. A `--skip-rotation` flag skips the Part entirely and
+joins the skip-flag list in `save/SKILL.md`'s `argument-hint`, matching the house pattern
+(`--skip-rollup`, `--skip-decisions-rollup`). **Part 7.1's early exit (both live files under
+their soft caps) skips 7.2-7.6 but NOT 7.7** — rotation's trigger is archive size, not
+live-file size, and the live files being under cap is the normal steady state. Steps:
 
 1. **Consent** per decision 3. Declined → skip this file, re-check next `--full` run.
 2. **Create `docs/archive/`** if missing.
@@ -88,9 +92,10 @@ over-threshold file independently:
    <M>k (<V> volumes total)."`
 8. **Invariant — byte conservation:** `wc -c` the live file before, and live + new volume
    after. Rotation only adds header bytes, so the after-sum must be **≥ the before count and
-   ≤ before + ~400 bytes** (the volume header + sentinel). Below the floor means content was
-   lost, above the ceiling means content was rewritten — either way, report loudly and do
-   not rotate further files this run.
+   ≤ before + 600 bytes** (volume header ~250 + sentinel ~160 + key-decisions table-header
+   repeat ~45, with margin). Below the floor means content was lost, above the ceiling means
+   content was rewritten — either way, report loudly and do not rotate further files this
+   run.
 
 ## Read-path guarantee (why volumes are performance-free)
 
