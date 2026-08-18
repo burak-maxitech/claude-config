@@ -491,7 +491,7 @@ Last Updated: 2026-08-01 (Session 1)
 
 ## Completed
 
-2 tasks completed. See [docs/completed-work.md](completed-work.md) for full checklist.
+2 tasks completed. See [completed-work.md](completed-work.md) for full checklist.
 
 ## In Progress
 
@@ -1263,6 +1263,14 @@ what `/doctor`'s trim check removes. Do not sync session state — that is STATU
 ```
 
 - [ ] **Step 6: Update `save-writer.md` to match**
+
+**Also fix a link-depth bug this refactor creates.** `mode-update.md:176, :207, :258, :333`
+emit `[docs/completed-work.md](docs/completed-work.md)` and
+`[docs/session-history.md](docs/session-history.md)` into the `## Completed` and
+`## Session History` bodies. Under v2 those sections live in `docs/STATUS.md`, so those targets
+resolve to `docs/docs/…` — broken on the first post-migration save, silently undoing the
+link-rewriting the migration just performed. Change them to the STATUS.md-relative form
+(`[completed-work.md](completed-work.md)`), matching the rule `doc-migrator.md` ships.
 
 **First, resolve a field-name collision.** `save-writer.md:63,74` uses `warnings:` as an
 **advisory** channel (density caps), consumed non-blockingly at `mode-update.md:85-88`. Task 4
