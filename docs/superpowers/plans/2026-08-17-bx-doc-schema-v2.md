@@ -1373,6 +1373,29 @@ Make it item 1 in the "Load Shared References" list, ahead of `doc-structure-rul
 Add the row `| **MIGRATE** | references/mode-migrate.md |` and a note:
 `MIGRATE runs on both the fast path and --full, then falls through to UPDATE in the same run.`
 
+- [ ] **Step 4b: Add the one missing `allowed-tools` grant — verified, and narrower than it looks**
+
+MIGRATE introduces commands the skill did not previously run. I checked each against the
+current grant rather than assuming:
+
+    allowed-tools: Read, Edit, Write, Grep, Glob, Bash(git:*), Bash(ls:*), Bash(find:*),
+                   Bash(wc:*), Bash(awk:*), Bash(sort:*), TaskList, TaskGet,
+                   AskUserQuestion, Agent
+
+- `git status` / `add` / `commit` / `restore` / `clean` -> already covered by `Bash(git:*)`.
+- The `doc-migrator` dispatch -> already covered by `Agent`.
+- The consent prompt -> already covered by `AskUserQuestion`.
+- **`bash <path>/assert-doc-schema.sh` -> NOT covered.** There is no `Bash(bash:*)` rule, and
+  `mode-migrate.md` Step 5 invokes the checker exactly that way.
+
+Add `Bash(bash:*)` (or a narrower rule that matches how the checker is actually invoked).
+
+Why this matters more than a missing entry usually would: an unpermitted command means a
+**permission prompt in the middle of a migration**, after Step 4 has already modified the
+user's files. On a `--silent` run there is nobody to answer it. This repo has learned this
+lesson twice already (S42 and S45 both landed on "`allowed-tools` must enumerate every command
+a skill invokes, including plugin `bin/` helpers"); this is the third instance.
+
 - [ ] **Step 5: Verify every mode has a reference file that exists**
 
 ```bash
