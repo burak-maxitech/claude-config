@@ -41,10 +41,10 @@ cc               # interactive project picker
 
 **What `/bx:resume` does:**
 - Checks auto-memory for stable project facts already in context
-- Reads CLAUDE.md, README.md, and docs/ in parallel (single turn)
+- Reads `docs/STATUS.md` (session state) + the docs/ listing in parallel — CLAUDE.md is auto-loaded and never re-read (schema v2)
 - Runs all git commands in parallel (log, diff, status)
 - Shows current status + recommends next task
-- Hydrates a live task list from CLAUDE.md using TaskCreate
+- Hydrates a live task list from the state file using TaskCreate
 
 ### Manual Steps (what the script does under the hood)
 
@@ -208,11 +208,11 @@ cd -
 ```
 
 **What `/bx:save` does:**
-- Drains live task list — syncs completed/in-progress/pending tasks back to CLAUDE.md
-- Updates CLAUDE.md with session history, status, and next steps
-- Archives old sessions (>3) to `docs/session-history.md` to keep CLAUDE.md lean
-- Syncs stable project facts to auto-memory for instant context in future sessions
-- Updates README.md and docs/*.md as needed
+- Drains live task list — syncs completed/in-progress/pending tasks back to `docs/STATUS.md`
+- Updates CLAUDE.md (instructions) + `docs/STATUS.md` (state) + `docs/session-history.md` via the `save-writer` subagent
+- On a pre-v2 repo, offers the one-time schema migration (state moves out of CLAUDE.md into `docs/STATUS.md`)
+- `--full` adds: README/docs sync, rollups (sessions older than the 5 newest compress to one-liners; Key Decisions >20 rows move to the archive), size-pressure shrinkers, and archive rotation (>100k history archives rotate into `docs/archive/` volumes)
+- Prunes auto-memory contradictions (never syncs facts derivable from the repo)
 
 ---
 
@@ -228,8 +228,8 @@ cd -
 
 **Features:**
 - Checks auto-memory for pre-loaded project context
-- Reads all docs and runs all git commands in parallel (2 turns total)
-- Hydrates CLAUDE.md tasks into live task tracker via TaskCreate
+- Reads the state file + docs listing and runs all git commands in parallel (2 turns total); never re-reads the auto-loaded CLAUDE.md
+- Hydrates the state file's tasks (`docs/STATUS.md` in schema v2) into the live tracker via TaskCreate
 
 **Output:** Status summary + recommended next task + live task list
 
@@ -260,17 +260,18 @@ cd -
 **When:** End of every session (or after major milestones)
 
 **Modes:**
-- **CREATE** - Generates all docs from scratch
-- **REFACTOR** - Splits monolithic README into three files
+- **CREATE** - Generates all docs from scratch (emits schema v2 directly)
+- **REFACTOR** - Splits monolithic README into the v2 structure
+- **MIGRATE** - One-time v1→v2 migration (consented; state moves to `docs/STATUS.md`), then falls through to UPDATE
 - **UPDATE** - Refreshes existing documentation
 
-**Updates:**
-- Drains live task list back into CLAUDE.md (completed → Completed, pending → Next Steps)
-- CLAUDE.md - Session history, status, next steps
-- Archives sessions >3 to `docs/session-history.md`
-- Syncs stable facts to auto-memory (`~/.claude/projects/.../memory/MEMORY.md`)
-- README.md - Project overview, setup
-- docs/*.md - PRD and specifications
+**Updates (fast path):**
+- Drains live task list back into `docs/STATUS.md` (completed → Completed, pending → Next Steps)
+- CLAUDE.md - `Last Updated`, Key Decisions, Known Issues (instructions only)
+- `docs/STATUS.md` - status table, in progress, next steps, last-session block
+- Appends the detailed session entry to `docs/session-history.md`
+
+**`--full` adds:** README + docs/*.md sync, auto-memory contradiction pruning, session/decision rollups, size-pressure shrinkers, archive rotation (>100k → `docs/archive/`). **Flags:** `--silent` (zero prompts, safe defaults), `--skip-migrate`, `--skip-rotation`, `--skip-commit`.
 
 ---
 
@@ -722,8 +723,9 @@ Every project should have:
 ```
 project/
 ├── README.md                  # Public overview, setup guide
-├── CLAUDE.md                  # Session context (AI reads this first)
+├── CLAUDE.md                  # Always-loaded instructions (schema v2: overview, decisions, blockers)
 └── docs/
+    ├── STATUS.md              # Session state — read on demand by /bx:resume (auto-managed)
     ├── [project]-prd.md       # Full specifications
     ├── session-history.md     # Archived sessions (auto-managed by /bx:save)
     └── [other docs].md        # Supporting documentation
@@ -739,10 +741,11 @@ Additionally, Claude Code maintains auto-memory at:
 | File | Purpose | Updated |
 |------|---------|---------|
 | **README.md** | Quick start, public docs | When features ship |
-| **CLAUDE.md** | AI context, session tracking | Every session |
+| **CLAUDE.md** | Always-loaded AI instructions (overview, decisions, blockers) | When instructions change |
+| **docs/STATUS.md** | Session state (status, in progress, next steps, last session) | Every session by `/bx:save` |
 | **docs/*.md** | Detailed specs, PRD | When requirements change |
-| **docs/session-history.md** | Archived session logs (>3 sessions) | Automatically by `/bx:save` |
-| **auto-memory MEMORY.md** | Stable facts (tech stack, commands, paths) | When project fundamentals change |
+| **docs/session-history.md** | Archived session logs (one-liners past the 5 newest) | Automatically by `/bx:save` |
+| **auto-memory MEMORY.md** | Claude's own corrections and learnings | When Claude learns something non-derivable |
 
 ---
 
@@ -787,7 +790,7 @@ When a bx skill triggers unexpected permission prompts (an `allowed-tools` list 
 
 ### Guarding subagent model routing: `Agent(model:…)` deny rules
 
-All 18 bx agents pin `model: sonnet` in frontmatter, but a misdispatch can still spawn one on Opus (the S43 bug). Claude Code 2.1.178 added `Tool(param:value)` permission syntax, so a deny rule in `.claude/settings.json` is a partial permission-layer backstop on top of the frontmatter:
+All 19 bx agents pin `model: sonnet` in frontmatter, but a misdispatch can still spawn one on Opus (the S43 bug). Claude Code 2.1.178 added `Tool(param:value)` permission syntax, so a deny rule in `.claude/settings.json` is a partial permission-layer backstop on top of the frontmatter:
 
 ```json
 "deny": ["Agent(model:opus)", "Agent(model:haiku)"]
@@ -828,41 +831,29 @@ Ctrl+C                           # Exit Claude
 | Issue | Solution |
 |-------|----------|
 | Claude doesn't know project context | Run `/bx:resume` first |
-| Lost track of what was done | Check CLAUDE.md Session History or `docs/session-history.md` for older sessions |
+| Lost track of what was done | Check `docs/STATUS.md` (last session) or `docs/session-history.md` for older sessions |
 | Starting fresh on old project | Run `/bx:save` to rebuild context |
 | Too many questions in `/bx:plan` | Say "let's skip that" or "good enough" |
 | `/bx:clean` too aggressive | Only delete "Safe to Delete" items, or avoid `--aggressive` flag |
 | `/bx:review` reviewing too much | Use `--staged` or specify files instead of running with no args |
 | Auto-memory out of date | Run `/bx:save` — it syncs stable facts automatically |
-| CLAUDE.md too long | `/bx:save` auto-archives sessions >3 to `docs/session-history.md` |
+| Docs growing too big | `/bx:save --full` rolls up old sessions/decisions, shrinks oversized sections, and rotates >100k history archives into `docs/archive/` volumes |
 
 ---
 
 ## My Custom Commands Location
 
-Commands are stored in:
+Commands live in the `bx/` plugin directory of the repo:
 ```
 ~/Development/projects/claude-config/
-├── .claude/
-│   ├── agents/              # Subagent definitions
-│   ├── scripts/             # Session startup scripts
-│   │   ├── start-claude.sh          # Mac/Linux startup
-│   │   └── start-claude.ps1        # Windows startup
-│   ├── settings.local.json  # Shared Claude Code settings
-│   └── skills/              # Skills (commands + references)
-│       ├── bx:arch/
-│       ├── bx:clean/
-│       ├── bx:health/
-│       ├── bx:plan/
-│       ├── bx:resume/
-│       ├── bx:review/
-│       ├── bx:seo/
-│       ├── bx:tests/
-│       ├── bx:save/
-│       └── bx:webdesign/
-├── .gitignore
+├── bx/                      # The installable plugin
+│   ├── .claude-plugin/plugin.json   # Manifest (semver = update cache key)
+│   ├── agents/              # 19 subagents → bx:<agent>
+│   ├── hooks/ + scripts/    # SessionStart orientation hook
+│   └── skills/              # 11 skills → /bx:<name> (each: SKILL.md + references/)
+├── .claude/scripts/         # cc launchers (start-claude.{sh,ps1}) — not plugin components
 ├── Workflow.md              # This file
-└── README.md
+└── README.md                # Full repository layout lives here
 ```
 
 GitHub repo: `burak-maxitech/claude-config` (public)
@@ -893,6 +884,7 @@ Installed as the `bx` plugin via the `burak-tools` marketplace (`/plugin install
 | | Replaced manual 8-step startup with single-command script (5 automated steps); shows tip to run `/bx:resume` |
 | Apr 2026 | Aligned with Opus 4.7 release (CC 2.1.111): added `effort: high` frontmatter to `/code-review` and `/bx:plan` for stronger reasoning on review/synthesis work |
 | | Documented when to reach for built-in `/code-review ultra` (high-risk pre-merge) vs custom `/code-review` (daily driver) in README |
+| Aug 2026 | **Doc schema v2** (bx v2.0.0–v2.1.0): CLAUDE.md keeps always-loaded instructions; session state moves to `docs/STATUS.md` (read on demand); `## Architecture Summary` → `docs/architecture.md`. `/bx:save` gained MIGRATE mode (consented one-time migration, verified by `assert-doc-schema.sh`), the `doc-migrator` subagent (19th agent), archive-read scalability fixes (no path grows with project age), and Part 7.7 archive rotation (>100k history archives rotate byte-verbatim into `docs/archive/` volumes). `/bx:resume` reads both layouts and never re-reads the auto-loaded CLAUDE.md. |
 | May 2026 | New `/bx:arch` skill — repo-wide complexity + refactor + perf + over-engineering audit, distinct from diff-scoped reviewers. Three guardrails: catalog-driven complexity-reducing refactors (not GoF pattern-mongering), reads intended architecture from CLAUDE.md/ADRs first, CCN delta sanity gate. **Four parallel subagents** (`arch-structure`, `arch-refactors`, `arch-performance`, `arch-simplification`). 4th dimension added mid-session after honest audit against user's three real goals (optimized / maintainable / least-code-possible) found `least-code-possible` was under-served — refactor catalog *trades* complexity, doesn't delete it. `arch-simplification` targets sub-file over-engineering: single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config, near-duplicates. Reports `lines_deletable` as top-line metric. |
 | | New `/bx:health` skill — read-only routing advisor. Reads `git status`, branch, recent commits, `CLAUDE.md` `In Progress`/`Next Steps`, open PR; classifies repo state into one of five buckets (pre-commit cleanup / pre-merge verification / post-ship audit / orient + audit / ambient improvement); prints a ~10-line report with one recommended skill flow + one alternative. Never invokes anything, never edits files. Solves "I have time but I'm not sure which skill to reach for next." |
 | | New `/bx:tests` skill — repo-wide test suite audit. Closes the biggest code-health gap surfaced in Session 23's audit (existing skills only covered diff-scoped or artifact-level test concerns). Three parallel Sonnet subagents (`test-coverage` / `test-quality` / `test-economics`). T01-T05 smell catalog. **Twin headline metric** so both directions (missing coverage on critical paths + wasteful/redundant tests) are equally visible. `--fix` restricted to T01 (assertion-free — provably safe deletion); everything else routes to `--plan`. `--coverage` opt-in for reading existing coverage reports (jest/vitest/pytest-cov/cargo-tarpaulin/go cover); never auto-invokes the tool. Defers entirely to `cleanup-styles-tests` §7 for orphans / >3mo skips / unused helpers / stale snapshots — non-overlap is deliberate. |
@@ -903,4 +895,4 @@ Installed as the `bx` plugin via the `burak-tools` marketplace (`/plugin install
 
 ---
 
-*Last updated: June 2026*
+*Last updated: August 2026*

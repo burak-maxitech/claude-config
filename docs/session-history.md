@@ -27,27 +27,6 @@
 
 ### Session 11 - 2026-03-17: Enabled model invocation on plan-feature skill (`disable-model-invocation: false`). (commits: 734b13b, 1cffa6b)
 
-### Session 55 - 2026-08-12
-**What happened:**
-- Built per-project session naming + coloring for the `cc` launcher, brainstorm → spec → plan → subagent-driven execution (4 tasks, 1 fix round, task review after each, whole-branch review at the end). `cc <project>` now runs `claude -n "<project>" "/color <color>"`.
-- Verified the upstream surface first rather than assuming: `-n/--name` officially sets the name in the prompt box, `/resume` picker, and terminal tab title; there is **no** launch-time color flag or settings key (requests #44800, #47332, #40393 closed `not_planned`); `/color` passed as the initial prompt argument is handled as a local command — proved with `claude -p "/color blue"` → `Session color set to: blue`, exit 0, no model turn.
-- Rejected hashing for color assignment on measured evidence: the palette has 8 colors and the machine has 8 project folders, so any hash collides by the birthday paradox (djb2 and byte-sum both gave 4 distinct of 8 — identical partitions, because 33 mod 8 == 1). Chose sticky auto-assign persisted to `~/.claude/cc-session-colors`, which is distinct *and* stable.
-- Task 2's review caught a plan-mandated defect: bash `=` is case-sensitive while PowerShell `-eq` is not, so `cc Horowell` would duplicate `horowell` on macOS. User ruled to fix the bash side; fix round 1 added case-insensitive lookup preserving original casing, plus 3 covering assertions.
-- Whole-branch review (opus) returned **Ready to ship**, verifying parity empirically in bash 5.3, pwsh 7.6.4 and WinPS 5.1 with a 20-case adversarial parse differential (identical accept/reject on all 20), and surfacing a pre-existing defect: `start-claude.ps1` is BOM-less UTF-8 with seven non-ASCII characters, which Windows PowerShell 5.1 fails to parse (2 errors; 0 on pwsh 7). Two items left open — the human live gate, and one batched fix wave held until it reports.
-
-**Files created/modified:**
-- `.claude/scripts/session-color.ps1`, `.claude/scripts/session-color.sh` - new sticky color allocators, one per shell; sourceable with no side effects so they can be tested against a temp registry
-- `.claude/scripts/tests/test-session-color.ps1`, `.claude/scripts/tests/test-session-color.sh` - new zero-dependency test suites (hand-rolled assertions, no Pester); 9 and 12 assertions
-- `.claude/scripts/start-claude.ps1`, `.claude/scripts/start-claude.sh` - Step 5 now sources the allocator and launches named + colored, falling back to a plain `-n` launch if no color is available; `SCRIPT_DIR` hoisted above the `cd` in the shell version
-- `README.md` - paragraph documenting the behavior, the registry path, and delete-to-reshuffle
-- `.gitignore` - `.superpowers/` (subagent-driven-development scratch)
-- `docs/superpowers/specs/2026-08-12-cc-session-naming-design.md`, `docs/superpowers/plans/2026-08-12-cc-session-naming.md` - design spec and 4-task implementation plan
-
-**Next session should:**
-- Run the live gate first: `cc claude-config` — is the prompt bar colored, does the name chip / tab title read the project, and is no model turn consumed? Then `cc horowell` for a second color.
-- Dispatch the single fix wave (ASCII sweep of `start-claude.ps1`, `try/catch` around the helper call, `ToLowerInvariant()`, 0-byte-registry header, PS case-insensitivity assertion, plan/spec doc-drift sweep, README wording per the gate result).
-- If the gate fails, treat the `statusLine` fallback as a fresh design decision — do not patch the launcher.
-
 ### Session 12 - 2026-04-11: CC 2.1 feature audit — killed `--gated` skill flag after verifying `defer` PreToolUse only works on single-tool-call turns for external SDK callers; shipped README interop section + skill doc notes for CI gating / MCP `maxResultSizeChars` / plugin `bin/` detection. (commits: 56a5513, dd6a7ce, 644fb0c, 83f9bb1)
 
 ### Session 13 - 2026-04-11: External best-practice repo review — direct-fetch verification killed 2 of plan's Tier 2 candidates (`paths:`/`effort:` were doc-extrapolation, not observed in actual external skills); shipped 3 doc bullets (MCP setup in README, mid-session `/compact` in workflow, `/loop` reference); flagged `.claude/rules/` symlink-friendly rule files as future option. (commits: adf634e, 5f61209, 445c357)
@@ -132,21 +111,7 @@
 
 ### Session 50 - 2026-07-22: `/bx:evolve` run (3 lanes, 8 findings, watermark `2.1.201 → 2.1.217`) + `--fix` applied 3 / rejected 1. The session's real finding was the **pinned-allowlist gap**: the docs lane proposed reverting the correct S47 `Agent(model:)` fix because `code.claude.com/docs/en/permissions` — the page that owns permission-rule syntax — wasn't in `scan-docs.md`'s allowlist; closed same session (8 → 9 pages) plus an allowlist completeness rule. Also corrected the `${CLAUDE_SKILL_DIR}` "not a real substitution" claim and recorded two orphaned commits (`fc2fa7b`, `acff6b1`) by reference rather than fabricating a session entry. (commits: 10566ae, e88b6ba)
 
-### Session 51 - 2026-07-23
-**What happened:**
-- Prepped the first-ever `/bx:webdesign` end-to-end dogfood. Read the full skill (SKILL.md + all 3 phase references + setup detection) to explain the experience: 2 gates (one-time Stitch setup + plugin-cache refresh) then 3 phases (Extract & Stage → Design & Review → Inject & Verify), with mandatory human checkpoints at page-inventory, design-direction, quota pre-flight, and the design review. Confirmed it creates a REAL Google Stitch project (remote), not local samples.
-- Verified dependency provenance via npm/GitHub: `@_davideast/stitch-mcp` is David East's personal Apache-2.0 package (a Google DevRel engineer — Google-adjacent, not first-party); `google-labs-code/stitch-skills` is the official Google Labs org (~7.8k stars). Flagged the trust implication (a personal npm pkg holds the GCP OAuth token).
-- Determined setup runs in the TARGET repo: MCP add uses `-s user` (machine-global) but skills install uses `--scope project` (must live in target repo); claude-config isn't a web project and fails the web-gate anyway. Target GCP project ID = `kaanarik` (billing linked per dashboard screenshot).
-- Wrote + committed `docs/webdesign-first-run-prompt.md` (b82637a) with a paste-ready kickoff prompt for the kaanarik session; saved auto-memory note `webdesign-first-run-queued.md` + `## /bx:webdesign` pointer in MEMORY.md.
-
-**Files created/modified:**
-- `docs/webdesign-first-run-prompt.md` - new: paste-ready first-run prompt + trust/scope context (committed b82637a)
-- auto-memory `webdesign-first-run-queued.md` - new note (project type)
-- auto-memory `MEMORY.md` - added `## /bx:webdesign` section pointer
-
-**Next session should:**
-- Run the `kaanarik` `/bx:webdesign` dogfood using `docs/webdesign-first-run-prompt.md` (needs one-time Stitch MCP + stitch-skills install in that repo first).
-- Or pick up `/bx:evolve` follow-ups (finding `093df977` FD-redirects smoke-check + `CLAUDE_ENV_FILE` UTF-8 check).
+### Session 51 - 2026-07-23: Prepped the first `/bx:webdesign` dogfood — mapped the skill's gates/phases/checkpoints, verified dependency provenance (`@_davideast/stitch-mcp` personal Apache-2.0 vs official `google-labs-code/stitch-skills`; flagged the OAuth-token trust implication), determined setup runs in the target repo (`kaanarik`), committed the paste-ready kickoff prompt `docs/webdesign-first-run-prompt.md`. (commit: b82637a)
 
 ### Session 52 - 2026-07-23
 **What happened:**
@@ -211,3 +176,37 @@
 **Next session should:**
 - Run the smoke-test batch: /loop /bx:review, /plugin update without /reload-plugins (v2.1.221), 2>/dev/null prompt check (093df977), CLAUDE_ENV_FILE UTF-8
 - Resume the kaanarik /bx:webdesign run through Phase 3 — and verify finding dadac845 (auto-mode vs. the Phase-3 rollback) live there
+
+### Session 55 - 2026-08-12
+**What happened:**
+- Built per-project session naming + coloring for the `cc` launcher, brainstorm → spec → plan → subagent-driven execution (4 tasks, 1 fix round, task review after each, whole-branch review at the end). `cc <project>` now runs `claude -n "<project>" "/color <color>"`.
+- Verified the upstream surface first rather than assuming: `-n/--name` officially sets the name in the prompt box, `/resume` picker, and terminal tab title; there is **no** launch-time color flag or settings key (requests #44800, #47332, #40393 closed `not_planned`); `/color` passed as the initial prompt argument is handled as a local command — proved with `claude -p "/color blue"` → `Session color set to: blue`, exit 0, no model turn.
+- Rejected hashing for color assignment on measured evidence: the palette has 8 colors and the machine has 8 project folders, so any hash collides by the birthday paradox (djb2 and byte-sum both gave 4 distinct of 8 — identical partitions, because 33 mod 8 == 1). Chose sticky auto-assign persisted to `~/.claude/cc-session-colors`, which is distinct *and* stable.
+- Task 2's review caught a plan-mandated defect: bash `=` is case-sensitive while PowerShell `-eq` is not, so `cc Horowell` would duplicate `horowell` on macOS. User ruled to fix the bash side; fix round 1 added case-insensitive lookup preserving original casing, plus 3 covering assertions.
+- Whole-branch review (opus) returned **Ready to ship**, verifying parity empirically in bash 5.3, pwsh 7.6.4 and WinPS 5.1 with a 20-case adversarial parse differential (identical accept/reject on all 20), and surfacing a pre-existing defect: `start-claude.ps1` is BOM-less UTF-8 with seven non-ASCII characters, which Windows PowerShell 5.1 fails to parse (2 errors; 0 on pwsh 7). Two items left open — the human live gate, and one batched fix wave held until it reports.
+
+**Files created/modified:**
+- `.claude/scripts/session-color.ps1`, `.claude/scripts/session-color.sh` - new sticky color allocators, one per shell; sourceable with no side effects so they can be tested against a temp registry
+- `.claude/scripts/tests/test-session-color.ps1`, `.claude/scripts/tests/test-session-color.sh` - new zero-dependency test suites (hand-rolled assertions, no Pester); 9 and 12 assertions
+- `.claude/scripts/start-claude.ps1`, `.claude/scripts/start-claude.sh` - Step 5 now sources the allocator and launches named + colored, falling back to a plain `-n` launch if no color is available; `SCRIPT_DIR` hoisted above the `cd` in the shell version
+- `README.md` - paragraph documenting the behavior, the registry path, and delete-to-reshuffle
+- `.gitignore` - `.superpowers/` (subagent-driven-development scratch)
+- `docs/superpowers/specs/2026-08-12-cc-session-naming-design.md`, `docs/superpowers/plans/2026-08-12-cc-session-naming.md` - design spec and 4-task implementation plan
+
+**Next session should:**
+- Run the live gate first: `cc claude-config` — is the prompt bar colored, does the name chip / tab title read the project, and is no model turn consumed? Then `cc horowell` for a second color.
+- Dispatch the single fix wave (ASCII sweep of `start-claude.ps1`, `try/catch` around the helper call, `ToLowerInvariant()`, 0-byte-registry header, PS case-insensitivity assertion, plan/spec doc-drift sweep, README wording per the gate result).
+- If the gate fails, treat the `statusLine` fallback as a fresh design decision — do not patch the launcher.
+
+### Session 56 - 2026-08-18
+
+**Focus:** Doc schema v2 shipped end-to-end (v2.0.0 → v2.0.1 → v2.1.0) + this repo migrated
+
+**What happened:**
+- Resumed `feat/doc-schema-v2` at Task 6's pending review and drove it home: Tasks 6-10 each through implementer → review → fix-round loops (Task 6: warnings-channel split; Task 7: MIGRATE wiring + `Bash(bash:*)`; Task 8: resume dual-layout; Task 9: v2.0.0 release docs + keep-and-document `.ps1` ruling; Task 10: ten fixtures, two new checker assertions, the first committed `--before` run, and blind rehearsals closing both delete-path branches by execution). Final whole-branch review (7 Important, all text) + one 17-item fix wave + a bounded correction for a wave-introduced tier-2 freshness hole; merged to main as 38 commits (`0eedfe2`), suite 13/13 both sides. See commits `2b1ef2e..0eedfe2`.
+- Scalability audit answered "do the archives grow forever?": yes by design (~196k chars at 57 sessions), and three hot paths paid linearly — fixed as v2.0.1 (`3bf748d`): Part 3.0 archive exclusion, save-writer tail-anchored appends, Part 5 windowed compression. Archives are now disk-only.
+- Archive rotation designed (4-question interview → spec `2026-08-18-bx-archive-rotation-design.md` → plan) and built via subagent-driven development: Part 7.7 (100k trigger, `docs/archive/<name>-K.md` volumes, ≤50k minimal cut, per-archive consent + sentinel, byte-conservation freeze-on-violation, no count cap — manual `git rm` escape hatch), registrations, blind-agent rehearsal on a synthetic 136k archive (B≤A≤B+600 held at +364, protected-tail md5 exact), final review + 7-edit fix wave (incl. the unguarded Step 0.3 read that would have voided the volumes-never-read guarantee); merged as v2.1.0 (`dd5c7fe`).
+- Pushed main (49 commits), `/plugin update bx` to 2.1.0 applied mid-session (hot-reload confirmed — the fab78c6a smoke-test answered), then ran the new `/bx:save`: MIGRATE detected v1, consent incl. the named `## Environment Variables` drop, doc-migrator + 20/20 checker assertions with `--before`, migration committed in isolation (`9e47f42`), then the consented compression pass took CLAUDE.md 16.2k → 8.3k (`72c505a`).
+- Process notes: rehearsals (blind agents executing only the instruction text) remained the decisive instrument — they caught the harness's read-back discouragement, the atomic-write ambiguity, and both gate directions that reviews reading the text could not; the fix-wave-introduces-a-regression pattern fired twice (tier-2 freshness; Part 0.5 headers) and was caught both times by scoped re-review.
+
+(commits: 2b1ef2e, 1d3af59, 3afbbab, b93bfc7, 9f2e328, 53e19ec, b3d607c, 0eedfe2, 3bf748d, 0865cd4, 2f86f36, 91da560, 5ce65d7, 8f4407f, ec2002d, dd5c7fe, 9e47f42, 72c505a)

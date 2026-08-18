@@ -234,3 +234,7 @@
 - [x] S54: /bx:evolve scan-docs allowlist 9→11 (checkpointing + code-review) + first full run since the S53 freeze — watermark 2.1.217→2.1.228, 4 Tier-1 findings registered — `bx/skills/evolve/references/scan-docs.md`, `docs/upstream/state.json`
 - [x] S54: /bx:evolve --fix — 4/4 applied across 11 files (checkpoint-undo sweep at 9 sites/8 files; /review-alias README note; v2.1.221 hedge; /loop caveat firmed)
 - [x] S54: Explicit plugin versioning v1.0.0 — plugin.json version+displayName, CHANGELOG.md, /bx:save Part-8 bump rule, README/CLAUDE.md echo sweep
+- [x] Doc schema v2 shipped (S56): contract + checker + 10 fixtures + hooks + doc-migrator/MIGRATE + packet split + SKILL wiring + resume dual-layout + v2.0.0 release (merged `0eedfe2`)
+- [x] /bx:save archive-read scalability: three linear paths closed (v2.0.1, `3bf748d`)
+- [x] Archive rotation Part 7.7 + registrations + blind-rehearsal acceptance (v2.1.0, merged `dd5c7fe`)
+- [x] This repo migrated to doc schema v2 + Key Decisions compressed 16k→8k (`9e47f42`, `72c505a`)

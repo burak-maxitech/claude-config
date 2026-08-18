@@ -2,19 +2,20 @@
 
 > Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
 
-Last Updated: 2026-08-18 (Session 55)
+Last Updated: 2026-08-18 (Session 56)
 
 ## Current Status
 
 | Area | Status |
 |------|--------|
 | Skills (11) | Complete |
-| Subagents (18) | Complete |
-| Plugin packaging (`bx`) | Core complete (S37); explicit semver **v1.0.0** + CHANGELOG.md (S54) — pending install smoke-test + symlink retirement |
-| Startup scripts | Complete — per-project session name + color added S55, pending live verification |
+| Subagents (19) | Complete — `doc-migrator` added S56 |
+| Plugin packaging (`bx`) | **v2.1.0 published S56** (doc schema v2 + archive rotation); install smoke-test + symlink retirement still pending |
+| Doc schema v2 | Complete — shipped S56; this repo migrated |
+| Startup scripts | Complete — S55 live gate still pending |
 | Cross-platform setup | Complete |
-| GitHub sync | Complete |
-| Documentation | Complete |
+| GitHub sync | Complete — main pushed through v2.1.0 |
+| Documentation | Complete — schema v2 |
 
 ## Completed
 
@@ -26,33 +27,33 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## In Progress
 
-**Per-project `cc` session naming + coloring — built, 2 items open (S55).** `cc <project>` now launches `claude -n "<project>" "/color <color>"`, so every session carries the project name (prompt box, `/resume` picker, terminal tab title) and a distinct prompt-bar color. Colors are auto-assigned on a project's first launch and remembered in `~/.claude/cc-session-colors`. Built brainstorm → spec → plan → subagent-driven (4 tasks, 1 fix round, all reviewed); whole-branch review verdict **Ready to ship**, with cross-shell parity verified empirically in bash 5.3, pwsh 7.6.4, and Windows PowerShell 5.1 (plus a 20-case adversarial parse differential — identical verdicts). **Open item 1: the human live gate** — run `cc claude-config` and confirm the prompt bar is actually colored, the name chip/tab title reads the project, and no model turn is consumed. `/color` as a prompt argument is proven for `-p` only; the interactive path needs a TTY. If it fails, do NOT patch the launcher — fall back to the spec's `statusLine` alternative as a fresh decision. **Open item 2: one fix wave**, deferred until the gate reports because README wording is part of it: ASCII-sweep `start-claude.ps1` (Windows PowerShell 5.1 parse fix), `try/catch` around the helper call, `ToLowerInvariant()`, treat a 0-byte registry as missing when writing the header, a case-insensitivity assertion in the PS suite, and sweep the stale case-sensitive code out of the checked-in plan + spec. Spec: `docs/superpowers/specs/2026-08-12-cc-session-naming-design.md`; plan: `docs/superpowers/plans/2026-08-12-cc-session-naming.md`.
+**Doc schema v2 post-merge verification (S56).** The dogfood migration of this repo is DONE (commits `9e47f42` migration, `72c505a` Key Decisions compression). Still owed from the deferred Task 10 skill-steps: live `/bx:save` runs against the fixtures (fx-v2 no-op, fx-partial resume, fx-dirty skip, fx-v1-envvars keep path, fx-v1-sparse scaffold, fx-v1-ineligible decline) and the first `/bx:save --full` on this repo — which will hit two first-run rollup consents, Part 7 shrinker offers, and likely the **first real archive rotation** (`docs/key-decisions.md` is ~96k and this save's appended rows push it toward the 100k trigger). Post-merge minors parked in both plans: backlog symptom measurement (7.7's clause is unreachable), checker fence-strip/CR robustness, mode-migrate declines-bullet v1-only phrasing, resume Quick Reference partial row, structure-rules cell wording.
 
-**`/bx:webdesign` first dogfood + third hardening pass (S52), pending re-run.** The 10th skill had its **first real end-to-end run** (on `kaanarik`): the whole pipeline ran — setup → detection → branch → inventory → before-shots → Stitch seeding → direction interview → quota pre-flight → 3-screen generation → mandatory review → palette iteration — and **paused cleanly at `review_pending`** on `webdesign/2026-07-23`, **no app code touched**. The safety architecture held; every failure was in the delegation surface (Google's skills + Stitch platform + Windows env). The run surfaced **15 findings, all applied S52** across 7 files: `stitch::`→`stitch-design:` naming; latent Phase-3 clean-tree traps (`.gitignore` now committed, `.playwright-mcp/` gitignored); Tailwind-v4 detection + `@theme` merge; setup-doc rewrite; Stitch platform gotchas + lossy-palette "verify-one-then-batch" pass. Then self-reviewed the fixes: `/bx:review` caught 2 more (`allowed-tools` `mv`/`cp`; a 2.1a↔2.2 double-generation) and a 4-agent `/simplify` pass applied 11 dedup/altitude refinements (incl. the missed Phase-3 after-shot site and a Step-4 self-contradiction). Earlier hardening: S42 (16) + S48 (13/12, `9b9c703`). **The 15-fix batch is pushed (`62d3461`); the review+simplify fixes land in the S52 re-save — `/plugin update bx` to pick everything up.** Kickoff prompt: `docs/webdesign-first-run-prompt.md`; dogfood checklist: `docs/superpowers/plans/2026-06-06-bx-webdesign-dogfood.md`.
+**Per-project `cc` session naming + coloring — built, 2 items open (S55).** Unchanged from S55: the human live gate (`cc claude-config`: prompt bar colored? name chip + tab title? no model turn?) and one batched fix wave held until the gate reports (ASCII-sweep `start-claude.ps1`, `try/catch` guard, `ToLowerInvariant()`, 0-byte registry handling, case-insensitivity assertion, stale plan/spec sweep). Spec: `docs/superpowers/specs/2026-08-12-cc-session-naming-design.md`.
 
-**S37 plugin packaging — remaining:** install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement. (GSC MCP migration #1 declined; Playwright #2 deferred.)
+**`/bx:webdesign` kaanarik run paused at `review_pending` (S52).** Unchanged: resume via `/bx:webdesign` after `/plugin update bx`, push through Phase 3 inject+verify; verify open finding `dadac845` while there.
+
+**S37 plugin packaging leftovers.** Install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement.
 
 ## Next Steps
 
-1. **Finish the `cc` session naming/coloring rollout (S55, in flight)** — run the live gate (`cc claude-config`: prompt bar colored? name chip + tab title? no model turn consumed?), then dispatch the single fix wave listed in `## In Progress`. Ledger: `.superpowers/sdd/2026-08-12-cc-session-naming/progress.md` (git-ignored).
-2. **Smoke-test batch (quick):** `/loop /bx:review` (docs now confirm the disable-model-invocation plain-text behavior for *scheduled tasks*; whether `/loop` shares it is the open half — workflow.md caveat is now "partially confirmed"); `/plugin update bx` without `/reload-plugins` (v2.1.221 "when safe", finding `fab78c6a`); a few `2>/dev/null` commands watching for new prompts (v2.1.214 fail-closed, finding `093df977`); `CLAUDE_ENV_FILE` UTF-8 persistence.
-3. **Design session: a verification pass for `/bx:review`** — still single-pass at `effort: high` with no false-positive filter; Anthropic's reviewer runs parallel agents + verification. Brainstorm → spec → skill-creator eval (finding `d1480670`, deliberately half-fixed in S53).
-4. **Resume the `/bx:webdesign` kaanarik run past review** — `/plugin update bx` first (picks up v1.0.0), re-run `/bx:webdesign` (resumes at `review_pending`), push through **Phase 3 inject+verify**. While there, VERIFY open finding `dadac845`: auto-mode blocks destructive git and Phase-3's rollback is exactly `git restore .` + `git clean -fd` — S54's community lane surfaced Anthropic's official auto-mode post confirming the premise.
+1. **`/bx:save --full` first run (S56 follow-up)** — expect: first-run rollup consents for session-history (57+ sessions) and Key Decisions, Part 7 shrinker offers, and likely the first real `docs/key-decisions.md` rotation into `docs/archive/`. Review its diff carefully; it exercises the v2.1.0 machinery end-to-end.
+2. **Finish the `cc` session naming/coloring rollout (S55)** — run the live gate, then dispatch the single fix wave listed in `## In Progress`.
+3. **Doc-schema v2 fixture verification** — the deferred live `/bx:save` runs against the six fixture cases (see `## In Progress`), plus the post-merge minors batch from both plans.
+4. **Resume the `/bx:webdesign` kaanarik run past review** — push through Phase 3 inject+verify; verify finding `dadac845`.
 5. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
-6. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — all content-review-hardened in S46, never run end-to-end.
-7. **S37 plugin-packaging leftovers** — install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement.
-8. **`/bx:evolve` follow-ups** — evaluate adding `auto-mode-config` to the scan-docs allowlist (owns the auto-mode classifier contract; flagged S54); act on the 14 `open` findings (top: the skills-dir/activation-gap cluster, now 5 distinct sources); v2 ideas: extract shared `references/lane-contract.md` (three scan files share ~50% mass), treat lane digest one-liners as non-citation-grade.
-9. **`/bx:seo` deferred items** — code-review leftovers (#5 redundant per-call token mints; #6 `_read_skill_config` CWD assumption; #7 `fetch-sa` subcommand) plus the S25/S27/S29 refactors (batched-Grep alternation; fix-mode + plan-mode scaffolding extraction).
+6. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — hardened S46, never run end-to-end.
+7. **S37 plugin-packaging leftovers** — install smoke-test, symlink retirement, `Skill(bx-*)` → `Skill(bx:*)`.
+8. **`/bx:evolve` follow-ups** — scan-docs allowlist candidate (`auto-mode-config`); 14 open findings; v2 ideas (shared `references/lane-contract.md`).
+9. **`/bx:seo` deferred items** — code-review leftovers (#5/#6/#7) + S25/S27/S29 refactors.
 
 ## Session History
 
 > Full history: [session-history.md](session-history.md)
 
-### Last Session (Session 55) - 2026-08-12
-- **Built per-project session naming + coloring for the `cc` launcher** — `claude -n "<project>" "/color <color>"`, with colors auto-assigned on first launch and remembered in `~/.claude/cc-session-colors`. Brainstorm → spec → plan → subagent-driven (4 tasks, 6 commits, 1 fix round, every task reviewed).
-- **Verified the upstream surface before designing:** `-n/--name` is officially supported (name + terminal tab title), but there is **no launch-time color flag or settings key** — Anthropic closed those requests `not_planned`. `/color` as the initial prompt argument is handled locally with no model turn.
-- **Rejected hashing for color assignment with measured evidence:** 8 palette colors vs 8 project folders means any hash collides (4 distinct of 8 measured); sticky auto-assign gives distinct *and* stable colors.
-- **Whole-branch review: Ready to ship.** Parity verified empirically across bash 5.3 / pwsh 7.6.4 / WinPS 5.1 plus a 20-case adversarial parse differential. It also surfaced a **pre-existing** defect: `start-claude.ps1` fails to parse under Windows PowerShell 5.1 (non-ASCII in a BOM-less file).
-- **Two items still open:** the human live gate (does `/color` apply in an interactive launch?) and one batched fix wave held until the gate reports.
-
-> Full session detail: [session-history.md](session-history.md) S55
+### Last Session (Session 56) - 2026-08-18
+- **Shipped doc schema v2 (bx v2.0.0):** resumed the `feat/doc-schema-v2` branch at Task 6's review, completed Tasks 7-10 (12-invocation fixture gate, 4 more blind doc-migrator rehearsals incl. both delete-path branches), final whole-branch review + a 17-finding fix wave + one bounded correction, merged to main — 38 commits.
+- **Closed the three archive read paths that grew with project age (v2.0.1):** Part 3.0 archive exclusion, save-writer Grep-anchored tail appends, Part 5 windowed rollup — after a scalability audit measured ~196k chars of archives being re-read per `--full`.
+- **Built archive rotation (v2.1.0):** spec → plan → subagent-driven; Part 7.7 rotates >100k history archives into `docs/archive/` volumes byte-verbatim (consent + sentinel, B ≤ A ≤ B+600 conservation); blind rehearsal on a 136k fixture passed with exact protected-tail md5.
+- **Published and adopted:** pushed main (49 commits), `/plugin update` to 2.1.0 mid-session (hot-reload confirmed working), then migrated THIS repo to schema v2 (`9e47f42`) and compressed Key Decisions 16k→8k (`72c505a`) — the first production run of the migration machinery.
+- **Next:** `/bx:save --full` (rollups + likely the first real key-decisions rotation).

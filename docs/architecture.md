@@ -10,24 +10,28 @@ claude-config/                         # marketplace repo
 │   └── marketplace.json               # "burak-tools" marketplace catalog
 ├── bx/                                # the installable `bx` plugin (S37, see Key Decisions)
 │   ├── .claude-plugin/plugin.json     # manifest (explicit semver `version` = update cache key; skills → /bx:<name>)
-│   ├── agents/                        # 18 subagents (Sonnet-routed) → bx:<agent>
+│   ├── agents/                        # 19 subagents (Sonnet-routed) → bx:<agent>
 │   ├── hooks/hooks.json               # SessionStart project-orientation injection
 │   ├── scripts/                       # session-start-context.{sh,ps1}
 │   └── skills/                        # 11 skills (SKILL.md + references/) → /bx:<name>
 │       ├── arch/    clean/   evolve/  health/
 │       ├── plan/    resume/  review/
-│       ├── save/    seo/     tests/   # save = /bx:save (was docs)
+│       ├── save/    seo/     tests/   # save = /bx:save; save/tests/ holds the doc-schema suite
 │       └── webdesign/                  # /bx:webdesign — visual re-skin via Stitch MCP
 ├── .claude/
 │   ├── scripts/             # start-claude.{sh,ps1} launchers (not plugin components)
 │   └── settings.local.json  # Local Claude Code settings
-├── docs/                    # Reference files (overflow from CLAUDE.md)
+├── docs/                    # Reference files + session state
+│   ├── STATUS.md            # Session state (schema v2) — read on demand by /bx:resume
+│   ├── architecture.md      # This file
 │   ├── completed-work.md
 │   ├── key-decisions.md
 │   ├── modernization-roadmap.md
-│   └── session-history.md
+│   ├── session-history.md
+│   ├── superpowers/         # Specs + plans from brainstorm→plan workflows
+│   └── upstream/            # /bx:evolve watermark + decision log
 ├── .gitignore
-├── CLAUDE.md                # This file — AI session context
+├── CLAUDE.md                # Always-loaded AI instructions (schema v2)
 ├── README.md                # Public overview
 └── workflow.md              # Personal workflow guide
 ```
@@ -36,4 +40,6 @@ claude-config/                         # marketplace repo
 
 **Skills** are directories under `bx/skills/` containing `SKILL.md` (YAML frontmatter) + a `references/` folder. Invocable as `/bx:<name>`.
 
-**Subagents** are the 18 markdown files under `bx/agents/`, dispatched by skills. They run on Sonnet for cost efficiency and have scoped tool permissions. (`save-writer` is dispatched by `/bx:save` to apply doc edits off the main thread.)
+**Subagents** are the 19 markdown files under `bx/agents/`, dispatched by skills. They run on Sonnet for cost efficiency and have scoped tool permissions. (`save-writer` is dispatched by `/bx:save` to apply doc edits off the main thread; `doc-migrator` performs the one-time v1→v2 schema migration.)
+
+**Doc schema v2 (S56):** CLAUDE.md carries only always-loaded instructions; session state lives in `docs/STATUS.md`; history archives (`session-history.md`, `key-decisions.md`, `completed-work.md`) are append-only, read by no automatic path, and rotate into `docs/archive/` volumes past 100k chars. The contract lives at `bx/skills/save/references/doc-schema.md`; `bx/skills/save/tests/assert-doc-schema.sh` verifies it mechanically.

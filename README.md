@@ -1,6 +1,6 @@
 # Claude Config
 
-**Burak's personal Claude Code toolkit**, packaged as the **`bx` plugin** — 11 custom skills, 18 subagents, cross-platform startup scripts, and a workflow guide, installed from this repo's own `burak-tools` marketplace.
+**Burak's personal Claude Code toolkit**, packaged as the **`bx` plugin** — 11 custom skills, 19 subagents, cross-platform startup scripts, and a workflow guide, installed from this repo's own `burak-tools` marketplace.
 
 The plugin bundles a full engineering workflow into namespaced `/bx:*` slash commands:
 
@@ -163,7 +163,7 @@ Then refresh your install with the two `/plugin …` commands from [Updating](#u
 | `/bx:webdesign` | Re-skin an existing web project's visual design via Google Stitch (MCP), preserving functionality (refactor; web-only). Drives 3 resumable phases — Extract & Stage (palette/typography/component inventory), Design & Review (Stitch-generated proposals, user approval), Inject & Verify (restyle markup in place preserving logic + content, verify no behavior breakage). Requires one-time setup: Stitch MCP server + Google's `stitch-skills` plugin. Works on a dedicated `webdesign/<date>` branch so the main branch is never destabilized. **Refactor-only (v1):** restyles each page's markup and classes in place — never raw-replaces working components or business logic. Web projects only. | Skill |
 | `/bx:evolve` | Upstream-watch audit for the **claude-config repo itself** — researches Anthropic changes (Claude Code releases, official docs, community) since a committed watermark, gates findings against the bx plugin's capability inventory, and reports with citations. `--fix` applies approved findings behind per-finding diff gates. Run after Anthropic ships a notable Claude Code release, or monthly. | Skill |
 | `/bx:health` | Routing advisor — looks at `git status`, branch, recent commits, `CLAUDE.md`, open PR, then suggests which skills to run in what order. **Read-only, never invokes anything.** Use when unsure where to start. | Skill |
-| `/bx:save` | End session - save progress. Fast by default (task drain + CLAUDE.md/session-history update via the `save-writer` subagent + commit); `--full` adds the README/docs sync + rollups; `--silent` runs zero-prompt (auto-commits with the suggested message, safe-default on all consents). | Skill |
+| `/bx:save` | End session - save progress. Fast by default (task drain + CLAUDE.md/`docs/STATUS.md`/session-history update via the `save-writer` subagent + commit); `--full` adds the README/docs sync + rollups + archive rotation (>100k history archives rotate into `docs/archive/` volumes); `--silent` runs zero-prompt (auto-commits with the suggested message, safe-default on all consents). The first run on a pre-v2 repo offers the one-time schema migration (see [Documentation layout](#documentation-layout-schema-v2)). | Skill |
 
 **Skills** are directories in `bx/skills/` (each `SKILL.md` + a `references/` folder) that use YAML frontmatter for tool permissions and can dispatch subagents. Installed via the plugin, they invoke as `/bx:<name>`.
 
@@ -217,7 +217,7 @@ Then refresh your install with the two `/plugin …` commands from [Updating](#u
 
 ## Subagents
 
-The `bx/agents/` folder contains 18 subagent definitions used by skills (namespaced `bx:<agent>` once installed). These run on Sonnet for cost efficiency and have scoped tool permissions. Skills dispatch them automatically via the Agent tool (renamed from Task in 2.1.63), and you can also reference them by name in `@`-mention typeahead inside the REPL (added in Claude Code 2.1.89).
+The `bx/agents/` folder contains 19 subagent definitions used by skills (namespaced `bx:<agent>` once installed). These run on Sonnet for cost efficiency and have scoped tool permissions. Skills dispatch them automatically via the Agent tool (renamed from Task in 2.1.63), and you can also reference them by name in `@`-mention typeahead inside the REPL (added in Claude Code 2.1.89).
 
 | Agent | Used By | Purpose |
 |-------|---------|---------|
@@ -235,7 +235,8 @@ The `bx/agents/` folder contains 18 subagent definitions used by skills (namespa
 | `seo-content` | `/bx:seo` | On-Page SEO (25 pts): titles, meta descriptions, headings hierarchy, image alt text, OpenGraph + Twitter Cards, internal linking, content depth signals. Strict no-fabrication rule on `--fix` — only inserts TODO placeholders. |
 | `geo-generative` | `/bx:seo` | Structured Data (20 pts) + Generative Engine readiness (20 pts): Schema.org JSON-LD coverage + rich-result eligibility, llms.txt presence + format, E-E-A-T signals (author bios, dates, citations), semantic content patterns (topic sentences, list/table structure, question-headings), AI-bot crawl access (GPTBot/ClaudeBot/PerplexityBot/etc.). Fetched best-practices brief is primary source of truth (GEO evolves fast); `brief_divergence` field surfaces when heuristic disagrees. |
 | `seo-gsc-insights` | `/bx:seo` (only when GSC API mode enabled) | Ingests orchestrator-parsed Google Search Console **API** digests (Search Analytics queries/pages + per-URL Inspection coverage clusters) + 35-day git-history change digest. Emits **13** sub-dim info-only findings (`indexing_coverage`, `crawled_not_indexed`, `discovered_not_indexed`, `not_found_404` with routing-rename match for bulk-redirect detection, `redirect_hygiene`, `canonical_conflict`, `blocked_access`, `soft_404`, `server_errors`, `ctr_opportunity`, `position_band_opportunity`, `traffic_orphan`, `brand_query_anomaly`); a **14th** (`deindex_regression`) is orchestrator-emitted from run-over-run sitemap-coverage snapshot diffs. `score_impact: 0` enforced agent-side AND orchestrator-side — GSC enriches recommendations, never the /100 score. Annotates each finding with `code_changed_since_gsc_window` (lowers certainty to 0.4 + rewrites recommendation when matched commit detected). |
-| `save-writer` | `/bx:save` | Applies session-save documentation edits off the main thread — reads the large append-only archives and writes CLAUDE.md / `docs/session-history.md` / `docs/completed-work.md` / `docs/key-decisions.md` from a structured update packet composed by the orchestrator. Not a scanner. |
+| `save-writer` | `/bx:save` | Applies session-save documentation edits off the main thread — writes CLAUDE.md / `docs/STATUS.md` and appends to the session-history / completed-work / key-decisions archives via anchored tail reads (never full-archive reads) from a structured update packet composed by the orchestrator. Not a scanner. |
+| `doc-migrator` | `/bx:save` (MIGRATE mode) | Performs the one-time doc schema v1→v2 migration — moves the five state sections from CLAUDE.md into `docs/STATUS.md` and the architecture tree into `docs/architecture.md`, byte-verbatim with a removal gate per section. No Bash; the orchestrator owns git and verifies with `assert-doc-schema.sh` before committing. |
 | `upstream-changelog` | `/bx:evolve` | Researches claude-code releases/CHANGELOG since the committed watermark version. Extracts new built-in commands, tool changes, hook additions, permission-model updates, and deprecations relevant to the bx plugin. |
 | `upstream-community` | `/bx:evolve` | Bounded community sweep (max 3 searches / 5 fetches) for Claude Code usage patterns and emerging practices not yet in official docs. Advisory-only findings, never fix-eligible. |
 | `upstream-docs` | `/bx:evolve` | Fetches a pinned allowlist of official Claude Code doc pages (code.claude.com) every run and compares guidance against the plugin's capability inventory. Extracts changed defaults and updated guidance on skills, agents, hooks, settings. |
@@ -310,7 +311,7 @@ claude-config/                         # marketplace repo
 ├── bx/                                # the installable `bx` plugin
 │   ├── .claude-plugin/
 │   │   └── plugin.json                # plugin manifest (skills invoke as /bx:<name>)
-│   ├── agents/                        # 18 subagents (Sonnet-routed) → bx:<agent>
+│   ├── agents/                        # 19 subagents (Sonnet-routed) → bx:<agent>
 │   │   ├── arch-performance.md
 │   │   ├── arch-refactors.md
 │   │   ├── arch-simplification.md
@@ -318,6 +319,7 @@ claude-config/                         # marketplace repo
 │   │   ├── cleanup-deps-config.md
 │   │   ├── cleanup-files-code.md
 │   │   ├── cleanup-styles-tests.md
+│   │   ├── doc-migrator.md
 │   │   ├── geo-generative.md
 │   │   ├── save-writer.md
 │   │   ├── seo-content.md
@@ -355,6 +357,8 @@ claude-config/                         # marketplace repo
 │   │   └── tests/                     # Allocator test suites (no test framework needed)
 │   └── settings.local.json            # Local Claude Code settings
 ├── docs/                              # Reference files (overflow from CLAUDE.md)
+│   ├── STATUS.md                      # Session state (schema v2) — read on demand by /bx:resume
+│   ├── architecture.md                # Architecture detail (schema v2)
 │   ├── completed-work.md
 │   ├── key-decisions.md
 │   ├── modernization-roadmap.md

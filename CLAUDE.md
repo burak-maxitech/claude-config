@@ -1,7 +1,7 @@
 <!-- bx-doc-schema: 2 -->
 # CLAUDE.md
 
-Last Updated: 2026-08-18 (Session 55)
+Last Updated: 2026-08-18 (Session 56)
 
 ## Project Overview
 
@@ -16,9 +16,6 @@ Last Updated: 2026-08-18 (Session 55)
 
 | Decision | Rationale |
 |----------|-----------|
-| PowerShell `try/catch` can't gate native-exe failures — `cc` launcher git-pull fix (S40) | `try/catch` only catches terminating PS errors; native exes signal via `$LASTEXITCODE` — gate on it (proved empirically, fixed in all 3 spots). |
-| `/bx:webdesign` — Stitch-driven web design refactor skill (S41, 2026-06-06) | Reuse Google's `stitch-skills` + a thin orchestrator (detection, preserve-aware briefs, tokens-first restyle, verification); 3 resumable phases on a `webdesign/<date>` branch. Merged `d5e98ab`. |
-| Pre-dogfood review-hardening of `/bx:webdesign` + `/bx:save` (S42, 2026-06-06) | Content-review both before any real run; durable rules: every root artifact gitignored-or-staged before `git add -A`/`clean -fd`, and `allowed-tools` must declare every Bash helper. (`d6681e8`) |
 | `/bx:clean` Step 1 dispatches dedicated Sonnet `cleanup-*` agents (S43) | Generic dispatch ran every scan on Opus; dispatching the named agents restores their `model: sonnet` routing + tool scoping. (commit 65179cd) |
 | `/bx:clean` eval suite + measured skill value (S43) | Evals show the skill's edge is fix-mode discipline + prompt-independent coverage, not raw detection; `bx/skills/clean/evals/` committed as a regression suite. (commit 65179cd) |
 | `/bx:save --silent` — zero-prompt runs (S44) | Auto-commits with the suggested message; every consent prompt resolves to its safe default (decline/skip) — the flag never answers "yes" for the user except the commit itself. (commit b82162d) |
@@ -36,6 +33,9 @@ Last Updated: 2026-08-18 (Session 55)
 | Explicit semver plugin versioning replaces commit-SHA versioning (S54) | `version` in plugin.json is the update cache key — every `bx/**` change must bump it (PATCH/MINOR/MAJOR; `/bx:save` Part 8 enforces); history in `CHANGELOG.md`. |
 | `cc` names and colors sessions at launch — the name is supported, the color is not (S55, 2026-08-12) | `claude -n <name>` is official; no color flag exists (requests closed `not_planned`) — `/color` rides as the initial prompt argument, handled locally with no model turn; fallback is a `statusLine`, not a launcher patch. |
 | Sticky color registry beats hashing when the palette is the same size as the project set (S55) | 8 colors × 8 projects makes any name-hash collide (measured 4/8 distinct); first-launch claim + registry in `~/.claude/cc-session-colors` is distinct AND stable. |
+| Doc schema v2 — CLAUDE.md/STATUS.md split with consented migration (S56, 2026-08-18) | Always-loaded instructions stay in CLAUDE.md; state moves to `docs/STATUS.md`; `/bx:save` gained MIGRATE (eligibility → consent → `doc-migrator` → invariant checker → isolated commit), proven by 10 fixtures + 7 blind rehearsals. v2.0.0, merged `0eedfe2`. |
+| Archives are disk-only and rotate at 100k (S56) | v2.0.1 closed the three linear archive-read paths (Part 3.0 exclusion, tail-anchored appends, windowed rollup); v2.1.0's Part 7.7 rotates >100k archives byte-verbatim into `docs/archive/` volumes (consent + sentinel, B ≤ A ≤ B+600, no count cap — manual `git rm` is the escape hatch). Nothing automatic reads a volume. |
+| Blind rehearsals are the acceptance instrument for instruction files (S56) | Agents executing only the instruction text caught what 12+ readings could not (harness conflicts, gate holes, nondeterminism); the decision-log ambiguity count is the regression metric (doc-migrator 5→2; Part 7.7 started at 2). |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
