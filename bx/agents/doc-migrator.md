@@ -45,6 +45,7 @@ target only, never the link text:
 | `/docs/foo.md` (root-relative, e.g. a site path) | unchanged — not filesystem-relative              |
 | `https://...`, `mailto:...`, any absolute URL | unchanged                                           |
 | `#some-anchor` (same-file anchor)             | unchanged target, but if the heading it pointed to moved to a *different* file, the anchor is now dangling. You cannot fix this silently — add one line to `notes:` naming the anchor and its old and new files. This is advisory, not blocking: report it and continue. |
+| any other relative link you are not confident how to rewrite | leave it byte-for-byte unchanged; add one line to `notes:` naming it. Never guess at a rewrite. |
 
 ## What you do, in this order
 
@@ -80,29 +81,41 @@ target only, never the link text:
 
        ---
 
-4. **Remove** each state section and `## Architecture Summary` from CLAUDE.md — but gate
-   every removal individually on a **content match, not just a header's existence**: before
-   removing a state section's `## ` header and body from CLAUDE.md, confirm both that the
-   exact header exists in `docs/STATUS.md` AND that its body there is byte-for-byte what
-   CLAUDE.md's current section produces under the link rewriting rules above. Check this even
-   for a section you just wrote in Step 2 of this same run (it will trivially match). The
-   case this actually guards is different: a `docs/STATUS.md` that already existed *before*
-   this run — a hand-edit, or a write truncated by an earlier interrupted attempt — can hold a
-   canonical header over DIFFERENT or truncated content, and Step 2 never rewrites a section
-   already present, so nothing else catches this. Apply the same content-match confirmation to
-   `## Architecture Summary` against `docs/architecture.md`.
+4. **Remove** each state section from CLAUDE.md once its `docs/STATUS.md` copy is confirmed
+   safe, and remove `## Architecture Summary` once `docs/architecture.md` is confirmed safe.
+   **The confirmation required differs by whether Step 2/3 wrote that destination copy during
+   THIS run, or found it already there** (per the Idempotency predicates below):
 
-   **If the header is absent, or its body does not match, do NOT remove that section from
-   CLAUDE.md and do NOT rewrite the STATUS.md/architecture.md copy.** This is a genuine
-   content conflict, not something to resolve silently — merging or picking one side is worse
-   than stopping. Add one line to `warnings:` naming the conflicting section and its two
-   locations, and stop (see Hard Rules); a human needs to look at it.
+   - **Destination written by you in Step 2 or 3 of this same run** — confirm only that it is
+     present (the header, for a state section; the file, for `docs/architecture.md`) and its
+     body is non-empty and not obviously truncated (does not end mid-sentence, mid-table, or
+     mid-fence). Do **not** re-derive the link rewriting and byte-compare it against a second
+     pass — the rules include a judgment call (a link you were not confident about, see the
+     table above), so a second derivation can legitimately disagree with the first, and that
+     disagreement must never block a migration you just performed correctly.
+   - **Destination that already existed before this run started** — the resumed-`partial` case
+     this gate exists for (a hand-edit, or a write truncated by an earlier interrupted
+     attempt). Require a genuine content match: re-derive what CLAUDE.md's current section
+     produces under the link rewriting rules above, and compare it byte-for-byte against the
+     existing copy, **ignoring leading and trailing blank lines** (section order differs
+     between the two files, so a section that is last-before-EOF in one and followed by
+     another header in the other differs by trailing whitespace alone — that is not a real
+     conflict). For `## Architecture Summary`, compare against `docs/architecture.md`'s
+     content **after its `---` line** — that file never contains an `## Architecture Summary`
+     header itself (Step 3 writes `# Architecture`, the pointer line, `---`, then the body
+     only), so the confirmation is file-existence-and-content-match, **never header presence**.
+
+   **If a pre-existing destination's body does not match, do NOT remove that section from
+   CLAUDE.md and do NOT rewrite the existing copy.** This is a genuine content conflict, not
+   something to resolve silently — merging or picking one side is worse than stopping. Add one
+   line to `warnings:` naming the conflicting section and its two locations, and stop (see
+   Hard Rules); a human needs to look at it.
 
    Remove a section's full body per the section-body rule above — never leave a `### `
    subsection behind. If `env_vars_disposition` is `drop`, also remove
-   `## Environment Variables` (no content-match check needed — it is a deletion, not a
-   relocation, and `drop` is only chosen when the section is empty or absent in the first
-   place); if `keep`, leave it exactly where it is.
+   `## Environment Variables` (no confirmation needed — it is a deletion, not a relocation,
+   and `drop` is only chosen when the section is empty or absent in the first place); if
+   `keep`, leave it exactly where it is.
 5. **Append the pointer line** as the final line of CLAUDE.md, after all remaining content:
 
        > Session state: [docs/STATUS.md](docs/STATUS.md)
@@ -118,8 +131,10 @@ If CLAUDE.md already contains the marker, change nothing and return `status: alr
 Otherwise — whether this is a fresh run or a resumed `partial` run (`docs/STATUS.md` exists
 but the marker does not) — evaluate each step by its own predicate below and complete only
 what is outstanding. **Never treat "STATUS.md exists" alone as license to skip to removal** —
-Step 4's per-section content-match gate above applies on every run, resumed or not, and is
-what actually prevents content loss on a resumed run.
+Step 4's two-tier gate above applies on every run, resumed or not, and is what actually
+prevents content loss on a resumed run: a destination you write this run only needs to be
+present and non-truncated, but one that already existed before this run needs a genuine
+content match before its CLAUDE.md copy may be removed.
 
 - **Step 2** outstanding iff `docs/STATUS.md` is missing; its header block (the
   `# Project Status` title, the `> Session state for /bx:resume...` pointer line, and the
@@ -133,8 +148,9 @@ what actually prevents content loss on a resumed run.
   `docs/architecture.md` is absent.
 - **Step 4** outstanding iff any state header (or `## Architecture Summary`, or
   `## Environment Variables` when `env_vars_disposition` is `drop`) remains in CLAUDE.md.
-  Apply its per-section content-match gate to each remaining header individually — a header
-  whose destination body cannot be confirmed to match stays in CLAUDE.md and blocks (see
+  Apply Step 4's two-tier confirmation to each remaining header individually — one written
+  this run needs only presence and non-truncation; one that already existed before this run
+  needs a genuine content match, and stays in CLAUDE.md (blocking) if it doesn't have one (see
   Step 4).
 - **Step 5** outstanding iff the pointer line is absent from CLAUDE.md.
 - **Step 6** outstanding iff CLAUDE.md's `Last Updated:` line does not already read `today`.
@@ -146,11 +162,12 @@ scaffolding, under `notes:` in your change report — never `warnings:` (see Out
 
 ## Hard rules
 
-- **Never delete content.** Every section you remove from CLAUDE.md must already have been
-  written, with matching content, into STATUS.md or architecture.md — confirmed by Step 4's
-  content-match gate, never assumed from a header's mere presence. If a destination write
-  failed, cannot be confirmed, or does not match, stop and report — do not continue to the
-  removal step for that section.
+- **Never delete content.** Every section you remove from CLAUDE.md must already have a
+  confirmed-safe destination copy — presence-plus-non-truncation for one you wrote this run,
+  a genuine content match for one that already existed (Step 4's two-tier gate), never assumed
+  from a header's mere presence. If a destination write failed, cannot be confirmed, or (for a
+  pre-existing copy) does not match, stop and report — do not continue to the removal step for
+  that section.
 - **Never introduce an `@path` import.** Links stay as markdown links.
 - **Never compress or reword.** Rationale compression is a separate, separately-consented
   pass that is not your job.
@@ -175,8 +192,9 @@ Two different channels, do not conflate them:
   and continues — nothing in `notes:` ever blocks a commit.
 - **`warnings:` is blocking.** Reserved ONLY for a condition that must stop the run before it
   commits anything: a destination write that could not be confirmed, a pre-existing
-  `docs/STATUS.md` (or `docs/architecture.md`) section whose body does not match CLAUDE.md's
-  current copy (Step 4's content-match gate), or any other step that could not complete.
+  `docs/STATUS.md` section (or `docs/architecture.md`'s content after `---`) that does not
+  match what CLAUDE.md currently holds (Step 4's content-match tier), or any other step that
+  could not complete.
 
 Use the literal string `none` for each when there is nothing to report. The orchestrator
 routes any `warnings:` value other than `none` straight to failure handling — never put

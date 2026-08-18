@@ -14,7 +14,7 @@ actually reach a valid v2 shape. `doc-schema.md`'s v1 detection fires on **any o
 five state sections, but `assert-doc-schema.sh` requires **all three** of
 `## Project Overview`, `## Key Decisions`, `## Known Issues / Blockers` in CLAUDE.md (plus
 the five state sections, in STATUS.md — `doc-migrator` can scaffold any that are missing, see
-the next bullet). Never ask permission for something that cannot succeed.
+the following bullets). Never ask permission for something that cannot succeed.
 
 - **If CLAUDE.md lacks any of the three instruction sections** (`## Project Overview`,
   `## Key Decisions`, `## Known Issues / Blockers`) → **decline without prompting.** Emit one
@@ -77,7 +77,9 @@ Await its change report.
 - `status: failed`, or a `warnings:` value other than the literal `none` -> go to Step 6
   (failure handling). `warnings:` is blocking-only by contract (see `doc-migrator.md`'s
   Output section) — a destination write that could not be confirmed, or a content conflict
-  in an already-present `docs/STATUS.md` section.
+  in an already-present `docs/STATUS.md` section. **A report with no `warnings:` line at all
+  is treated as blocking, the same as a non-`none` value** — never read a missing line as
+  "nothing to report."
 - `status: already-v2` -> detection was wrong; log it and fall through to UPDATE.
 - `status: migrated` or `resumed-partial` -> continue to Step 5. Carry any `notes:` value
   into the session's eventual report, but it is advisory only — it never changes this
@@ -96,10 +98,14 @@ This checks `<project_root>` — the repo being migrated. `check-doc-rule-consis
 **separate, development-time lint over the bx/ plugin's own source tree**, not a check on any
 user's repository; it does not belong here (a plugin-authoring concern must never gate or
 roll back a user's migration, especially one running after Step 4 has already touched their
-files). It is exercised in Task 10's verification loop instead — never wire it into this mode.
+files). It is exercised by the plugin's own test suite instead — never wire it into this mode.
 
 - Exit 0 -> continue to Step 6.
-- Exit 1 -> failure handling below.
+- **Any non-zero exit** -> failure handling below. Do not special-case the exit code:
+  `assert-doc-schema.sh` exits `2` on a usage error, and an unresolved path makes `bash
+  <path>` exit `127` — the same `${CLAUDE_SKILL_DIR}`-empty-string failure warned about above.
+  Neither is "1", and treating only exit `1` as failure would let an unverified migration
+  commit. Any exit other than `0` means the checker did not confirm success.
 
 ## Step 6: Commit, or fail cleanly
 
