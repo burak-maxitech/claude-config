@@ -1566,14 +1566,15 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 ```bash
 DEST="$(mktemp -d)"
 bash bx/skills/save/tests/make-fixtures.sh "$DEST"
-bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v0"      --expect v0
-bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v1"      --expect v1
-bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v2"      --expect v2
-bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-partial" --expect partial
-bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-dirty"   --expect v1
+bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v0"          --expect v0
+bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v1"          --expect v1
+bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v1-envvars"  --expect v1
+bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-v2"          --expect v2
+bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-partial"     --expect partial
+bash bx/skills/save/tests/assert-doc-schema.sh "$DEST/fx-dirty"       --expect v1
 bash bx/skills/save/tests/test-hook-layout.sh
 ```
-Expected: all six exit 0.
+Expected: all seven exit 0.
 
 - [ ] **Step 2: Run `/bx:save` against `fx-v1` and verify the migration**
 
@@ -1594,8 +1595,10 @@ Expected: checker exits 0; the migration is its own commit, message beginning `d
 | `fx-v2` | `/bx:save` | **No** migration prompt; no new migration commit |
 | `fx-partial` | `/bx:save`, accept | Marker added; `docs/STATUS.md` **not** recreated or duplicated; checker `--expect v2` exits 0 |
 | `fx-dirty` | `/bx:save` | Migration **skipped** with the dirty-tree message; the save still completes; layout still v1 |
+| `fx-v1-envvars` | `/bx:save`, accept | `## Environment Variables` **survives into CLAUDE.md** — the section lists real variables, so `env_vars_disposition` must resolve to `keep`. Verify with `assert-doc-schema.sh --expect v2 --before <snapshot>`, which now fails if a populated section is dropped |
 
-These three are the cases a single dogfood run would never exercise.
+These four are the cases a single dogfood run would never exercise. The last one guards the
+only path where migration can silently lose content, so it is not optional.
 
 - [ ] **Step 4: Verify idempotency**
 
