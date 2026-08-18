@@ -1,10 +1,10 @@
 ---
 name: save
-description: "Saves session state for the next /bx:resume — drains the task tracker, updates CLAUDE.md + docs/session-history.md, and commits. Fast by default (UPDATE mode via a save-writer subagent); --full adds README/docs sync + rollups. Also runs CREATE/REFACTOR for first-time or monolithic docs. Use at end of a session to save progress, or to create/refactor docs."
+description: "Saves session state for the next /bx:resume — drains the task tracker, updates CLAUDE.md + docs/session-history.md, and commits. Fast by default (UPDATE mode via a save-writer subagent); --full adds README/docs sync + rollups. Also runs CREATE/REFACTOR for first-time or monolithic docs. Use at end of a session to save progress, or to create/refactor docs. Migrates repos on the older doc layout to schema v2 on first run, with consent."
 disable-model-invocation: true
 effort: low
-allowed-tools: Read, Edit, Write, Grep, Glob, Bash(git:*), Bash(ls:*), Bash(find:*), Bash(wc:*), Bash(awk:*), Bash(sort:*), TaskList, TaskGet, AskUserQuestion, Agent
-argument-hint: "[scope] [--full] [--fast] [--silent] [--skip-memory] [--skip-tasks] [--skip-commit] [--skip-rollup] [--skip-decisions-rollup] [--skip-caps]"
+allowed-tools: Read, Edit, Write, Grep, Glob, Bash(git:*), Bash(ls:*), Bash(find:*), Bash(wc:*), Bash(awk:*), Bash(sort:*), Bash(bash:*), TaskList, TaskGet, AskUserQuestion, Agent
+argument-hint: "[scope] [--full] [--fast] [--silent] [--skip-memory] [--skip-tasks] [--skip-commit] [--skip-rollup] [--skip-decisions-rollup] [--skip-caps] [--skip-migrate]"
 ---
 
 # /bx:save - Session Save & Documentation Skill
@@ -21,30 +21,36 @@ First, analyze the current documentation state:
 
 | State | Condition | Action |
 |-------|-----------|--------|
-| **REFACTOR** | Only README.md exists (monolithic) | Split into three files |
-| **CREATE** | No documentation exists | Create all three files from scratch |
-| **UPDATE** | README.md + CLAUDE.md + docs/*.md exist | Update to reflect current state |
+| **REFACTOR** | Only README.md exists (monolithic) | Split into the v2 structure |
+| **CREATE** | No documentation exists | Create the v2 structure from scratch |
+| **MIGRATE** | CLAUDE.md exists on doc schema **v1** or **partial** | Migrate to v2, then fall through to UPDATE |
+| **UPDATE** | CLAUDE.md exists on doc schema **v2** | Update to reflect current state |
 
-**Detection logic:**
+**Detection logic** — the predicate lives in `references/doc-schema.md`; read it and apply
+it rather than reimplementing it here:
+
 ```
 IF README.md exists AND CLAUDE.md missing:
-    -> REFACTOR mode: Split README.md into proper structure
-ELSE IF README.md missing:
-    -> CREATE mode: Generate all documentation from codebase analysis
+    -> REFACTOR
+ELSE IF README.md missing AND CLAUDE.md missing:
+    -> CREATE
 ELSE:
-    -> UPDATE mode: Update existing documentation structure
+    layout = doc-schema.md detection predicate
+    IF layout is v1 or partial -> MIGRATE
+    ELSE                       -> UPDATE
 ```
 
 **Announce the mode** at the start of your response:
-> "Documentation Mode: [REFACTOR/CREATE/UPDATE]"
+> "Documentation Mode: [REFACTOR/CREATE/MIGRATE/UPDATE]"
 
 ---
 
 ## Step 2: Load Shared References
 
 Read these reference files from this skill's `references/` directory:
-1. `references/doc-structure-rules.md` — target structure and context preservation rules
-2. `references/claude-md-sections.md` — required CLAUDE.md sections contract
+1. `references/doc-schema.md` — the layout contract and detection predicate (read FIRST; Step 1's mode depends on it)
+2. `references/doc-structure-rules.md` — target structure and context preservation rules
+3. `references/claude-md-sections.md` — required CLAUDE.md sections contract
 
 ---
 
@@ -56,9 +62,10 @@ Based on the detected mode, read **only** the relevant reference file and follow
 |------|---------------|
 | **REFACTOR** | `references/mode-refactor.md` |
 | **CREATE** | `references/mode-create.md` |
+| **MIGRATE** | `references/mode-migrate.md` |
 | **UPDATE** | `references/mode-update.md` |
 
-**UPDATE mode dispatches the `save-writer` subagent** (Sonnet) to apply the file edits off the main thread — see `references/mode-update.md` (Save Path / Dispatch). CREATE and REFACTOR run inline on the orchestrator.
+**UPDATE mode dispatches the `save-writer` subagent** (Sonnet) to apply the file edits off the main thread — see `references/mode-update.md` (Save Path / Dispatch). CREATE and REFACTOR run inline on the orchestrator. MIGRATE runs on both the fast path and --full, then falls through to UPDATE in the same run.
 
 Execute the instructions in the loaded reference file.
 
