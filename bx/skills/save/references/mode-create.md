@@ -12,6 +12,9 @@ When no documentation exists, generate all files from codebase analysis.
 6. **Extract purpose** - From code comments, file names, structure
 7. **Check for existing docs/** - Don't overwrite existing files
 
+**New projects are created at schema v2 directly** — they never pass through v1, so MIGRATE
+never runs on them.
+
 ## Create: README.md Template
 
 ```markdown
@@ -62,9 +65,12 @@ When no documentation exists, generate all files from codebase analysis.
 
 ## Create: CLAUDE.md Template
 
-**IMPORTANT:** This template contains ALL required sections for `/bx:resume` compatibility.
+**IMPORTANT:** This template contains ALL required instruction sections for `/bx:resume`
+compatibility (see `claude-md-sections.md`). Session state lives in the sibling
+`docs/STATUS.md` template below, never here.
 
 ```markdown
+<!-- bx-doc-schema: 2 -->
 # Claude Code Context
 
 > **Purpose:** Maintains context across AI coding sessions.
@@ -83,6 +89,56 @@ When no documentation exists, generate all files from codebase analysis.
 
 **Key Documentation:**
 - [List all docs/*.md files found or created with descriptions]
+
+---
+
+## Key Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| [Detected pattern/choice] | [Inferred or documented reason] |
+| [Another decision] | [Reason] |
+
+<!-- Reference files (docs/completed-work.md, docs/key-decisions.md, docs/session-history.md) will be created by /bx:save as content accumulates -->
+
+---
+
+## Known Issues / Blockers
+
+- [ ] [Any detected TODOs, FIXMEs, or issues]
+- [ ] [Blockers preventing progress]
+
+*None currently* - if no issues detected
+
+---
+
+## Environment Variables
+
+<!-- Omit this section entirely when the project needs no env vars. -->
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| [VAR_NAME] | Yes/No | [Purpose] |
+
+[Extracted from .env.example or code analysis]
+
+---
+
+> Session state: [docs/STATUS.md](docs/STATUS.md)
+```
+
+## Create: docs/STATUS.md Template
+
+**IMPORTANT:** This template contains ALL required session-state sections for `/bx:resume`
+compatibility (see `claude-md-sections.md`). Instructions live in the sibling `CLAUDE.md`
+template above, never here.
+
+```markdown
+# Project Status
+
+> Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
+
+Last Updated: [DATE AND TIME]
 
 ---
 
@@ -116,42 +172,6 @@ Initial setup completed — documentation generated from codebase analysis.
 1. **[Priority 1]** - [Description and relevant files]
 2. **[Priority 2]** - [Description and relevant files]
 3. **[Priority 3]** - [Description and relevant files]
-
----
-
-## Key Decisions
-
-| Decision | Rationale |
-|----------|-----------|
-| [Detected pattern/choice] | [Inferred or documented reason] |
-| [Another decision] | [Reason] |
-
-<!-- Reference files (docs/completed-work.md, docs/key-decisions.md, docs/session-history.md) will be created by /bx:save as content accumulates -->
-
----
-
-## Architecture Summary
-
-[Brief architecture based on code analysis - 2-4 sentences or small diagram]
-
----
-
-## Known Issues / Blockers
-
-- [ ] [Any detected TODOs, FIXMEs, or issues]
-- [ ] [Blockers preventing progress]
-
-*None currently* - if no issues detected
-
----
-
-## Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| [VAR_NAME] | Yes/No | [Purpose] |
-
-[Extracted from .env.example or code analysis]
 
 ---
 

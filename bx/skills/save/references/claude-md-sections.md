@@ -1,26 +1,45 @@
-# CLAUDE.md Required Sections
+# Required Sections (doc schema v2)
 
-**The `/bx:resume` command depends on these exact section headers in CLAUDE.md.**
+**`/bx:resume` depends on these exact headers.** The canonical layout and detection
+predicate live in [doc-schema.md](doc-schema.md) — this file lists the sections; that file
+defines the schema. If they ever disagree, `doc-schema.md` wins.
 
-**Target size: ~17k chars, hard limit 40k chars.** If CLAUDE.md exceeds 35k chars, warn the user and suggest moving content to reference files.
+## CLAUDE.md — instructions only
 
-CLAUDE.md **MUST** contain these sections (in this order):
-1. `## Project Overview` - Name, repo, description, key docs links
-2. `## Current Status` - Status table with Complete/In Progress/Not Started indicators
-3. `## Completed` - Brief 1-2 line summary of completed work + link to `docs/completed-work.md` for full checklist. **NOT a full checkbox list** — the detailed list lives in the reference file.
-4. `## In Progress` - Checkbox list of current work
-5. `## Next Steps` - Numbered priority list
-6. `## Key Decisions` - Condensed table of ~20 most important architectural decisions (API gotchas, naming conventions, critical tech choices) + link to `docs/key-decisions.md` for full history. **Do NOT include implementation details** like "removed field X" — those go only in the reference file.
-7. `## Architecture Summary` - Brief architecture description
-8. `## Known Issues / Blockers` - Current blockers
-9. `## Environment Variables` - Required env vars
-10. `## Session History` - Only the **last session** as a 3-5 bullet summary + link to `docs/session-history.md` for full archive. **NOT a chronological log** — detailed entries go in the reference file.
+Always loaded, every session. **Target ~7k chars.** Contains only facts Claude should hold
+all the time.
 
-**Reference files (overflow docs):**
-- `docs/completed-work.md` — full completed task checklist
-- `docs/key-decisions.md` — full decision table with all entries
-- `docs/session-history.md` — detailed session logs archive
+1. `## Project Overview` — name, repo, one-line description, key doc links
+2. `## Key Decisions` — condensed table, ~20 rows, + link to `docs/key-decisions.md`
+3. `## Known Issues / Blockers` — current blockers
+4. `## Environment Variables` — **only when populated** (see doc-schema.md)
 
-These reference files are **optional** — if they don't exist in a project, that's fine. They are created as needed when CLAUDE.md content is offloaded.
+Plus the marker as line 1, a `Last Updated:` line, and the pointer line
+`> Session state: [docs/STATUS.md](docs/STATUS.md)`.
+
+**Never put session state here.** Current Status, Completed, In Progress, Next Steps and
+Session History all changed frequently, and CLAUDE.md is paid for on every request of every
+session.
+
+## docs/STATUS.md — session state
+
+Read on demand by `/bx:resume`. **Target ~10k chars.** Sections in this order:
+
+1. `## Current Status` — status table
+2. `## Completed` — 1-2 line summary + link to `docs/completed-work.md`
+3. `## In Progress` — current work
+4. `## Next Steps` — numbered priority list
+5. `## Session History` — last session only, 3-5 bullets, + link to `docs/session-history.md`
+
+Plus its own `Last Updated:` line. The staleness signal must follow the state.
+
+## Reference files (overflow archives)
+
+- `docs/completed-work.md` — full completed checklist
+- `docs/key-decisions.md` — full decision log
+- `docs/session-history.md` — detailed session archive
+- `docs/architecture.md` — architecture detail moved out of CLAUDE.md
+
+All optional; created as needed when content is offloaded.
 
 **Do not rename, remove, or reorder these sections.**

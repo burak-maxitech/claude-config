@@ -7,13 +7,15 @@ All projects should have this documentation system:
 | File | Location | Purpose | Audience |
 |------|----------|---------|----------|
 | **README.md** | Root | Public overview, setup guide, quick reference | Developers, new team members |
-| **CLAUDE.md** | Root | Lean session context (~17k chars), active status, working notes | AI coding assistants |
+| **CLAUDE.md** | Root | Always-loaded instructions (~7k chars): overview, decisions, blockers | AI coding assistants |
+| **docs/STATUS.md** | docs/ | Session state read on demand by /bx:resume (~10k chars) | AI coding assistants |
 | **docs/*.md** | docs/ | PRD, specifications, detailed documentation | Detailed implementation reference |
 | **docs/completed-work.md** | docs/ | Full completed task checklist (overflow from CLAUDE.md) | Reference |
 | **docs/key-decisions.md** | docs/ | Full decision log (overflow from CLAUDE.md) | Reference |
 | **docs/session-history.md** | docs/ | Detailed session logs archive (overflow from CLAUDE.md) | Reference |
+| **docs/architecture.md** | docs/ | Architecture detail moved out of CLAUDE.md | Reference |
 
-**Size targets:** CLAUDE.md should be ~17k chars, hard limit 40k chars. When sections grow large, offload detail to the reference files above and keep only summaries + links in CLAUDE.md.
+**Size targets:** CLAUDE.md ~7k chars; docs/STATUS.md ~10k chars. When either grows, offload detail to the reference files and keep summaries + links.
 
 ## Handling docs/ Folder
 
@@ -47,10 +49,16 @@ Therefore:
 
 ### Pruning Is Preservation
 
-CLAUDE.md has a ~17k char target because it is read into context every session, and unbounded growth eventually degrades performance. The cap-enforcement steps (`mode-update.md` Part 1.10) and the two rollups (Parts 5 and 6) **are the mechanism that keeps this rule workable at scale**:
+CLAUDE.md has a ~7k char target because it is read into context every session, and unbounded growth eventually degrades performance. The cap-enforcement steps (`mode-update.md` Part 1.10) and the two rollups (Parts 5 and 6) **are the mechanism that keeps this rule workable at scale**:
 
 - **Moving a Key Decisions row from CLAUDE.md → `docs/key-decisions.md` is preservation.** The row still exists; it is one level less eager to load.
 - **Collapsing a run of `Complete` status rows into a summary line is preservation** — as long as the individual entries land in `docs/completed-work.md` with any unique notes before they leave CLAUDE.md.
 - **Compressing a session history block to a one-liner with commit hashes is preservation** — the full prose is recoverable via `git show <hash>`.
 
 The "when in doubt, keep it" rule applies to *information*, not to *location*. When CLAUDE.md would otherwise grow past its targets, moving content to its designated reference file is the correct action — not an exception to preservation.
+
+- **Moving session state from CLAUDE.md to `docs/STATUS.md` is preservation.** The v1 -> v2
+  migration relocates five sections byte-for-byte; nothing is deleted. CLAUDE.md keeps a
+  `> Session state:` pointer so the content is one hop away, and `/bx:resume` reads it
+  on demand. This is the same rule as the Key Decisions rollup, applied to state instead
+  of decisions.

@@ -62,13 +62,14 @@ For UPDATE mode the change report is assembled from the `save-writer` subagent's
 ## Verification Checklist: REFACTOR Mode
 - [ ] All README.md content accounted for
 - [ ] Nothing deleted, only moved (content may move to reference files — that counts as preserved)
-- [ ] CLAUDE.md has ALL required sections (see claude-md-sections.md) in lean format
-- [ ] CLAUDE.md Completed section is a summary + link (NOT full checklist)
+- [ ] CLAUDE.md has ALL required instruction sections (see claude-md-sections.md)
+- [ ] docs/STATUS.md has ALL required state sections, in order (see claude-md-sections.md)
+- [ ] docs/STATUS.md Completed section is a summary + link (NOT full checklist)
 - [ ] CLAUDE.md Key Decisions has ~20 max rows + link to full log
-- [ ] CLAUDE.md Session History has only last session (3-5 bullets) + link
+- [ ] docs/STATUS.md Session History has only last session (3-5 bullets) + link
 - [ ] Reference files created as needed (docs/completed-work.md, docs/key-decisions.md, docs/session-history.md)
-- [ ] CLAUDE.md has "Last Updated" timestamp
-- [ ] CLAUDE.md is under 35k chars (target ~17k)
+- [ ] CLAUDE.md and docs/STATUS.md both have a "Last Updated" timestamp
+- [ ] CLAUDE.md is ~7k chars; docs/STATUS.md is ~10k chars
 - [ ] docs/ folder has specifications
 - [ ] README.md links to actual files in docs/
 - [ ] Existing docs/ files preserved
@@ -79,24 +80,24 @@ For UPDATE mode the change report is assembled from the `save-writer` subagent's
 - [ ] Tech stack accurately detected
 - [ ] Project structure matches reality
 - [ ] Environment variables documented
-- [ ] CLAUDE.md has ALL required sections in lean format
-- [ ] CLAUDE.md has "Last Updated" timestamp
+- [ ] CLAUDE.md has ALL required instruction sections; docs/STATUS.md has ALL required state sections (see claude-md-sections.md)
+- [ ] CLAUDE.md and docs/STATUS.md both have a "Last Updated" timestamp
 - [ ] CLAUDE.md does NOT reference files that don't exist yet (reference files created on demand by /bx:save)
 - [ ] Templates ready for future updates
 - [ ] Didn't overwrite existing docs/ files
 
 ## Verification Checklist: UPDATE Mode
-- [ ] CLAUDE.md "Last Updated" timestamp refreshed
-- [ ] CLAUDE.md session history has brief last-session summary (3-5 bullets, NOT full log)
+- [ ] CLAUDE.md and docs/STATUS.md "Last Updated" timestamps refreshed
+- [ ] docs/STATUS.md session history has brief last-session summary (3-5 bullets, NOT full log)
 - [ ] Detailed session log appended to docs/session-history.md
-- [ ] CLAUDE.md Completed section is a summary line + link (NOT a full checklist)
+- [ ] docs/STATUS.md Completed section is a summary line + link (NOT a full checklist)
 - [ ] Completed items appended to docs/completed-work.md
 - [ ] New key decisions appended to docs/key-decisions.md
 - [ ] CLAUDE.md Key Decisions table has only important architectural decisions (~20 max)
-- [ ] CLAUDE.md status reflects current state
-- [ ] CLAUDE.md links to actual docs/ files (including reference files)
-- [ ] CLAUDE.md has all required sections intact
-- [ ] CLAUDE.md is under 35k chars (warn if exceeded, target ~17k)
+- [ ] docs/STATUS.md status reflects current state
+- [ ] CLAUDE.md and docs/STATUS.md link to actual docs/ files (including reference files)
+- [ ] CLAUDE.md and docs/STATUS.md have all required sections intact
+- [ ] CLAUDE.md is ~7k chars; docs/STATUS.md is ~10k chars (warn if either grows well past target)
 - [ ] Cap enforcement (Part 1.10) ran — Current Status ≤10, Next Steps ≤10, In Progress ≤5 (or warnings issued)
 - [ ] Size-pressure rollup (Part 7) ran when CLAUDE.md exceeded 35k post-Parts 5/6, or skipped silently when under threshold
 - [ ] (Fast path) `save-writer` subagent was dispatched with the update packet and returned a change report — no full-file contents echoed in the response
@@ -113,6 +114,20 @@ For UPDATE mode the change report is assembled from the `save-writer` subagent's
 - [ ] Key Decisions rollup considered (unless --skip-decisions-rollup) — oldest rows moved to docs/key-decisions.md when CLAUDE.md table > 20
 - [ ] Commit checkpoint offered LAST (unless --skip-commit; auto-committed without prompt on --silent) — runs after both rollups so their changes land in the same commit
 - [ ] Project-specific files preserved
+
+## MIGRATE mode checklist
+
+- [ ] Working tree was clean before migrating (or migration was correctly skipped)
+- [ ] User consented, or `--silent`/`--skip-migrate` correctly skipped without writing the marker
+- [ ] `docs/STATUS.md` exists with all five state sections in order
+- [ ] CLAUDE.md contains none of the five state sections
+- [ ] CLAUDE.md line 1 is `<!-- bx-doc-schema: 2 -->`
+- [ ] CLAUDE.md contains `> Session state: [docs/STATUS.md](docs/STATUS.md)`
+- [ ] `## Architecture Summary` landed in `docs/architecture.md` (if it existed)
+- [ ] Both CLAUDE.md and STATUS.md carry a `Last Updated:` line
+- [ ] No `@path` imports were introduced
+- [ ] `assert-doc-schema.sh <repo> --expect v2 --before <snapshot>` exits 0
+- [ ] Migration is its own commit, separate from the session save
 
 ## Post-Verification Note
 
