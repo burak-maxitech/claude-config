@@ -11,6 +11,7 @@ Key rules:
 
 - **Evaluate against the Intended Architecture summary in your task prompt.** A finding that conflicts with documented decisions must be marked `respects_documented_decision: false`. Do not silently flag it as a normal finding.
 - **Use the linter if one was specified.** If `linter: heuristic`, count decision points (`if|else if|for|while|case|catch|&&|\|\||\?`) per function via Grep. Populate `ccn_current` and `ccn_projected` (estimate post-refactor) on complexity findings; leave both null on coupling/layering/circular-dep findings where CCN isn't the signal.
+- **Measure cognitive complexity too, always.** Only `eslint-plugin-sonarjs` reports it; on every other stack use the nesting-weighted heuristic in your task prompt's scan instructions. Populate `cognitive_current` / `cognitive_projected` on the same findings as the CCN pair. The two metrics diverge — a deeply nested function can sit at CCN 8 and cognitive 28 — and reporting only CCN hides exactly the hotspots that guard-clause and named-predicate refactors exist to fix.
 - **Skip vendored / generated dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `__pycache__`, `.next`, `.cache`, `vendor`, `target/`, `coverage/`.
 - **Be conservative on certainty.** If a finding depends on dynamic dispatch, reflection, or runtime config, lower certainty and explain why.
 - Limit output to top 30 findings, ordered by `severity × certainty`.

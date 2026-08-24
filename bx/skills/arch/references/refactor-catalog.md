@@ -5,7 +5,10 @@ Each entry is a refactor *technique* (not a GoF pattern) that demonstrably reduc
 ## Rules for the catalog
 
 - **Languages tag is binding.** A subagent may not propose a refactor on a file whose language is not listed.
-- **CCN reduction must be plausible.** Each entry states the expected direction of CCN change.
+- **A complexity reduction must be plausible on at least one metric.** Each entry states its
+  expected direction for **both** cyclomatic and cognitive complexity. An entry whose CCN
+  direction is "unchanged" earns its place on cognitive complexity, and findings citing it must
+  carry the cognitive pair — see R01 and R09.
 - **Only single-file refactors are `--fix-eligible`.** Multi-file or API-breaking refactors route to `--plan` instead.
 - **No GoF patterns by default.** A few are included (Strategy, Command) but only with strict "detect when" triggers that catch the *problem*, not the *surface*.
 
@@ -16,7 +19,10 @@ Each entry is a refactor *technique* (not a GoF pattern) that demonstrably reduc
 - **Languages:** all
 - **Detect when:** function body is a single deeply nested `if/else` ladder where each branch returns or sets a result. Indentation depth ≥3 from method header.
 - **Replace with:** invert each condition, return early on the negative path. Body becomes flat.
-- **CCN direction:** unchanged (same decision points) but cognitive complexity drops sharply. Cognitive complexity is what the linter usually flags.
+- **CCN direction:** unchanged (same decision points).
+- **Cognitive direction:** drops sharply — every nesting increment disappears. **A finding citing
+  R01 must supply `cognitive_current` / `cognitive_projected`;** the Step 5.1 gate drops it as
+  unsubstantiated otherwise, since CCN alone can never justify it.
 - **--fix-eligible:** true
 - **Citation:** Refactoring (Fowler), "Replace Nested Conditional with Guard Clauses"
 
@@ -81,7 +87,10 @@ Each entry is a refactor *technique* (not a GoF pattern) that demonstrably reduc
 - **Languages:** all
 - **Detect when:** an `if` condition spans 3+ joined boolean clauses (`a && b && (c || d)`).
 - **Replace with:** extract the condition into a named boolean function (or local variable for one-off use).
-- **CCN direction:** unchanged but readability improves; sometimes enables further simplification.
+- **CCN direction:** unchanged in total (the clauses move, they do not disappear).
+- **Cognitive direction:** drops in the calling function — the boolean-operator sequence breaks
+  collapse into one named call. **A finding citing R09 must supply the cognitive pair**, same rule
+  as R01.
 - **--fix-eligible:** true
 
 ## R10 — Iterator/pipeline chain over imperative accumulator
@@ -150,6 +159,14 @@ These are deletion-biased: the recommendation is usually *remove* code, not tran
 - **CCN direction:** unchanged.
 - **Lines deletable:** size of the interface declaration + any factory plumbing.
 - **--fix-eligible:** false (cross-file: callers must update)
+- **Hard suppression — Dependency Inversion boundary:** a port has exactly one adapter *by
+  design*. Suppress (do not flag, do not lower certainty) when the interface's module maps to a
+  layer boundary named in the Intended Architecture summary, when its name or path carries a
+  boundary marker (`port`, `adapter`, `gateway`, `repository`, `provider`, `client`, `store`), or
+  when implementer and consumer sit in different named layers. Suppressed instances are reported
+  under `s01_suppressed` and counted in the report footer, never silently dropped.
+  **Counterpart:** `D03` (DIP violation) reads the same evidence from the opposite direction —
+  S01 asks "is this abstraction unearned?", D03 asks "is this concretion illegal?"
 - **Caveats:**
   - **Test seam:** if a mock/fake implementation exists in tests, the abstraction is legitimate — do not flag.
   - **Public API:** if the interface is exported from a package entry point, lower certainty.
@@ -205,6 +222,13 @@ These are deletion-biased: the recommendation is usually *remove* code, not tran
 - **CCN direction:** drops by the number of removed branches.
 - **Lines deletable:** the defensive block.
 - **--fix-eligible:** true (single-file)
+- **Hard suppression — trust boundary:** a type annotation is a compile-time claim about a
+  runtime the compiler never sees. Suppress when the enclosing function is within one hop of a
+  boundary marker: an entry-point path (`handlers`, `controllers`, `routes`, `api`, `cmd`,
+  `adapters`, `middleware`), deserialization (`JSON.parse`, `json.loads`, `unmarshal`, `pickle`,
+  `serde_json::from_`), an environment or config read, FFI, ORM row mapping, or a parameter of an
+  exported entry point. The check you would delete is what makes the annotation true. Suppressed
+  instances are reported under `s06_suppressed` and counted in the footer.
 - **Caveats:** dynamic-language code (Python without strict typing, plain JS without TS) — skip entirely; the check may catch real bugs.
 
 ## S07 — Speculative generic / type parameter

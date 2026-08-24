@@ -28,10 +28,37 @@ Step 2: For each, count concrete implementations:
   TS:       Grep "implements <Name>" or `class \w+ extends <Name>`
   Python:   Grep "class \w+\(<Name>\)" or "<Name>\.register"
   Rust:     Grep "impl <Name> for"
-Step 3: If exactly 1 impl AND no documented multi-impl intent in CLAUDE.md/ADRs → flag.
+Step 3: If exactly 1 impl AND no documented multi-impl intent in CLAUDE.md/ADRs → flag,
+        UNLESS the boundary suppression below applies.
 
 False-positive guard: Check if a mock/fake exists in tests directories — that's a legitimate test seam, do NOT flag.
 ```
+
+**Boundary suppression (mandatory, applied before flagging).** A single implementation is the
+*expected* shape of a Dependency Inversion boundary — a port in a hexagonal architecture has
+exactly one adapter by design. Deleting it is not simplification; it re-couples the domain to
+infrastructure. **Suppress the finding when either holds:**
+
+1. The interface's module maps to a layer boundary named in the **Intended Architecture summary**
+   in your task prompt — or its name/path carries a boundary marker (`port`, `adapter`,
+   `gateway`, `repository`, `provider`, `client`, `store`).
+2. Its implementer and its consumer sit in **different** named layers.
+
+Do not silently discard a suppressed finding. Report it under a separate key so the orchestrator
+can disclose the count in the footer:
+
+```
+s01_suppressed:
+  - location: <path>:<line-range>
+    interface: <name>
+    reason: boundary | cross-layer
+    layer: <the layer named in the Intended Architecture summary>
+```
+
+When the Intended Architecture summary was **inferred** rather than read from docs (your task
+prompt says which), suppression is only as good as that inference — say so in the `reason`, and
+the footer will carry the caveat. The counterpart check is catalog entry `D03` (DIP violation),
+which looks at the same evidence from the opposite direction.
 
 ### S02 — Pass-through wrapper
 ```
@@ -105,10 +132,42 @@ Step 2: Find try/catch around operations that don't throw:
   - try/catch around plain dict/object access
   - try/catch around pure arithmetic (no division-by-zero or BigInt context)
 
-Step 3: Flag with high certainty when type system proves the impossibility.
+Step 3: Flag with high certainty when type system proves the impossibility,
+        UNLESS the trust-boundary suppression below applies.
 
 False-positive guard: Dynamic-language code (Python without strict typing, plain JS) — skip entirely. The check may still catch real bugs.
 ```
+
+**Trust-boundary suppression (mandatory, applied before flagging).** A type annotation is a
+compile-time claim about a runtime the compiler never sees. Data crossing a trust boundary enters
+the type system carrying **no** proof — the annotation is an assertion, not a guarantee, and the
+check you would delete is what makes it true. This is the difference between removing dead code
+and removing the last line of defense.
+
+**Suppress the finding when the enclosing function is within one hop of any boundary marker:**
+
+| Marker | Detect |
+|--------|--------|
+| Entry-point path | path matches `handlers?|controllers?|routes?|api|cmd|adapters?|middleware` |
+| Deserialization | body contains `JSON.parse`, `json.loads`, `unmarshal`, `pickle.load`, `yaml.load`, `.deserialize(`, `serde_json::from_` |
+| Environment / config | reads `process.env`, `os.environ`, `getenv`, a config object loaded from disk |
+| FFI | `ctypes`, cgo, N-API, `extern "C"`, WASM imports |
+| ORM row mapping | a value originating from a raw query result or row → object mapper |
+| Exported entry point | the value originates in a parameter of a symbol exported from the package |
+
+"Within one hop" means: the check sits in the boundary function itself, or in a function whose
+argument came directly from one.
+
+Report suppressed findings the same way S01 does, so the count reaches the footer:
+
+```
+s06_suppressed:
+  - location: <path>:<line-range>
+    reason: <which marker matched>
+```
+
+Genuinely impossible states *inside* the domain — values constructed locally and never crossing a
+boundary — are still flagged normally.
 
 ### S07 — Speculative generic / type parameter
 ```

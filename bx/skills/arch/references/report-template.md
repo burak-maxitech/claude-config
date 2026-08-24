@@ -33,13 +33,17 @@ Default (lightweight):
 **Detected layout:**
 <top-level dir tree, 2 levels deep>
 
-**Complexity heatmap (top 10 by CCN):**
+**Complexity heatmap (top 10 by max(CCN, cognitive)):**
 
-| File:Line                   | Function           | CCN | LOC |
-|-----------------------------|--------------------|-----|-----|
-| src/api/handler.ts:45       | handleRequest      | 24  | 180 |
-| ...                         | ...                | ... | ... |
+| File:Line                   | Function           | CCN | Cog | LOC |
+|-----------------------------|--------------------|-----|-----|-----|
+| src/api/handler.ts:45       | handleRequest      | 24  | 41  | 180 |
+| src/billing/apply.ts:12     | applyDiscounts     | 8   | 28  | 64  |
+| ...                         | ...                | ... | ... | ... |
 ```
+
+Rank by `max(CCN, cognitive)`, not CCN. The second row above is the case a CCN-only heatmap
+misses entirely: modest decision-point count, deeply nested — the exact shape R01 and R09 target.
 
 If `--map` flag is set, additionally render an ASCII module-dep sketch (one node per top-level module, edges for imports). Skip if >15 top-level modules — it becomes unreadable.
 
@@ -50,12 +54,16 @@ Four subsections, in order: **Simplification** (deletion-first, surfaced highest
 ```
 ### Refactors
 
-| Rank | Location                    | Title                          | Sev | Cert | Effort | CCN  Δ          | Catalog |
-|------|-----------------------------|--------------------------------|-----|------|--------|------------------|---------|
-| 1    | src/api/handler.ts:45-180   | Decompose god function         | H   | 0.85 | medium | 24 → 6 (Δ -18)   | R07     |
-| 2    | src/util/parse.ts:12-40     | Replace flag arg with two fns  | M   | 0.9  | small  | 8 → 4 (Δ -4)     | R03     |
-| ...  | ...                         | ...                            | ... | ...  | ...    | ...              | ...     |
+| Rank | Location                    | Title                          | Sev | Cert | Effort | CCN Δ          | Cog Δ          | Catalog |
+|------|-----------------------------|--------------------------------|-----|------|--------|----------------|----------------|---------|
+| 1    | src/api/handler.ts:45-180   | Decompose god function         | H   | 0.85 | medium | 24 → 6 (-18)   | 41 → 9 (-32)   | R07     |
+| 2    | src/util/parse.ts:12-40     | Replace flag arg with two fns  | M   | 0.9  | small  | 8 → 4 (-4)     | 11 → 5 (-6)    | R03     |
+| 3    | src/auth/verify.ts:30-72    | Flatten nested ladder          | M   | 0.9  | small  | 9 → 9 (0)      | 26 → 11 (-15)  | R01     |
+| ...  | ...                         | ...                            | ... | ...  | ...    | ...            | ...            | ...     |
 ```
+
+Both delta columns are always rendered. Row 3 is the shape the old CCN-only gate deleted before
+it could reach the report: flat CCN, large cognitive win.
 
 For Performance, replace the `Catalog` column with `Category` (e.g. `N+1`, `O(n²)`, `Hot-loop invariant`) and add a `Suspect?` column (Y/N). Suspects are findings with `certainty < 0.7`.
 
@@ -132,7 +140,8 @@ If `--fix` flag is set, this section is replaced by the per-finding gate flow (s
 ```
 ---
 
-Linter: eslint (with `complexity` rule, threshold 10)  [or: heuristic Grep-based]
+Cyclomatic complexity: eslint (`complexity` rule, threshold 10)   [or: radon | ruff | lizard | heuristic Grep-based]
+Cognitive complexity: heuristic (nesting-weighted)                [or: eslint-plugin-sonarjs]
 Files in scope: 312
 Files sampled: 50 (priority-ranked by LOC × churn × fan-in)
 Files via drill-down: 18
@@ -146,6 +155,18 @@ Deletion totals (from Simplification dimension):
 - breakdown by category: S01 (5 findings, 78 lines), S02 (3 findings, 42 lines), S06 (8 findings, 45 lines), ...
 
 Findings filtered:
-- Dropped 7 refactor findings where projected CCN ≥ current CCN (sanity gate)
+- Dropped 7 refactor findings that reduced neither cyclomatic nor cognitive complexity (sanity gate)
 - Dropped 4 findings with certainty < 0.5 and severity != high (and lines_deletable < 20)
+
+Suppressed by design (not findings — disclosed so the coverage is honest):
+- S01 × 3 at Dependency Inversion boundaries: src/ports/PaymentGateway.ts, src/ports/Clock.ts,
+  src/ports/EventBus.ts — one implementation is the expected shape of a port.
+- S06 × 5 at trust boundaries: 3 × request handler, 1 × JSON deserialization, 1 × env read.
+- Intended Architecture summary was read from docs/architecture.md.
+  [or: **was inferred from directory structure** — suppression accuracy follows inference accuracy;
+   re-run after documenting the layering if these counts look wrong.]
 ```
+
+The suppression block is **mandatory even when both counts are zero** (render
+`Suppressed by design: none.`). A reader cannot tell a clean codebase from a silently narrowed
+scan unless the skill says which one it is.

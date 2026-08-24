@@ -56,6 +56,10 @@ Same JSON-shaped format as the other arch subagents, with one **mandatory additi
 ## Hard rules
 
 - **`lines_deletable >= 1` is mandatory.** A finding that doesn't actually save lines is not a simplification finding — drop it (or it belongs to another subagent).
+- **Two suppressions are mandatory, not advisory.** Your scan instructions define them in full; both exist because the finding they block would make the codebase *worse*, not merely noisier:
+  - **S01 at a Dependency Inversion boundary.** One implementation is the expected shape of a port, not evidence of over-engineering. Suppress at any boundary named in the Intended Architecture summary, or when implementer and consumer sit in different layers.
+  - **S06 at a trust boundary.** Types prove nothing about deserialized JSON, request bodies, env vars, FFI returns, or ORM rows. Suppress within one hop of any boundary marker.
+  - Suppressed findings are **reported under `s01_suppressed` / `s06_suppressed`, never silently dropped** — the orchestrator discloses the counts in the report footer.
 - **Honor `respects_documented_decision`.** If CLAUDE.md / ADRs explicitly justify the abstraction (e.g. "we're keeping PaymentProvider abstract because Stripe is replaceable mid-2026"), mark `respects_documented_decision: false` and let the orchestrator surface it for user confirmation rather than recommending deletion.
 - **Skip vendored / generated dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `__pycache__`, `.next`, `.cache`, `vendor`, `target/`, `coverage/`, anything matching `*.generated.*` or under `__generated__/`.
 - **Don't double up with `/bx:clean`.** If the *whole file* is unused, that's `/bx:clean`'s territory. You target *symbols within used files*. Coordinate via the consolidator (orchestrator deduplicates).

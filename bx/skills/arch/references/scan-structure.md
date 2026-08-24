@@ -18,6 +18,7 @@ If `Linter` is not "heuristic":
 | Linter | Invocation | Output to parse |
 |--------|------------|-----------------|
 | `eslint` (with `complexity` rule) | `npx eslint --no-eslintrc -c <config> -f json <files...>` | JSON, look for `messages[].ruleId == 'complexity'` |
+| `eslint-plugin-sonarjs` | same invocation, config enabling `sonarjs/cognitive-complexity` | JSON, `messages[].ruleId == 'sonarjs/cognitive-complexity'` — the message text carries the score |
 | `radon` | `radon cc -j <files...>` | JSON, complexity per function |
 | `ruff` | `ruff check --select C901 --output-format json <files...>` | JSON |
 | `lizard` | `lizard -X <files...>` | XML, parse `<measure type="Function">` |
@@ -25,7 +26,11 @@ If `Linter` is not "heuristic":
 
 Cap the file list to the scope. Capture per-function CCN values. If the linter fails to run (config missing, version mismatch), log to your output as `linter_error: "<reason>"` and fall back to heuristic.
 
-## Step 1b — Heuristic CCN (when no linter)
+## Step 1b — Heuristic complexity (when no linter)
+
+Two metrics, computed separately. Report both — they diverge, and that divergence is the point.
+
+### Cyclomatic (McCabe)
 
 For each function in scope, count occurrences of these decision-point patterns and add 1:
 
@@ -33,19 +38,45 @@ For each function in scope, count occurrences of these decision-point patterns a
 Grep pattern (per function body): \b(if|else if|elif|for|while|case|catch|except)\b|&&|\|\||\?[^.]
 ```
 
-This approximates McCabe CCN. Document any function with count >10.
+Document any function with count >10.
+
+### Cognitive (simplified Sonar)
+
+**Always compute this, even when a cyclomatic linter is available** — no cyclomatic tool
+(`radon`, `ruff`, `lizard`, `pmd`) reports cognitive complexity. Only `eslint-plugin-sonarjs`
+does, and only for JS/TS. Score per function:
+
+| Rule | Points |
+|------|--------|
+| Each decision point (`if`, `for`, `while`, `case` group, `catch`) | +1 |
+| **Nesting increment** — the same decision point, per level of nesting it sits inside | +1 per level |
+| Each break in a sequence of boolean operators (`a && b \|\| c` = 2 sequences = 1 break) | +1 |
+| Recursion (function calls itself) | +1 |
+| `else` / `elif` continuing a chain | +1 (no nesting increment) |
+
+Estimate nesting depth from indentation relative to the function header.
+
+The nesting increment is what separates the two metrics: flattening a triply-nested `if` ladder
+into guard clauses removes **zero** decision points (CCN unchanged) but strips every nesting
+increment (cognitive drops sharply). That is why `R01` and `R09` exist, and why a CCN-only gate
+used to delete every finding citing them.
+
+Document any function with cognitive score >15.
 
 ## Step 2 — Identify hotspots
 
-From CCN data, surface:
+From the complexity data, surface:
 
 - All functions with CCN > linter's threshold (or >10 in heuristic mode)
-- Top 20 highest-CCN functions across the scope, regardless of threshold
+- All functions with cognitive score >15
+- Top 20 functions by `max(ccn, cognitive)` across the scope, regardless of threshold
 
 For each, also capture:
 
 - File path and line range
 - LOC of the function
+- **Both** scores — a function at CCN 8 / cognitive 28 is a real hotspot that a CCN threshold
+  misses entirely, and it is the shape guard-clause and named-predicate refactors target
 - Whether the file is a test file (deprioritize tests — they often have high CCN by nature)
 
 ## Step 3 — God functions / files
@@ -99,6 +130,8 @@ If neither, build the graph manually via Grep of imports. Cap analysis depth at 
   "effort_estimate": "medium",
   "ccn_current": 24,
   "ccn_projected": 6,
+  "cognitive_current": 41,
+  "cognitive_projected": 9,
   "respects_documented_decision": true,
   "recommended_refactor": "Decompose into 6 named steps per R07; the function fans out into auth, validation, dispatch, persistence, response, error handling — each is a natural extraction boundary."
 }

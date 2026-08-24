@@ -37,17 +37,25 @@ Mirror `/bx:clean` Step 0: gather stack, workspaces, linter, and repo size befor
 - `composer.json` → PHP, `Gemfile` → Ruby, `pom.xml` / `build.gradle` → JVM
 - `tsconfig.json` → TypeScript (richer pattern detection)
 
-**Linter auto-detect for CCN measurement** (record availability, do not run yet):
+**Linter auto-detect for complexity measurement** (record availability, do not run yet). Two
+metrics are measured, not one — see `references/finding-rubrics.md` for why both are needed:
 
-| Stack | Tool | Detection |
-|-------|------|-----------|
-| JS/TS | `eslint` with `complexity` rule | `.eslintrc*` references `complexity` rule, or `eslint-plugin-sonarjs` present |
-| Python | `radon` | `radon` in `pyproject.toml`/requirements deps |
-| Python | `ruff` (mccabe `C901`) | `pyproject.toml` `[tool.ruff]` enables `C` rules |
-| Multi-lang | `lizard` | `lizard` in deps (any stack) |
-| JVM | `pmd` / `checkstyle` config | `pmd-ruleset.xml`, `checkstyle.xml` |
+| Stack | Tool | Metric | Detection |
+|-------|------|--------|-----------|
+| JS/TS | `eslint` with `complexity` rule | cyclomatic | `.eslintrc*` references `complexity` rule |
+| JS/TS | `eslint-plugin-sonarjs` (`sonarjs/cognitive-complexity`) | **cognitive** | plugin present in deps or `.eslintrc*` |
+| Python | `radon` | cyclomatic | `radon` in `pyproject.toml`/requirements deps |
+| Python | `ruff` (mccabe `C901`) | cyclomatic | `pyproject.toml` `[tool.ruff]` enables `C` rules |
+| Multi-lang | `lizard` | cyclomatic | `lizard` in deps (any stack) |
+| JVM | `pmd` / `checkstyle` config | cyclomatic | `pmd-ruleset.xml`, `checkstyle.xml` |
 
-If none detected, fall back to **Grep heuristic** (count decision points: `if|else if|for|while|case|catch|&&|\|\||\?` per function). Record this as `linter: heuristic` so the report disclosure is accurate.
+**No tool outside `eslint-plugin-sonarjs` computes cognitive complexity** — `radon`, `ruff`,
+`lizard`, and `pmd` are cyclomatic-only. On every other stack, cognitive complexity comes from
+the heuristic in `references/scan-structure.md` Step 1b.
+
+If no cyclomatic linter is detected either, fall back to the Grep heuristic for both metrics.
+Record the two independently — `cyclomatic: <tool|heuristic>` and `cognitive: <sonarjs|heuristic>`
+— so the report footer discloses each accurately. They are frequently different.
 
 **Repo size tier** (`git ls-files | wc -l`):
 
@@ -148,6 +156,8 @@ Each finding must include:
   effort_estimate: trivial | small | medium | large
   ccn_current: <int or null>
   ccn_projected: <int or null>
+  cognitive_current: <int or null>
+  cognitive_projected: <int or null>
   lines_deletable: <int>  (mandatory for simplification, default 0 for others)
   respects_documented_decision: true | false
   recommended_refactor: <prose>
@@ -172,11 +182,30 @@ Read `references/scan-simplification.md` AND ensure the same `references/refacto
 
 After all four subagents return:
 
-1. **Sanity gate (CCN delta)** — drop refactor-dimension findings where `ccn_projected >= ccn_current`. Simplification findings are not gated on CCN — they're gated on `lines_deletable >= 1` (the subagent already enforces this).
+1. **Sanity gate (complexity delta)** — drop a refactor-dimension finding only when it reduces
+   *neither* metric: `ccn_projected >= ccn_current` **AND**
+   `cognitive_projected >= cognitive_current`. A finding that lowers either one survives.
+
+   This gate is dual-metric because the catalog reasons about both. `R01` (guard-clause flatten)
+   and `R09` (named predicate) state **"CCN direction: unchanged"** — they move cognitive load,
+   not decision-point count. A CCN-only gate deletes them before the report, which is exactly
+   what it used to do. Any entry whose CCN direction is "unchanged" **must** carry a cognitive
+   delta; a finding citing such an entry with no cognitive numbers is dropped as unsubstantiated,
+   not passed through.
+
+   Simplification findings are not gated on complexity at all — they're gated on
+   `lines_deletable >= 1` (the subagent already enforces this).
 2. **Certainty gate** — drop findings with `certainty < 0.5` unless `severity = high` OR `lines_deletable >= 20`. Big deletions earn a pass through the certainty filter so user can review even uncertain large wins.
 3. **Deduplicate** — if two subagents report the same location, merge into one finding with both perspectives. Common overlap: `arch-refactors` R03 (flag arg) and `arch-simplification` S03 (always-same param) — keep one with the higher rank score.
 4. **Rank score** — `severity_weight × certainty / effort_weight` where severity {low: 1, medium: 2, high: 4} and effort {trivial: 1, small: 2, medium: 4, large: 8}. For simplification findings, also factor `log(lines_deletable + 1)` into the score so big deletions float up.
 5. **Aggregate lines_deletable totals** — sum across all simplification findings (and any other findings reporting `lines_deletable > 0`). Track distinct files affected. These are the top-line numbers in Section 0 of the report.
+
+5b. **Collect suppressions** — `arch-simplification` returns `s01_suppressed` (Dependency
+   Inversion boundaries) and `s06_suppressed` (trust boundaries) alongside its findings. These are
+   *not* findings and never enter ranking, but they are never silently discarded either: count
+   them, keep their locations, and hand them to the report footer. If the Intended Architecture
+   summary was inferred rather than read from docs, the footer must say so — suppression quality
+   follows inference quality.
 6. **Group**:
    - **Quick wins** — top rank, effort ∈ {trivial, small}. Heavily favors simplification deletions and trivial refactors (R01, R08, R09, S04, S06).
    - **Strategic refactors** — high severity, effort ∈ {medium, large}
