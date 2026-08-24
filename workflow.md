@@ -325,7 +325,7 @@ on pre-v2 repos. The full breakdown — including what `--full` adds — lives i
 ```
 
 **Three guardrails distinguish this from "apply GoF patterns" tools:**
-1. **Refactor catalog over GoF patterns.** The catalog (in `references/refactor-catalog.md`) leans toward complexity-reducing techniques (guard clauses, pure-function extraction, flag-argument removal, discriminated unions, table-lookup dispatch). Patterns appear only when the *problem* matches.
+1. **Refactor catalog over GoF patterns.** The catalog (split per prefix under `references/catalog-*.md`, shared rules in `catalog-rules.md`) leans toward complexity-reducing techniques (guard clauses, pure-function extraction, flag-argument removal, discriminated unions, table-lookup dispatch). Patterns appear only when the *problem* matches.
 2. **Reads intended architecture first.** Step 1 reads CLAUDE.md, README.md, `docs/architecture/`, and ADRs to summarize what the project's architecture is *supposed* to be. Findings that conflict with documented decisions are surfaced separately for user confirmation, not applied automatically.
 3. **CCN delta sanity gate.** Each finding includes `ccn_current` (from detected linter) and `ccn_projected`. Findings whose projected ≥ current are filtered before report.
 

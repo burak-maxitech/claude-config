@@ -177,13 +177,13 @@ Each finding must include:
 Read `references/scan-structure.md`, then dispatch the `arch-structure` subagent with those instructions + shared context. Targets: cyclomatic/cognitive complexity hotspots, coupling, cohesion, layering violations, circular deps.
 
 ### Agent 2: arch-refactors
-Read `references/scan-refactors.md` AND `references/refactor-catalog.md`, then dispatch the `arch-refactors` subagent with both + shared context. The catalog is mandatory context — every finding must cite a catalog entry by ID.
+Read `references/scan-refactors.md` AND `references/catalog-rules.md` AND `references/catalog-refactors.md`, then dispatch the `arch-refactors` subagent with all three + shared context. The catalog is mandatory context — every finding must cite a catalog entry by ID.
 
 ### Agent 3: arch-performance
 Read `references/scan-performance.md`, then dispatch the `arch-performance` subagent with those instructions + shared context. Restricted to high-precision categories (N+1, sync I/O in async paths, accidental O(n²), missing memoization, hot-loop invariants). Other performance hunches are framed as "suspects to measure," not fixes.
 
 ### Agent 4: arch-simplification
-Read `references/scan-simplification.md` AND ensure the same `references/refactor-catalog.md` (S-prefix entries) is in the prompt. Dispatch the `arch-simplification` subagent with both + shared context. Targets: over-engineering and almost-dead code (single-impl interfaces, pass-through wrappers, always-same params, unread config, defensive code for impossible states, near-duplicates, speculative generics, unused exports). Every finding must report `lines_deletable >= 1`.
+Read `references/scan-simplification.md` AND `references/catalog-rules.md` AND `references/catalog-simplification.md`. Dispatch the `arch-simplification` subagent with both + shared context. Targets: over-engineering and almost-dead code (single-impl interfaces, pass-through wrappers, always-same params, unread config, defensive code for impossible states, near-duplicates, speculative generics, unused exports). Every finding must report `lines_deletable >= 1`.
 
 ---
 

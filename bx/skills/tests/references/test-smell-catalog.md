@@ -1,6 +1,6 @@
 # Test Smell Catalog — T-prefix entries
 
-Each entry follows the same schema as the S-prefix simplification catalog in `bx:arch/references/refactor-catalog.md`. The `test-quality` subagent must cite an entry by ID in `smell_id`. Entries marked `--fix-eligible: true` may be auto-applied in `--fix` mode (still gated by per-finding diff preview).
+Each entry follows the same schema as the arch catalogs, whose canonical rules live in `../arch/references/catalog-rules.md` — resolve that against **this skill's base directory** (`bx/skills/tests/`), not against this file's directory. The S-prefix entries this catalog was modelled on are in the sibling `catalog-simplification.md`. The `test-quality` subagent must cite an entry by ID in `smell_id`. Entries marked `--fix-eligible: true` may be auto-applied in `--fix` mode (still gated by per-finding diff preview).
 
 ## Rules for the catalog
 

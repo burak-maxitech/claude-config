@@ -1,6 +1,6 @@
 # Scan: Refactor Opportunities (catalog-driven)
 
-Loaded by the orchestrator alongside `refactor-catalog.md` and passed to the `arch-refactors` subagent.
+Loaded by the orchestrator alongside `catalog-rules.md` + `catalog-refactors.md` and passed to the `arch-refactors` subagent.
 
 ## Inputs you receive in your task prompt
 
@@ -15,7 +15,7 @@ Loaded by the orchestrator alongside `refactor-catalog.md` and passed to the `ar
   justification fields, `evidence` and `why_this_might_be_wrong`. Score against it rather than
   against your own sense of confidence — five scanners never see each other's output, and the
   orchestrator gates, ranks, and groups on exactly these numbers.
-- `Refactor catalog` — full content of `refactor-catalog.md` (you must cite entries by ID)
+- `Refactor catalog` — full content of `catalog-rules.md` + `catalog-refactors.md` (you must cite entries by ID). You receive the R-entries only; other prefixes belong to other scanners.
 
 ## Approach
 

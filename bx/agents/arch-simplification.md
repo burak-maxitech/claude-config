@@ -35,7 +35,7 @@ When in doubt, prefer to flag — but lower `certainty` accordingly. The orchest
 
 ## What to scan for (the catalog defines the rules)
 
-Use the **S-prefixed entries in `refactor-catalog.md`** that the orchestrator passes you. Do not invent categories — if you find a smell that no S-entry covers, propose a new one at the end of your output (under `catalog_gap_proposals`) instead of surfacing the finding.
+Use the **S-prefixed entries in `catalog-simplification.md`** that the orchestrator passes you (its shared rules live in `catalog-rules.md`). Do not invent categories — if you find a smell that no S-entry covers, propose a new one at the end of your output (under `catalog_gap_proposals`) instead of surfacing the finding.
 
 The S-entries broadly cover:
 

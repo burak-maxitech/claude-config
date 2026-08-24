@@ -64,7 +64,7 @@ Pattern B: outer `for x of coll`, inner `for y of coll` (or same `coll`) with in
 Severity: `medium-high` depending on collection size hints (literal arrays vs unbounded). Recommend Set/Map preprocessing (`new Map(collB.map(i => [i.id, i]))`).
 
 ### Missing memoization on pure recursive functions
-Same trigger as catalog entry R12 in `refactor-catalog.md`. This subagent and `arch-refactors` both find it; the orchestrator deduplicates. Surface here only when the *recursion depth* (estimated by # of recursive calls per invocation) and *base-case branching* suggest non-trivial cost.
+Same trigger as catalog entry R12 in `catalog-refactors.md`. This subagent and `arch-refactors` both find it; the orchestrator deduplicates. Surface here only when the *recursion depth* (estimated by # of recursive calls per invocation) and *base-case branching* suggest non-trivial cost.
 
 Severity: `medium`. Recommend memoization.
 
