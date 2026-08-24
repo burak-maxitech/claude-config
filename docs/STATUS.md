@@ -40,15 +40,16 @@ See [completed-work.md](completed-work.md) for full checklist.
 ## Next Steps
 
 1. **`/plugin update bx`, then dogfood `/bx:arch` end-to-end** — v2.3.0 is pushed but the local cache still runs 2.1.1, so none of this session's work is live. The skill has never run; this is now worth more than another rehearsal round.
-2. **Finish the `cc` session naming/coloring rollout (S55)** — run the live gate, then dispatch the single fix wave listed in `## In Progress`.
-3. **Doc-schema v2 fixture verification** — the deferred live `/bx:save` runs against the six fixture cases (see `## In Progress`), plus the post-merge minors batch from both plans.
-4. **/simplify follow-up: move Part 7.7 rotation out of Part 7** into its own sibling Part — deletes the five "except 7.7" carve-outs; requires a blind rehearsal before shipping (deliberately skipped S57).
-5. **Resume the `/bx:webdesign` kaanarik run past review** — push through Phase 3 inject+verify; verify finding `dadac845`.
-6. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
-7. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — hardened S46, never run end-to-end.
-8. **S37 plugin-packaging leftovers** — install smoke-test, symlink retirement, `Skill(bx-*)` → `Skill(bx:*)`.
-9. **`/bx:evolve` follow-ups** — scan-docs allowlist candidate (`auto-mode-config`); 14 open findings; v2 ideas (shared `references/lane-contract.md`).
-10. **`/bx:seo` deferred items** — code-review leftovers (#5/#6/#7) + S25/S27/S29 refactors.
+2. **Doc tiering — decision pass on the `/doctor` findings (S59)** — spec drafted at [superpowers/specs/2026-08-24-bx-doc-tiering-design.md](superpowers/specs/2026-08-24-bx-doc-tiering-design.md); status Draft, 8 decisions open, nothing implemented. Field evidence from a `/doctor` run on a repo that uses `/bx:save` every session: CLAUDE.md at 31.1k chars (2.6× the 12k soft cap) with `## Known Issues / Blockers` at 48% of it — the one required section with no cap, no shrinker and no archive destination. Recommended split: ship the Known Issues governor + relocate-don't-delete + the derivable-content clause first; hold the `.claude/rules/` path-scoped tier behind a second gate. Pairs with #5.
+3. **Finish the `cc` session naming/coloring rollout (S55)** — run the live gate, then dispatch the single fix wave listed in `## In Progress`.
+4. **Doc-schema v2 fixture verification** — the deferred live `/bx:save` runs against the six fixture cases (see `## In Progress`), plus the post-merge minors batch from both plans.
+5. **/simplify follow-up: move Part 7.7 rotation out of Part 7** into its own sibling Part — deletes the five "except 7.7" carve-outs; requires a blind rehearsal before shipping (deliberately skipped S57). The S59 spec's D4 proposes a Part 7.9 sibling on the same reasoning — do these together.
+6. **Resume the `/bx:webdesign` kaanarik run past review** — push through Phase 3 inject+verify; verify finding `dadac845`.
+7. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
+8. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — hardened S46, never run end-to-end.
+9. **S37 plugin-packaging leftovers** — install smoke-test, symlink retirement, `Skill(bx-*)` → `Skill(bx:*)`.
+10. **`/bx:evolve` follow-ups** — scan-docs allowlist candidate (`auto-mode-config`); 14 open findings; v2 ideas (shared `references/lane-contract.md`).
+11. **`/bx:seo` deferred items** — code-review leftovers (#5/#6/#7) + S25/S27/S29 refactors.
 
 ## Session History
 
