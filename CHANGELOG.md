@@ -2,6 +2,39 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.4.0 — 2026-08-24
+
+### Fixed
+
+- **`respects_documented_decision` was being set backwards, and the exclusivity rule buried the
+  result.** Found in the first end-to-end `/bx:arch` dogfood: all five robustness findings — the
+  most valuable in the run — came back `false`, though nothing documented opposes adding a lock or
+  a timeout. The scanner read the flag as "this code violates a decision" instead of "my
+  *recommendation* collides with one", and because Step 5.8 makes that group exclusive, all five
+  left the actionable lists. `finding-rubrics.md` now states the rule as a two-question decision
+  procedure with a worked table (including the row that trips scanners: a finding whose fix
+  *restores* a documented goal is `true`), and Step 5.7 gained the inverse check — an unsubstantiated
+  `false` is treated as `true` for grouping and named in the report, with a majority-`false` sanity
+  check for whole-scanner inversion.
+
+### Added
+
+- **`coverage_negatives`** — a channel for "I swept this category and it was genuinely empty".
+  Scanners were told to report empty categories honestly but had nowhere to put them, so they
+  encoded negatives as `severity: low` findings with `recommended_refactor: "None"`, which then
+  ranked and polluted the tables. Declared in the finding contract, collected at Step 5.6, rendered
+  in the report footer.
+- **Notable pairs** — a two-finding cluster sharing one concrete root mechanism does not qualify as
+  a theme and is no longer silently dropped either; it renders as a single line under the themes.
+  The dogfood surfaced two: unlocked read-modify-write across `session-color` and the GSC helper's
+  history writes, and the SessionStart hook's timeout + subprocess pair.
+
+### Changed
+
+- Step 4 passes reference files to subagents **by absolute path** rather than inlining their
+  contents — the documented approach required the orchestrator to hold ~95k chars to compose five
+  prompts, for text the agent reads itself either way.
+
 ## 2.3.0 — 2026-08-24
 
 ### Fixed

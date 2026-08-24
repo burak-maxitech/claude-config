@@ -147,10 +147,15 @@ Launch all five subagents in a single turn (one Agent tool call per agent). Mirr
 
 For each subagent, **read its corresponding reference file** (it contains the detailed scan instructions) and pass the contents in the task prompt along with the shared context.
 
-**Read `references/finding-rubrics.md` once and pass its full contents to every subagent** as the
-`Scoring contract` block below. It is the canonical owner of the severity / certainty / effort
-anchors and the two mandatory justification fields. Do not paraphrase it per-agent — five agents
-scoring against five paraphrases is the problem it exists to solve.
+**Pass reference files by absolute path, not by contents.** Each subagent has `Read`; instruct it to
+read its scan file, `catalog-rules.md`, its own catalog, and `references/finding-rubrics.md` in full
+before scanning, giving the absolute paths resolved against this skill's base directory. Inlining
+the contents would require the orchestrator to hold ~95k chars to compose five prompts, for no gain
+— the agent ends up with the same text either way.
+
+`finding-rubrics.md` is the **`Scoring contract`** every agent must read: the canonical owner of the
+severity / certainty / effort anchors and the two mandatory justification fields. Never paraphrase it
+per-agent — five agents scoring against five paraphrases is the problem it exists to solve.
 
 ### Shared context to pass to all subagents:
 
@@ -323,7 +328,17 @@ Running this after the merge is what prevents double counting: 5.4 keeps the *hi
 merged finding's members rather than summing them, so two scanners reporting the same 12 deletable
 lines contribute 12 here, not 24.
 
-### 5.6 Collect suppressions
+### 5.6 Collect suppressions and coverage negatives
+
+Scanners return **`coverage_negatives`** — categories they swept and found genuinely empty, with the
+evidence that makes the negative credible ("grepped `flock|lockfile|Mutex`: 0 hits"; "the only class
+in scope is a single-method exception type"). These are **not findings**: they never rank, never
+group, never enter a theme. Collect them for the footer.
+
+A negative result is worth reporting — it separates a clean codebase from an unscanned one — but it
+is not actionable, and a scanner with nowhere else to put it will encode it as a `severity: low`
+finding with `recommended_refactor: "None"`, which then pollutes the ranked tables. If you receive
+one in that shape, move it here rather than ranking it.
 
 `arch-simplification` returns `s01_suppressed` (Dependency Inversion boundaries) and
 `s06_suppressed` (trust boundaries) alongside its findings. These are *not* findings and never enter
@@ -342,6 +357,15 @@ before using them:
   rather than treating it as clean. Never silently flip the flag.
 - **A finding whose location also appears in that same scanner's `*_suppressed` list** — the scanner
   contradicted itself. Compare against the finding's **original** pre-merge location. Surface it under **Scanner Conflicts** with both of its own stated reasons.
+- **`respects_documented_decision: false` whose `evidence` quotes no documented statement the
+  *recommendation* would violate** — the flag is inverted. This is the common failure: a scanner
+  marks `false` because the code appears to break something documented, when the correct reading is
+  whether the **fix** collides with a stated intent (a finding that restores a documented goal is
+  `true`). Treat the flag as `true` for grouping, and **say so in the report** — name the finding and
+  the reason. Do not route it to Documented-Decision Conflicts on an unsubstantiated `false`;
+  that group is exclusive, so an inverted flag silently removes a finding from every actionable list.
+  **Sanity check:** if a scanner returned `false` on the majority of its findings, assume inversion
+  and re-check every one.
 
 ### 5.8 Group
 
@@ -407,6 +431,13 @@ genuine duplicates, co-located findings arrive here intact, which is what makes 
    evidence and say that you did.
 6. **Findings in no theme are not dropped.** They render below, in the per-dimension tables, exactly
    as before. Theming reorganizes the top of the report; it never filters it.
+
+**Notable pairs.** A cluster of exactly **2** findings sharing one concrete root mechanism does not
+qualify as a theme and must not be promoted to one — but it is not nothing, and dropping it silently
+loses a real cross-file pattern. Render it as a single line under the themes:
+`**Notable pair:** <mechanism> — <location A>, <location B>.` Cap at three such lines, ranked by
+summed rank score. Only genuine single-mechanism pairs qualify; two findings that merely share a
+directory do not.
 
 If fewer than 3 themes clear the bar, render the ones that do and say so. If none do, say
 **"No cross-cutting themes — findings are independent"** and go straight to the tables. That is a

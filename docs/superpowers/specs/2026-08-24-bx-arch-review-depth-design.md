@@ -316,6 +316,51 @@ changes what the skill finds or suppresses.
 Rehearsals prove the instructions are unambiguous; only a real run proves the six scanners surface
 anything useful on real code.
 
+### First dogfood run — 2026-08-24, four defects
+
+The end-to-end run owed since S46 ran against this repo (145 files in scope, 26 planted eval
+fixtures excluded, bounded tier, heuristic for both metrics). Five scanners returned 20 findings;
+17 survived the gates. Filed as findings against the skill itself:
+
+**A1 — `respects_documented_decision` is set backwards, and the exclusivity rule buries the result.**
+severity **high** · certainty 0.95 · evidence: all five `arch-robustness` findings returned
+`false`, though nothing documented opposes adding a lock or a timeout. The scanner read the flag as
+"this code violates a documented decision" instead of "my recommendation collides with one". Step
+5.8 makes that group exclusive, so all five — the highest-value findings in the run — left Quick
+wins for a confirmation section. `finding-rubrics.md` already states the correct reading in prose
+and it still did not take; 5.7 validates only the `true` direction, so nothing caught it.
+*Fix:* a two-question decision procedure in the rubric owner, plus a 5.7 check for an unjustified
+`false`.
+
+**A2 — no channel exists for a negative result.**
+severity medium · certainty 1.0 · evidence: the scan files instruct scanners to say when a category
+has nothing to bite on, but the output schema emits findings only — so `arch-structure` encoded "no
+circular dependencies found" and "no D-entry finding meets its threshold" as *findings* with
+`severity: low` and `recommended_refactor: "None"`. Unrouted, they rank and pollute the tables.
+*Fix:* a `coverage_negatives` list in the finding contract, collected at 5.6 and rendered in the
+footer.
+
+**A3 — the ≥3 theme bar rejects real two-member mechanisms.**
+severity low · certainty 0.9 · evidence: `session-color.{sh,ps1}` and
+`gsc-parse-helper.py`'s history/watchpoints writes are the *same defect shape* — unlocked
+read-modify-write on a shared file — in two unrelated files, and the pattern is invisible in the
+report because it has two members. Same for the SessionStart hook pair (E03 + subprocess overhead).
+*Fix:* keep the bar; add a "Notable pairs" line under the themes so a 2-member single-mechanism
+cluster is surfaced without being promoted to a theme.
+
+**A4 — Step 4's "pass the reference contents in the prompt" is impractical at this size.**
+severity low · certainty 1.0 · evidence: composing five prompts that way requires the orchestrator
+to hold ~95k chars of reference material. The run passed cache paths instead and the agents read
+them — functionally identical, a fraction of the cost.
+*Fix:* make path-passing the documented approach.
+
+**What the run validated:** the wave-2 dedup narrowing was decisive — the god-file finding spans
+`:1-1745` and would have absorbed eight findings under the pre-wave-2 overlap-only rule. The D03
+layering guard correctly did not fire on a repo with no named layers. The dual-metric gate earned
+itself: an `R01` finding at CCN 3→3 / cognitive 8→4 reached the report, which the pre-v2.3.0
+CCN-only gate would have deleted. No scanner padded to its cap, and one verified its own
+recommendation by executing it.
+
 **Explicitly not done this pass:** no end-to-end dogfood run and no eval suite. `/bx:arch` has
 still never been run end to end (`docs/STATUS.md` Next Steps #7); that run remains owed and needs
 `/plugin update bx` first, since skills execute from the plugin cache, not the working tree.

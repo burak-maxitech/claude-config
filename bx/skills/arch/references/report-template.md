@@ -405,6 +405,12 @@ Deletion totals (from Simplification dimension):
 - files_affected: 22
 - breakdown by category: S01 (5 findings, 78 lines), S02 (3 findings, 42 lines), S06 (8 findings, 45 lines), ...
 
+Coverage negatives (categories swept and found empty — evidence that the scan ran, not that it
+found nothing to say):
+- C — locking primitives: grepped flock|lockfile|Mutex across 13 files, 0 hits
+- D01/D02/D08: only class in scope is a single-method exception type
+- (render `none reported` when no scanner returned any)
+
 Catalog gap proposals (from scanners, for review — not findings):
 - arch-refactors: "repeated manual null-coalescing chain", 7 occurrences, proposed R15.
 - (render `none` when no scanner returned any)

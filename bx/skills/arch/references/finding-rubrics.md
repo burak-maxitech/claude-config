@@ -133,18 +133,54 @@ nature.
 Trusted by the orchestrator to route findings into a confirmation section, and never defined
 anywhere else — so, precisely:
 
-- **`true`** — acting on this finding does not contradict anything the Intended Architecture summary
-  states. This is the default and the common case, including for ordinary defects the project has
-  never written anything about.
-- **`false`** — the project has **documented a decision that this finding argues against**. The flag
-  is not about whether the code is good; it is about whether *your recommendation* collides with a
-  stated intent. A deliberate, documented tradeoff ("in-memory cache is authoritative, rebuilt at
-  boot"; "monolith by choice, see ADR-0007") gets `false` — you are still surfacing it, but the user
-  must confirm before it is actioned.
+**Answer these two questions in order. Do not set the flag any other way.**
 
-Read it as *"my recommendation respects the documented decision"*, not *"this code respects it."*
-When you set `false`, quote the documented decision in `evidence` so the orchestrator can render the
-conflict without going to find it.
+1. Does the Intended Architecture summary contain a statement that my **recommendation** would
+   violate if it were applied? If you cannot quote that statement, the answer is no.
+2. If no → **`true`**. If yes → **`false`**, and quote the statement in `evidence`.
+
+That is the whole rule. `true` is the default and the overwhelmingly common case, including for
+every ordinary defect the project has never written anything about.
+
+**The most common error is setting `false` because the code looks like it violates something.**
+That is backwards. The flag is about your *fix*, not the code:
+
+| Situation | Flag | Why |
+|-----------|------|-----|
+| A race with no lock; nothing documented about locking | `true` | Adding a lock violates no stated intent |
+| A missing timeout; nothing documented about timeouts | `true` | Same |
+| A finding whose fix would *restore* a documented goal the code currently breaks | `true` | You are serving the decision, not colliding with it |
+| Deleting an abstraction the docs say to keep ("Stripe is replaceable mid-2026") | `false` | Your recommendation contradicts a stated intent |
+| Splitting a monolith an ADR chose deliberately | `false` | Same |
+
+The third row is the one that trips scanners: finding a defect that *breaks* a documented goal is
+still `true`, because fixing it honors that goal. `false` is rare. If most of your findings carry
+`false`, you have inverted the flag — re-read this table before returning them.
+
+Setting `false` is consequential: the orchestrator treats that group as **exclusive**, so the
+finding leaves the actionable lists entirely and waits on user confirmation. Never set it without a
+quotable statement.
+
+## `coverage_negatives` — the channel for "I looked and there was nothing"
+
+Alongside your findings, return a `coverage_negatives` list: categories you swept that came up
+genuinely empty, each with the evidence that makes the negative credible.
+
+```
+coverage_negatives:
+  - category: "C — locking primitives"
+    evidence: "Grepped flock|lockfile|\.lock|LockFileEx|Mutex across all 13 files: 0 hits."
+  - category: "D01/D02/D08 — class-based design entries"
+    evidence: "Only class in scope is CredentialError, a single-method exception type. No implementers."
+```
+
+**A negative result is not a finding.** Do not emit it as a `severity: low` finding with
+`recommended_refactor: "None"` — that ranks, groups, and pollutes the report's tables with rows
+nobody can act on. Put it here. The orchestrator renders these in the footer, where they do the job
+a negative belongs in: separating a clean codebase from an unscanned one.
+
+Report a category here when you swept it and it was empty. Do not list every entry you did not
+match — only categories a reader would otherwise wonder about.
 
 ## Complexity fields
 
