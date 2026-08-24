@@ -245,6 +245,7 @@ rank = severity_weight × certainty × leverage / effort_weight
 ```
 
 - severity {low: 1, medium: 2, high: 4}; effort {trivial: 1, small: 2, medium: 4, large: 8}
+- The schema field is **`effort_estimate`**; `effort` anywhere in this step means that same field.
 - **`leverage = 1 + churn_norm + fan_in_norm`** for the finding's file, both normalized 0..1
   across the scope (Step 3 computes them — see `references/scale-strategy.md`). A CCN-30 function
   nobody touches is not the problem; a CCN-15 function changed 40 times in 90 days and imported by
@@ -271,6 +272,11 @@ code.** Both conditions must hold:
    | `R12` (memoize recursion) / performance `missing memoization` | Same function |
    | `X01` (unbounded result set) / performance `payload size` | Same query |
    | `R07` (decompose god function) / structure `god function` | Same function, two scanners |
+
+   Performance findings carry no `cite_catalog_entry` (the schema requires it only for refactor and
+   simplification dimensions). Match those rows on the performance finding's **`category`** instead —
+   the right-hand column above names it. A candidate pair where neither side has a catalog entry or a
+   category never merges.
 
 **Co-location is not duplication.** A god-function finding spanning `orders.ts:7-30` *contains* a
 swallowed exception at `:22`, a race at `:16-19`, and a deletable null check at `:11` — four
@@ -310,8 +316,12 @@ is visible rather than silent.
 
 ### 5.5 Aggregate `lines_deletable`
 
-Sum across all findings reporting `lines_deletable > 0`. Track distinct files affected. These are
-the top-line numbers in Section 1 of the report.
+Sum across the **post-5.4** findings reporting `lines_deletable > 0`. Track distinct files affected.
+These are the top-line numbers in Section 1 of the report.
+
+Running this after the merge is what prevents double counting: 5.4 keeps the *highest* value among a
+merged finding's members rather than summing them, so two scanners reporting the same 12 deletable
+lines contribute 12 here, not 24.
 
 ### 5.6 Collect suppressions
 
@@ -374,14 +384,27 @@ genuine duplicates, co-located findings arrive here intact, which is what makes 
 
    What neither path admits: a cluster that is merely *everything one scanner returned*, with no
    shared mechanism and no family diversity. That is a well-ranked table, not a theme.
-3. **Overlapping clusters** — when one cluster is a subset of another, report only one: the cluster
-   whose first move closes more findings. Never report both, and never let the same finding appear
-   as evidence for two themes.
+3. **Overlapping clusters** — when one cluster is a subset of another, report only one. Choose by
+   asking, for each member of the larger cluster, **whether the candidate first move plausibly
+   remedies it** — not by member count. A directory-prefix cluster that picks up one extra finding
+   the first move does not touch is *worse* than the tighter cluster, not better: the theme would
+   claim coverage it does not have. Never report both, and never let one finding be evidence for two
+   themes.
+
+   The same closure test governs qualification: the **single-mechanism** path in rule 2 requires one
+   first move to close every member. A cluster clearing only the **cross-cutting** path has no
+   closure requirement — but if you cannot name a first move touching most of it, it is a weak theme
+   and should not outrank one you can.
 4. **Rank themes** by summed rank score of their members; take the **top 3**.
 5. Each theme renders three things: a **one-sentence thesis** naming the structural cause, the
    **evidence set** (its member findings, by location), and the **single highest-leverage first
-   move** — one action, not a list. Draw the first move from the members' `recommended_refactor`
-   fields; if none carries one, synthesize it from their titles and evidence and say that you did.
+   move** — one action, not a list. Draw it from the `recommended_refactor` of the member that
+   **most other members depend on** — the structural or root-cause finding, not necessarily the
+   highest-ranked one. In a cluster where a god function contains a swallowed exception, decomposing
+   the function is the first move even though the exception outranks it, because the decomposition
+   is what makes the rest separately fixable. Where no member is foundational, use the
+   highest-ranked member's. If none carries a `recommended_refactor`, synthesize from titles and
+   evidence and say that you did.
 6. **Findings in no theme are not dropped.** They render below, in the per-dimension tables, exactly
    as before. Theming reorganizes the top of the report; it never filters it.
 
