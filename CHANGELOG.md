@@ -2,6 +2,57 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.3.0 — 2026-08-24
+
+### Fixed
+
+- **Three `/bx:arch` rules that made the architecture worse.** `S01` recommended deleting
+  Dependency Inversion — a port has exactly one adapter by design — and is now hard-suppressed
+  at any layer boundary named in the Intended Architecture summary. `S06` deleted validation at
+  trust boundaries, where a type annotation is a compile-time claim about a runtime the compiler
+  never sees; it is now suppressed within one hop of deserialization, env reads, FFI, ORM row
+  mapping, or an entry point. Both report suppressions rather than discarding them.
+- **The complexity gate deleted the catalog's own quick wins.** `R01` and `R09` state "CCN
+  direction: unchanged", so a CCN-only gate dropped every finding citing them. Root cause was a
+  metric mismatch: the catalog reasons about *cognitive* complexity, the skill only measured
+  *cyclomatic*. Cognitive complexity is now measured (`eslint-plugin-sonarjs` where present, a
+  nesting-weighted heuristic everywhere else — no other linter reports it), and the gate drops a
+  finding only when it reduces neither metric.
+
+### Added
+
+- **Three dimensions that had zero coverage**, as 31 new catalog entries:
+  `catalog-design.md` (D01–D08 — LSP, ISP, DIP, Law of Demeter, anemic domain model, feature envy,
+  primitive obsession, god class) and `catalog-robustness.md` (C01–C08 concurrency and thread
+  safety, E01–E08 error safety and resource lifecycle, X01–X07 architectural scalability). Every
+  entry carries language tags, a greppable trigger, a severity signal naming what actually fails,
+  and false-positive guards. None is `--fix`-eligible: adding an `await`, a timeout or a lock
+  changes runtime behavior a diff preview cannot show, and `--fix` runs no tests.
+- **A fifth scanner, `arch-robustness`**, owning C/E/X. It asks a different question from the
+  other four — not "is this hard to read?" but "what happens when this runs twice at once, when
+  the network hangs, or when the table has ten million rows?" It builds an entry-point map before
+  scoring, and reports findings whose dependencies it could not resolve rather than staying silent.
+- **A calibrated finding contract** (`finding-rubrics.md`, canonical owner): anchored severity,
+  certainty defined by evidence class rather than confidence, effort anchors, and two mandatory
+  fields — `evidence` (the work behind the certainty band) and `why_this_might_be_wrong` (the
+  skill's only adversarial pressure).
+- **A report that opens with a judgment**: the top 3 architectural themes, each a thesis naming a
+  structural cause, its evidence set, and one highest-leverage first move. Findings outside a theme
+  still render in full below. Ranking now multiplies by `churn × fan-in`, so findings are ordered
+  by where change actually hurts.
+- **Layering analysis when nothing is documented** — previously skipped entirely, which is the
+  common case. The dominant import direction per module pair is inferred and minority-direction
+  imports are reported as violations of the codebase's own convention, capped at 0.7 certainty.
+
+### Changed
+
+- `refactor-catalog.md` split per prefix (`catalog-rules.md` + `catalog-refactors.md` +
+  `catalog-simplification.md` + the two new files); each agent receives only its own entries, so
+  token cost stays flat while the catalog grows from 23 entries to 54.
+- Per-agent finding caps 30 → 15 (performance 20 → 15).
+- `/bx:tests --plan` no longer advertises a "TaskCreate-ready brief"; `/bx:health` describes the
+  six dimensions and the thesis-first report.
+
 ## 2.2.0 — 2026-08-24
 
 ### Fixed

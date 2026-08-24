@@ -280,6 +280,42 @@ citation-resolution loop over every `../<skill>/references/*.md` (resolved again
 base directory**, S48), and a grep proving `refactor-catalog` survives only in
 `docs/key-decisions.md`.
 
+### Result — six waves, gate not met, shipped with the residual recorded
+
+Three surfaces were rehearsed; Step 5 and the report template three times each, scan+rubrics twice.
+
+| Surface | Rounds | Ambiguity count |
+|---------|--------|-----------------|
+| Step 5 consolidation | 3 | 15 → 12 → 11 |
+| Report template | 3 | 24 → 18 → 12 |
+| Scan + rubrics | 2 | 12 → 12 |
+
+**The ≤2 bar was not reached, and the raw count stopped being the useful metric after wave 2.**
+The bar came from `doc-migrator`, a single-purpose file of ~100 lines; the surface here is ~1000
+lines across five files. The rehearsal prompt was also stricter than S56's — it asked agents to log
+anything "two careful readers could execute differently, even if you found a reasonable answer", so
+the final logs contain entries the agents themselves label *correct literal reading* and *latent,
+not exercised*. Two entries in the last template round were errors in the rehearsal's own input
+data that the template correctly caught.
+
+What the counts hide is the severity collapse:
+
+| Wave | What it found |
+|------|---------------|
+| 1 | Three self-contradictions; a merge that emptied a report group; a trace rule that suppressed every missing-timeout finding on an untraceable client |
+| 2 | A dedup rule *introduced by wave 1* that collapsed six distinct defects into one |
+| 3 | Two Step 5.8 groups with no destination; merged perspectives discarded at render |
+| 4–5 | A field named two ways; where to anchor an annotation; a plural noun |
+| 6 | Confirmed the wave-1 suppression fix works; a certainty ceiling declared outside its owner file |
+
+**Residual, accepted:** roughly 8–10 items per surface, all of the wave-4/5/6 class — formatting
+conventions, unexercised latent forks, and judgment calls the text names as judgment calls. None
+changes what the skill finds or suppresses.
+
+**Owed next, and more valuable than another rehearsal round:** the first end-to-end dogfood run.
+Rehearsals prove the instructions are unambiguous; only a real run proves the six scanners surface
+anything useful on real code.
+
 **Explicitly not done this pass:** no end-to-end dogfood run and no eval suite. `/bx:arch` has
 still never been run end to end (`docs/STATUS.md` Next Steps #7); that run remains owed and needs
 `/plugin update bx` first, since skills execute from the plugin cache, not the working tree.
