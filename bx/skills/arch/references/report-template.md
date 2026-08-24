@@ -32,15 +32,25 @@ Step 5.8 hands you five groups. Every one has a destination; none is dropped.
 
 | Group | Renders as |
 |-------|-----------|
-| Quick wins | Section 6, as a **Quick wins** list — location, title, effort, and the one-line action. This is the section's first block, above the strategic briefs. |
+| Quick wins | Section 6, as a **Quick wins** list — location, title, effort, and a one-line action, **ranked descending** like the tables. Trim the action to the imperative clause of `recommended_refactor`; the finding's table row carries the full text. This is the section's first block, above the strategic briefs. |
 | Strategic refactors | Section 6's `/bx:plan` snippets, one per member, top 3 by rank |
 | Documented-decision conflicts | Section 4 |
 | Performance suspects | The Performance subsection of Section 3, with `Suspect? = Y` |
 | Scanner conflicts | Section 5 |
 
-**Section 6 is the one place you compose rather than transcribe.** The "render, never re-derive"
-rule governs *findings data* — you must not recompute a finding's fields. Writing the skill-chain
-bullets and the `/bx:plan` brief prose from the findings you were given is this section's job.
+**Two sections compose rather than transcribe: Section 0 and Section 6.** The "render, never
+re-derive" rule governs *findings data* — never recompute a finding's fields, a theme's membership,
+or a group's contents. But Section 0's thesis and first-move prose, and Section 6's skill-chain
+bullets and `/bx:plan` briefs, are written by you from the data you were given. Step 5 supplies the
+theme's members and its qualifying rationale, not finished paragraphs.
+
+**Fences.** Every example in this file is fenced so it reads as a literal. In the *output*, only
+Section 6's `/bx:plan` snippets stay fenced — they are copy-paste commands. Everything else renders
+as live markdown: headings must be real headings, tables must be real tables.
+
+**Empty cases not covered by a section's own rules:** an empty Architecture Map renders the heading
+plus `Layout not determined.`; a Section 6 with neither quick wins nor strategic refactors renders
+the heading plus `No actions suggested — see the findings tables.`
 
 ## Merged findings
 
@@ -51,9 +61,19 @@ detail block** naming the other perspective, its catalog entry, and its own cert
 > Also reported by `arch-performance` as "Possible large payload serialization" (category `payload`,
 > certainty 0.50) — counted as a performance suspect.
 
+**Placement.** When the merged finding is its subsection's #1, the line goes directly under its
+detail block. Otherwise it goes immediately below the subsection's table, prefixed with the row it
+refers to — `[rank 3, src/api/orders.ts:32]`. Never leave the annotation unanchored.
+
 The secondary perspective still drives its own group membership (Step 5.4 keeps each perspective's
 certainty for exactly this reason), so a merged finding can appear as a Performance suspect while
-its primary row sits under Robustness.
+its primary row sits under Robustness. **The group destination wins over an "empty dimension"
+signal:** if Step 5.8 routed a finding to the Performance suspects group, the Performance subsection
+renders that row even when no standalone performance finding survived.
+
+**Fields on a group-derived row** come from the primary finding — severity, effort, location, theme
+— except `certainty` and `category`/`Entry`, which come from the perspective that put it in that
+group.
 
 ## Global rendering rules
 
@@ -74,7 +94,9 @@ These apply to every section; sections below do not restate them.
   show only body content: `## Top-line Metrics`, `## Findings`, `## Disclosure` (the footer).
 - **Empty counts.** Substitute the literal number, including `0` — except the deletion line, which
   has a defined prose alternate (see Section 1). Fix the grammar when a count is 1 ("1 finding",
-  not "1 findings").
+  not "1 findings") — **except** where one noun serves several counts, as on the Robustness metrics
+  line (`<n> concurrency · <n> error-safety · <n> scalability findings`). Leave that sentence's shape
+  alone; restructuring boilerplate is worse than one plural.
 - **Empty sections.** Render the heading and `None found.` as the body. Two exceptions, both stated
   at their section: Section 5 is omitted entirely when empty; Section 4 always renders.
 - **Complexity hotspot count** (Section 1) = functions with CCN > 10 **or** cognitive > 15 — the
@@ -82,9 +104,11 @@ These apply to every section; sections below do not restate them.
 - **Theme column.** Every findings table in Section 3 carries it, including the tables whose
   examples below predate it. Value is `T1`/`T2`/`T3` or blank.
 - **Detail block.** Render one below **every** subsection table, expanding that subsection's #1
-  finding. Use the generic Current state / Recommendation / Conflict shape, except Robustness and
-  Design, which have their own shapes shown at their tables. Never render more than one per
-  subsection.
+  finding. Use the generic shape — **Current state / Recommendation / Evidence / Might be wrong if /
+  Conflict** — except Robustness and Design, which have their own shapes shown at their tables.
+  Every finding carries `evidence` and `why_this_might_be_wrong`, so every detail block has a line
+  for each; omitting them would discard the two fields that make a finding auditable. Never render
+  more than one detail block per subsection.
 - **Evidence citations** (Section 0) are `` `location` (ID) `` where ID is `cite_catalog_entry` when
   the finding has one and the dimension name otherwise (structure findings carry no catalog ID).
   Order them by rank, descending.
