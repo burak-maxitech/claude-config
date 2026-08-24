@@ -1,7 +1,9 @@
 # Catalog Rules — the shared contract for every `/bx:arch` catalog
 
 **Canonical owner** for the catalog schema and the rules that bind every entry, whatever its
-prefix. The per-prefix catalogs carry entries only; they do not restate these rules.
+prefix. A per-prefix catalog may carry a short preamble stating how these rules land for its own
+family — but it states no rule that is not derivable from this file, and when the two disagree,
+this file wins.
 
 Each entry is a *technique* or a *defect class*, not a pattern name. Subagents must cite an entry
 by ID in `cite_catalog_entry`. Entries marked `--fix-eligible: true` may be auto-applied in
@@ -22,9 +24,21 @@ most of which neither could cite.
 
 ## Entry schema
 
-Every entry states, in this order: `Languages`, `Detect when`, `Replace with`,
-`CCN direction`, `Cognitive direction`, `Lines deletable` (S-entries), `--fix-eligible`, and
-`Caveats` / false-positive guards. Optional: `Citation`, `Counterpart`, `Hard suppression`.
+Every entry states `Languages`, `Detect when`, `Replace with`, `--fix-eligible`, and
+`Caveats / false-positive guards`. Beyond those four, which fields apply depends on what the
+family is *for*:
+
+| Field | Required on | Meaning |
+|-------|-------------|---------|
+| `CCN direction` + `Cognitive direction` | `R` entries | The expected change in each metric. `R` entries exist to reduce complexity, so this is their justification. |
+| `Lines deletable` | `S` entries | What the deletion actually saves. |
+| `Severity signal` | `D`, `C`, `E`, `X` entries | What determines consequence for this defect class — the input to the `severity` band, not a replacement for it. These families do not reduce complexity, so they carry no complexity direction; a file-level "complexity direction is n/a throughout" statement covers the whole catalog. |
+
+Optional anywhere: `Citation`, `Counterpart`, `Hard suppression`.
+
+`Severity signal` **informs** the severity choice; the binding anchors are still
+`finding-rubrics.md`'s. Where an entry's signal and the rubric anchors disagree, the rubric wins
+and the disagreement is worth a `catalog_gap_proposals` note.
 
 ## Binding rules
 

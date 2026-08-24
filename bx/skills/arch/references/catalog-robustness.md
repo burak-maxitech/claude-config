@@ -31,7 +31,10 @@ Per-language idioms differ; the shape does not.
 - **Languages:** ts, js, python, go, java, c#, kotlin, rust, php, ruby
 - **Detect when:** a module-scope binding that is mutable (`let`/`var`, a mutated object or array,
   a Python module global, a Go package var, a static field) is **assigned or mutated** inside a
-  function reachable from a request handler, event consumer, or goroutine/task.
+  function reachable from a request handler, event consumer, or goroutine/task, **and** at least one
+  of: the write spans an `await` or blocking call, the value is also read to make a decision, or the
+  runtime is genuinely multi-threaded. A fire-and-forget synchronous counter that nothing reads
+  meets the module-scope shape but not the danger — skip it rather than filing a `low`.
   - Grep module scope for `^(let|var) `, `^[A-Z_]+ = \{`, `^var \w+ =`, `static \w+`
   - then Grep for writes to that name inside handler-path files
 - **Replace with:** move the state into the request/session scope, or put it behind a lock or an
@@ -44,8 +47,10 @@ Per-language idioms differ; the shape does not.
     handle) is the correct pattern — flag only if written *after* init.
   - **Single-threaded runtimes still race across `await`.** Node and Python asyncio interleave at
     await points, so "it's single-threaded" is not a defense if the write spans one.
-  - **Deliberate process-local caches** with documented staleness tolerance — mark
-    `respects_documented_decision: false` rather than flagging outright.
+  - **Deliberate process-local caches** with documented staleness tolerance — still surface the
+    finding, but set `respects_documented_decision: false` (see `finding-rubrics.md`: the flag says
+    your *recommendation* collides with a documented decision, not that the code is wrong), so the
+    user confirms before it is actioned.
 
 ## C02 — Check-then-act without atomicity (TOCTOU)
 
@@ -339,6 +344,10 @@ asserting.
 - **Detect when:** a query or listing with no limit, pagination, or cursor on a table that grows
   with usage — `findMany()` / `SELECT *` with no `LIMIT`, `.all()`, `scan()`, `list_objects` with
   no paginator, `readdir` on a growing directory.
+- **Precedence over X02:** an unbounded *query* is X01, even though materializing its result also
+  matches X02. File it as X01 and mention the materialization in the same finding. X02 is for
+  loading a bounded-but-large source in full (a file, an export, a fixed dataset). One line, one
+  entry — never both.
 - **Replace with:** pagination or a cursor; a hard cap even on "small" tables.
 - **--fix-eligible:** false
 - **Severity signal:** `high` when the result crosses a network boundary or is returned to a

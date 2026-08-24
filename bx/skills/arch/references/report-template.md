@@ -2,11 +2,62 @@
 
 Render the final report exactly in this order. Every section appears even if empty (with "None found" as content) so the output structure is predictable across runs.
 
+## What this template consumes
+
+Step 5 hands you a consolidated result. **This template renders it — it never re-derives it.**
+If a field below is missing from the input, that is a bug in Step 5; render the affected cell as
+`unknown` and note it in the footer. Do not recompute it yourself, and do not go read source files
+to fill it in.
+
+Per finding: `location`, `title`, `dimension`, `merged_dimensions`, `severity`, `certainty`,
+`effort_estimate`, `rank`, `evidence`, `why_this_might_be_wrong`, `recommended_refactor`,
+`respects_documented_decision`, `cite_catalog_entry` (absent on structure findings),
+`lines_deletable`, the `ccn_*` / `cognitive_*` pairs (null where complexity is not the signal),
+`category` (performance) or catalog family (robustness), and `theme` (absent means none).
+
+Also: the theme list from Step 5.9, the group memberships from Step 5.8, the suppression lists
+from Step 5.6, `catalog_gap_proposals`, aggregate deletion totals, the complexity heatmap, the
+scope/tier/sampling counts, which complexity tool ran for each metric, whether the Intended
+Architecture summary was **read or inferred**, and which of `--map` / `--plan` / `--fix` are set.
+
+**Themes arrive already qualified.** Step 5.9 decided what is and is not a theme. Render exactly
+the themes you were given, in the order given, numbered `1`/`2`/`3` — and label them `T1`/`T2`/`T3`
+in that same render order, regardless of any identifier the input used. Never re-test a theme
+against the qualification rule, never promote a cluster the input did not name, never drop one it
+did.
+
+## Global rendering rules
+
+These apply to every section; sections below do not restate them.
+
+- **Headings.** Every section renders its own `##` heading, including the ones whose examples below
+  show only body content: `## Top-line Metrics`, `## Findings`, `## Disclosure` (the footer).
+- **Empty counts.** Substitute the literal number, including `0` — except the deletion line, which
+  has a defined prose alternate (see Section 1). Fix the grammar when a count is 1 ("1 finding",
+  not "1 findings").
+- **Empty sections.** Render the heading and `None found.` as the body. Two exceptions, both stated
+  at their section: Section 5 is omitted entirely when empty; Section 4 always renders.
+- **Complexity hotspot count** (Section 1) = functions with CCN > 10 **or** cognitive > 15 — the
+  same thresholds `scan-structure.md` uses. Do not invent a different one.
+- **Theme column.** Every findings table in Section 3 carries it, including the tables whose
+  examples below predate it. Value is `T1`/`T2`/`T3` or blank.
+- **Detail block.** Render one below **every** subsection table, expanding that subsection's #1
+  finding. Use the generic Current state / Recommendation / Conflict shape, except Robustness and
+  Design, which have their own shapes shown at their tables. Never render more than one per
+  subsection.
+- **Evidence citations** (Section 0) are `` `location` (ID) `` where ID is `cite_catalog_entry` when
+  the finding has one and the dimension name otherwise (structure findings carry no catalog ID).
+  Order them by rank, descending.
+- **Ties and ordering.** Every table sorts by `rank` descending. Step 5.3 already broke ties
+  deterministically — preserve the order you were given rather than re-sorting.
+
 ## Section 0 — The Read (top 3 architectural themes)
 
 Render this **first, before any metric or table.** A quarterly architecture review's value is its
-point of view; everything below is supporting material. Themes come from Step 5.7 — each needs
-≥3 findings drawn from ≥2 dimensions.
+point of view; everything below is supporting material. Themes come from Step 5.9, which admits a
+cluster by either of two paths: **cross-cutting** (≥3 findings spanning ≥2 catalog families) or
+**single-mechanism** (≥3 findings sharing one concrete root cause that a single first move closes).
+Count catalog families, never the `dimension` field — C/E/X all carry `dimension: robustness`.
 
 ```
 ## /bx:arch — <project name>
@@ -36,7 +87,7 @@ Rules:
 - The thesis names a **cause**, not a category. "Error handling is inconsistent" is a category.
   "Every outbound call inherits an unconfigured shared HTTP client" is a cause.
 - **Fewer than 3 qualifying themes:** render those that qualify and say so — "only 2 themes
-  cleared the ≥3 findings / ≥2 dimensions bar."
+  cleared the bar (cross-cutting or single-mechanism)."
 - **No qualifying themes:** render
   `**No cross-cutting themes** — findings are independent; see the tables below.` This is a real
   result, not a failure: it means the codebase has local problems rather than a systemic one.
@@ -108,9 +159,20 @@ reading of it. Nothing is dropped, truncated, or moved out of its dimension.
 Both delta columns are always rendered. Row 3 is the shape the old CCN-only gate deleted before
 it could reach the report: flat CCN, large cognitive win.
 
-For Performance, replace the `Catalog` column with `Category` (e.g. `N+1`, `O(n²)`, `Hot-loop invariant`) and add a `Suspect?` column (Y/N). Suspects are findings with `certainty < 0.7`.
+For **Performance**, use the Refactors columns with `Catalog` replaced by `Category` (e.g. `N+1`,
+`O(n²)`, `Hot-loop invariant`), a `Suspect?` column (Y/N) added, and **both complexity-delta columns
+dropped** — performance findings do not carry them. Suspects are findings with `certainty < 0.7`.
 
-For Structure, drop the `Catalog` column.
+For **Structure**, use the Refactors columns with `Catalog` dropped and both complexity-delta
+columns kept — structure findings are the ones that most often carry them:
+
+```
+### Structure
+
+| Rank | Location                  | Title                    | Sev | Cert | Effort | CCN Δ       | Cog Δ        | Theme |
+|------|---------------------------|--------------------------|-----|------|--------|-------------|--------------|-------|
+| 1    | src/api/orders.ts:7-30    | God function createOrder | H   | 0.90 | medium | 12 → 5 (-7) | 29 → 8 (-21) | T2    |
+```
 
 For **Simplification**, replace `CCN Δ` with `Lines Δ`, sort primarily by `lines_deletable × certainty` (deletion impact), and use this column ordering — `Catalog` last because S-IDs are short:
 
@@ -197,8 +259,10 @@ If empty, render `## ⚠ Documented-Decision Conflicts\n\nNone — all findings 
 
 ## Section 5 — Scanner Conflicts
 
-Rendered only when `arch-simplification` and `arch-robustness` disagree about the same location —
-S06 wants a check deleted, an `E` entry wants one added.
+Rendered only when Step 5.8 handed you a scanner-conflict group. **"Same location" was already
+decided in Step 5.4** (same file, overlapping or nested line ranges) — do not re-test it with a
+stricter or looser rule here. The group also contains the self-contradictions Step 5.7 routed in
+(a scanner that both flagged and suppressed the same location).
 
 ```
 ## ⚠ Scanner Conflicts
@@ -249,6 +313,11 @@ Files via drill-down: 18
 Files skipped: 244
 
 Top skipped (low priority): src/types/__generated__/*.ts, src/migrations/*.sql, ...
+
+[On the `full` or `bounded` tier nothing is sampled. Render instead:
+ Files in scope: 7
+ Files read: 7 (full tier — no sampling applied)
+ Files skipped: 0]
 
 Deletion totals (from Simplification dimension):
 - total_lines_deletable: 184

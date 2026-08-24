@@ -7,7 +7,11 @@ the `arch-robustness` subagent. Detailed scanning instructions follow.
 
 - `Detected stack` — language(s), framework(s)
 - `Workspaces` — list or "none"
-- `Tier` — full | bounded | sample
+- `Tier` — full | bounded | sample. `full`: read every file in scope. `bounded`: read every file,
+  but deep-trace only the entry-point-reachable set. `sample`: the orchestrator already narrowed
+  the scope file list — scan exactly what you were given and do not widen it.
+- `Workspaces` — list or "none". When several, treat each as a separate scope: an entry-point map
+  per workspace, and never trace a dependency across a workspace boundary you were not given.
 - `Scope file list` — exact paths to scan
 - `Intended Architecture summary` — 3-5 bullets
 - `Scoring contract` — the full contents of `finding-rubrics.md`. It is the canonical owner
@@ -47,9 +51,25 @@ Before scanning, spend one pass identifying:
 - **Concurrency spawn points** — `go func`, `create_task`, `Promise.all`, thread pools, workers
 - **Process entry points** — `main`, CLI commands, migration scripts
 
+**When no framework pattern matches** — plain exported functions, no decorators, the router file
+out of scope — fall back in this order and **say which rung you used** in the evidence of every
+finding that depends on it:
+
+1. A framework pattern matched (above). Full confidence in the map.
+2. Signature convention — `(req, res)`, `(request)`, `(event, context)`, `(ctx)` — **plus** a
+   statement in the Intended Architecture summary placing that directory at the HTTP boundary.
+   Treat as a handler; cap dependent findings at 0.8.
+3. Neither. Say the map could not be built and cap every dependent finding at 0.69.
+
 Record which files are reachable from each. `C01`, `C07`, `X03`, `X04`, and `X06` all key off
-"is this on a request path?" and are unscorable without it. If you cannot build this map for the
-stack in front of you, say so and cap certainty at 0.69 for every entry that depends on it.
+"is this on a request path?" and are unscorable without it.
+
+**Unresolvable imports.** When a reachable module imports something that is not in scope
+(`../lib/db` with no such file), you cannot complete the trace — and that is *not* a reason to drop
+the findings that depend on it. Follow `finding-rubrics.md`'s rule: report at the band your actual
+examination reached and name the unresolvable dependency in `evidence`. Silence here is the worst
+outcome, because a missing timeout on an untraceable DB client is exactly the finding the user
+needs and exactly the one a strict "trace before you claim" reading deletes.
 
 ## Per-entry scanning hints
 
@@ -166,4 +186,6 @@ determine:
 Do not return prose. Return only structured findings, ordered by `severity × certainty`.
 **Cap output at 15 findings** — three categories share this budget, so rank across all of them
 rather than reserving slots per category. If one category dominates a codebase, that is itself the
-signal, and the theme synthesis in the orchestrator's Step 5.7 will surface it.
+signal, and the theme synthesis in the orchestrator's Step 5.9 will surface it — a cluster of
+findings sharing one root cause qualifies as a theme on its own, without needing a second catalog
+family alongside it.

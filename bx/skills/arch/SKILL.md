@@ -210,68 +210,149 @@ This agent asks a different question from the other four: not "is this hard to r
 
 ## Step 5 — Consolidate, Filter, Score
 
-After all five subagents return:
+After all five subagents return. **Run these in the order given — the order is load-bearing**, and
+each sub-step names what it consumes.
 
-1. **Sanity gate (complexity delta)** — drop a refactor-dimension finding only when it reduces
-   *neither* metric: `ccn_projected >= ccn_current` **AND**
-   `cognitive_projected >= cognitive_current`. A finding that lowers either one survives.
+### 5.1 Sanity gate (complexity delta)
 
-   This gate is dual-metric because the catalog reasons about both. `R01` (guard-clause flatten)
-   and `R09` (named predicate) state **"CCN direction: unchanged"** — they move cognitive load,
-   not decision-point count. A CCN-only gate deletes them before the report, which is exactly
-   what it used to do. Any entry whose CCN direction is "unchanged" **must** carry a cognitive
-   delta; a finding citing such an entry with no cognitive numbers is dropped as unsubstantiated,
-   not passed through.
+Applies to **any finding that claims a complexity reduction** — i.e. any finding returning a
+non-null `ccn_*` or `cognitive_*` pair, whatever its dimension. Drop it only when it reduces
+*neither* metric: `ccn_projected >= ccn_current` **AND** `cognitive_projected >= cognitive_current`.
+A finding that lowers either one survives.
 
-   Simplification findings are not gated on complexity at all — they're gated on
-   `lines_deletable >= 1` (the subagent already enforces this).
-2. **Certainty gate** — drop findings with `certainty < 0.5` unless `severity = high` OR `lines_deletable >= 20`. Big deletions earn a pass through the certainty filter so user can review even uncertain large wins.
-3. **Deduplicate** — if two subagents report the same location, merge into one finding with both perspectives. Common overlap: `arch-refactors` R03 (flag arg) and `arch-simplification` S03 (always-same param) — keep one with the higher rank score.
-4. **Rank score** — `severity_weight × certainty × leverage / effort_weight` where severity
-   {low: 1, medium: 2, high: 4} and effort {trivial: 1, small: 2, medium: 4, large: 8}. For
-   simplification findings, also factor `log(lines_deletable + 1)` so big deletions float up.
+This gate is dual-metric because the catalog reasons about both. `R01` (guard-clause flatten) and
+`R09` (named predicate) state **"CCN direction: unchanged"** — they move cognitive load, not
+decision-point count. A CCN-only gate deletes them before the report, which is exactly what it used
+to do. Any entry whose CCN direction is "unchanged" **must** carry a cognitive delta; a finding
+citing such an entry with no cognitive numbers is dropped as unsubstantiated, not passed through.
 
-   **`leverage = 1 + churn_norm + fan_in_norm`** for the finding's file, both normalized 0..1
-   across the scope (Step 3 computes them — see `references/scale-strategy.md`). A CCN-30 function
-   nobody touches is not the problem; a CCN-15 function changed 40 times in 90 days and imported by
-   30 modules is. Without this term the ranking treats a leaf utility and a load-bearing module
-   identically, which is the difference between a linter's output and an architecture review's.
-5. **Aggregate lines_deletable totals** — sum across all simplification findings (and any other findings reporting `lines_deletable > 0`). Track distinct files affected. These are the top-line numbers in Section 0 of the report.
+Findings with both pairs null are not claiming a complexity reduction and pass through untouched —
+that is most robustness, design, and simplification findings. Simplification is gated instead on
+`lines_deletable >= 1` (the subagent already enforces this).
 
-5b. **Collect suppressions** — `arch-simplification` returns `s01_suppressed` (Dependency
-   Inversion boundaries) and `s06_suppressed` (trust boundaries) alongside its findings. These are
-   *not* findings and never enter ranking, but they are never silently discarded either: count
-   them, keep their locations, and hand them to the report footer. If the Intended Architecture
-   summary was inferred rather than read from docs, the footer must say so — suppression quality
-   follows inference quality.
-6. **Group**:
-   - **Quick wins** — top rank, effort ∈ {trivial, small}. Heavily favors simplification deletions and trivial refactors (R01, R08, R09, S04, S06).
-   - **Strategic refactors** — high severity, effort ∈ {medium, large}
-   - **Documented-decision conflicts** — `respects_documented_decision == false`, regardless of dimension. Separate section, requires user confirmation. (Especially important for simplification: documented "we keep this abstraction for X" must override deletion suggestions.)
-   - **Performance suspects** — `dimension == performance` AND `certainty < 0.7`. Framed as "measure, don't refactor blindly."
-   - **Scanner conflicts** — the same location where `arch-simplification` wants to delete a check
-     and `arch-robustness` wants one added (S06 vs an `E` entry). Both readings surface together;
-     the orchestrator does **not** silently pick a winner. One of the two scanners missed a
-     suppression, and which one is a judgment the user should see.
+### 5.2 Certainty gate
 
-7. **Synthesize themes.** The report opens with a judgment, not a list. After ranking:
+Drop findings with `certainty < 0.5` unless `severity = high` OR `lines_deletable >= 20`. Big
+deletions earn a pass through the certainty filter so the user can review even uncertain large wins.
 
-   1. **Cluster** the surviving findings three ways — by shared module or directory prefix, by
-      shared layer-boundary crossing (from Step 1), and by shared root mechanism (same catalog
-      family, e.g. four `E` findings that are all "the shared HTTP client is unconfigured").
-   2. **A theme requires ≥3 findings drawn from ≥2 dimensions.** This threshold is what stops a
-      theme from being one scanner's output relabelled. A cluster of 5 findings all from
-      `arch-simplification` is not a theme — it is a well-ranked table.
-   3. **Rank themes** by summed rank score of their members; take the **top 3**.
-   4. Each theme renders three things: a **one-sentence thesis** naming the structural cause, the
-      **evidence set** (its member findings, by location), and the **single highest-leverage first
-      move** — one action, not a list.
-   5. **Findings in no theme are not dropped.** They render below, in the per-dimension tables,
-      exactly as before. Theming reorganizes the top of the report; it never filters it.
+### 5.3 Rank score
 
-   If fewer than 3 themes clear the bar, render the ones that do and say so. If none do, say
-   **"No cross-cutting themes — findings are independent"** and go straight to the tables. That is
-   a real and useful result: it means the codebase has no systemic problem, only local ones.
+**Computed before deduplication, because dedup needs it.**
+
+```
+rank = severity_weight × certainty × leverage / effort_weight
+```
+
+- severity {low: 1, medium: 2, high: 4}; effort {trivial: 1, small: 2, medium: 4, large: 8}
+- **`leverage = 1 + churn_norm + fan_in_norm`** for the finding's file, both normalized 0..1
+  across the scope (Step 3 computes them — see `references/scale-strategy.md`). A CCN-30 function
+  nobody touches is not the problem; a CCN-15 function changed 40 times in 90 days and imported by
+  30 modules is. Without this term the ranking treats a leaf utility and a load-bearing module
+  identically, which is the difference between a linter's output and an architecture review's.
+- Simplification findings are additionally multiplied by **`ln(lines_deletable + 1)`** — natural
+  log, multiplicative — so big deletions float up.
+- **Ties** break by: severity, then certainty, then lower effort, then `location` string. Ranking
+  must be deterministic across runs.
+
+### 5.4 Deduplicate
+
+Two findings are **the same location** when they name the same file **and their line ranges overlap
+or nest**. A single line inside another finding's range counts as overlapping. (Exact-string
+matching is not enough: `orders.ts:22` and `orders.ts:20-24` are the same defect seen twice.)
+
+Merging is **not** discarding:
+
+- The **higher-ranked** finding supplies every scalar field — severity, certainty, effort,
+  dimension, complexity pairs.
+- The lower-ranked one contributes its `title`, `evidence`, and `cite_catalog_entry` as an
+  additional perspective on the merged finding.
+- The merged finding carries **`merged_dimensions`** — every dimension and catalog family that went
+  into it. **Every dimension-keyed filter downstream reads `merged_dimensions`, not `dimension`.**
+  Without this, a performance suspect merged into a robustness finding silently vanishes from the
+  "Performance suspects" group — a filter bug, not a judgment.
+- A merged finding inherits the **highest** leverage among its members.
+
+Common overlap: `arch-refactors` R03 (flag arg) and `arch-simplification` S03 (always-same param).
+
+**Ordering note:** 5.1 and 5.2 run before this, so a finding dropped by a gate never reaches merge.
+That is deliberate — a finding that substantiates nothing should not survive by attaching itself to
+one that does — but it means that finding's perspective is lost. When a gate drops a finding sharing
+a location with a survivor, record it in the footer's filtered list *with its location*, so the loss
+is visible rather than silent.
+
+### 5.5 Aggregate `lines_deletable`
+
+Sum across all findings reporting `lines_deletable > 0`. Track distinct files affected. These are
+the top-line numbers in Section 1 of the report.
+
+### 5.6 Collect suppressions
+
+`arch-simplification` returns `s01_suppressed` (Dependency Inversion boundaries) and
+`s06_suppressed` (trust boundaries) alongside its findings. These are *not* findings and never enter
+ranking, but they are never silently discarded either: count them, keep their locations, and hand
+them to the report footer. If the Intended Architecture summary was inferred rather than read from
+docs, the footer must say so — suppression quality follows inference quality.
+
+### 5.7 Validate the trust flags
+
+Two subagent-declared fields are trusted by later steps, so check them against their own evidence
+before using them:
+
+- **`respects_documented_decision: true` whose `evidence` cites a documented decision the finding
+  contradicts** — e.g. a `D03` finding whose evidence quotes the architecture doc naming that layer.
+  The flag is unreliable; route the finding to **Documented-Decision Conflicts** for confirmation
+  rather than treating it as clean. Never silently flip the flag.
+- **A finding whose location also appears in that same scanner's `*_suppressed` list** — the scanner
+  contradicted itself. Surface it under **Scanner Conflicts** with both of its own stated reasons.
+
+### 5.8 Group
+
+- **Quick wins** — every finding with effort ∈ {trivial, small}, ranked. **No cutoff** — the table
+  is the complete list and the reader stops where they like. Silently truncating it would read as
+  "that is all there was."
+- **Strategic refactors** — severity high, effort ∈ {medium, large}
+- **Documented-decision conflicts** — `respects_documented_decision == false`, plus anything 5.7
+  routed here. Separate section, requires user confirmation. (Especially important for
+  simplification: a documented "we keep this abstraction for X" must override a deletion.)
+- **Performance suspects** — `performance` ∈ `merged_dimensions` AND `certainty < 0.7`. Framed as
+  "measure, don't refactor blindly."
+- **Scanner conflicts** — the same location where `arch-simplification` wants to delete a check and
+  `arch-robustness` wants one added (S06 vs an `E` entry), plus the self-contradictions from 5.7.
+  Both readings surface together; the orchestrator does **not** silently pick a winner. One of the
+  two scanners missed a suppression, and which one is a judgment the user should see.
+
+### 5.9 Synthesize themes
+
+The report opens with a judgment, not a list.
+
+1. **Cluster** the surviving findings three ways — by shared module or directory prefix, by shared
+   layer-boundary crossing (from Step 1), and by shared root mechanism (one concrete construct: a
+   single client, a single function, a single shared object).
+2. **A cluster qualifies as a theme by either path:**
+   - **Cross-cutting** — ≥3 findings spanning **≥2 catalog families** (`R`, `S`, `D`, `C`, `E`, `X`).
+     Count families, **not** the `dimension` field: C/E/X all carry `dimension: robustness`, so a
+     dimension-based test would reject genuinely diverse robustness clusters.
+   - **Single-mechanism** — ≥3 findings sharing **one concrete root cause**, where a single first
+     move closes all of them. This path may be a single family: four `E` findings that are all "the
+     shared HTTP client is unconfigured" is the strongest kind of theme, not a disqualified one.
+
+   What neither path admits: a cluster that is merely *everything one scanner returned*, with no
+   shared mechanism and no family diversity. That is a well-ranked table, not a theme.
+3. **Overlapping clusters** — when one cluster is a subset of another, report only one: the cluster
+   whose first move closes more findings. Never report both, and never let the same finding appear
+   as evidence for two themes.
+4. **Rank themes** by summed rank score of their members; take the **top 3**.
+5. Each theme renders three things: a **one-sentence thesis** naming the structural cause, the
+   **evidence set** (its member findings, by location), and the **single highest-leverage first
+   move** — one action, not a list. Draw the first move from the members' `recommended_refactor`
+   fields; if none carries one, synthesize it from their titles and evidence and say that you did.
+6. **Findings in no theme are not dropped.** They render below, in the per-dimension tables, exactly
+   as before. Theming reorganizes the top of the report; it never filters it.
+
+If fewer than 3 themes clear the bar, render the ones that do and say so. If none do, say
+**"No cross-cutting themes — findings are independent"** and go straight to the tables. That is a
+real and useful result: it means the codebase has local problems rather than a systemic one. Never
+invent a theme to fill a slot.
 
 ---
 
@@ -279,7 +360,7 @@ After all five subagents return:
 
 Read `references/report-template.md` for exact formatting. The shape:
 
-0. **The read** — the top 3 architectural themes from Step 5.7, each with its thesis, evidence set,
+0. **The read** — the top 3 architectural themes from Step 5.9, each with its thesis, evidence set,
    and first move. This is the **first thing in the report**, before any metric or table. A
    quarterly architecture review's value is its point of view; the tables are the supporting
    material.
