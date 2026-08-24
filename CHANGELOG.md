@@ -2,6 +2,38 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.8.0 — 2026-08-24
+
+### Fixed
+
+- **`/bx:tests` severity was uncalibrated for small repos.** Found by the first full `/bx:tests`
+  run. `priority = density × (1+log10(churn+1)) × (1+log10(fan_in+1))` is a density ≤1.0 times two
+  log terms, so it only reaches the mapped thresholds of 2.0/5.0 on repos with churn and fan-in in
+  the dozens-to-hundreds. This repo's own audit scored **0.08–0.18 across all 7 source files** — a
+  literal mapping labels everything `low`, including a same-day concurrency fix shipped with no
+  regression test. `priority_score` now **ranks but does not grade**: severity comes from a
+  blast-radius table (auth/credential path or a behaviour-changing `bug_fix_no_test` → high; runs on
+  every invocation → medium; leaf or unconfirmed-reachable → low). The score and factors are still
+  emitted verbatim as the ranking's audit trail.
+
+- **`coverage_gap_total` double-counted overlapping findings.** A whole-file finding and a range
+  finding inside that same file both summed into the headline — the audit reported 2,461 where the
+  unique figure was 2,382. Each source line now counts once; both findings still surface separately.
+
+### Added
+
+- **`coverage_negatives`** — the channel `/bx:tests` lacked for "I swept this and found nothing",
+  mirroring the `/bx:arch` fix in v2.4.0. Without it a scanner told to report empty categories
+  honestly has nowhere to put that and encodes it as a `severity: low` finding with no action, which
+  then ranks.
+
+  This version is sharper than `/bx:arch`'s: it distinguishes **three** states, not two.
+  `unavailable` means the precondition is absent (no snapshot mechanism, no CI, no mocking layer);
+  `clean` means the category applies and was genuinely checked. Reporting `unavailable` as `clean`
+  claims coverage the scan never had. Declared in Step 4, collected at Step 5, rendered in the
+  footer. The distinction came from the run itself — the economics scanner produced it only because
+  the dispatch prompt asked for it by hand.
+
 ## 2.7.0 — 2026-08-24
 
 ### Fixed

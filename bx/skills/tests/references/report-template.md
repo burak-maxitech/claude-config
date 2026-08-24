@@ -193,6 +193,14 @@ Findings filtered:
 - Dropped 3 ratio_under findings overlapping with test-coverage's file-level gaps (deduplicator)
 - Dropped 2 findings with certainty < 0.5 and impact below threshold
 
+Coverage negatives (categories swept that produced nothing — evidence the scan ran, not that it
+found nothing to say). `unavailable` means the precondition is absent; `clean` means it was
+genuinely checked:
+- snapshot_heavy — unavailable: no snapshot mechanism in the repo (0 hits for toMatchSnapshot / __snapshots__)
+- flakiness_marker — clean: all 6 test files grepped for retry/skip/flaky markers, none found
+- flakiness_history — unavailable: no CI, so no flake-fix commits exist to mine
+- (render `none reported` when no subagent returned any)
+
 Defer to /bx:clean for: orphaned test files, stale snapshots, >3mo skipped tests, unused test helpers.
 Defer to /code-review or /bx:review for: per-commit / per-PR test quality.
 ```

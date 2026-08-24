@@ -124,10 +124,26 @@ Stop after the install_hint finding; do not fall back to heuristic mode.
 }
 ```
 
-Severity mapping:
-- `priority_score >= 5.0` → high
-- `priority_score >= 2.0` → medium
-- otherwise → low
+### Severity — from blast radius, not from the score
+
+**`priority_score` ranks; it does not grade.** It is a *relative* measure and works at any repo
+size, so order findings by it. Do **not** map it to severity through absolute thresholds: the score
+is the product of a density ≤1.0 and two `log10` terms, so it only reaches 2.0 or 5.0 on repos with
+churn and fan-in in the dozens-to-hundreds. On a small repo every file scores 0.05–0.5, and a
+literal mapping labels *everything* low — including a same-day concurrency fix shipped with no
+regression test. (Measured: this repo's own audit produced 0.08–0.18 across all 7 source files.)
+
+Set `severity` from what breaks, using the first row that matches:
+
+| Severity | The file is… |
+|----------|--------------|
+| `high` | On an auth/credential/payment path; **or** carries a `bug_fix_no_test` finding whose fix changed runtime behaviour (a lock, a timeout, a retry, a state transition); **or** is the single largest untested unit in the repo by a wide margin |
+| `medium` | Reachable from an entry point that runs on every invocation (a hook, a launcher, a CLI dispatcher); **or** has real churn and no test neighbour at all |
+| `low` | A leaf utility, a one-off script, or a path you could not confirm is even reachable |
+
+Always emit `priority_score` and `priority_factors` verbatim regardless — they are the audit trail
+for the ranking, and a reader comparing two runs needs them. When the score and the severity table
+disagree, the table wins and the finding says so in one clause.
 
 Effort estimate from gap size:
 - `coverage_gap_lines <= 20` → trivial

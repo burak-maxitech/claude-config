@@ -203,6 +203,33 @@ Each finding includes (subset depending on dimension):
   economic_signal: snapshot_heavy | flakiness_marker | flakiness_history | ratio_over | ratio_under   (test-economics only)
 ```
 
+**Every subagent also returns `coverage_negatives`** — a list, alongside its findings, of categories
+it swept that produced nothing. These are **not findings**: they never rank, never group, never
+reach a headline. Without this channel a scanner told to "report honestly when a category is empty"
+has nowhere to put that, so it encodes it as a `severity: low` finding with no action — which then
+ranks and pollutes the report.
+
+Each entry states one of **three** states, and the distinction is the whole point:
+
+```
+coverage_negatives:
+  - category: "snapshot_heavy"
+    state: unavailable          # the mechanism does not exist here at all
+    evidence: "Searched repo for toMatchSnapshot() and __snapshots__/: 0 hits outside docs describing the check."
+  - category: "flakiness_marker"
+    state: clean                # the mechanism exists, was checked, found nothing
+    evidence: "Grepped all 6 test files for retry/skip/flaky markers: none."
+  - category: "flakiness_history"
+    state: unavailable          # the signal cannot be produced here
+    evidence: "No CI, so no flake-fix commits exist to mine. 2 git-log matches inspected, both false positives."
+```
+
+- **`unavailable`** — the precondition is absent (no snapshot mechanism, no CI, no mocking layer).
+  Reporting this as "clean" is a lie of omission: it claims coverage the scan never had.
+- **`clean`** — the category applies, was genuinely checked, and found nothing.
+- Never report `clean` for something you could not check. A reader distinguishes a healthy suite
+  from an unscanned one only if the scan says which.
+
 ### Agent 1: test-coverage
 Read `references/scan-coverage.md`, then dispatch the `test-coverage` subagent with those instructions + shared context. Targets: missing tests on critical-rank source files; bug-fixes-without-regression-tests in last 50 commits. Heuristic by default; reads coverage report only in `--coverage` mode.
 
@@ -227,11 +254,20 @@ After all three subagents return:
    - severity {low: 1, medium: 2, high: 4}
    - effort {trivial: 1, small: 2, medium: 4, large: 8}
    - impact = `coverage_gap_lines + deletable_lines`
-5. **Twin-headline aggregation.**
-   - `coverage_gap_total = sum(coverage_gap_lines)` across coverage findings. Distinct files affected = unique source paths.
+5. **Collect `coverage_negatives`.** Gather every subagent's list, deduplicate by category, and
+   hand it to the report footer. These never enter ranking or the headline. If a subagent returned a
+   negative encoded as a `severity: low` finding with an empty `recommended_action`, move it here
+   rather than ranking it.
+
+6. **Twin-headline aggregation.**
+   - `coverage_gap_total = sum(coverage_gap_lines)` across coverage findings, **counting each source
+     line once**. A whole-file finding and a range finding inside that same file overlap — add the
+     whole-file figure and drop the nested range from the sum, keeping both as separate findings.
+     Summing them naively inflates the headline, which is the one number a reader quotes.
+     Distinct files affected = unique source paths.
    - `deletable_total = sum(deletable_lines)` across **only** these contributing finding types: `smell_id == T01`, `smell_id == T05 AND certainty >= 0.85` (the deletable subset of T05), `economic_signal == snapshot_heavy`. Distinct files affected = unique paths.
    - **Never include T02/T03/T04 or non-snapshot economics in `deletable_total`** — those are rewritable, not deletable. Including them would mislead the headline.
-6. **Group**:
+7. **Group**:
    - **Quick wins** — top rank, effort ∈ {trivial, small}. Heavily favors T01 deletions and small snapshot reductions.
    - **Strategic rewrites** — `dimension == quality` AND `smell_id ∈ {T02, T03, T04}` AND effort ∈ {medium, large}.
    - **Coverage gaps** — `dimension == coverage`, ordered by `priority_score × certainty`.
