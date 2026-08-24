@@ -26,9 +26,49 @@ in that same render order, regardless of any identifier the input used. Never re
 against the qualification rule, never promote a cluster the input did not name, never drop one it
 did.
 
+## Where each Step 5.8 group renders
+
+Step 5.8 hands you five groups. Every one has a destination; none is dropped.
+
+| Group | Renders as |
+|-------|-----------|
+| Quick wins | Section 6, as a **Quick wins** list — location, title, effort, and the one-line action. This is the section's first block, above the strategic briefs. |
+| Strategic refactors | Section 6's `/bx:plan` snippets, one per member, top 3 by rank |
+| Documented-decision conflicts | Section 4 |
+| Performance suspects | The Performance subsection of Section 3, with `Suspect? = Y` |
+| Scanner conflicts | Section 5 |
+
+**Section 6 is the one place you compose rather than transcribe.** The "render, never re-derive"
+rule governs *findings data* — you must not recompute a finding's fields. Writing the skill-chain
+bullets and the `/bx:plan` brief prose from the findings you were given is this section's job.
+
+## Merged findings
+
+A finding with more than one entry in `merged_dimensions` was two scanners' reports of one defect.
+Render the primary row from the surviving finding's fields, then add **one line directly under the
+detail block** naming the other perspective, its catalog entry, and its own certainty:
+
+> Also reported by `arch-performance` as "Possible large payload serialization" (category `payload`,
+> certainty 0.50) — counted as a performance suspect.
+
+The secondary perspective still drives its own group membership (Step 5.4 keeps each perspective's
+certainty for exactly this reason), so a merged finding can appear as a Performance suspect while
+its primary row sits under Robustness.
+
 ## Global rendering rules
 
 These apply to every section; sections below do not restate them.
+
+- **`Rank` column** is the **ordinal position** within its table (1, 2, 3…), not the raw score.
+  Sort by the raw score; never print it.
+- **`Sev` column** abbreviates: `high` → `H`, `medium` → `M`, `low` → `L`. `Cert` prints two
+  decimals.
+- **Section headings** render as bare titles — `## Architecture Map`, `## Findings` — never with a
+  "Section N —" prefix. The numbering in this file orders the sections; it is not output text.
+- **`---` separators** are reproduced only where they appear inside a fenced example, never inserted
+  between sections.
+- **Fixed boilerplate is not customized.** The Architecture Map's "(from CLAUDE.md / README / ADRs)"
+  is a label, not a claim about which file was read; the footer states the actual source.
 
 - **Headings.** Every section renders its own `##` heading, including the ones whose examples below
   show only body content: `## Top-line Metrics`, `## Findings`, `## Disclosure` (the footer).
@@ -238,6 +278,23 @@ Conflict with documented decision? No.
 Design findings carry no complexity delta and are never `--fix`-eligible. Each must name **the
 change that becomes expensive**, not the principle that is bent.
 
+Design's detail block uses the Robustness shape, with the cost sentence in place of the failure
+sentence:
+
+```
+**#1 — Domain imports PrismaClient directly (`src/domain/pricing.ts:1-3`)**
+
+Pricing rules cannot be tested without a database, and the ORM's types have propagated into three
+domain signatures. Every rule added on top inherits the coupling.
+
+Evidence: line 1 imports @prisma/client; docs/architecture.md states domain must not import
+infrastructure.
+
+Might be wrong if: this is a type-only import.
+
+Conflict with documented decision? Yes — docs/architecture.md, "domain must not import infrastructure".
+```
+
 ---
 
 ## Section 4 — Documented-Decision Conflicts
@@ -343,4 +400,7 @@ Suppressed by design (not findings — disclosed so the coverage is honest):
 
 The suppression block is **mandatory even when both counts are zero** (render
 `Suppressed by design: none.`). A reader cannot tell a clean codebase from a silently narrowed
-scan unless the skill says which one it is.
+scan unless the skill says which one it is. When one count is zero and the other is not, render
+both lines — `S06 × 0` is information, not noise.
+
+`breakdown by category` renders `none` when no simplification finding survived.
