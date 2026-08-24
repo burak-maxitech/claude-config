@@ -127,7 +127,7 @@ Only when undo/queue/log is documented as a need. If not, do not surface.
 
 Same JSON-shaped format as `scan-structure.md`. Required additional field: `cite_catalog_entry` set to the entry ID (e.g. `"R03"`).
 
-Cap output at 30 findings, ordered by `severity × certainty / effort_weight`.
+Cap output at 15 findings, ordered by `severity × certainty / effort_weight`.
 
 ## Special: catalog gaps
 

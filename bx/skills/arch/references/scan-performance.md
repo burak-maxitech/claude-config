@@ -137,4 +137,4 @@ If the Intended Architecture summary says "no perf tuning until v2," cap your ou
 
 `ccn_*` fields are usually null for performance findings — populate only when the fix also reduces complexity (hot-loop hoist often does both).
 
-Cap output at 20 findings.
+Cap output at 15 findings.

@@ -35,7 +35,7 @@ Key rules:
 - **Be conservative on certainty.** If you cannot fully see the call sites of a function, your projected CCN is a guess — lower certainty.
 - **Avoid GoF pattern-mongering.** GoF patterns (Strategy, Command, Observer) frequently *hide* complexity behind indirection rather than removing it. The catalog deliberately leans toward technique-level refactors (guard clauses, pure-function extraction, etc.). Use a GoF pattern only when the catalog explicitly includes it AND the *problem* (not just the surface code) matches the catalog's "detect when" trigger.
 - **Skip vendored / generated dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `__pycache__`, `.next`, `.cache`, `vendor`, `target/`, `coverage/`.
-- Limit output to top 30 findings, ordered by `severity × certainty / effort_estimate`.
+- Limit output to top 15 findings, ordered by `severity × certainty / effort_estimate`.
 
 Output shape per finding (all required):
 

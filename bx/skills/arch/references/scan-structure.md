@@ -1,4 +1,4 @@
-# Scan: Structure (cyclomatic + cognitive complexity, coupling, layering, circular deps)
+# Scan: Structure + Design (complexity, coupling, layering, circular deps, D-prefix design principles)
 
 Loaded by the orchestrator and passed to the `arch-structure` subagent. Detailed scanning instructions follow.
 
@@ -9,6 +9,8 @@ Loaded by the orchestrator and passed to the `arch-structure` subagent. Detailed
 - `Linter` — name + invocation, OR "heuristic"
 - `Tier` — full | bounded | sample
 - `Scope file list` — exact paths to scan
+- `Design catalog` — full content of `catalog-rules.md` + `catalog-design.md` (D-prefix). You
+  receive the D-entries only; other prefixes belong to other scanners. Cite by ID.
 - `Intended Architecture summary` — 3-5 bullets
 - `Scoring contract` — the full contents of `finding-rubrics.md`. It is the canonical owner
   of the `severity` / `certainty` / `effort_estimate` anchors and of the two mandatory
@@ -106,13 +108,58 @@ Flag outliers:
 
 ## Step 5 — Layering violations
 
-**Only run this step if the Intended Architecture summary names specific layers** (e.g. "domain / adapters / infra", "feature folders with no cross-feature imports"). Otherwise skip — there's no defined ordering to violate.
+### 5a — Against a documented layering
 
-For each named layer, identify which directories belong to it. Then Grep for imports that violate the documented direction:
+**When the Intended Architecture summary names specific layers** (e.g. "domain / adapters / infra", "feature folders with no cross-feature imports"), identify which directories belong to each. Then Grep for imports that violate the documented direction:
 
 - Hexagonal: `domain/` must not import from `infrastructure/` or `adapters/`
 - Feature folders: `features/X/` must not import from `features/Y/`
 - Custom: whatever the summary specifies
+
+These are full-confidence findings — the intended direction is stated, and the import contradicts it.
+
+### 5b — Against an *observed* convention (when nothing is documented)
+
+Most repos document no layering. Skipping the step entirely there — which is what this scan used
+to do — means the common case gets no boundary analysis at all. Instead, **infer the dominant
+direction and report violations of the codebase's own convention**:
+
+1. Group files by top-level source directory (the natural module unit).
+2. For each ordered pair of groups, count imports in each direction.
+3. Where one direction dominates (**≥5 imports one way, ≤20% of that count the other**), treat the
+   dominant direction as the observed convention.
+4. Report the minority-direction imports as violations of it.
+
+Frame these as **"this contradicts the convention the rest of the codebase follows"**, never as
+"you are violating hexagonal architecture." The evidence is the ratio, and the finding must quote
+it (`14 imports core → adapters, 2 the other way`).
+
+**Cap certainty at 0.7 for every 5b finding** and set `respects_documented_decision: true` — there
+is no documented decision to respect or violate. If the dominance test finds no clear direction
+anywhere, say so: "no consistent module direction observed" is a legitimate architectural finding
+about a codebase with no boundaries, and more useful than silence.
+
+## Step 5c — Design principles (D-entries)
+
+Scan the **D-prefix entries** in the design catalog passed in your task prompt (`catalog-design.md`,
+shared rules in `catalog-rules.md`). Cite by ID in `cite_catalog_entry`.
+
+These are the SOLID/OO checks — LSP, ISP, DIP, Law of Demeter, anemic domain model, feature envy,
+primitive obsession, god class. Each entry carries its own detect-when trigger and
+false-positive guards; follow them rather than the principle's textbook definition.
+
+Two rules bind this step:
+
+- **A finding must name the change that becomes expensive**, not the principle that is bent.
+  "This violates SRP" is not a finding. "Every new payment method requires editing this class, its
+  enum, and three switch statements" is.
+- **`D03` (DIP violation) requires a named layering.** If the Intended Architecture summary names
+  no layers — or says there are none deliberately — do not flag D03 at all. A layering inferred by
+  Step 5b is **not** sufficient evidence for it; 5b establishes a convention, not an intended
+  dependency direction. The other seven D-entries do not depend on layering and always apply.
+
+`D03` is the counterpart of the simplification scanner's `S01`, which is hard-suppressed at
+exactly the boundaries D03 protects. The two must never fire on the same interface.
 
 ## Step 6 — Circular dependencies
 
@@ -144,4 +191,4 @@ If neither, build the graph manually via Grep of imports. Cap analysis depth at 
 }
 ```
 
-Do not return prose. Return only structured findings, ordered by `severity × certainty`. Cap output at 30 findings.
+Do not return prose. Return only structured findings, ordered by `severity × certainty`. Cap output at 15 findings.

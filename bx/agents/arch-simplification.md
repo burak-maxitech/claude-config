@@ -86,7 +86,7 @@ Same JSON-shaped format as the other arch subagents, with one **mandatory additi
 - **Skip vendored / generated dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `__pycache__`, `.next`, `.cache`, `vendor`, `target/`, `coverage/`, anything matching `*.generated.*` or under `__generated__/`.
 - **Don't double up with `/bx:clean`.** If the *whole file* is unused, that's `/bx:clean`'s territory. You target *symbols within used files*. Coordinate via the consolidator (orchestrator deduplicates).
 - **Be conservative with public API.** Lower certainty when the symbol/abstraction is exported from a package's public entry point — external consumers may use it.
-- Limit output to top 30 findings, ordered by `lines_deletable × certainty` (deletion impact × confidence).
+- Limit output to top 15 findings, ordered by `lines_deletable × certainty` (deletion impact × confidence).
 
 ## What to leave alone (false-positive guards)
 

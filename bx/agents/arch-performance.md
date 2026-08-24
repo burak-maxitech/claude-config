@@ -56,4 +56,4 @@ These belong in your output but explicitly tagged. The orchestrator routes them 
 - **Evaluate against the Intended Architecture summary.** If the project documents "no perf tuning until v2," cap your output at top-3 highest-impact findings and mark all as suspects.
 - **CCN columns**: leave `ccn_current` and `ccn_projected` populated only when the perf fix also reduces complexity (often the case for hot-loop hoisting and deduping). Otherwise leave both null.
 - **Skip vendored / generated dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `__pycache__`, `.next`, `.cache`, `vendor`, `target/`, `coverage/`.
-- Limit output to top 20 findings.
+- Limit output to top 15 findings.

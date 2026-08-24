@@ -225,7 +225,7 @@ lines_deletable = symbol body length (when deletable) OR 0 + 1 word change (when
 
 ## Output ordering
 
-Sort by `lines_deletable × certainty` descending. Cap at 30 findings.
+Sort by `lines_deletable × certainty` descending. Cap at 15 findings.
 
 ## Final output addendum
 

@@ -1,7 +1,7 @@
 ---
 name: arch
-description: Repo-wide architecture audit. Surfaces structural debt, complexity hotspots, refactor opportunities, performance suspects, AND over-engineering/almost-dead code (single-impl interfaces, pass-through wrappers, defensive code for impossible states, unread config). Reports `lines_deletable` as a top-line metric.
-when_to_use: When user mentions architecture review, refactoring opportunities, technical debt at the repo level, "is this codebase over-engineered", "make the codebase smaller", or "where's the complexity in this codebase". Different from `/code-review` (diff-scoped, daily driver), `/bx:review` (thorough senior-engineer review), `/code-review ultra` (PR-scoped cloud review), and `/bx:clean` (file-level deletion only).
+description: Repo-wide architecture audit across six dimensions — structural debt and complexity hotspots (cyclomatic AND cognitive), catalog-cited refactors, OO/SOLID design-principle violations, thread safety and concurrency defects, error safety and resource lifecycle gaps, architectural scalability limits, performance suspects, and over-engineering/almost-dead code. Opens with the top 3 architectural themes, not a flat finding list.
+when_to_use: When user mentions architecture review, refactoring opportunities, technical debt at the repo level, SOLID/OO design quality, thread safety or race conditions, error handling gaps, scalability limits, "is this codebase over-engineered", "make the codebase smaller", "is this production-ready", or "where's the complexity in this codebase". Different from `/code-review` (diff-scoped, daily driver), `/bx:review` (thorough senior-engineer review), `/code-review ultra` (PR-scoped cloud review), and `/bx:clean` (file-level deletion only).
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(sort:*), Bash(uniq:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(pip:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(cat:*), Bash(head:*), Agent
 effort: high
@@ -10,7 +10,21 @@ argument-hint: "[path] [--plan] [--fix] [--full-scan] [--map]"
 
 # Architecture Review — Repo-Wide Architectural Audit
 
-Audit this codebase like a staff engineer doing a quarterly architecture health check. Surface structural debt, complexity hotspots, refactor opportunities that *demonstrably* reduce cognitive load (not pattern-mongering), and high-precision performance suspects.
+Audit this codebase like a staff engineer doing a quarterly architecture health check.
+
+Six dimensions, scanned in parallel:
+
+| Dimension | Asks |
+|-----------|------|
+| **Structure** | Where is complexity concentrated, and what depends on what? |
+| **Design** (`D`) | Do the types and modules honor the principles that keep change cheap — SOLID, cohesion, boundaries? |
+| **Refactors** (`R`) | Which catalog techniques *demonstrably* reduce cognitive load here? |
+| **Simplification** (`S`) | What exists but earns nothing? |
+| **Robustness** (`C`/`E`/`X`) | What happens when this runs twice at once, when the network hangs, or when the table has ten million rows? |
+| **Performance** | What is statically detectable, and what merely needs measuring? |
+
+The report opens with the **top 3 architectural themes** — a judgment, not a list. Findings that
+do not cluster into a theme still appear in full below it; nothing is dropped.
 
 This skill is distinct from the diff-scoped reviewers in this repo:
 
@@ -68,7 +82,7 @@ Record the two independently — `cyclomatic: <tool|heuristic>` and `cognitive: 
 Override with `--full-scan` to force `full` regardless of size.
 
 **Tell the user what you detected** in one line, e.g.:
-> Detected: TypeScript pnpm monorepo (5 workspaces), 312 files, eslint with complexity rule. Tier: bounded. Scanning structure / refactors / performance / simplification.
+> Detected: TypeScript pnpm monorepo (5 workspaces), 312 files. Cyclomatic: eslint `complexity`. Cognitive: heuristic (no sonarjs). Tier: bounded. Scanning structure+design / refactors / simplification / robustness / performance.
 
 ---
 
@@ -94,7 +108,7 @@ From these, write a 3-5 bullet **Intended Architecture summary**:
 
 If no architecture docs exist, say so and infer from top-level directory structure — but flag in the report that findings are evaluated against an *inferred* architecture.
 
-**Pass this summary verbatim to all four subagents** in their task prompts. Subagents must mark any finding that conflicts with the documented intent as `respects_documented_decision: false`. Those surface in a separate report section the user has to confirm before action — they are *not* automatically actioned, even in `--fix` mode.
+**Pass this summary verbatim to all five subagents** in their task prompts. Subagents must mark any finding that conflicts with the documented intent as `respects_documented_decision: false`. Those surface in a separate report section the user has to confirm before action — they are *not* automatically actioned, even in `--fix` mode.
 
 ---
 
@@ -129,7 +143,7 @@ Compute the file lists once and pass them to subagents so all three see the same
 
 ## Step 4 — Parallel Subagent Dispatch
 
-Launch all four subagents in a single turn (one Agent tool call per agent). Mirror `/bx:clean` Step 1.
+Launch all five subagents in a single turn (one Agent tool call per agent). Mirror `/bx:clean` Step 1.
 
 For each subagent, **read its corresponding reference file** (it contains the detailed scan instructions) and pass the contents in the task prompt along with the shared context.
 
@@ -174,7 +188,7 @@ Each finding must include:
 ```
 
 ### Agent 1: arch-structure
-Read `references/scan-structure.md`, then dispatch the `arch-structure` subagent with those instructions + shared context. Targets: cyclomatic/cognitive complexity hotspots, coupling, cohesion, layering violations, circular deps.
+Read `references/scan-structure.md` AND `references/catalog-rules.md` AND `references/catalog-design.md`, then dispatch the `arch-structure` subagent with all three + shared context. Targets: cyclomatic/cognitive complexity hotspots, coupling, cohesion, layering violations, circular deps, **and the D-prefix design-principle entries** (LSP/ISP/DIP violations, Law of Demeter, anemic domain model, feature envy, primitive obsession, god class).
 
 ### Agent 2: arch-refactors
 Read `references/scan-refactors.md` AND `references/catalog-rules.md` AND `references/catalog-refactors.md`, then dispatch the `arch-refactors` subagent with all three + shared context. The catalog is mandatory context — every finding must cite a catalog entry by ID.
@@ -185,11 +199,18 @@ Read `references/scan-performance.md`, then dispatch the `arch-performance` suba
 ### Agent 4: arch-simplification
 Read `references/scan-simplification.md` AND `references/catalog-rules.md` AND `references/catalog-simplification.md`. Dispatch the `arch-simplification` subagent with both + shared context. Targets: over-engineering and almost-dead code (single-impl interfaces, pass-through wrappers, always-same params, unread config, defensive code for impossible states, near-duplicates, speculative generics, unused exports). Every finding must report `lines_deletable >= 1`.
 
+### Agent 5: arch-robustness
+Read `references/scan-robustness.md` AND `references/catalog-rules.md` AND `references/catalog-robustness.md`, then dispatch the `arch-robustness` subagent with all three + shared context. Targets: concurrency and thread safety (`C`), error safety and resource lifecycle (`E`), and architectural scalability (`X`) — races and TOCTOU, locks held across await, floating async work, swallowed exceptions, missing timeouts and retries, unreleased resources, unbounded result sets, missing backpressure.
+
+This agent asks a different question from the other four: not "is this hard to read or bigger than it needs to be?" but "what happens when this runs twice at once, when the network hangs, or when the table has ten million rows?" Its findings are usually about something *absent*, which is why its scan file requires an entry-point map before scoring.
+
+**Dispatch note.** Name every agent explicitly, as above. Generic dispatch loses each agent's frontmatter `model: sonnet` routing and its tool scoping (S43/S50) — a `Agent(model:…)` deny rule cannot guard an omitted model parameter.
+
 ---
 
 ## Step 5 — Consolidate, Filter, Score
 
-After all four subagents return:
+After all five subagents return:
 
 1. **Sanity gate (complexity delta)** — drop a refactor-dimension finding only when it reduces
    *neither* metric: `ccn_projected >= ccn_current` **AND**
