@@ -1,7 +1,7 @@
 <!-- bx-doc-schema: 2 -->
 # CLAUDE.md
 
-Last Updated: 2026-08-18 (Session 57)
+Last Updated: 2026-08-24 (Session 58)
 
 ## Project Overview
 
@@ -16,10 +16,6 @@ Last Updated: 2026-08-18 (Session 57)
 
 | Decision | Rationale |
 |----------|-----------|
-| `/bx:clean` Step 1 dispatches dedicated Sonnet `cleanup-*` agents (S43) | Generic dispatch ran every scan on Opus; dispatching the named agents restores their `model: sonnet` routing + tool scoping. (commit 65179cd) |
-| `/bx:clean` eval suite + measured skill value (S43) | Evals show the skill's edge is fix-mode discipline + prompt-independent coverage, not raw detection; `bx/skills/clean/evals/` committed as a regression suite. (commit 65179cd) |
-| `/bx:save --silent` — zero-prompt runs (S44) | Auto-commits with the suggested message; every consent prompt resolves to its safe default (decline/skip) — the flag never answers "yes" for the user except the commit itself. (commit b82162d) |
-| `/bx:seo` content-review hardening — doc-drift sweep rule (S45) | A rework isn't done until its stale echoes are swept from sibling files; `allowed-tools` must enumerate every command incl. plugin `bin/` helpers. (`1d6698a`) |
 | `/bx:evolve` upstream-watch skill — design contract (S46) | Two-tier authority (official actionable with citations; community advisory-only), committed watermark + decision log, capability-relevance gate; orchestrator computes all hashes. Spec: `docs/superpowers/specs/2026-06-09-bx-evolve-design.md`. |
 | Sentinel exit-point principle for /bx:evolve (S46) | `lane-unavailable-*` sentinels are lane-health reports, not findings — they exit at consolidation Step 3.1, and one principle replaces 7 scattered carve-outs. (`21b41bb`) |
 | `/bx:evolve` relevance gate confirmed + user-directed registration path (S47) | Gate validated by dogfood; user-directed items register as proper `open` findings with re-fetched verbatim excerpts; lane digest one-liners are NOT citation-grade. |
@@ -37,6 +33,9 @@ Last Updated: 2026-08-18 (Session 57)
 | Archives are disk-only and rotate at 100k (S56) | v2.0.1 closed the three linear archive-read paths (Part 3.0 exclusion, tail-anchored appends, windowed rollup); v2.1.0's Part 7.7 rotates >100k archives byte-verbatim into `docs/archive/` volumes (consent + sentinel, B ≤ A ≤ B+600, no count cap — manual `git rm` is the escape hatch). Nothing automatic reads a volume. |
 | Blind rehearsals are the acceptance instrument for instruction files (S56) | Agents executing only the instruction text caught what 12+ readings could not (harness conflicts, gate holes, nondeterminism); the decision-log ambiguity count is the regression metric (doc-migrator 5→2; Part 7.7 started at 2). |
 | Doc contracts get a named owner; satellites reference, not restate (S57) | /simplify found the archive set restated in 4 files and rotation constants in 5; doc-schema.md's new Archives section is canonical and drift-prone copies now cite their owner. Moving 7.7 out of Part 7 deferred until it can be blind-rehearsed. (v2.1.1) |
+| Task-tracker tools are not assumed present (S58, 2026-08-24) | v2.1.233 removed TaskCreate/TaskList/TodoWrite from the default toolset on current models; `allowed-tools` grants permission, not existence. `save/references/task-tools.md` owns the fact + a degraded path per skill (resume folds tasks into its summary, save behaves as `--skip-tasks`, plan treats the approved plan as the tracker). Tracker paths demoted, never deleted. (v2.2.0) |
+| `/bx:arch` measures cognitive complexity, not just cyclomatic (S58) | The catalog reasoned about cognitive load while the skill measured only McCabe, so the Step 5 gate deleted every R01/R09 finding ("CCN direction: unchanged") before the report. Cognitive is now measured (sonarjs where present, nesting-weighted heuristic elsewhere — no other linter reports it) and the gate drops a finding only when it reduces neither metric. (v2.3.0) |
+| Two `/bx:arch` deletion rules are hard-suppressed at boundaries (S58) | S01 recommended deleting Dependency Inversion (a port has one adapter by design) and S06 deleted validation at trust boundaries (a type annotation is a compile-time claim about a runtime the compiler never sees). Both now suppress at the boundary and report the suppression count — the finding is withheld, never silently dropped. D03 is S01's declared counterpart. (v2.3.0) |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -46,10 +45,12 @@ Last Updated: 2026-08-18 (Session 57)
 
 **Plugin-versioning sharp edge (S54):** `version` in `bx/.claude-plugin/plugin.json` is the plugin's update cache key — a push that changes `bx/**` without bumping it is never offered to users (`/plugin update` reports "already at the latest version"). `/bx:save` Part 8 enforces the bump; manual committers follow the README contributors note. History in `CHANGELOG.md`.
 
-**14 open upstream findings** live in `docs/upstream/state.json`; the watermark is current again (changelog 2.1.228 · docs/community 2026-08-11 — S54's full run released the S53 freeze). Correction from resume: the S53 "5 uncommitted files" claim was stale — they were committed in `e1bd066` and pushed before this session, and the plugin cache already carried them.
+**14 open upstream findings** live in `docs/upstream/state.json`. The watermark is **frozen at changelog 2.1.228 · docs/community 2026-08-11** — S58's arch-scoped run kept the S53-convention freeze, so a full `/bx:evolve` run is still owed. That scoped run's finding (`5d1459d5`, v2.1.233 task-tool removal) is applied and its sibling-echo class is now swept across all five affected skills (v2.2.0).
 
 **`start-claude.ps1` cannot be parsed by Windows PowerShell 5.1 (pre-existing, found S55).** The file is BOM-less UTF-8 containing seven non-ASCII characters (em-dashes and an arrow); WinPS 5.1 decodes a BOM-less `.ps1` as the ANSI codepage, so `—` becomes `â€"` and the trailing quote terminates a string early — 2 parse errors on 5.1, 0 on pwsh 7. Predates this branch (`git show d78105e:` confirms), and the user runs pwsh 7, but README tells teammates to install `cc` without naming a host. Fix queued in the S55 fix wave: replace the seven characters with ASCII.
 
 **The interactive `/color` path is still unverified (S55).** `/color <c>` as a *prompt argument* is proven for `-p` (`claude -p "/color blue"` → `Session color set to: blue`, exit 0, no model turn), but the interactive path needs a TTY and could not be exercised from a tool call. The `cc` launcher now ships that argument. If the live gate shows the prompt bar is not colored, the documented fallback is a custom `statusLine` printing a per-project colored banner — a fresh design decision, NOT a launcher patch.
+
+**`/bx:arch` v2 shipped without meeting its own acceptance bar (S58).** Six blind-rehearsal waves ran against the rewritten surfaces; the S56 ≤2 ambiguity bar was not reached (Step 5 15→12→11, report template 24→18→12, scan+rubrics 12→12) and v2.3.0 shipped on the severity curve instead — wave 1 found rules that deleted real findings, wave 6 found a certainty ceiling declared in the wrong file. The residual is formatting conventions and named judgment calls; it is recorded in the spec's acceptance section, not waived silently. The skill has still never run end-to-end.
 
 > Session state: [docs/STATUS.md](docs/STATUS.md)

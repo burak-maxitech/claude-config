@@ -240,3 +240,7 @@
 - [x] This repo migrated to doc schema v2 + Key Decisions compressed 16k→8k (`9e47f42`, `72c505a`)
 - [x] /simplify cleanup wave over v2.0.0–v2.1.0: 17 fixes across 13 files (efficiency, dedup, altitude) + v2.1.1 bump - bx/skills/save/**, bx/agents/*, bx/scripts/session-start-context.sh, README.md, workflow.md
 - [x] First /bx:save --full on doc schema v2 (S57) - rollup/rotation machinery exercised end-to-end; no rotation fired (key-decisions ~98k < 100k trigger)
+- [x] Swept the TaskCreate-availability class across 5 skills — canonical owner + degraded paths (v2.2.0, `bf134a8`)
+- [x] `/bx:arch` review depth v2 — 8 phases, 23 → 54 catalog entries, 5th scanner, calibrated finding contract, thesis-first report (v2.3.0, `ed708e3`..`7afd51f`)
+- [x] Six blind-rehearsal waves across three instruction surfaces; residual recorded in the design spec
+- [x] Pushed `97c6e22..7afd51f` (16 commits) to origin/main

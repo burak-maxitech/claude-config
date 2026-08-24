@@ -10,7 +10,7 @@ claude-config/                         # marketplace repo
 │   └── marketplace.json               # "burak-tools" marketplace catalog
 ├── bx/                                # the installable `bx` plugin (S37, see Key Decisions)
 │   ├── .claude-plugin/plugin.json     # manifest (explicit semver `version` = update cache key; skills → /bx:<name>)
-│   ├── agents/                        # 19 subagents (Sonnet-routed) → bx:<agent>
+│   ├── agents/                        # 20 subagents (Sonnet-routed) → bx:<agent>
 │   ├── hooks/hooks.json               # SessionStart project-orientation injection
 │   ├── scripts/                       # session-start-context.{sh,ps1}
 │   └── skills/                        # 11 skills (SKILL.md + references/) → /bx:<name>

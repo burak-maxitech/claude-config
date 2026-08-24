@@ -2,19 +2,19 @@
 
 > Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
 
-Last Updated: 2026-08-18 (Session 57)
+Last Updated: 2026-08-24 (Session 58)
 
 ## Current Status
 
 | Area | Status |
 |------|--------|
 | Skills (11) | Complete |
-| Subagents (19) | Complete — `doc-migrator` added S56 |
-| Plugin packaging (`bx`) | **v2.1.1 ready S57** (simplify cleanup wave over v2.0.0–v2.1.0); push + install smoke-test + symlink retirement still pending |
+| Subagents (20) | Complete — `arch-robustness` added S58 |
+| Plugin packaging (`bx`) | **v2.3.0 pushed S58**; `/plugin update bx` not yet run locally, install smoke-test + symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate still pending |
 | Cross-platform setup | Complete |
-| GitHub sync | Complete — main pushed through v2.1.0 |
+| GitHub sync | Complete — main pushed through v2.3.0 (`7afd51f`) |
 | Documentation | Complete — schema v2 |
 
 ## Completed
@@ -35,9 +35,11 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 **S37 plugin packaging leftovers.** Install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement.
 
+**`/bx:arch` review depth v2 shipped, dogfood owed (S58).** Eight phases took the skill from a function-level refactor scanner to a six-dimension architecture review: catalog 23 → 54 entries (D design/SOLID, C concurrency, E error safety, X scalability), a fifth scanner `arch-robustness`, a calibrated finding contract (`finding-rubrics.md` — anchored severity, certainty by evidence class, mandatory `evidence` + `why_this_might_be_wrong`), thesis-first report with theme synthesis, and churn × fan-in in the rank score. Spec: `docs/superpowers/specs/2026-08-24-bx-arch-review-depth-design.md`. **Owed:** `/plugin update bx`, then the first end-to-end run — rehearsals prove the instructions are unambiguous, only a real run proves the scanners find anything useful.
+
 ## Next Steps
 
-1. **First real archive rotation** — `docs/key-decisions.md` is ~98k chars; upcoming decision rows cross the 100k trigger, so a near-future `/bx:save --full` fires the first Part 7.7 rotation into `docs/archive/`. Review its diff carefully.
+1. **`/plugin update bx`, then dogfood `/bx:arch` end-to-end** — v2.3.0 is pushed but the local cache still runs 2.1.1, so none of this session's work is live. The skill has never run; this is now worth more than another rehearsal round.
 2. **Finish the `cc` session naming/coloring rollout (S55)** — run the live gate, then dispatch the single fix wave listed in `## In Progress`.
 3. **Doc-schema v2 fixture verification** — the deferred live `/bx:save` runs against the six fixture cases (see `## In Progress`), plus the post-merge minors batch from both plans.
 4. **/simplify follow-up: move Part 7.7 rotation out of Part 7** into its own sibling Part — deletes the five "except 7.7" carve-outs; requires a blind rehearsal before shipping (deliberately skipped S57).
@@ -52,9 +54,9 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 > Full history: [session-history.md](session-history.md)
 
-### Last Session (Session 57) - 2026-08-18
-- **`/simplify` over the v2.0.0→v2.1.0 diff (17 commits):** 4 parallel reviewers (reuse / simplification / efficiency / altitude) → 17 fixes across 13 files; 6 findings deliberately skipped (biggest: the 7.7-out-of-Part-7 restructure, deferred behind a blind rehearsal).
-- **Efficiency wins:** save-writer anchor Greps no longer echo ~98% of the archives back (`-o` + `head_limit: 0`); Part 7.7 moves bytes via a byte-exact shell split instead of Read→Write; `--full` stops reading dated planning records (~356KB); Part 5.1's full-archive read deleted.
-- **Ownership consolidation:** doc-schema.md gains the canonical Archives section; `--silent` promoted to a normative default rule; satellites (save/resume SKILL.md, README) now cite owners instead of restating; assert-doc-schema.sh derives all section checks from one constant; make-fixtures.sh `stub_docs` helper (fixtures verified byte-identical).
-- **v2.1.1** bumped + CHANGELOG entry; all checkers pass (assert-doc-schema against repo + fixtures incl. negative order tests, check-doc-rule-consistency).
-- **Next:** first real key-decisions rotation (~98k, near the 100k trigger); fixture live runs; `cc` live gate.
+### Last Session (Session 58) - 2026-08-24
+- **Recovered S58 state after a Claude outage**, then swept the class the S58 `/bx:evolve` run had flagged and left open: v2.1.233 removed the task-tracker tools from the default toolset, and five skills promised behavior that could not run. New canonical owner `save/references/task-tools.md` + a degraded path per skill; tracker paths demoted, never deleted (**v2.2.0**).
+- **`/bx:arch` review depth v2 (v2.3.0)** — ran through `/bx:plan`, 8 phases. Fixed three rules that made architecture *worse* (S01 deleting Dependency Inversion, S06 deleting trust-boundary validation, a CCN-only gate deleting its own catalog's quick wins), then added the three dimensions with zero coverage: SOLID/OO, thread safety, error safety, scalability. Catalog 23 → 54 entries; fifth scanner `arch-robustness`; report now opens with a thesis, not six tables.
+- **Calibrated the finding contract** — five scanners were scoring severity/certainty against no rubric while the orchestrator gated, ranked and grouped on those numbers. `finding-rubrics.md` is the canonical owner; `evidence` and `why_this_might_be_wrong` are now mandatory on every finding.
+- **Six blind-rehearsal waves; the ≤2 bar was not met and is recorded as such.** The rehearsals caught what readings could not: a theme rule whose own worked example could never satisfy it, a dedup rule *introduced by a previous wave* that collapsed six distinct defects into one, and a trace rule that made the scanner silently withhold every missing-timeout finding on an unresolvable import.
+- **Pushed** `97c6e22..7afd51f`, 16 commits, both versions. `/plugin update bx` and the first end-to-end `/bx:arch` run are owed.

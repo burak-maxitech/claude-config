@@ -13,7 +13,7 @@
 | **Plan Feature** | `/bx:plan` | Interview before building |
 | **During Development** | `/code-review` (quick) or `/bx:review` (thorough) | Review code quality |
 | **During Development** | `/bx:clean` | Find dead code & cruft |
-| **Architecture Audit** | `/bx:arch` | Repo-wide complexity + refactor + perf + over-engineering audit (4 dimensions, reports `lines_deletable`) |
+| **Architecture Audit** | `/bx:arch` | Six-dimension repo audit — complexity (cyclomatic + cognitive), SOLID/design, refactors, over-engineering, robustness (thread safety / error safety / scalability), performance. Opens with the top 3 architectural themes |
 | **Test Suite Audit** | `/bx:tests` | Repo-wide test health — coverage gaps on critical paths + smells (T01-T05) + suite economics. Twin headline metric. |
 | **SEO + GEO Audit** | `/bx:seo` | Repo-wide SEO + Generative Engine Optimization audit for web projects. Fetches current best practices every run. Probes sitemap URL health. **Optional GSC integration via Search Console API** (Performance via `searchanalytics.query` + per-URL Indexing via `urlInspection.index.inspect`). Configure `.seo-data/gsc/config.yaml` `site_url:` after `gcloud auth application-default login`. Score `/100` tracked over time. |
 | **Visual Re-skin** | `/bx:webdesign` | Re-skin an existing web project's visual design via Google Stitch (MCP). Web projects only. Requires one-time Stitch MCP + `stitch-skills` setup. Works on a dedicated `webdesign/<date>` branch. |
@@ -329,7 +329,7 @@ on pre-v2 repos. The full breakdown — including what `--full` adds — lives i
 2. **Reads intended architecture first.** Step 1 reads CLAUDE.md, README.md, `docs/architecture/`, and ADRs to summarize what the project's architecture is *supposed* to be. Findings that conflict with documented decisions are surfaced separately for user confirmation, not applied automatically.
 3. **CCN delta sanity gate.** Each finding includes `ccn_current` (from detected linter) and `ccn_projected`. Findings whose projected ≥ current are filtered before report.
 
-**Decomposition:** Four parallel Sonnet subagents — `arch-structure` (complexity, coupling, layering), `arch-refactors` (catalog-driven complexity reduction), `arch-performance` (high-precision categories only), `arch-simplification` (over-engineering / almost-dead code, reports `lines_deletable`).
+**Decomposition:** Five parallel Sonnet subagents — `arch-structure` (complexity, coupling, layering, `D` design principles), `arch-refactors` (catalog-driven complexity reduction), `arch-performance` (high-precision categories only), `arch-simplification` (over-engineering / almost-dead code, reports `lines_deletable`), `arch-robustness` (`C` concurrency / `E` error safety / `X` scalability).
 
 **Top-line metric:** Report opens with **Code we can delete: N lines across M files** so "least amount of code possible" is the first signal. Quick-wins phase puts simplification deletions ahead of refactors.
 
@@ -846,7 +846,7 @@ Commands live in the `bx/` plugin directory of the repo:
 ~/Development/projects/claude-config/
 ├── bx/                      # The installable plugin
 │   ├── .claude-plugin/plugin.json   # Manifest (semver = update cache key)
-│   ├── agents/              # 19 subagents → bx:<agent>
+│   ├── agents/              # 20 subagents → bx:<agent>
 │   ├── hooks/ + scripts/    # SessionStart orientation hook
 │   └── skills/              # 11 skills → /bx:<name> (each: SKILL.md + references/)
 ├── .claude/scripts/         # cc launchers (start-claude.{sh,ps1}) — not plugin components

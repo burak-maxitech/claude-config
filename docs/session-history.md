@@ -113,48 +113,9 @@
 
 ### Session 51 - 2026-07-23: Prepped the first `/bx:webdesign` dogfood — mapped the skill's gates/phases/checkpoints, verified dependency provenance (`@_davideast/stitch-mcp` personal Apache-2.0 vs official `google-labs-code/stitch-skills`; flagged the OAuth-token trust implication), determined setup runs in the target repo (`kaanarik`), committed the paste-ready kickoff prompt `docs/webdesign-first-run-prompt.md`. (commit: b82637a)
 
-### Session 52 - 2026-07-23
-**What happened:**
-- Reviewed the full transcript of the first-ever `/bx:webdesign` end-to-end run (on the `kaanarik` repo) — a careful shakedown that exercised the whole pipeline and paused cleanly at `review_pending` on the `webdesign/2026-07-23` branch with no app code touched. Mapped observed vs. intended behavior against all 9 skill files.
-- Identified 15 optimization findings (3 tiers: confirmed defects, under-documentation gaps, nits) and, on user request ("apply everything"), applied all 15 across 7 skill files (+120/−59).
-- Verified the `stitch-skills` plugin namespaces on disk before the global rename (`stitch::` → `stitch-design:`; `react-components` → `stitch-build:`).
-- Fixed latent Phase-3 clean-tree traps the paused run never reached: `.gitignore` edit now committed in Phase 1, `.playwright-mcp/` added to the managed gitignore block; added Tailwind-v4 detection + `@theme` token-merge (the kaanarik stack).
-- Rewrote the setup doc (wizard prints its own `claude mcp add`; API-key/`.env` secret hygiene; TUI needs a real terminal) and encoded Stitch platform gotchas (generation timeout≠failure; `list_screens` omits generated screens; lossy color control → new "generate one, verify palette, then batch" pass).
+### Session 52 - 2026-07-23: `/bx:webdesign` first-dogfood hardening — reviewed the first end-to-end run (paused clean at `review_pending` on the `kaanarik` repo, no app code touched), applied all 15 findings across 7 skill files, then self-reviewed those fixes (`/bx:review` 2 more + a 4-agent `/simplify` 11 refinements). Key gotchas encoded: `stitch-design:`/`stitch-build:` namespaces, Phase-3 clean-tree traps (`.gitignore` committed in Phase 1, `.playwright-mcp/`), Tailwind-v4 `@theme` token merge, and the lossy Stitch palette → generate-one-verify-then-batch. (commits: 62d3461, 4931ee7)
 
-- Re-save: after committing the 15 fixes (`62d3461`, pushed), self-reviewed them — `/bx:review` surfaced 2 more (allowed-tools `mv`/`cp`; a 2.1a↔2.2 double-generation that would waste a generation), and a 4-agent `/simplify` pass applied 11 dedup/altitude refinements, notably fixing a missed Phase-3 after-shot site (Playwright writes to `.playwright-mcp/`) the before-shot fix hadn't covered, plus a Step-4 overview self-contradiction. Skipped 2 as v2 structural refactors (role-based skill-name indirection; a shared platform-notes section).
-
-**Files created/modified:**
-- `bx/skills/webdesign/SKILL.md` — allowed-tools +python/python3/tsx/node
-- `bx/skills/webdesign/references/{setup-stitch-mcp,web-stack-detection,phase1-extract,phase2-design-review,phase3-inject,stitch-formats}.md` — 6 reference files hardened
-- auto-memory — webdesign-first-run-queued → webdesign-dogfood-hardened; MEMORY.md pointer
-
-**Next session should:**
-- Push the S52 fixes, `/plugin update bx`, then re-run `/bx:webdesign` on kaanarik past review into Phase 3 to exercise the latent fixes (Tailwind-v4 merge, clean-tree guards).
-- Consider the same real-run treatment for `/bx:seo`, `/bx:tests`, `/bx:arch`, `/bx:health` (all content-hardened, never run E2E).
-
----
-
-### Session 53 - 2026-07-30
-**What happened:**
-- Ran **`/bx:evolve` scoped to `/bx:review` only**. The skill supports no per-skill scoping, so it was adapted: capability inventory built solely from `bx/skills/review/` (23 entries), pain-point list narrowed to the one review-relevant slug (repo-wide `plugin-cache-staleness` deliberately excluded so its 4 open findings wouldn't be dragged in), and **Step 6 watermark advance suppressed** — advancing on a single-skill audit would falsely record the other 10 skills as checked through v2.1.220.
-- Lanes: changelog `ok` (3 releases, 2.1.218→2.1.220), docs `ok` (9/9 pinned pages, **0 findings**), community `degraded` (1 fetch 429'd). The v2.1.218 `/code-review`-runs-in-background claim was verified verbatim against the release body per the S47 "digests aren't citation-grade" rule.
-- **The methodological result of the run:** the docs lane found nothing but flagged that two pages it needed (`checkpointing`, `code-review`) are not on its pinned allowlist. Direct orchestrator fetches of both produced **5 of the 7 findings**, including the only outright-wrong statement in the skill. The community lane separately handed off official URLs it couldn't emit as Tier-1; one was promoted to an official finding via orchestrator verification (same path as S50's `9aa8e1d0`).
-- `--fix` pass: **5 applied, 1 rejected, 1 skipped.** Applied — checkpoint-granularity correction; hedged `/loop` caveat; `effort: high` tradeoff callout; ladder prose in README + workflow; output-format Rule 8 ("verification bar"). Rejected — the lane's proposal to pad `when_to_use` with harness-version trivia (it is a *triggering* field; nothing in SKILL.md was invalidated, and the substance belonged in the human-facing ladder instead). Skipped — `ReportFindings` adoption, since the tool's contract is exclusive-of-text and wholesale adoption would silently delete the severity table, Convention Violations, and What's Good sections.
-- Two deliberate scope corrections worth remembering: `workflow.md:706/709` contain `/code-review → /bx:review` arrow chains but were **excluded** from the ladder edit because they sit inside a fenced block illustrating sample `/bx:health` *output*; and the `/loop` caveat was written to cover `/bx:clean` too, since `disable-model-invocation` is plugin-wide.
-
-**Files created/modified:**
-- `bx/skills/review/SKILL.md` — corrected the post-`--fix` checkpoint claim (per-prompt, not per-edit; `Esc Esc` only on an empty prompt; 30-day cleanup); added a "Why `effort: high`, and what it costs" callout routing users to `--verify`.
-- `bx/skills/review/references/output-format.md` — added Rule 8: Critical/Important findings must name a concrete failure scenario cited to `file:line`, else downgrade to Suggestion.
-- `README.md` — review-ladder rung 2 now carries the effort confidence/coverage tradeoff and v2.1.218 background-subagent behaviour.
-- `workflow.md` — added the unverified `disable-model-invocation` caveat under `/loop`; added the v2.1.218 note to the Tiering line.
-- `docs/upstream/state.json` — 7 new findings written as `open` (Checkpoint 1), then verdicts applied (Checkpoint 2): 5 applied, 1 rejected, 1 left open. Watermark untouched.
-
-**Next session should:**
-- Commit + push the 5 files, then `/plugin update bx` + `/reload-plugins`.
-- Add `checkpointing` + `code-review` to `scan-docs.md`'s allowlist (9 → 11), then run a **full** `/bx:evolve` — 2.1.218–2.1.220 remain unaudited for the other 10 skills.
-- Smoke-test `/loop /bx:review` to resolve the hedged caveat.
-
----
+### Session 53 - 2026-07-30: `/bx:evolve` scoped to `/bx:review` only, with the **watermark advance suppressed** — advancing on a single-skill audit would falsely record the other 10 skills as checked. The methodological result: the docs lane found 0 findings but flagged that two pages it needed (`checkpointing`, `code-review`) were missing from its pinned allowlist, and direct orchestrator fetches of those produced **5 of the 7 findings**, including the only outright-wrong statement in the skill (the per-edit checkpoint claim). `--fix`: 5 applied, 1 rejected (`when_to_use` is a *triggering* field, not a changelog), 1 skipped (`ReportFindings`' contract is exclusive-of-text and would have deleted three sections). (commit: e1bd066)
 
 ### Session 54 - 2026-08-11
 **What happened:**
@@ -230,3 +191,23 @@
 - Watch for the first real key-decisions rotation on the next `--full` (file at ~98k now)
 - Run the deferred fixture live `/bx:save` runs; then the `cc` live gate + S55 fix wave
 - Take the 7.7-out-of-Part-7 restructure through a blind rehearsal before shipping
+
+### Session 58 - 2026-08-24
+**What happened:**
+- **Recovered from an outage-truncated session**, then closed the sibling-echo class left open by S58's arch-scoped `/bx:evolve` run: claude-code v2.1.233 removed `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList`/`TodoWrite` from the default toolset on current models, and five bx skills promised behavior that silently could not run. New canonical owner `bx/skills/save/references/task-tools.md` (the fact, the availability check, a degraded path per skill); `/bx:tests --plan` dropped the identical "TaskCreate-ready brief" phrasing; `/bx:plan` treats the approved plan document as the tracker; `/bx:resume` folds the same task selection into its Step 4 summary; `/bx:save` Part 0 behaves as `--skip-tasks`. Corrected the finding's own guess — `bx/skills/clean` has no task-tool references. **v2.2.0** (`bf134a8`).
+- **`/bx:arch` review depth v2 — 8 phases through `/bx:plan`, shipped as v2.3.0.** Three rules were actively wrong: `S01` recommended deleting Dependency Inversion (a port has exactly one adapter by design), `S06` deleted validation at trust boundaries (a type annotation is a compile-time claim about a runtime the compiler never sees), and the Step 5 gate dropped every `R01`/`R09` finding because the catalog reasons about *cognitive* complexity while the skill measured only *cyclomatic* — a metric mismatch `R01`'s own entry names. All three fixed; both deletion rules now hard-suppress at the boundary and report the suppression count.
+- **Coverage: 23 → 54 catalog entries.** New `catalog-design.md` (D01–D08: LSP, ISP, DIP, Law of Demeter, anemic domain model, feature envy, primitive obsession, god class) and `catalog-robustness.md` (C01–C08 concurrency, E01–E08 error safety, X01–X07 scalability), none `--fix`-eligible. Fifth scanner `arch-robustness` owns C/E/X and builds an entry-point map before scoring. Catalog split per prefix so each agent receives only its own entries — token cost flat while the catalog more than doubled. Layering is now inferred from the codebase's own dominant import direction when nothing is documented (previously skipped entirely, which is the common case).
+- **Calibrated the finding contract and gave the report a point of view.** `finding-rubrics.md` (canonical owner, cited by 12 sites, restated by none): severity as blast radius × likelihood × reversibility, certainty by *evidence class* rather than confidence, plus mandatory `evidence` and `why_this_might_be_wrong` — the skill's only adversarial pressure. Report now opens with the top 3 architectural themes (thesis + evidence + one first move); rank score multiplies by `churn × fan-in`, so findings are ordered by where change actually hurts.
+- **Six blind-rehearsal waves; the S56 ≤2 bar was not met** (Step 5 15→12→11, template 24→18→12, scan+rubrics 12→12) and v2.3.0 shipped on the severity curve, recorded in the spec's acceptance section rather than waived. What the rehearsals caught that 12+ readings did not: a theme rule whose own worked example could never qualify under it (C/E/X all share `dimension: robustness`), a dedup rule **introduced by wave 1's own fix** that collapsed six distinct defects in one function into a single finding, two Step 5.8 groups with no rendering destination, and — highest cost — a "trace before you claim" rule that made the scanner *silently omit* every missing-timeout finding on an unresolvable import. Wave 6 confirmed that last one fixed.
+
+**Files created/modified:**
+- `bx/skills/save/references/task-tools.md` (new, canonical owner) + sweeps in `bx/skills/{tests,plan,resume,save}`, `bx/agents/save-writer.md`
+- `bx/skills/arch/references/` — new `finding-rubrics.md`, `catalog-rules.md`, `catalog-refactors.md`, `catalog-simplification.md`, `catalog-design.md`, `catalog-robustness.md`, `scan-robustness.md`; `refactor-catalog.md` deleted (split); all four `scan-*.md`, `report-template.md`, `plan-mode.md`, `fix-mode.md`, `scale-strategy.md` rewritten
+- `bx/agents/arch-robustness.md` (new) + all four existing `arch-*.md`
+- `bx/skills/arch/SKILL.md` — Steps 0/1/2/4/5 (5.1–5.9)/6; `bx/skills/health/references/state-buckets.md`, `bx/skills/tests/references/test-smell-catalog.md`, `workflow.md`
+- `docs/superpowers/specs/2026-08-24-bx-arch-review-depth-design.md` (new), `docs/upstream/state.json`, `CHANGELOG.md`, `bx/.claude-plugin/plugin.json` (2.1.1 → 2.2.0 → 2.3.0)
+
+**Next session should:**
+- Run `/plugin update bx` first — the local cache still runs 2.1.1, so nothing from this session is live
+- Dogfood `/bx:arch` end-to-end (never run); it is now worth more than another rehearsal round
+- A full `/bx:evolve` run is still owed — the watermark stayed frozen at 2.1.228 through S58's scoped run
