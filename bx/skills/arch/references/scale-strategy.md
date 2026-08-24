@@ -1,6 +1,31 @@
-# Scale Strategy — Sample-Based Drill-Down
+# Scale Strategy — Sampling, and the leverage signals
 
-Used when repo size tier from Step 0 is `sample` (>500 files), or the user passed a path argument that still resolves to >500 files.
+Two jobs. **Sampling** (which files to read) applies only on the `sample` tier. **Leverage
+signals** (churn and fan-in) are computed on *every* tier, because Step 5.4 ranks findings with
+them.
+
+## Leverage signals — computed on every tier
+
+Compute both for every file in scope, regardless of tier, and hand them to the orchestrator:
+
+- **churn_score** — commits touching the file in the last 90 days, normalized 0..1 across the scope:
+  ```
+  git log --since='90 days ago' --name-only --pretty=format: | sort | uniq -c | sort -rn
+  ```
+- **fan_in_score** — distinct files importing it, normalized 0..1 across the scope.
+
+Step 5.4 multiplies the rank score by `leverage = 1 + churn_norm + fan_in_norm`. This is the
+difference between a linter's ranking and an architecture review's: a CCN-30 function nobody
+touches is not the problem, and a CCN-15 function changed 40 times this quarter and imported by 30
+modules is. Both numbers are cheap — one `git log` and the import graph the structure scan already
+builds for circular-dependency detection.
+
+Previously these were computed only to *select* files on the `sample` tier and then discarded,
+which meant repos under 500 files never computed churn at all.
+
+## Sampling — `sample` tier only
+
+Used when the repo size tier from Step 0 is `sample` (>500 files), or the user passed a path argument that still resolves to >500 files.
 
 ## Tier definitions
 
@@ -23,11 +48,7 @@ priority = log(LOC + 1) × (1 + churn_score) × (1 + fan_in_score)
 Where:
 
 - **LOC** = `wc -l <file>` (uncomment-stripped not necessary; raw lines is fine)
-- **churn_score** = number of commits touching this file in the last 90 days, normalized to 0..1 across all files in scope:
-  ```
-  git log --since='90 days ago' --name-only --pretty=format: | sort | uniq -c | sort -rn
-  ```
-- **fan_in_score** = number of distinct files importing this file, normalized to 0..1 across all files in scope. For JS/TS/Python, count `from <path>` / `import <path>` references via Grep. For other languages, fall back to filename-as-symbol Grep.
+- **churn_score** and **fan_in_score** — as defined above; they are already computed for ranking, so sampling reuses them rather than recomputing. For fan-in on languages without a clear import syntax, fall back to filename-as-symbol Grep.
 
 Take the **top 50 files by priority** as the sample. Add any file matching:
 

@@ -2,15 +2,54 @@
 
 Render the final report exactly in this order. Every section appears even if empty (with "None found" as content) so the output structure is predictable across runs.
 
-## Section 0 — Top-line Metrics
+## Section 0 — The Read (top 3 architectural themes)
 
-Render this **first**, before anything else, so the user sees the deletion potential immediately:
+Render this **first, before any metric or table.** A quarterly architecture review's value is its
+point of view; everything below is supporting material. Themes come from Step 5.7 — each needs
+≥3 findings drawn from ≥2 dimensions.
 
 ```
 ## /bx:arch — <project name>
 
+### The read
+
+**1. <One-sentence thesis naming the structural cause.>**
+<2-3 sentences: what pattern the evidence shows, and what it costs — the change that has become
+expensive, the failure that has become likely.>
+
+*Evidence (6 findings):* `src/api/orders.ts:88` (E03) · `src/api/users.ts:40` (E03) ·
+`src/lib/http.ts:4` (C01) · `src/api/refunds.ts:12` (E01) · `src/api/orders.ts:130` (E07) ·
+`src/lib/http.ts:22` (X06)
+
+*First move:* Configure a timeout and a retry policy on the single shared axios instance in
+`src/lib/http.ts` — five of the six findings resolve there.
+
+**2. <thesis>** …
+
+**3. <thesis>** …
+```
+
+Rules:
+
+- **One first move per theme, not a list.** If you cannot name a single highest-leverage action,
+  the theme is not coherent enough to lead the report.
+- The thesis names a **cause**, not a category. "Error handling is inconsistent" is a category.
+  "Every outbound call inherits an unconfigured shared HTTP client" is a cause.
+- **Fewer than 3 qualifying themes:** render those that qualify and say so — "only 2 themes
+  cleared the ≥3 findings / ≥2 dimensions bar."
+- **No qualifying themes:** render
+  `**No cross-cutting themes** — findings are independent; see the tables below.` This is a real
+  result, not a failure: it means the codebase has local problems rather than a systemic one.
+- Never invent a theme to fill the third slot.
+
+---
+
+## Section 1 — Top-line Metrics
+
+```
 **Code we can delete: <total_lines_deletable> lines across <files_affected> files.**
-**Complexity hotspots: <count> functions exceeding linter threshold.**
+**Complexity hotspots: <count> functions above threshold (cyclomatic or cognitive).**
+**Robustness: <n> concurrency · <n> error-safety · <n> scalability findings.**
 **Performance suspects to measure: <count> findings.**
 ```
 
@@ -18,7 +57,7 @@ The deletion line uses bold to make it impossible to miss. Numbers come from Ste
 
 ---
 
-## Section 1 — Architecture Map
+## Section 2 — Architecture Map
 
 Default (lightweight):
 
@@ -47,9 +86,13 @@ misses entirely: modest decision-point count, deeply nested — the exact shape 
 
 If `--map` flag is set, additionally render an ASCII module-dep sketch (one node per top-level module, edges for imports). Skip if >15 top-level modules — it becomes unreadable.
 
-## Section 2 — Findings
+## Section 3 — Findings
 
-Four subsections, in order: **Simplification** (deletion-first, surfaced highest), **Structure**, **Refactors**, **Performance**. Each subsection is a table:
+Six subsections, in order: **Simplification** (deletion-first, surfaced highest), **Robustness**, **Structure**, **Design**, **Refactors**, **Performance**. Each subsection is a table.
+
+**Findings that belong to a Section 0 theme are still listed here**, with a `Theme` column marking
+which one (`T1`/`T2`/`T3`, blank if none). The tables are the complete record; Section 0 is the
+reading of it. Nothing is dropped, truncated, or moved out of its dimension.
 
 ```
 ### Refactors
@@ -95,7 +138,47 @@ Conflict with documented decision? No.
 
 Only render the detail block for #1 of each subsection — the table covers the rest.
 
-## Section 3 — Documented-Decision Conflicts
+### Robustness
+
+| Rank | Location                    | Title                                   | Sev | Cert | Effort | Cat | Entry | Theme |
+|------|-----------------------------|-----------------------------------------|-----|------|--------|-----|-------|-------|
+| 1    | src/payments/charge.ts:88   | Provider call has no timeout            | H   | 0.90 | trivial| E   | E03   | T1    |
+| 2    | src/cache/warm.ts:22        | Check-then-fill race on shared cache    | H   | 0.75 | small  | C   | C02   |       |
+| 3    | src/reports/export.ts:14    | Unbounded result set streamed to client | M   | 0.80 | medium | X   | X01   |       |
+
+`Cat` is the catalog family: `C` concurrency · `E` error safety · `X` scalability. Robustness
+findings never carry complexity deltas and are never `--fix`-eligible — they route to `--plan`.
+
+The "Top finding detail" block for this subsection must state **the failure**, not the rule:
+
+```
+**#1 — Provider call has no timeout (`src/payments/charge.ts:88`)**
+
+The shared axios instance in `src/lib/http.ts:4` is constructed with no `timeout`, so this call
+waits indefinitely. If the provider hangs, each in-flight charge holds a connection until the pool
+is exhausted and unrelated endpoints begin failing.
+
+Evidence: traced `http` to src/lib/http.ts:4 — `axios.create({ baseURL })`, no timeout key.
+Grepped `timeout` in src/lib/: 0 hits. 3 other call sites share the instance.
+
+Might be wrong if: the deployment sets a proxy-level timeout shorter than the pool's idle limit.
+
+Conflict with documented decision? No.
+```
+
+### Design
+
+| Rank | Location                        | Title                                  | Sev | Cert | Effort | Entry | Theme |
+|------|---------------------------------|----------------------------------------|-----|------|--------|-------|-------|
+| 1    | src/domain/Order.ts:1-40        | Anemic domain model — rules in service | M   | 0.75 | large  | D05   | T2    |
+| 2    | src/domain/pricing.ts:8         | Domain imports Prisma client directly  | H   | 0.85 | medium | D03   | T2    |
+
+Design findings carry no complexity delta and are never `--fix`-eligible. Each must name **the
+change that becomes expensive**, not the principle that is bent.
+
+---
+
+## Section 4 — Documented-Decision Conflicts
 
 If any findings have `respects_documented_decision: false`:
 
@@ -112,7 +195,25 @@ If any findings have `respects_documented_decision: false`:
 
 If empty, render `## ⚠ Documented-Decision Conflicts\n\nNone — all findings respect documented architecture decisions.`
 
-## Section 4 — Suggested Next Actions
+## Section 5 — Scanner Conflicts
+
+Rendered only when `arch-simplification` and `arch-robustness` disagree about the same location —
+S06 wants a check deleted, an `E` entry wants one added.
+
+```
+## ⚠ Scanner Conflicts
+
+Two scanners reached opposite conclusions about the same code. One of them missed a suppression;
+which one is a judgment call, so both readings are shown unresolved.
+
+| Location            | Simplification says          | Robustness says                     |
+|---------------------|------------------------------|-------------------------------------|
+| src/api/parse.ts:31 | S06 — type proves non-null   | E01 — input crosses a trust boundary |
+```
+
+If empty, omit the section entirely (unlike Section 4, which always renders).
+
+## Section 6 — Suggested Next Actions
 
 ```
 ## Suggested Next Actions
@@ -153,6 +254,10 @@ Deletion totals (from Simplification dimension):
 - total_lines_deletable: 184
 - files_affected: 22
 - breakdown by category: S01 (5 findings, 78 lines), S02 (3 findings, 42 lines), S06 (8 findings, 45 lines), ...
+
+Catalog gap proposals (from scanners, for review — not findings):
+- arch-refactors: "repeated manual null-coalescing chain", 7 occurrences, proposed R15.
+- (render `none` when no scanner returned any)
 
 Findings filtered:
 - Dropped 7 refactor findings that reduced neither cyclomatic nor cognitive complexity (sanity gate)

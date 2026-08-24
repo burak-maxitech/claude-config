@@ -227,7 +227,15 @@ After all five subagents return:
    `lines_deletable >= 1` (the subagent already enforces this).
 2. **Certainty gate** — drop findings with `certainty < 0.5` unless `severity = high` OR `lines_deletable >= 20`. Big deletions earn a pass through the certainty filter so user can review even uncertain large wins.
 3. **Deduplicate** — if two subagents report the same location, merge into one finding with both perspectives. Common overlap: `arch-refactors` R03 (flag arg) and `arch-simplification` S03 (always-same param) — keep one with the higher rank score.
-4. **Rank score** — `severity_weight × certainty / effort_weight` where severity {low: 1, medium: 2, high: 4} and effort {trivial: 1, small: 2, medium: 4, large: 8}. For simplification findings, also factor `log(lines_deletable + 1)` into the score so big deletions float up.
+4. **Rank score** — `severity_weight × certainty × leverage / effort_weight` where severity
+   {low: 1, medium: 2, high: 4} and effort {trivial: 1, small: 2, medium: 4, large: 8}. For
+   simplification findings, also factor `log(lines_deletable + 1)` so big deletions float up.
+
+   **`leverage = 1 + churn_norm + fan_in_norm`** for the finding's file, both normalized 0..1
+   across the scope (Step 3 computes them — see `references/scale-strategy.md`). A CCN-30 function
+   nobody touches is not the problem; a CCN-15 function changed 40 times in 90 days and imported by
+   30 modules is. Without this term the ranking treats a leaf utility and a load-bearing module
+   identically, which is the difference between a linter's output and an architecture review's.
 5. **Aggregate lines_deletable totals** — sum across all simplification findings (and any other findings reporting `lines_deletable > 0`). Track distinct files affected. These are the top-line numbers in Section 0 of the report.
 
 5b. **Collect suppressions** — `arch-simplification` returns `s01_suppressed` (Dependency
@@ -241,6 +249,29 @@ After all five subagents return:
    - **Strategic refactors** — high severity, effort ∈ {medium, large}
    - **Documented-decision conflicts** — `respects_documented_decision == false`, regardless of dimension. Separate section, requires user confirmation. (Especially important for simplification: documented "we keep this abstraction for X" must override deletion suggestions.)
    - **Performance suspects** — `dimension == performance` AND `certainty < 0.7`. Framed as "measure, don't refactor blindly."
+   - **Scanner conflicts** — the same location where `arch-simplification` wants to delete a check
+     and `arch-robustness` wants one added (S06 vs an `E` entry). Both readings surface together;
+     the orchestrator does **not** silently pick a winner. One of the two scanners missed a
+     suppression, and which one is a judgment the user should see.
+
+7. **Synthesize themes.** The report opens with a judgment, not a list. After ranking:
+
+   1. **Cluster** the surviving findings three ways — by shared module or directory prefix, by
+      shared layer-boundary crossing (from Step 1), and by shared root mechanism (same catalog
+      family, e.g. four `E` findings that are all "the shared HTTP client is unconfigured").
+   2. **A theme requires ≥3 findings drawn from ≥2 dimensions.** This threshold is what stops a
+      theme from being one scanner's output relabelled. A cluster of 5 findings all from
+      `arch-simplification` is not a theme — it is a well-ranked table.
+   3. **Rank themes** by summed rank score of their members; take the **top 3**.
+   4. Each theme renders three things: a **one-sentence thesis** naming the structural cause, the
+      **evidence set** (its member findings, by location), and the **single highest-leverage first
+      move** — one action, not a list.
+   5. **Findings in no theme are not dropped.** They render below, in the per-dimension tables,
+      exactly as before. Theming reorganizes the top of the report; it never filters it.
+
+   If fewer than 3 themes clear the bar, render the ones that do and say so. If none do, say
+   **"No cross-cutting themes — findings are independent"** and go straight to the tables. That is
+   a real and useful result: it means the codebase has no systemic problem, only local ones.
 
 ---
 
@@ -248,16 +279,27 @@ After all five subagents return:
 
 Read `references/report-template.md` for exact formatting. The shape:
 
-0. **Top-line metric** — "Code we can delete: N lines across M files" (from Step 5 aggregation). This is the first line of the report, before the architecture map. Makes "least amount of code" a primary signal.
-1. **Architecture Map** (lightweight by default; full ASCII dep graph behind `--map`)
-   - Detected layers (from Step 1) + observed file/dir tree alignment
-   - Complexity heatmap: top 10 hotspots by current CCN with file:line and CCN value
-2. **Findings** — four subsections in the template's order (Simplification first — deletion-first — then Structure / Refactors / Performance), each ordered by rank score. CCN delta column (`current → projected`, Δ) for refactors. `Lines Δ` column for simplification.
-3. **Documented-Decision Conflicts** — separate, prefixed with "**Confirm intent before action:**"
-4. **Suggested Next Actions**
+0. **The read** — the top 3 architectural themes from Step 5.7, each with its thesis, evidence set,
+   and first move. This is the **first thing in the report**, before any metric or table. A
+   quarterly architecture review's value is its point of view; the tables are the supporting
+   material.
+1. **Top-line metrics** — "Code we can delete: N lines across M files", complexity hotspot count,
+   robustness findings by category (`C`/`E`/`X`), performance suspects to measure.
+2. **Architecture Map** (lightweight by default; full ASCII dep graph behind `--map`)
+   - Detected or inferred layers (from Step 1 / Step 5b) + observed file/dir tree alignment
+   - Complexity heatmap: top 10 hotspots by `max(CCN, cognitive)`, both scores shown
+3. **Findings** — six subsections in the template's order (Simplification first — deletion-first —
+   then Robustness / Structure / Design / Refactors / Performance), each ordered by rank score.
+   CCN **and** cognitive delta columns for refactors. `Lines Δ` for simplification. Category
+   (`C`/`E`/`X`) for robustness.
+4. **Documented-Decision Conflicts** — separate, prefixed with "**Confirm intent before action:**"
+5. **Scanner Conflicts** — S06-vs-`E` collisions, both readings shown, unresolved by design
+6. **Suggested Next Actions**
    - Skill chains: e.g. "If many `Unused module` candidates appeared, run `/bx:clean` first and rerun this."
-   - Copy-pasteable `/bx:plan <brief>` snippets for top 3 strategic refactors
-5. **Footer** — disclosure: linter used (or "heuristic"), files scanned, files sampled vs skipped, deletion totals
+   - Copy-pasteable `/bx:plan <brief>` snippets for the top 3 strategic refactors
+7. **Footer** — disclosure: both complexity tools (or "heuristic"), files scanned, files sampled vs
+   skipped, deletion totals, **suppression counts** (S01/S06 — mandatory even at zero), and any
+   `catalog_gap_proposals` the scanners returned
 
 ---
 

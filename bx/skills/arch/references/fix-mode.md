@@ -12,6 +12,12 @@ A finding is `--fix-eligible` only if **all** are true:
 4. `respects_documented_decision: true`
 5. `certainty >= 0.7`
 
+**No `D`, `C`, `E`, or `X` finding is ever eligible**, regardless of the five conditions above.
+Design findings are cross-file by nature. Robustness findings — adding an `await`, a timeout, a
+lock, a `finally` — change *runtime behavior* in ways a diff preview cannot show, and this mode
+runs no tests afterward (see "What this mode does NOT do"). A wrong timeout or a misplaced `await`
+is a production incident, not a style regression. They all route to `--plan`.
+
 **Simplification findings (S-prefix)** that *are* fix-eligible:
 
 - **S04** when the unread config key lives in a single file (typical for ad-hoc constants in `config.ts`); auto-routes to `--plan` when key spans multiple env files.
