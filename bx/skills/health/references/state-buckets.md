@@ -83,7 +83,7 @@ Skip `/code-review ultra` for trivial PRs — the cloud cost and 10–20 min wai
 
 Why this order:
 - `/bx:clean` first deletes whole files/deps that are dead — cleaner signal for everything downstream.
-- `/bx:arch` then audits the *remaining* code for structural complexity, refactor opportunities, perf suspects, and over-engineering.
+- `/bx:arch` then audits the *remaining* code across six dimensions — structural complexity (cyclomatic and cognitive), OO/SOLID design principles, refactor opportunities, over-engineering, robustness (thread safety, error safety, scalability), and perf suspects.
 - `/bx:tests` audits the test suite itself — coverage gaps in critical code AND wasteful/redundant tests. Run after the structural audits so coverage gaps are measured against post-cleanup code.
 - `/bx:seo` *(web projects only)* audits SEO + Generative Engine Optimization with fresh fetched best practices. Run after structural cleanup so the SEO scan reflects the post-cleanup site. Score is tracked over time in `docs/seo-history.md`.
 - `/bx:arch --plan` turns findings into phased work.
@@ -94,7 +94,7 @@ Why this order:
 /bx:arch (default mode, no --plan, no --fix)
 ```
 
-The default `/bx:arch` report includes a "Code we can delete: N lines" top-line metric and ranks findings by quick-wins. Pick one and act on it; come back another day for the full flow.
+The default `/bx:arch` report opens with **the top 3 architectural themes** — each a one-sentence thesis, its evidence, and a single highest-leverage first move. That is the 30-minute read: take one theme's first move. Below it sit the top-line metrics ("Code we can delete: N lines") and the full per-dimension tables if you want to go deeper.
 
 ---
 
@@ -144,7 +144,7 @@ Build the doc surface first; everything downstream is easier with it.
 ```
 
 Why:
-- `/bx:arch` is the highest-signal entry point when nothing is on fire — it surfaces deletions, refactors, and perf wins ranked by impact. Use `/bx:tests` instead when the test suite specifically is what you want to invest in (coverage gaps in critical code + redundant/wasteful tests). When `is_web: true`, `/bx:seo` is also a strong inline option — SEO/GEO findings tend to deliver visible business impact (search ranking, AI citation) and the skill tracks scores over time in `docs/seo-history.md` so progress compounds across runs.
+- `/bx:arch` is the highest-signal entry point when nothing is on fire — it surfaces deletions, design-principle and robustness defects (races, missing timeouts, unbounded queries), refactors, and perf wins, ranked by impact × churn × fan-in, and opens with the top 3 architectural themes so "pick one finding" can instead be "take one theme's first move". Use `/bx:tests` instead when the test suite specifically is what you want to invest in (coverage gaps in critical code + redundant/wasteful tests). When `is_web: true`, `/bx:seo` is also a strong inline option — SEO/GEO findings tend to deliver visible business impact (search ranking, AI citation) and the skill tracks scores over time in `docs/seo-history.md` so progress compounds across runs.
 - When `is_web: true` and the user's improvement appetite is *visual* rather than structural — "the app works but looks dated" — route to `/bx:webdesign` instead of the audit chain. It re-skins the site's design via Google Stitch as a self-contained pipeline (extract → design → inject/verify) on a dedicated `webdesign/<date>` branch with rollback. It replaces the whole flow above (no `/bx:plan` step needed — it plans internally), and it needs a one-time Stitch MCP + `stitch-skills` setup, so flag that prerequisite when recommending it to someone who hasn't run it before.
 - Pick **one** finding (don't try to do them all).
 - `/bx:plan` to scope the change before writing code.
