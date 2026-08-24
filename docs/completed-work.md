@@ -244,3 +244,8 @@
 - [x] `/bx:arch` review depth v2 — 8 phases, 23 → 54 catalog entries, 5th scanner, calibrated finding contract, thesis-first report (v2.3.0, `ed708e3`..`7afd51f`)
 - [x] Six blind-rehearsal waves across three instruction surfaces; residual recorded in the design spec
 - [x] Pushed `97c6e22..7afd51f` (16 commits) to origin/main
+- [x] `/bx:arch` dogfooded end-to-end (Next Steps #1, open since S46) — 4 skill defects found and fixed
+- [x] `/bx:evolve` full run; watermark released 2.1.228 → 2.1.241 after a freeze held since S53
+- [x] S37 install-smoke-test leftover closed — `claude plugin validate --strict` wired into `/bx:save` Part 8
+- [x] First real archive rotation (`docs/key-decisions.md` 100k → 49k, volume 1 written)
+- [x] Eight plugin versions shipped and pushed: v2.2.0 → v2.6.0

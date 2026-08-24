@@ -8,13 +8,13 @@ Last Updated: 2026-08-24 (Session 58)
 
 | Area | Status |
 |------|--------|
-| Skills (11) | Complete |
+| Skills (11) | Complete — `/bx:arch` and `/bx:evolve` dogfooded end-to-end S58 |
 | Subagents (20) | Complete — `arch-robustness` added S58 |
-| Plugin packaging (`bx`) | **v2.3.0 pushed S58**; `/plugin update bx` not yet run locally, install smoke-test + symlink retirement still pending |
+| Plugin packaging (`bx`) | **v2.6.0 pushed S58**; install smoke-test now automated (Part 8 step 2b, `claude plugin validate --strict`). Local cache on 2.5.1 — `/plugin update bx` needed. Symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate still pending |
 | Cross-platform setup | Complete |
-| GitHub sync | Complete — main pushed through v2.3.0 (`7afd51f`) |
+| GitHub sync | Complete — main pushed through v2.6.0 (`db1f3b5`) |
 | Documentation | Complete — schema v2 |
 
 ## Completed
@@ -35,20 +35,20 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 **S37 plugin packaging leftovers.** Install smoke-test, retire `~/.claude` symlinks, `settings.local.json` `Skill(bx-*)` → `Skill(bx:*)`, launcher-script symlink-check retirement.
 
-**`/bx:arch` review depth v2 shipped, dogfood owed (S58).** Eight phases took the skill from a function-level refactor scanner to a six-dimension architecture review: catalog 23 → 54 entries (D design/SOLID, C concurrency, E error safety, X scalability), a fifth scanner `arch-robustness`, a calibrated finding contract (`finding-rubrics.md` — anchored severity, certainty by evidence class, mandatory `evidence` + `why_this_might_be_wrong`), thesis-first report with theme synthesis, and churn × fan-in in the rank score. Spec: `docs/superpowers/specs/2026-08-24-bx-arch-review-depth-design.md`. **Owed:** `/plugin update bx`, then the first end-to-end run — rehearsals prove the instructions are unambiguous, only a real run proves the scanners find anything useful.
+**`/bx:arch` review depth v2 shipped and dogfooded (S58).** Eight phases took the skill from a function-level refactor scanner to a six-dimension architecture review: catalog 23 → 54 entries (D design/SOLID, C concurrency, E error safety, X scalability), a fifth scanner `arch-robustness`, a calibrated finding contract (`finding-rubrics.md` — anchored severity, certainty by evidence class, mandatory `evidence` + `why_this_might_be_wrong`), thesis-first report with theme synthesis, and churn × fan-in in the rank score. Spec: `docs/superpowers/specs/2026-08-24-bx-arch-review-depth-design.md`. **Owed:** `/plugin update bx`, then the first end-to-end run — rehearsals prove the instructions are unambiguous, only a real run proves the scanners find anything useful.
 
 ## Next Steps
 
-1. **`/plugin update bx`, then dogfood `/bx:arch` end-to-end** — v2.3.0 is pushed but the local cache still runs 2.1.1, so none of this session's work is live. The skill has never run; this is now worth more than another rehearsal round.
+1. **`/plugin update bx`** — main is on v2.6.0, the local cache on 2.5.1, so Part 8's new `claude plugin validate` step is not live yet.
 2. **Doc tiering — decision pass on the `/doctor` findings (S59)** — spec drafted at [superpowers/specs/2026-08-24-bx-doc-tiering-design.md](superpowers/specs/2026-08-24-bx-doc-tiering-design.md); status Draft, 8 decisions open, nothing implemented. Field evidence from a `/doctor` run on a repo that uses `/bx:save` every session: CLAUDE.md at 31.1k chars (2.6× the 12k soft cap) with `## Known Issues / Blockers` at 48% of it — the one required section with no cap, no shrinker and no archive destination. Recommended split: ship the Known Issues governor + relocate-don't-delete + the derivable-content clause first; hold the `.claude/rules/` path-scoped tier behind a second gate. Pairs with #5.
 3. **Finish the `cc` session naming/coloring rollout (S55)** — run the live gate, then dispatch the single fix wave listed in `## In Progress`.
 4. **Doc-schema v2 fixture verification** — the deferred live `/bx:save` runs against the six fixture cases (see `## In Progress`), plus the post-merge minors batch from both plans.
 5. **/simplify follow-up: move Part 7.7 rotation out of Part 7** into its own sibling Part — deletes the five "except 7.7" carve-outs; requires a blind rehearsal before shipping (deliberately skipped S57). The S59 spec's D4 proposes a Part 7.9 sibling on the same reasoning — do these together.
 6. **Resume the `/bx:webdesign` kaanarik run past review** — push through Phase 3 inject+verify; verify finding `dadac845`.
 7. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
-8. **Dogfood `/bx:tests`, `/bx:arch`, `/bx:health`** — hardened S46, never run end-to-end.
+8. **Dogfood `/bx:tests` and `/bx:health`** — hardened S46, still never run end-to-end. `/bx:arch` and `/bx:evolve` were dogfooded S58 and each produced real skill defects on the first run; expect the same here.
 9. **S37 plugin-packaging leftovers** — install smoke-test, symlink retirement, `Skill(bx-*)` → `Skill(bx:*)`.
-10. **`/bx:evolve` follow-ups** — scan-docs allowlist candidate (`auto-mode-config`); 14 open findings; v2 ideas (shared `references/lane-contract.md`).
+10. **`/bx:evolve` follow-ups** — fix Step 3.4's missing `applied` branch and store `source_excerpt` alongside the hash; stabilise the `bx:pain/<slug>` derivation. 18 open findings, incl. three fresh: `df34007f` (`/plugin install` auto-refresh — check whether `update` behaves the same before touching docs), `59d3bdac` (background-by-default dispatch — this run corroborated bx's fan-outs still block, so it is a documentation gap not a break), `3dd5decb` (`/code-review` ladder, predicted to reject as already-covered). Also: scan-docs allowlist candidate (`auto-mode-config`); shared `references/lane-contract.md`.
 11. **`/bx:seo` deferred items** — code-review leftovers (#5/#6/#7) + S25/S27/S29 refactors.
 
 ## Session History
@@ -56,8 +56,8 @@ See [completed-work.md](completed-work.md) for full checklist.
 > Full history: [session-history.md](session-history.md)
 
 ### Last Session (Session 58) - 2026-08-24
-- **Recovered S58 state after a Claude outage**, then swept the class the S58 `/bx:evolve` run had flagged and left open: v2.1.233 removed the task-tracker tools from the default toolset, and five skills promised behavior that could not run. New canonical owner `save/references/task-tools.md` + a degraded path per skill; tracker paths demoted, never deleted (**v2.2.0**).
-- **`/bx:arch` review depth v2 (v2.3.0)** — ran through `/bx:plan`, 8 phases. Fixed three rules that made architecture *worse* (S01 deleting Dependency Inversion, S06 deleting trust-boundary validation, a CCN-only gate deleting its own catalog's quick wins), then added the three dimensions with zero coverage: SOLID/OO, thread safety, error safety, scalability. Catalog 23 → 54 entries; fifth scanner `arch-robustness`; report now opens with a thesis, not six tables.
-- **Calibrated the finding contract** — five scanners were scoring severity/certainty against no rubric while the orchestrator gated, ranked and grouped on those numbers. `finding-rubrics.md` is the canonical owner; `evidence` and `why_this_might_be_wrong` are now mandatory on every finding.
-- **Six blind-rehearsal waves; the ≤2 bar was not met and is recorded as such.** The rehearsals caught what readings could not: a theme rule whose own worked example could never satisfy it, a dedup rule *introduced by a previous wave* that collapsed six distinct defects into one, and a trace rule that made the scanner silently withhold every missing-timeout finding on an unresolvable import.
-- **Pushed** `97c6e22..7afd51f`, 16 commits, both versions. `/plugin update bx` and the first end-to-end `/bx:arch` run are owed.
+- **Recovered an outage-truncated session**, then swept the class its `/bx:evolve` run had flagged and left open: v2.1.233 removed the task-tracker tools from the default toolset and five skills promised behaviour that could not run. Canonical owner `task-tools.md` + a degraded path per skill (**v2.2.0**).
+- **`/bx:arch` review depth v2 (v2.3.0)** — 8 phases via `/bx:plan`. Fixed three rules that made architecture *worse* (S01 deleting Dependency Inversion, S06 deleting trust-boundary validation, a CCN-only gate deleting its own catalog's quick wins), then added the dimensions with zero coverage. Catalog 23 → 54; fifth scanner `arch-robustness`; calibrated finding contract; report opens with a thesis.
+- **First end-to-end dogfood found four skill defects** (**v2.4.0**) that six rehearsal waves could not — rehearsals feed scanners synthetic findings, so an empty category and an inverted trust flag are structurally invisible. Applied its four fix-eligible code findings (**v2.4.1**), then the remaining four (**v2.5.0–v2.5.1**).
+- **Both concurrency fixes were wrong until executed.** A 100ms backoff let 8 racers exceed a 5s cap and collide anyway; a defensive stale-reap destroyed *live* locks. Verified by measurement: 5/5 trials 8-way distinct, and 10-of-12 lost updates without the Python lock vs 12/12 with it.
+- **`/bx:evolve` full run released the watermark** (2.1.228 → 2.1.241, frozen since S53) and applied `claude plugin validate` into `/bx:save` Part 8 (**v2.6.0**), closing the S37 install-smoke-test leftover. Its own first run exposed a Step 3.4 branch that does not exist.
