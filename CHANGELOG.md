@@ -2,6 +2,29 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.6.0 — 2026-08-24
+
+### Added
+
+- **`/bx:save` Part 8 now runs the official plugin smoke test** (`/bx:evolve` finding `b5659902`,
+  docs lane). After the version bump and before the commit, step 2b runs
+  `claude plugin validate ./bx --strict` plus `claude plugin validate .` for the root marketplace
+  manifest. `--strict` is deliberate at a commit checkpoint: unrecognized frontmatter keys and
+  missing metadata are tolerated by the runtime but are exactly the drift this catches.
+
+  A validation warning is **information, not a veto** — a failure surfaces the output verbatim and
+  asks fix-now-or-commit-anyway rather than blocking on the skill's own judgement. `--silent`
+  reports and commits anyway (its contract is zero prompts, and silently skipping a commit would be
+  worse than committing something that warns). A missing `claude` binary skips silently, so an older
+  harness never fails a save.
+
+  `bx/skills/save/SKILL.md` `allowed-tools` gained `Bash(claude:*)` — without it the new step would
+  prompt on every save, which is the S45 enumeration rule. Dogfooded on itself: bx and the
+  marketplace manifest both pass plain and `--strict`.
+
+  This closes the "install smoke-test" half of the S37 plugin-packaging leftovers, open since
+  Session 37.
+
 ## 2.5.1 — 2026-08-24
 
 ### Fixed

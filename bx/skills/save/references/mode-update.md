@@ -856,6 +856,31 @@ After all documentation updates **and rollups** are complete, remind the user to
 
 1. **Run `git status`** to show all uncommitted files (staged and unstaged)
 2. **Plugin version bump (claude-config repo only — skip silently when `bx/.claude-plugin/plugin.json` doesn't exist).** If any uncommitted file is under `bx/`, the commit MUST also bump `version` in `bx/.claude-plugin/plugin.json` and add a matching entry to the repo-root `CHANGELOG.md` (newest first). The version is the plugin's update cache key: a pushed commit that doesn't bump it is never offered to users — `/plugin update` reports "already at the latest version". Semver: PATCH for fixes and doc corrections, MINOR for a new skill/agent/flag, MAJOR for breaking renames or removed behavior. In `--silent` mode, default to PATCH and derive the CHANGELOG line from the suggested commit message.
+2b. **Validate the plugin (same repo-only condition as step 2 — skip silently when
+   `bx/.claude-plugin/plugin.json` doesn't exist).** After the version bump and before the commit,
+   run the official local smoke test:
+
+   ```
+   claude plugin validate ./bx --strict
+   ```
+
+   `--strict` treats warnings as errors, which is what you want at a commit checkpoint: unrecognized
+   frontmatter keys and missing metadata are tolerated by the runtime but are exactly the drift this
+   step exists to catch. Also validate the marketplace manifest with `claude plugin validate .` when
+   `.claude-plugin/marketplace.json` exists at the repo root.
+
+   - **Passes** → report one line (`plugin validate: passed`) and continue to step 3.
+   - **Fails or warns** → surface the output verbatim and ask whether to fix now or commit anyway.
+     Do NOT block the commit on your own judgement; a validation warning is information for the
+     user, not a veto. In `--silent` mode, report the failure in the run summary and commit anyway —
+     the flag's contract is zero prompts, and silently *skipping* the commit would be worse than
+     committing something that warns.
+   - **Command not found** (older Claude Code, or a non-interactive environment without the CLI on
+     PATH) → skip silently. This step must never fail a save because the harness lacks the command.
+
+   This is the "install smoke-test" half of the S37 plugin-packaging leftovers, closed by
+   `/bx:evolve` finding `b5659902` (docs lane, 2026-08-24).
+
 3. **If there are uncommitted changes:**
    - Show the list of modified/untracked files
    - Suggest a conventional commit message based on what was done this session, e.g.:

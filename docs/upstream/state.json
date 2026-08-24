@@ -1,8 +1,8 @@
 {
   "watermark": {
-    "last_changelog_version": "2.1.228",
-    "docs_checked_at": "2026-08-11",
-    "community_checked_at": "2026-08-11"
+    "last_changelog_version": "2.1.241",
+    "docs_checked_at": "2026-08-24",
+    "community_checked_at": "2026-08-24"
   },
   "decisions": [
     {
@@ -378,6 +378,61 @@
       "class": "breakage",
       "title": "TaskCreate/TodoWrite unavailable by default on Sonnet 5 and newer models (v2.1.233) — /bx:arch --plan promises a 'TaskCreate-ready brief'",
       "note": "APPLIED 2026-08-23 in the same-session --fix pass, both affected files edited (all-or-none per the S45 sibling-echo rule). bx/skills/arch/SKILL.md:101 — the --plan row's 'phased TaskCreate-ready brief' became 'phased brief ready to hand off to /bx:plan'; the env-var caveat was deliberately NOT put in the table cell (a one-cell entry cannot carry it legibly, and the same row already routes the reader to plan-mode.md). bx/skills/arch/references/plan-mode.md:5 — dropped '(or directly to TaskCreate)' from the intro sentence and added a 'Hand-off target' paragraph making /bx:plan the unconditional path and TaskCreate a conditional one, naming the CLAUDE_CODE_ENABLE_TODO_TOOLS=1 gate and the affected model list. The TaskCreate route was demoted, NOT deleted, per the no-remove-manual-steps convention. ORIGINAL FINDING: SCOPED RUN (arch-only; watermark frozen at 2.1.228 per the S53 convention). Changelog lane, severity high, certainty 0.90. v2.1.233 removed TaskCreate/TaskGet/TaskUpdate/TaskList + TodoWrite from the default toolset on Opus 4.8, Sonnet 5, Fable 5, Mythos 5 and newer; CLAUDE_CODE_ENABLE_TODO_TOOLS=1 restores them. Affects bx/skills/arch/SKILL.md:101 ('phased TaskCreate-ready brief' for --plan) and bx/skills/arch/references/plan-mode.md:5 ('or directly to TaskCreate'). ORCHESTRATOR-CORROBORATED LIVE: this very session (Opus 5) has no TaskCreate/TaskList in its toolset — /bx:resume Step 5 task hydration could not run for that reason, so this is observed behavior, not just a release-note inference. Proposed: qualify both sites with the CLAUDE_CODE_ENABLE_TODO_TOOLS=1 gate and demote 'directly to TaskCreate' to a conditional path, making /bx:plan (which owns its own hydration flow) the primary unconditional hand-off. SIBLING-ECHO WARNING (S45): the same TaskCreate assumption likely exists in bx/skills/resume/references/task-hydration.md, bx/skills/save (task drain), bx/skills/plan and bx/skills/clean — OUT OF SCOPE for this arch-scoped run and NOT swept here; a full run must audit them, so do not read a fix of the two arch sites as closing the class. SIBLING SWEEP CLOSED 2026-08-24 (S58 continuation): the class the S45 warning predicted was real and is now swept. Canonical owner created at bx/skills/save/references/task-tools.md (the fact, the availability check, per-skill degraded paths) per the S57 named-owner principle; the five satellites cite it and none restates the version, model list, or env-var name. Sites fixed: bx/skills/tests/SKILL.md:102 (identical 'phased TaskCreate-ready brief' phrasing), bx/skills/plan/SKILL.md + references/plan-and-tasks.md (approved plan document becomes the tracker; per-phase gating kept verbatim), bx/skills/resume/SKILL.md Step 5 + references/task-hydration.md (same selection folded into the Step 4 summary as a numbered list; pre-hydration stale check skipped), bx/skills/save/references/mode-update.md Part 0 + gather list + Save Path step 1 (absent tools == --skip-tasks), bx/agents/save-writer.md:22 (drain may have been skipped). arch's own plan-mode.md paragraph was refactored from a restatement into a citation of the new owner. CORRECTION to the original note's guess: bx/skills/clean has NO task-tool references and needed no change. All 7 cross-skill citations verified to resolve against their skill base directory; assert-doc-schema.sh + check-doc-rule-consistency.sh pass. Shipped in plugin v2.2.0."
+    },
+    {
+      "finding_id": "59d3bdac80106bf6e20bd6b7115e2681cd552e89",
+      "decision": "open",
+      "date": "2026-08-24",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.232",
+      "affected_capability": "bx:skills/agent-dispatch-background-default",
+      "source_content_hash": "",
+      "class": "breakage",
+      "title": "v2.1.232 makes non-teammate Agent spawns background-by-default in interactive sessions; verify bx's synchronous fan-outs still block",
+      "note": "Changelog lane, severity high, certainty 0.65. v2.1.232: subagent forking on by default and non-teammate agent spawns in interactive sessions now run in the background by default. bx dispatches synchronous fan-outs that then consolidate results: /bx:evolve Step 2 (3 lanes), /bx:clean Step 1 (3 cleanup-* agents), /bx:arch Step 4 (5 arch-* agents), /bx:save (save-writer), /bx:tests (3 agents). ORCHESTRATOR-CORROBORATED: this very run dispatched 3 lanes and did receive all 3 results before consolidating, so the wait behavior is intact in practice for Agent-tool dispatch with an explicit subagent_type. Proposed: audit the 4 files matching subagent_type plus the arch/tests/clean fan-outs and state explicitly that the orchestrator awaits all dispatched agents, so the assumption is documented rather than incidental."
+    },
+    {
+      "finding_id": "df34007f15b9ddf028c401c92205d29b40c92a0f",
+      "decision": "open",
+      "date": "2026-08-24",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.232",
+      "affected_capability": "bx:pain/plugin-cache-staleness-skills-run-from-cache-a-bx-push-without-a-version-bump-reaches-no-user",
+      "source_content_hash": "",
+      "class": "opportunity",
+      "title": "/plugin install now refreshes the marketplace first — README/workflow install instructions may be able to drop the manual marketplace-update step",
+      "note": "Changelog lane, severity high, certainty 0.6. Covers /plugin install only, NOT /plugin update. The version-bump-as-cache-key mechanism may still be required for updates. Verify the update path before touching update-side instructions."
+    },
+    {
+      "finding_id": "03c9a5759b41f154e90c83b6283616c734948adc",
+      "decision": "open",
+      "date": "2026-08-24",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.229",
+      "affected_capability": "bx:pain/plugin-cache-staleness-skills-run-from-cache-a-bx-push-without-a-version-bump-reaches-no-user",
+      "source_content_hash": "",
+      "class": "opportunity",
+      "title": "Plugin marketplace `command` sources with mode:link re-resolve per session without a restart",
+      "note": "Changelog lane, severity high, certainty 0.45. Described for a local command printing a plugin directory (e.g. an IDE); may not map onto a git-hosted marketplace like burak-tools. Needs verification before any doc change."
+    },
+    {
+      "finding_id": "3dd5decbd91eb6e396e2c73721795f7a19c3cd56",
+      "decision": "open",
+      "date": "2026-08-24",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.232",
+      "affected_capability": "bx:review/builtin-code-review-ladder",
+      "source_content_hash": "",
+      "class": "best_practice",
+      "title": "/code-review at high/xhigh/max now also runs as a background agent",
+      "note": "Changelog lane, severity low, certainty 0.4. Likely a no-op: the ladder prose was generalized to 'background' when v2.1.218 shipped (finding d1219059..., applied). A near-identical v2.1.218 signal was REJECTED as already-covered (finding 282556d0...); expect the same outcome. Confirm no effort-level-specific synchronous claim survives in the 15 files referencing /code-review."
+    },
+    {
+      "finding_id": "b56599023ccc3b81871106b9b323570f3e98afb7",
+      "decision": "applied",
+      "date": "2026-08-24",
+      "source_url": "https://code.claude.com/docs/en/plugins",
+      "affected_capability": "bx:pain/s37-plugin-packaging-leftovers-install-smoke-test-symlink-retirement",
+      "source_content_hash": "",
+      "class": "opportunity",
+      "title": "`claude plugin validate` is the documented local smoke-test — wire it into /bx:save Part 8 to close the S37 install-smoke-test leftover",
+      "note": "Docs lane, severity medium, certainty 0.6. ORCHESTRATOR-VERIFIED THIS RUN: the command exists (claude plugin validate [--strict] <path>), and bx passes both plain and --strict, as does the marketplace manifest at repo root. Proposed: add a validate step to mode-update.md Part 8 alongside the version bump, surfacing errors/warnings at the commit checkpoint. Closes the install-smoke-test half of the S37 plugin-packaging leftovers open since Session 37. APPLIED 2026-08-24 (same-run --fix): mode-update.md Part 8 gains step 2b — run `claude plugin validate ./bx --strict` after the version bump and before the commit, plus `claude plugin validate .` for the root marketplace manifest. Pass reports one line; fail/warn surfaces output verbatim and asks fix-now-or-commit-anyway (never a veto — a warning is information, not a block); --silent reports and commits anyway since its contract is zero prompts; command-not-found skips silently so an older harness never fails a save. bx/skills/save/SKILL.md allowed-tools gained Bash(claude:*) per the S45 enumeration rule — without it the new step would prompt on every save. Dogfooded on itself: bx and the root marketplace manifest both pass plain and --strict. Shipped in plugin v2.6.0."
     }
   ]
 }
