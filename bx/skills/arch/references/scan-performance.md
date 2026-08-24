@@ -9,6 +9,11 @@ Loaded by the orchestrator and passed to the `arch-performance` subagent. Detail
 - `Tier` — full | bounded | sample
 - `Scope file list` — exact paths to scan
 - `Intended Architecture summary` — 3-5 bullets
+- `Scoring contract` — the full contents of `finding-rubrics.md`. It is the canonical owner
+  of the `severity` / `certainty` / `effort_estimate` anchors and of the two mandatory
+  justification fields, `evidence` and `why_this_might_be_wrong`. Score against it rather than
+  against your own sense of confidence — five scanners never see each other's output, and the
+  orchestrator gates, ranks, and groups on exactly these numbers.
 
 ## Core principle (repeated for emphasis)
 
@@ -124,7 +129,9 @@ If the Intended Architecture summary says "no perf tuning until v2," cap your ou
   "respects_documented_decision": true,
   "recommended_refactor": "Batch fetch permissions for all user IDs once before the loop. Use `findMany({ where: { userId: { in: ids } } })` and convert to a Map for O(1) lookup inside the iteration.",
   "category": "N+1",
-  "is_suspect": false
+  "is_suspect": false,
+  "evidence": "list.ts:41 calls `await db.permission.findMany({where:{userId}})` inside `for (const u of users)`. Read all 3 callers of listUsers — 2 pass an unbounded page result.",
+  "why_this_might_be_wrong": "If the ORM batches within a request context (Prisma's dataloader-style batching is enabled in some setups), the per-item call is already coalesced."
 }
 ```
 

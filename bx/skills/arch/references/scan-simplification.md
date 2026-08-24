@@ -9,6 +9,11 @@ Loaded by the orchestrator and passed to the `arch-simplification` subagent. Det
 - `Tier` — full | bounded | sample
 - `Scope file list` — exact paths to scan
 - `Intended Architecture summary` — 3-5 bullets
+- `Scoring contract` — the full contents of `finding-rubrics.md`. It is the canonical owner
+  of the `severity` / `certainty` / `effort_estimate` anchors and of the two mandatory
+  justification fields, `evidence` and `why_this_might_be_wrong`. Score against it rather than
+  against your own sense of confidence — five scanners never see each other's output, and the
+  orchestrator gates, ranks, and groups on exactly these numbers.
 - `Refactor catalog` — full content of `refactor-catalog.md`. Use only S-prefixed entries. Cite by ID.
 
 ## Approach

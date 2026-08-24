@@ -10,6 +10,11 @@ Loaded by the orchestrator and passed to the `arch-structure` subagent. Detailed
 - `Tier` — full | bounded | sample
 - `Scope file list` — exact paths to scan
 - `Intended Architecture summary` — 3-5 bullets
+- `Scoring contract` — the full contents of `finding-rubrics.md`. It is the canonical owner
+  of the `severity` / `certainty` / `effort_estimate` anchors and of the two mandatory
+  justification fields, `evidence` and `why_this_might_be_wrong`. Score against it rather than
+  against your own sense of confidence — five scanners never see each other's output, and the
+  orchestrator gates, ranks, and groups on exactly these numbers.
 
 ## Step 1 — Run the linter (if available)
 
@@ -133,7 +138,9 @@ If neither, build the graph manually via Grep of imports. Cap analysis depth at 
   "cognitive_current": 41,
   "cognitive_projected": 9,
   "respects_documented_decision": true,
-  "recommended_refactor": "Decompose into 6 named steps per R07; the function fans out into auth, validation, dispatch, persistence, response, error handling — each is a natural extraction boundary."
+  "recommended_refactor": "Decompose into 6 named steps per R07; the function fans out into auth, validation, dispatch, persistence, response, error handling — each is a natural extraction boundary.",
+  "evidence": "Read handler.ts:45-180 in full. 6 blank-line-separated blocks, each with its own early-return. sonarjs reports cognitive 41. Grepped callers of handleRequest: 2 (routes/index.ts:14, test/handler.test.ts:9).",
+  "why_this_might_be_wrong": "If the 6 blocks share more local state than the read suggests, extraction needs a context object and the projected cognitive drop is optimistic."
 }
 ```
 

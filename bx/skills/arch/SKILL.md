@@ -133,7 +133,12 @@ Launch all four subagents in a single turn (one Agent tool call per agent). Mirr
 
 For each subagent, **read its corresponding reference file** (it contains the detailed scan instructions) and pass the contents in the task prompt along with the shared context.
 
-### Shared context to pass to all four subagents:
+**Read `references/finding-rubrics.md` once and pass its full contents to every subagent** as the
+`Scoring contract` block below. It is the canonical owner of the severity / certainty / effort
+anchors and the two mandatory justification fields. Do not paraphrase it per-agent — five agents
+scoring against five paraphrases is the problem it exists to solve.
+
+### Shared context to pass to all subagents:
 
 ```
 Detected stack: <from Step 0>
@@ -147,13 +152,17 @@ Intended Architecture summary:
 
 Findings format: structured JSON-like blocks. Do NOT format a final report — return raw findings only.
 
+Scoring contract: <full contents of references/finding-rubrics.md>
+
 Each finding must include:
-  dimension: structure | refactor | performance | simplification
+  dimension: structure | refactor | performance | simplification | design | robustness
   location: <path>:<line-range>
   title: <one-line>
-  severity: low | medium | high
-  certainty: 0.0–1.0
+  severity: low | medium | high          (anchors: scoring contract)
+  certainty: 0.0–1.0                     (evidence class: scoring contract)
   effort_estimate: trivial | small | medium | large
+  evidence: <the work behind the certainty band — quoted lines, grep counts, call sites>
+  why_this_might_be_wrong: <one sentence, specific to this finding>
   ccn_current: <int or null>
   ccn_projected: <int or null>
   cognitive_current: <int or null>
