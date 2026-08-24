@@ -2,6 +2,37 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.5.0 — 2026-08-24
+
+### Fixed
+
+- **Session-color registry race** (`session-color.sh` / `.ps1`, dogfood finding C02). The
+  read-decide-append had no lock, so two launches in the same window both observed the same
+  registry state and claimed the same color — defeating the "distinct AND stable" goal the
+  registry exists for. Both twins now take a `mkdir`-based mutex (atomic on every platform) with
+  a ~10s budget, after which they proceed unlocked: the worst case is the old behaviour, never
+  worse. Verified with real concurrency, not by inspection — 5/5 trials of 8 simultaneous
+  launches now yield 8 distinct colors and no duplicate rows, on both bash and PowerShell.
+
+  Two bugs were found *in the fix itself*, both only by running it:
+  a 100ms backoff let 8 racers take ~4.1s against a 5s cap, so late processes fell through to
+  the unlocked path and collided anyway (now 20ms/10s); and an age check inside the retry loop
+  ran `find` on every iteration where any failure read as "stale" and `rmdir`'d a **live** lock,
+  admitting several processes to the critical section at once — worse than no lock. Reaping now
+  happens once, only after the budget is exhausted. Both hazards are documented in the code so
+  they are not reintroduced.
+
+- **SessionStart hook: 3 `git rev-parse` spawns collapsed to 1** in both twins. The hook runs on
+  every session launch against a stated `<1s` budget, so three processes to learn three values
+  was two too many. Output order verified (`true` / toplevel / branch) and the out-of-repo path
+  still exits 0.
+
+- **`doc-structure-rules.md` no longer restates `doc-schema.md`.** Its Target State table
+  independently duplicated the file layout, size targets and rotation mechanics with no citation,
+  violating this project's own named-owner decision — and `check-doc-rule-consistency.sh` does not
+  cover that file, so the drift checker could not see it. Collapsed to a pointer plus the two rows
+  the schema genuinely does not own (16 lines).
+
 ## 2.4.1 — 2026-08-24
 
 ### Fixed

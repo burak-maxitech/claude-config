@@ -13,7 +13,49 @@ function Get-CcSessionColorRegistryPath {
     Join-Path $env:USERPROFILE '.claude\cc-session-colors'
 }
 
+# Serialise the whole read-decide-append below. Two launches racing here both
+# observe the same registry state and both claim the same color, defeating the
+# "distinct AND stable" goal the registry exists for. Creating a directory is
+# atomic, so it is the portable mutex  -  mirrors session-color.sh exactly.
+#
+# A launch is never blocked: after ~10s we proceed unlocked, which is the old
+# behaviour, so the worst case is the status quo and never worse. Do NOT add an
+# age check inside the retry loop  -  one that fails for any reason reads as
+# "stale" and deletes a LIVE lock, which is worse than having no lock at all.
 function Get-CcSessionColor {
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectName,
+        [string]$RegistryPath
+    )
+
+    if (-not $RegistryPath) { $RegistryPath = Get-CcSessionColorRegistryPath }
+
+    $lock = "$RegistryPath.lock"
+    $lockDir = Split-Path $lock -Parent
+    if ($lockDir -and -not (Test-Path -LiteralPath $lockDir)) {
+        try { $null = New-Item -ItemType Directory -Path $lockDir -Force -ErrorAction Stop } catch { return $null }
+    }
+    $waited = 0
+    while ($true) {
+        try { $null = New-Item -ItemType Directory -Path $lock -ErrorAction Stop; break }
+        catch {
+            $waited++
+            if ($waited -gt 500) {
+                Remove-Item -LiteralPath $lock -Recurse -Force -ErrorAction SilentlyContinue
+                try { $null = New-Item -ItemType Directory -Path $lock -ErrorAction Stop } catch { }
+                break
+            }
+            Start-Sleep -Milliseconds 20
+        }
+    }
+    try {
+        return Get-CcSessionColorUnlocked -ProjectName $ProjectName -RegistryPath $RegistryPath
+    } finally {
+        Remove-Item -LiteralPath $lock -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Get-CcSessionColorUnlocked {
     param(
         [Parameter(Mandatory = $true)][string]$ProjectName,
         [string]$RegistryPath

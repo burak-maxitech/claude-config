@@ -2,21 +2,17 @@
 
 ## Target State
 
-All projects should have this documentation system:
+The canonical layout — CLAUDE.md, `docs/STATUS.md`, the three history archives, `docs/archive/`
+rotation, and the size targets for each file — is defined in [doc-schema.md](doc-schema.md), which
+**owns** it. Read that file for the schema. Do not restate it here: a second uncited copy is exactly
+the drift this project's own named-owner decision exists to prevent.
+
+Two files the schema does not cover:
 
 | File | Location | Purpose | Audience |
 |------|----------|---------|----------|
 | **README.md** | Root | Public overview, setup guide, quick reference | Developers, new team members |
-| **CLAUDE.md** | Root | Always-loaded instructions (~7k chars): overview, decisions, blockers | AI coding assistants |
-| **docs/STATUS.md** | docs/ | Session state read on demand by /bx:resume (~10k chars) | AI coding assistants |
 | **docs/*.md** | docs/ | PRD, specifications, detailed documentation | Detailed implementation reference |
-| **docs/completed-work.md** | docs/ | Full completed task checklist (overflow from CLAUDE.md) | Reference |
-| **docs/key-decisions.md** | docs/ | Full decision log (overflow from CLAUDE.md) | Reference |
-| **docs/session-history.md** | docs/ | Detailed session logs archive (overflow from CLAUDE.md) | Reference |
-| **docs/architecture.md** | docs/ | Architecture detail moved out of CLAUDE.md | Reference |
-| **docs/archive/** | docs/ | Rotated archive volumes (`<name>-<K>.md`) written by `/bx:save` Part 7.7 when a history archive exceeds 100k chars. Read by nothing automatic — grep on demand. | Reference |
-
-**Size targets:** CLAUDE.md ~7k chars; docs/STATUS.md ~10k chars. When either grows, offload detail to the reference files and keep summaries + links.
 
 ## Handling docs/ Folder
 

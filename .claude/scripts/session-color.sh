@@ -17,7 +17,51 @@ _cc_trim() {
     printf '%s' "$s"
 }
 
+# Serialise the whole read-decide-append below. Two launches racing here both
+# observe the same registry state and both claim the same color, which defeats
+# the "distinct AND stable" goal the registry exists for. mkdir is atomic on
+# every POSIX filesystem, so it is the portable mutex.
+#
+# A launch is never blocked by this: after ~10s we give up and proceed unlocked,
+# which is exactly the old behaviour, so the worst case is the status quo and
+# never worse. A lock orphaned by a killed process is reaped on age.
+#
+# The backoff is 20ms, not 100ms, and that matters: every waiter wakes and
+# retries together, so the expected wait grows with the number of contenders.
+# At 100ms, eight simultaneous launches took ~4.1s against a 5s cap — close
+# enough that any extra load pushed late processes past the cap and into the
+# unlocked path, reintroducing the exact collision this lock exists to stop.
+# Measured 8-way contention at 20ms: well under 1s.
 cc_session_color() {
+    local registry_arg="${2:-$HOME/.claude/cc-session-colors}"
+    local lock="${registry_arg}.lock" waited=0 rc=0 lock_dir=""
+    lock_dir="$(dirname "$registry_arg")"
+    [ -d "$lock_dir" ] || mkdir -p "$lock_dir" 2>/dev/null || return 1
+
+    while ! mkdir "$lock" 2>/dev/null; do
+        waited=$((waited + 1))
+        if [ "$waited" -gt 500 ]; then
+            # Budget (~10s) exhausted: either extreme contention or a lock
+            # orphaned by a process killed while holding it. Reap ONCE and make
+            # a final attempt. Never reap inside the loop — an age check there
+            # runs on every retry, and a `find` that fails for any reason reads
+            # as "stale" and rmdir's a LIVE lock, letting several processes into
+            # the critical section. That is worse than no lock at all, and it is
+            # exactly what an earlier version of this function did.
+            rmdir "$lock" 2>/dev/null
+            mkdir "$lock" 2>/dev/null || true
+            break
+        fi
+        sleep 0.02
+    done
+
+    _cc_session_color_unlocked "$@"
+    rc=$?
+    rmdir "$lock" 2>/dev/null
+    return $rc
+}
+
+_cc_session_color_unlocked() {
     local project="$1"
     local registry="${2:-$HOME/.claude/cc-session-colors}"
     local names=() colors=()

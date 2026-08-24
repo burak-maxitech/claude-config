@@ -26,18 +26,23 @@ fi
 
 # Only emit context inside a git repo. If we're not in one, the user is probably
 # in their home dir or a one-off chat — no project orientation to emit.
-if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  exit 0
-fi
+# One rev-parse for all three facts. This hook runs on every session launch with
+# a <1s budget, so three process spawns to learn three values is two too many.
+git_facts="$(git rev-parse --is-inside-work-tree --show-toplevel --abbrev-ref HEAD 2>/dev/null)" || exit 0
+[ "$(printf '%s
+' "$git_facts" | sed -n 1p)" = "true" ] || exit 0
 
-repo_root="$(git rev-parse --show-toplevel)"
+repo_root="$(printf '%s
+' "$git_facts" | sed -n 2p)"
 repo_name="$(basename "$repo_root")"
 
 echo "## Project orientation: $repo_name"
 echo ""
 
 # Branch + uncommitted files
-branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+branch="$(printf '%s
+' "$git_facts" | sed -n 3p)"
+[ -n "$branch" ] || branch=unknown
 dirty_count="$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
 last_commit_age="$(git log -1 --format=%cr 2>/dev/null || echo unknown)"
 echo "- Branch: \`$branch\` · $dirty_count uncommitted files · last commit $last_commit_age"

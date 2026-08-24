@@ -20,17 +20,19 @@ if ($env:CLAUDE_ENV_FILE) {
 }
 
 # Only emit context inside a git repo
-$null = git rev-parse --is-inside-work-tree 2>$null
-if ($LASTEXITCODE -ne 0) { exit 0 }
+# One rev-parse for all three facts. This hook runs on every session launch with
+# a <1s budget, so three process spawns to learn three values is two too many.
+$gitFacts = @(git rev-parse --is-inside-work-tree --show-toplevel --abbrev-ref HEAD 2>$null)
+if ($LASTEXITCODE -ne 0 -or $gitFacts.Count -lt 3 -or $gitFacts[0] -ne 'true') { exit 0 }
 
-$repoRoot = git rev-parse --show-toplevel 2>$null
+$repoRoot = $gitFacts[1]
 $repoName = Split-Path $repoRoot -Leaf
 
 Write-Output "## Project orientation: $repoName"
 Write-Output ""
 
 # Branch + uncommitted files
-$branch = (git rev-parse --abbrev-ref HEAD 2>$null)
+$branch = $gitFacts[2]
 if (-not $branch) { $branch = 'unknown' }
 $dirtyCount = (git status --porcelain 2>$null | Measure-Object -Line).Lines
 $lastCommitAge = git log -1 --format=%cr 2>$null
