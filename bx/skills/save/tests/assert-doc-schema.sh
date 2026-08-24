@@ -158,12 +158,8 @@ if [ -n "$BEFORE" ] && [ -f "$BEFORE" ]; then
                 [ -f "$REPO/docs/architecture.md" ] || missing="$missing '$h'"
                 continue ;;
             "## Environment Variables")
-                if [ "$env_populated" -eq 1 ]; then
-                    if [ -f "$CLAUDE_MD" ] && grep -qxF "$h" "$CLAUDE_MD"; then
-                        :
-                    else
-                        missing="$missing '$h'"
-                    fi
+                if [ "$env_populated" -eq 1 ] && { [ ! -f "$CLAUDE_MD" ] || ! grep -qxF "$h" "$CLAUDE_MD"; }; then
+                    missing="$missing '$h'"
                 fi
                 continue ;;
         esac

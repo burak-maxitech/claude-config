@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "bx",
   "displayName": "bx — Burak's Engineering Toolkit",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "Burak's personal engineering toolkit — code review, architecture audit, test audit, SEO/GEO audit, cleanup, health routing, planning, session resume, and docs management. Skills invoke as /bx:<name>.",
   "author": {
     "name": "Burak Arık"

@@ -2,6 +2,24 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.4.1 — 2026-08-24
+
+### Fixed
+
+- **`/bx:arch --fix` pass over its own dogfood findings** (behavior-preserving refactors,
+  verified rather than assumed):
+  - `gsc-parse-helper.py`: extracted `_threshold_status(b, c, invert=False)` from
+    `_watchpoint_status`'s three near-identical threshold blocks (CCN 18 → 7, cognitive
+    20 → 8) and `_median_ctr(rows)` from its two verbatim copies; `detect_brand_anomaly`'s
+    two filter loops became comprehensions (CCN 5 → 3, cognitive 6 → 1). Equivalence proven
+    against the pre-refactor semantics across 162 threshold cases (both `invert` directions,
+    including every `b <= 0` edge) and 11 median sizes: 0 mismatches.
+  - `assert-doc-schema.sh`: flattened a 4-level nested guard in the `## Environment Variables`
+    arm (CCN 3 → 3 unchanged, cognitive 8 → 4) — the R01 shape the dual-metric gate exists to
+    preserve. The De Morgan inversion was exercised in all three directions with a purpose-built
+    fixture: populated+present passes, populated+missing fails correctly, unpopulated+missing
+    passes (the deliberate drop exception). All 10 doc-schema fixtures still pass.
+
 ## 2.4.0 — 2026-08-24
 
 ### Fixed

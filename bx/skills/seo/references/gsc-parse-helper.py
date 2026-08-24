@@ -543,6 +543,13 @@ def parse_q1(path):
               f"ctr={r['ctr']:.4f} pos={r['position']:.2f}")
 
 
+def _median_ctr(rows):
+    """Median CTR across rows. Shared by parse_q2 and parse_ctr_opportunities."""
+    ctrs = sorted([r['ctr'] for r in rows])
+    n = len(ctrs)
+    return ctrs[n // 2] if n % 2 else (ctrs[n // 2 - 1] + ctrs[n // 2]) / 2
+
+
 def parse_q2(path):
     """Q2 (pages digest): impressions >= 10, sort desc, take top 50.
     Also computes median CTR for sub-dim 10 ctr_opportunity threshold."""
@@ -556,9 +563,7 @@ def parse_q2(path):
     print(f"q2_filtered_top:{len(top)}")
 
     if top:
-        ctrs = sorted([r['ctr'] for r in top])
-        n = len(ctrs)
-        median = ctrs[n // 2] if n % 2 else (ctrs[n // 2 - 1] + ctrs[n // 2]) / 2
+        median = _median_ctr(top)
         print(f"q2_median_ctr:{median:.6f}")
         print(f"q2_ctr_threshold_subdim10:{median * 0.5:.6f}")
 
@@ -604,9 +609,7 @@ def parse_ctr_opportunities(path):
         print("ctr_opportunities:0")
         return
 
-    ctrs = sorted([r['ctr'] for r in top])
-    n = len(ctrs)
-    median = ctrs[n // 2] if n % 2 else (ctrs[n // 2 - 1] + ctrs[n // 2]) / 2
+    median = _median_ctr(top)
     threshold = median * 0.5
 
     print(f"q2_median_ctr:{median:.6f}")
@@ -753,20 +756,13 @@ def detect_brand_anomaly(q1_path, brand_name):
     data = load_json(q1_path)
     rows = data.get('rows', [])
     brand_lower = brand_name.lower()
-    matches = []
-    for r in rows:
-        query = r['keys'][0].lower()
-        # Substring match — catches "burak arık" matching "burak arık fotografçı"
-        if brand_lower in query:
-            matches.append(r)
+    # Substring match — catches "burak arık" matching "burak arık fotografçı"
+    matches = [r for r in rows if brand_lower in r['keys'][0].lower()]
 
     print(f"brand_name:{brand_name}")
     print(f"brand_query_matches:{len(matches)}")
 
-    anomalies = []
-    for r in matches:
-        if r['position'] > 3.0 or r['ctr'] < 0.10:
-            anomalies.append(r)
+    anomalies = [r for r in matches if r['position'] > 3.0 or r['ctr'] < 0.10]
 
     print(f"brand_anomalies:{len(anomalies)}")
     print("--- brand anomalies ---")
@@ -1610,46 +1606,32 @@ def watchpoint_check(watchpoints_path, q2_pages_path, run_date):
         print("watchpoints_evict_write_failed:1")
 
 
+def _threshold_status(b, c, invert=False):
+    """Classify a baseline→current move as improved/regressed/unchanged.
+
+    invert=True for position, where a LOWER value is better — it flips both the
+    delta direction and the b<=0 case (a zero baseline position is meaningless,
+    so it stays 'unchanged' rather than counting any current value as improved).
+    """
+    if b <= 0:
+        if invert:
+            return 'unchanged'
+        return 'unchanged' if c <= 0 else 'improved'
+    delta_ratio = (b - c) / b if invert else (c - b) / b
+    if delta_ratio > 0.10:
+        return 'improved'
+    if delta_ratio < -0.10:
+        return 'regressed'
+    return 'unchanged'
+
+
 def _watchpoint_status(baseline, current):
     """Compare baseline vs current metrics. Decide on the primary metric:
     if baseline has ctr → ctr-anchored (lower-is-worse); if baseline has
     position → position-anchored (lower-is-better); else impressions."""
-    if 'ctr' in baseline and 'ctr' in current:
-        b = baseline['ctr']
-        c = current['ctr']
-        if b <= 0:
-            return 'unchanged' if c <= 0 else 'improved'
-        delta_ratio = (c - b) / b
-        if delta_ratio > 0.10:
-            return 'improved'
-        elif delta_ratio < -0.10:
-            return 'regressed'
-        return 'unchanged'
-
-    if 'position' in baseline and 'position' in current:
-        b = baseline['position']
-        c = current['position']
-        if b <= 0:
-            return 'unchanged'
-        delta_ratio = (b - c) / b  # lower position is better → invert
-        if delta_ratio > 0.10:
-            return 'improved'
-        elif delta_ratio < -0.10:
-            return 'regressed'
-        return 'unchanged'
-
-    if 'impressions' in baseline and 'impressions' in current:
-        b = baseline['impressions']
-        c = current['impressions']
-        if b <= 0:
-            return 'unchanged' if c <= 0 else 'improved'
-        delta_ratio = (c - b) / b
-        if delta_ratio > 0.10:
-            return 'improved'
-        elif delta_ratio < -0.10:
-            return 'regressed'
-        return 'unchanged'
-
+    for metric, invert in (('ctr', False), ('position', True), ('impressions', False)):
+        if metric in baseline and metric in current:
+            return _threshold_status(baseline[metric], current[metric], invert)
     return 'unchanged'
 
 
