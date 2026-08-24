@@ -61,8 +61,11 @@ finding that depends on it:
    Treat as a handler; cap dependent findings at 0.8.
 3. Neither. Say the map could not be built and cap every dependent finding at 0.69.
 
-Record which files are reachable from each. `C01`, `C07`, `X03`, `X04`, and `X06` all key off
-"is this on a request path?" and are unscorable without it.
+Record which files are reachable from each. `C01`, `C07`, `X03`, `X04`, and `X06` key off "is this
+on a request path?" most directly, but they are **examples, not an exhaustive list** — `E03`, `E07`,
+`C02` and `X01` all take their severity or their concurrency premise from the same fact. The rung
+cap applies to **every** finding whose severity or certainty rests on the map, not only to those
+five.
 
 **Unresolvable imports.** When a reachable module imports something that is not in scope
 (`../lib/db` with no such file), you cannot complete the trace — and that is *not* a reason to drop
@@ -110,6 +113,12 @@ For `C02` specifically: the shape is two statements, not one pattern — an exis
 dependent write. Grep candidates (`if not`, `if (!`, `exists`, `find`, `get`) then read forward a
 few lines. A unique constraint or upsert nearby kills the finding.
 
+**Several entries may fire on one block, and that is correct** when each names a distinct failure.
+A handler that duplicate-writes (`C02`), swallows the charge error (`E01`), and has no rollback
+(`E07`) has three defects, not one — file three findings. The orchestrator's dedup only merges the
+*same* defect reported twice; distinct failures at one location are what themes are for. Merge them
+yourself only when one fix provably closes all of them.
+
 ### Error safety (`E`)
 
 Grep-driven, then read:
@@ -152,6 +161,15 @@ determine:
   boundaries, which is where your `E` entries live. If you flag a missing check on the same line
   S06 wants to delete a check, one of you is wrong — report it, with both readings, and let the
   orchestrator surface the conflict.
+
+**When you notice a defect that belongs to another scanner's catalog** — a layering violation, a
+god function, an unearned abstraction — **do not file it and do not stay silent about whether you
+looked.** `arch-structure` and `arch-simplification` run in the same pass over the same scope and
+own those entries; the finding is not lost by your ignoring it. Say nothing in your findings, and
+append nothing to `catalog_gap_proposals` — that channel is for smells **no** catalog covers, not
+for another scanner's territory. This is the one case where dropping something you saw is correct,
+and it is correct only because a sibling scanner is looking at the same code with the right
+catalog.
 
 ## Skip
 

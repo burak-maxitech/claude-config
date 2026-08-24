@@ -234,6 +234,11 @@ Per-language idioms differ; the shape does not.
 - **Caveats / false-positive guards:**
   - **A shared configured client.** If the module builds one client with a timeout and every call
     goes through it, individual call sites need nothing — trace to the client before flagging.
+  - **Where the trace stops.** Follow the client to its construction site. If the timeout is set
+    there, no finding. If construction sets none, that is the finding — **even when the driver
+    could be configured out-of-band** (a `DATABASE_URL` parameter, a proxy, an env var). Say so in
+    `why_this_might_be_wrong` and let the reader confirm; an unset timeout you can see beats a set
+    one you are guessing at.
   - **Streaming or long-poll endpoints** legitimately have no total timeout, but should still set
     a read/idle timeout.
   - **Build scripts and one-shot CLIs** — `low`, not `high`.
@@ -393,8 +398,10 @@ asserting.
 ## X04 — Synchronous fan-out on a request path
 
 - **Languages:** all
-- **Detect when:** one inbound request triggers **sequential** calls to ≥3 downstream services or
-  endpoints before responding, with no parallelism, caching, or aggregation.
+- **Detect when:** one inbound request triggers **sequential** calls to ≥3 **distinct backend
+  systems** before responding, with no parallelism, caching, or aggregation. Count *systems*, not
+  call sites: four queries against one database is one system (and is `X01`/`N+1` territory if it is
+  a problem at all), while a DB call plus a payment provider plus a search service is three.
 - **Replace with:** parallelize the independent calls (bounded — see `C05`), aggregate upstream,
   or move non-essential work off the response path.
 - **--fix-eligible:** false

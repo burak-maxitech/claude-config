@@ -61,6 +61,17 @@ scope"). **Do not silently omit the finding** because you could not complete the
 unverifiable gap the user can check in five seconds is worth more than silence, provided you say
 which part is unverified.
 
+**Defects with no dependency set.** Some findings are provable from one function body and do not
+depend on who calls it — a mutable default argument, a swallowed exception, a resource never
+released. The breadth axis does not apply: score these on whether you **read the whole enclosing
+function** (0.80–0.95) or only pattern-matched it (0.50–0.69). A grep confirming *zero* callers is
+not caller enumeration and does not by itself lift a finding into the 0.70+ band.
+
+**Scan files may cap, never redefine.** A scan reference may impose a certainty *ceiling* on
+findings resting on an inferred premise — an entry-point map built from a naming convention rather
+than a framework pattern, for instance. That is a cap applied on top of these bands, not a new
+scale. The bands themselves move only in this file.
+
 Findings below `0.50` are dropped by the orchestrator's gate unless `severity: high` or
 `lines_deletable >= 20` — so a low band is not a wasted finding, it is an honest one. Two things
 force a band **down** regardless of how much you read: dynamic dispatch or reflection anywhere in
