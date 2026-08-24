@@ -2,6 +2,40 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.7.0 — 2026-08-24
+
+### Fixed
+
+- **`/bx:tests` resolved its stack from a planted eval fixture.** Found by the first `/bx:tests`
+  dogfood, which halted at Step 0 before dispatching anything. The only `package.json` in this repo
+  is `bx/skills/clean/evals/fixtures/node-react-app/package.json` — a synthetic project the
+  `/bx:clean` eval suite grades against, declaring `"test": "vitest run"`. Executed literally, Step 0
+  detects Vitest from it and audits fabricated code, reporting *deliberately* planted dead tests as
+  real findings while the run looks successful. The charitable reading is no better: exiting with
+  "no test framework detected" on a repo whose 5 shell scripts carry **68 working assertions**.
+
+- **Shell and PowerShell harnesses are now a recognised test framework.** The detection table had no
+  row for them, so a suite with a `pass`/`fail` discipline was invisible even though it has
+  assertions and gates commits. Coverage tooling is `none`, so they run heuristic-only. The exit
+  message now also names the exclusion that suppressed a manifest, since "no framework detected" on
+  a repo containing a visible `package.json` otherwise reads as a bug.
+
+### Added
+
+- **`bx/skills/arch/references/scan-exclusions.md`** — canonical owner for what a repo-wide scanner
+  must never read: synthetic/fixture trees, vendored and generated dirs, immutable history. It
+  governs **stack detection as well as file scope**, which is the half that was missing: a fixture
+  tree carries its own manifests, so excluding it from scanning but not from detection still poisons
+  the run.
+
+  `/bx:arch` (Step 3 + 5 agents + `scan-robustness.md`) and `/bx:tests` (Step 0 + Step 3 + 3 agents
+  + 3 scan files) now cite it — 14 sites that previously carried their own copy of the vendored list.
+  13 further restatements in `/bx:seo`, `/bx:webdesign` and `/bx:clean` are listed in the owner file
+  as pending rather than silently tolerated.
+
+  Until now the fixture guard existed only as a hand-written exclusion in the `/bx:arch` dogfood's
+  dispatch prompt — which meant it protected exactly one run and nothing else.
+
 ## 2.6.0 — 2026-08-24
 
 ### Added

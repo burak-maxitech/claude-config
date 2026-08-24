@@ -34,7 +34,7 @@ Key rules:
 - **Evaluate against the Intended Architecture summary in your task prompt.** Refactors that conflict with documented decisions must be marked `respects_documented_decision: false`. Pattern-application is *especially* prone to conflicting with deliberate stylistic choices ("we prefer explicit branches over polymorphism"); flag those clearly.
 - **Be conservative on certainty.** If you cannot fully see the call sites of a function, your projected CCN is a guess — lower certainty.
 - **Avoid GoF pattern-mongering.** GoF patterns (Strategy, Command, Observer) frequently *hide* complexity behind indirection rather than removing it. The catalog deliberately leans toward technique-level refactors (guard clauses, pure-function extraction, etc.). Use a GoF pattern only when the catalog explicitly includes it AND the *problem* (not just the surface code) matches the catalog's "detect when" trigger.
-- **Skip vendored / generated dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `__pycache__`, `.next`, `.cache`, `vendor`, `target/`, `coverage/`.
+- **Scope is computed by the orchestrator, not by you.** Scan exactly the file list in your task prompt. Its exclusions — synthetic/fixture trees, vendored and generated dirs, immutable history — are owned by the arch skill's `references/scan-exclusions.md`. **Never widen your own scope**; if something outside the list looks relevant, say so as a note rather than reading it. The fixture rule matters most: planted eval fixtures produce true-shaped findings that are false by construction.
 - Limit output to top 15 findings, ordered by `severity × certainty / effort_estimate`.
 
 Output shape per finding (all required):

@@ -27,7 +27,15 @@ This skill is distinct from existing test-touching paths in this repo:
 
 Mirror `/bx:arch` Step 0. Gather stack, test framework, coverage-tool availability, workspaces, and repo size before any heavy work.
 
-**Stack + test-framework auto-detect** (read each, skip silently if missing):
+**Exclude fixture trees from detection FIRST.** Read `../arch/references/scan-exclusions.md`
+(resolve against **this skill's base directory**) and apply it before reading any manifest. A
+fixture tree carries its own `package.json` / `requirements.txt`, and resolving the stack from one
+makes the whole run audit fabricated code — the eval fixtures under `evals/fixtures/` hold
+*deliberately* planted dead tests and unused exports, so every finding would be false by
+construction while the run looked successful. **If the only manifest in the repo sits inside an
+excluded tree, the correct conclusion is "no stack detected", not that fixture's stack.**
+
+**Stack + test-framework auto-detect** (read each *outside the excluded trees*, skip silently if missing):
 
 | Stack signal | Test framework hints | Coverage tool |
 |---|---|---|
@@ -38,6 +46,15 @@ Mirror `/bx:arch` Step 0. Gather stack, test framework, coverage-tool availabili
 | `composer.json` | `phpunit` / `pest` | `phpunit --coverage` (Xdebug/PCOV) |
 | `Gemfile` | `rspec` / `minitest` | `simplecov` |
 | `pom.xml` / `build.gradle` | JUnit | JaCoCo |
+| `tests/*.sh`, `test-*.sh`, `*.bats` | hand-rolled shell harness / `bats` | none — heuristic only |
+| `tests/*.ps1`, `test-*.ps1`, `*.Tests.ps1` | hand-rolled PowerShell harness / Pester | none — heuristic only |
+
+**Shell and PowerShell harnesses count as a test framework.** A suite of scripts with a `pass`/`fail`
+discipline (or `exit 1` on failure) is a real suite even with no runner in a manifest — it has
+assertions, it gates commits, and its coverage and quality are auditable. Detect by finding
+executable test-named scripts that define or call a pass/fail helper. Coverage tooling is `none`, so
+these run heuristic-only; `--coverage` reports "no coverage tool for a shell harness" rather than
+failing. Do not exit as "no framework detected" when a repo's suite is shell-based.
 
 For monorepos, check `workspaces` (npm/yarn/pnpm), `pnpm-workspace.yaml`, `[workspace] members = [...]` (Cargo), `go.work`. Each workspace may have its own framework — handle per-workspace.
 
@@ -57,10 +74,16 @@ Override with `--full-scan`.
 
 > Detected: TypeScript/Jest project, 87 source files, 64 test files, vitest available. Tier: full. Mode: heuristic (use `--coverage` for report-based coverage gap analysis).
 
-If **no test framework detected at all**, output:
-> No test framework detected. /bx:tests needs at least one of: jest/vitest/pytest/cargo test/go test/phpunit/rspec/junit. Exiting.
+If **no test framework detected at all** — no manifest outside the excluded trees, AND no shell or
+PowerShell harness — output:
+> No test framework detected. /bx:tests needs one of: jest/vitest/pytest/cargo test/go test/phpunit/rspec/junit, or a shell/PowerShell test harness (`tests/*.sh`, `test-*.ps1`). Exiting.
 
 Then stop the skill cleanly — do not dispatch subagents.
+
+**Say which trees were excluded when you exit this way.** "No framework detected" on a repo that
+visibly contains a `package.json` reads as a bug unless the message names the exclusion that
+suppressed it — e.g. "the only manifests found were inside `evals/fixtures/`, which is excluded as a
+planted-fixture tree."
 
 ---
 
@@ -136,7 +159,9 @@ If `--coverage` is **not** passed, default `coverage_mode: heuristic` and `cover
   - `bounded` → read all but cap deep-reads
   - `sample` → read the sibling arch skill's scale strategy (`../arch/references/scale-strategy.md` relative to this skill's base directory) and apply smart sampling. For bx:tests specifically, weight test files by `import_fan_in` of the source they test, not just churn.
 
-Compute file lists once and pass to all subagents.
+Apply `../arch/references/scan-exclusions.md` (resolved against this skill's base directory) when
+computing scope, exactly as Step 0 applied it to detection. Compute file lists once and pass to all
+subagents; agents never widen their own scope. Record excluded/sampled/skipped counts for the footer.
 
 ---
 

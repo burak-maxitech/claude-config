@@ -137,7 +137,16 @@ Interpret `$ARGUMENTS`:
   - `bounded` → all source files but with deep-read budget
   - `sample` → read `references/scale-strategy.md` and apply smart sampling (LOC × churn × import-fan-in priority, not random)
 
-Compute the file lists once and pass them to subagents so all three see the same scope. Record what was sampled vs skipped — this goes into the report's footer.
+**Apply `references/scan-exclusions.md` before anything else.** It is the canonical owner of what a
+repo-wide scan must never read — synthetic/fixture trees, vendored and generated dirs, immutable
+history — and it governs stack detection in Step 0 as well as file scope here. The fixture rule is
+the one that matters: planted eval fixtures yield true-shaped findings that are false by
+construction, and the run looks successful while producing them.
+
+Compute the file lists once and pass them to subagents so all five see the same scope. Agents never
+widen their own scope. Record what was excluded, sampled, and skipped — with counts — for the
+report's footer; a reader cannot tell a clean codebase from a narrowed scan unless the scan says
+which it was.
 
 ---
 

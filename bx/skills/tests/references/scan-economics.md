@@ -104,7 +104,7 @@ For each commit hash, `git show --stat --name-only <hash>` (one call per commit)
 
 - **`deletable_lines >= 1` ONLY for `economic_signal == "snapshot_heavy"`.** Other signals always report 0 — the twin-headline math depends on this.
 - **Honor `respects_documented_decision`.** Snapshots in paths the intent summary marks as "visual-regression boundary" (e.g. `components/`) → mark `respects_documented_decision: false`.
-- **Skip vendored/generated/build dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `__pycache__`, `.next`, `.cache`, `vendor`, `target/`, `coverage/`, `__generated__/`.
+- **Scope is computed by the orchestrator, not by you.** Scan exactly the file list in your task prompt. Its exclusions — synthetic/fixture trees, vendored and generated dirs, immutable history — are owned by the arch skill's `references/scan-exclusions.md`. **Never widen your own scope**; if something outside the list looks relevant, say so as a note rather than reading it. The fixture rule matters most: planted eval fixtures produce true-shaped findings that are false by construction.
 - **Cap output at 25 findings**, ordered by `severity_weight × certainty × (1 + log10(deletable_lines + 1))` desc.
 
 ## False-positive guards

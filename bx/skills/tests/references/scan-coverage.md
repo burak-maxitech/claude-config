@@ -139,7 +139,7 @@ Effort estimate from gap size:
 
 - **`coverage_gap_lines >= 1` mandatory.** Drop zero-gap findings.
 - **Order by `priority_score × certainty` descending.** Cap at 30.
-- **Skip vendored/generated/build dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `__pycache__`, `.next`, `.cache`, `vendor`, `target/`, `coverage/`, `__generated__/`, `*.generated.*`, `*.d.ts`.
+- **Scope is computed by the orchestrator, not by you.** Scan exactly the file list in your task prompt. Its exclusions — synthetic/fixture trees, vendored and generated dirs, immutable history — are owned by the arch skill's `references/scan-exclusions.md`. **Never widen your own scope**; if something outside the list looks relevant, say so as a note rather than reading it. The fixture rule matters most: planted eval fixtures produce true-shaped findings that are false by construction.
 - **Skip trivial files**: pure type/interface declaration files, single-line constant export files, framework-generated barrel files (`index.ts` that only re-exports).
 
 ## Final output addendum

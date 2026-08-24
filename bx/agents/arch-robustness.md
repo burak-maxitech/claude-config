@@ -80,10 +80,9 @@ Do not invent categories — if you find a recurring failure mode no entry cover
   tradeoff ("single-instance by design", "no retry — the caller owns it", "in-memory cache is
   authoritative and rebuilt at boot"), mark it `false` and let the orchestrator surface it for
   confirmation rather than recommending the change.
-- **Skip vendored / generated dirs:** `node_modules`, `venv`, `.git`, `dist`, `build`,
-  `__pycache__`, `.next`, `.cache`, `vendor`, `target/`, `coverage/`, `*.generated.*`,
-  `__generated__/`. Skip test files too, **except** for `E06` (panic-on-unexpected) and `C08`
-  (shared-instance idioms), which are worth reporting anywhere.
+- **Scope is computed by the orchestrator, not by you.** Scan exactly the file list in your task prompt. Its exclusions — synthetic/fixture trees, vendored and generated dirs, immutable history — are owned by the arch skill's `references/scan-exclusions.md`. **Never widen your own scope**; if something outside the list looks relevant, say so as a note rather than reading it. The fixture rule matters most: planted eval fixtures produce true-shaped findings that are false by construction.
+  Skip test files too, **except** for `E06` (panic-on-unexpected) and `C08` (shared-instance
+  idioms), which are worth reporting anywhere.
 - **Limit output to 15 findings**, ordered by `severity × certainty`. Three categories share that
   budget — rank across all of them rather than reserving slots per category.
 

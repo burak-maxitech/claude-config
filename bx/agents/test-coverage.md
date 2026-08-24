@@ -85,7 +85,7 @@ For bug-fix-without-regression findings, set `smell_id: "bug_fix_no_test"` and r
 
 - **`coverage_gap_lines >= 1` is mandatory.** Drop findings where the gap is zero (e.g., file has a test neighbor that touches every exported symbol by name).
 - **Honor `respects_documented_decision`.** If the testing-intent summary says "we don't unit-test thin controllers, only e2e", flag thin-controller gaps with `respects_documented_decision: false` so the orchestrator surfaces them for confirmation rather than recommending tests.
-- **Skip vendored / generated / build dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `__pycache__`, `.next`, `.cache`, `vendor`, `target/`, `coverage/`, `__generated__/`, `*.generated.*`.
+- **Scope is computed by the orchestrator, not by you.** Scan exactly the file list in your task prompt. Its exclusions — synthetic/fixture trees, vendored and generated dirs, immutable history — are owned by the arch skill's `references/scan-exclusions.md`. **Never widen your own scope**; if something outside the list looks relevant, say so as a note rather than reading it. The fixture rule matters most: planted eval fixtures produce true-shaped findings that are false by construction.
 - **Skip test files themselves.** Source-only scope.
 - **Skip trivial files**: pure type/interface declarations, single-line constant exports, framework-generated files (`*.styled.ts` from styled-components, `*.d.ts` declaration files).
 - **Cap output at 30 findings.** Order by `priority_score × certainty` descending.

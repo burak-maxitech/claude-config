@@ -94,7 +94,7 @@ Surface findings where:
 
 - **`deletable_lines >= 1` only when `economic_signal == "snapshot_heavy"`.** Other signals report 0. The orchestrator's twin-headline math depends on this — never inflate `deletable_lines` for flakiness or ratio findings.
 - **Honor `respects_documented_decision`.** If the intent summary says "we use snapshots as visual regression boundary for `components/`," mark `snapshot_heavy` findings in that path with `respects_documented_decision: false`.
-- **Skip vendored / generated dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `__pycache__`, `.next`, `.cache`, `vendor`, `target/`, `coverage/`.
+- **Scope is computed by the orchestrator, not by you.** Scan exactly the file list in your task prompt. Its exclusions — synthetic/fixture trees, vendored and generated dirs, immutable history — are owned by the arch skill's `references/scan-exclusions.md`. **Never widen your own scope**; if something outside the list looks relevant, say so as a note rather than reading it. The fixture rule matters most: planted eval fixtures produce true-shaped findings that are false by construction.
 - **Cap output at 25 findings**, ordered by `severity_weight × certainty × (1 + log(deletable_lines + 1))` descending.
 
 ## False-positive guards
