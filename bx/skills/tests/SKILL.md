@@ -99,7 +99,7 @@ Interpret `$ARGUMENTS`:
 |----------|--------|
 | (none) | Default review-only: produce report and stop |
 | path (e.g. `src/auth/`, `tests/api/`) | Scope subagents to that path (filtering both source and test scope to match) |
-| `--plan` | After report, transform top findings into a phased TaskCreate-ready brief (read `references/plan-mode-test.md`) |
+| `--plan` | After report, transform top findings into a phased brief ready to hand off to `/bx:plan` (read `references/plan-mode-test.md`) |
 | `--fix` | After report, apply T01 deletions with per-finding diff preview gate (read `references/fix-mode-test.md`). Restricted to T01 only. |
 | `--coverage` | Opt into reading coverage tool reports (jest `coverage-summary.json` / pytest `coverage.json` / etc.). Never auto-invoked. |
 | `--full-scan` | Force `full` tier regardless of repo size |

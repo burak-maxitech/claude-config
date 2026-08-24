@@ -2,6 +2,31 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.2.0 — 2026-08-24
+
+### Fixed
+
+- **Task-tracker tools are no longer assumed present** (upstream finding `5d1459d5`,
+  claude-code v2.1.233 removed `TaskCreate`/`TaskGet`/`TaskUpdate`/`TaskList`/`TodoWrite`
+  from the default toolset on Opus 4.8, Sonnet 5, Fable 5, Mythos 5 and newer;
+  `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` restores them). Five skills promised behavior that
+  silently could not run:
+  - `/bx:arch --plan` and `/bx:tests --plan` no longer advertise a "TaskCreate-ready
+    brief" — both hand off to `/bx:plan`.
+  - `/bx:plan` Step 6, `/bx:resume` Step 5, and `/bx:save` Part 0 gate their tracker
+    calls on an availability check.
+
+### Added
+
+- **`bx/skills/save/references/task-tools.md`** — canonical owner for the task-tool
+  availability rule (the fact, the check, and a per-skill degraded path). The five
+  satellites cite it; none restates the version, model list, or env-var name.
+- **Degraded paths** so every affected skill still completes its job with the tools
+  absent: `/bx:resume` folds the same task selection into its summary as a numbered
+  list; `/bx:save` behaves as `--skip-tasks` and derives deltas from the conversation;
+  `/bx:plan` treats the approved plan document as the tracker and keeps per-phase
+  gating. Tracker paths are demoted, never deleted — they run whenever the tools exist.
+
 ## 2.1.1 — 2026-08-18
 
 ### Fixed

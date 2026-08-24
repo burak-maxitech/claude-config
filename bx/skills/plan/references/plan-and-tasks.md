@@ -29,6 +29,13 @@ Use `ExitPlanMode` to present the plan to the user for approval. The user will r
 
 Once the user approves the plan, **create a live task tracker** from the implementation phases:
 
+**First, check the task tools are present** — they are absent by default on current models.
+The check and this skill's degraded path are in `../save/references/task-tools.md` (resolve
+against **this skill's base directory**, `bx/skills/plan/`, not against this file's directory).
+If they are absent: the approved plan document is the tracker — keep the phase list visible in
+your response, work the phases in order, and keep the phase gating below verbatim (it is what
+actually protects the work; the tracker is only bookkeeping). Then skip to **Phase Gating**.
+
 ### Create Tasks with TaskCreate
 For each implementation phase/step in the approved plan:
 1. Create a task with `TaskCreate`:

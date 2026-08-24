@@ -19,7 +19,7 @@ The packet contains:
 - `completed_items` — list of `- [x] …` lines to append to `docs/completed-work.md` (may be empty).
 - `decision_rows` — a list of `| decision | rationale |` table rows to append (may be empty).
 
-You do NOT call `TaskList` — the orchestrator already drained it and folded the result into `status_md_deltas` / `completed_items`.
+You do NOT call `TaskList` — the orchestrator already drained it (or skipped the drain, when the task tools were unavailable or `--skip-tasks` was passed) and folded the result into `status_md_deltas` / `completed_items`.
 
 ## What you do
 

@@ -169,6 +169,11 @@ Read `references/summary-template.md` and present the summary to the user using 
 
 Read `references/task-hydration.md` and follow its rules to load the state file's tasks into the live task tracker.
 
+**Availability gate first.** The task tools are absent by default on current models. Apply the
+check in `../save/references/task-tools.md` (resolve against this skill's base directory). If
+they are absent, take the degraded path recorded there — the same items go into the Step 4
+summary as a numbered list instead — and do not attempt hydration.
+
 ---
 
 ## Step 6: Validate Structure

@@ -4,6 +4,13 @@ After presenting the summary, load the state file's tasks into the live task tra
 TaskCreate. The state file is `docs/STATUS.md` in schema v2, CLAUDE.md in v1.
 `Known Issues / Blockers` remains in CLAUDE.md in both layouts.
 
+**This whole file is the tracker path.** It applies only when the task tools are present —
+Step 5's availability gate decides that (rule: `../save/references/task-tools.md`, resolved
+against **this skill's base directory**, `bx/skills/resume/`). When they are absent, skip the
+Pre-Hydration Check entirely (no tracker means no stale tasks to find) and fold the same
+selection — same sections, same rules, same ~10 cap — into the Step 4 summary as a numbered
+list with the recommended item marked.
+
 ---
 
 ## Pre-Hydration Check

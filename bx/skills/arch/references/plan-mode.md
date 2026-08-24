@@ -2,7 +2,9 @@
 
 ultrathink — phased refactor briefs require synthesizing across structure/refactors/performance/simplification subagent output and sequencing for risk + leverage. Deep reasoning materially improves phase grouping and hand-off snippet quality.
 
-Transform the report's findings into a phased refactor brief that hands off cleanly to `/bx:plan` (or directly to TaskCreate). Each phase becomes a self-contained payload the user can drop into a fresh session.
+Transform the report's findings into a phased refactor brief that hands off cleanly to `/bx:plan`. Each phase becomes a self-contained payload the user can drop into a fresh session.
+
+**Hand-off target:** `/bx:plan` is the unconditional path — it owns its own task hydration, including what to do when the task tools are missing. Loading a phase straight into the task tracker (`TaskCreate`) is a *conditional* path: those tools are absent by default on current models. The rule lives in `../save/references/task-tools.md` — resolve it against **this skill's base directory** (`bx/skills/arch/`), not against this file's directory. Do not restate its version, model list, or env-var name here. When the tools are absent, hand the phase to `/bx:plan` or paste it into a fresh session.
 
 ## Phase grouping
 

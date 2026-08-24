@@ -22,7 +22,7 @@ Gather only what the orchestrator needs to *route* and *compose the packet*. The
 - `git status`
 
 **Other:**
-- `TaskList`
+- `TaskList` — only if the task tools are present (`references/task-tools.md`); skip silently if not.
 
 **Deferred to `--full` only:** `README.md`, `docs/*.md` archive reads. If routing lands on `--full`, read those at the top of the Full Path (Step 0.3, which applies Part 3.0's exclusions), not here.
 
@@ -61,7 +61,7 @@ The orchestrator owns everything that needs conversation context or user input; 
 
 **Sequence:**
 
-1. **Drain the task list (Part 0 logic).** Run the Part 0 / Drain Validation rules below to reconcile `TaskList` against docs/STATUS.md (CLAUDE.md's state sections on a v1 repo). Respect `--skip-tasks`. The result (completed → completed-work items; in-progress → In Progress; new pending → Next Steps) becomes part of the packet, NOT inline edits.
+1. **Drain the task list (Part 0 logic).** Run the Part 0 / Drain Validation rules below to reconcile `TaskList` against docs/STATUS.md (CLAUDE.md's state sections on a v1 repo). Respect `--skip-tasks`, and Part 0's availability gate (absent task tools ⇒ same behavior as `--skip-tasks`). The result (completed → completed-work items; in-progress → In Progress; new pending → Next Steps) becomes part of the packet, NOT inline edits.
 2. **Compose the update packet** (see "Update Packet" below) from: the conversation (what happened this session — only the orchestrator knows this), the filtered commit list, the diff file list, and the drained task state. Apply the Prose Caps.
 3. **Dispatch the `save-writer` subagent** (see "Dispatch" below) and await its change report.
 4. **Drift probes** (cheap, on already-gathered data — no new reads): emit the drift warning block if anything fired. Do NOT enforce.
@@ -131,6 +131,12 @@ The remaining Parts (0.5, 2, 3, 4, 5, 6, 7) run on the **orchestrator**, not the
 ## Part 0: Drain Task List into docs/STATUS.md
 
 Before updating documentation, **capture any task progress from the current session's live task tracker:**
+
+**Availability gate.** The task tools are absent by default on current models — see
+`references/task-tools.md` (this skill owns that file). If `TaskList` is not in your toolset,
+treat this Part exactly as `--skip-tasks`: no drain, no stale-task warning. The In Progress /
+Next Steps deltas then come from the conversation alone, which the orchestrator has either
+way, and the drain summary line reports it once. Everything below is the tracker path.
 
 1. **Run `TaskList`** to get all tasks and their statuses
 2. **For each completed task:**

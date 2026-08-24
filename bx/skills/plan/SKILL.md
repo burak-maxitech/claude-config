@@ -126,7 +126,9 @@ Follow the "Finishing Up" section in the loaded mode reference to present findin
 
 After the user confirms ready to proceed, read `references/plan-and-tasks.md` and follow its workflow:
 1. Enter Plan Mode → write implementation plan → Exit Plan Mode for approval
-2. After approval → hydrate tasks with TaskCreate → begin implementation
+2. After approval → hydrate tasks with `TaskCreate` **if the task tools are present**, else take the degraded path → begin implementation
+
+The task tools are absent by default on current models. Apply the check and the degraded path in `../save/references/task-tools.md` (resolve against this skill's base directory). `/bx:plan` is the hand-off target other skills route to, so this path must work either way.
 
 ---
 
@@ -141,6 +143,6 @@ After the user confirms ready to proceed, read `references/plan-and-tasks.md` an
 7. Read mode-specific reference (`references/mode-greenfield.md` or `references/mode-existing.md`)
 8. Begin interview with first batch of questions (via `AskUserQuestion` when available)
 9. After interview → `EnterPlanMode` → write implementation plan → `ExitPlanMode` for approval
-10. After approval → read `references/plan-and-tasks.md` → hydrate tasks with `TaskCreate` → begin implementation
+10. After approval → read `references/plan-and-tasks.md` → hydrate tasks with `TaskCreate` (or its degraded path when the task tools are absent) → begin implementation
 
 $ARGUMENTS

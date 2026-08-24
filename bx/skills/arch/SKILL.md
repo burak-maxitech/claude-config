@@ -98,7 +98,7 @@ Interpret `$ARGUMENTS`:
 |----------|--------|
 | (none) | Default review-only: produce report and stop |
 | path (e.g. `src/api/`) | Scope subagents to that path only; everything else applies normally |
-| `--plan` | After the report, transform top findings into a phased TaskCreate-ready brief (read `references/plan-mode.md`) |
+| `--plan` | After the report, transform top findings into a phased brief ready to hand off to `/bx:plan` (read `references/plan-mode.md`) |
 | `--fix` | After the report, apply mechanical refactors with per-finding diff preview gate (read `references/fix-mode.md`). Restricted to single-file, non-API-breaking. End with `/rewind` reminder. |
 | `--full-scan` | Force `full` tier regardless of repo size |
 | `--map` | Include the heavier architecture-map section (default has lightweight version) |
