@@ -91,6 +91,7 @@ Exit codes:
     4   credential resolution / token mint failure
 """
 # -*- coding: utf-8 -*-
+import contextlib
 import json
 import os
 import re
@@ -1272,6 +1273,63 @@ def _load_json_safe(path, default):
         return default
 
 
+@contextlib.contextmanager
+def _rmw_lock(path, timeout=10.0):
+    """Advisory lock for a read-modify-write cycle on `path`.
+
+    _atomic_write_json makes the final os.replace atomic, which stops two
+    processes interleaving *content*. It does nothing about two processes
+    reading the same pre-mutation state and the second replace discarding the
+    first's additions -- a lost update. A run_count increment or a watchpoint
+    refresh silently reverts, and the escalation threshold downstream can then
+    miss a real regression because the increment vanished. This closes that
+    half of the race; the docstring below only ever claimed the other half.
+
+    Degrades to unlocked after `timeout` rather than failing the run, so the
+    worst case is the old behaviour and never worse.
+
+    Do NOT add an age check inside the retry loop. One that fails for any
+    reason reads as "stale", unlinks a LIVE lock, and admits several writers at
+    once -- strictly worse than no lock. Reaping happens once, after the budget
+    is spent. (An earlier version of the sibling shell fix had exactly that bug
+    and only a concurrency test caught it.)
+    """
+    lock_path = f"{path}.lock"
+    parent = os.path.dirname(lock_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    fd = None
+    deadline = time.time() + timeout
+    while True:
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            break
+        except FileExistsError:
+            if time.time() >= deadline:
+                try:
+                    os.unlink(lock_path)
+                    fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                except OSError:
+                    fd = None
+                break
+            time.sleep(0.02)
+        except OSError:
+            fd = None
+            break
+    try:
+        yield
+    finally:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            try:
+                os.unlink(lock_path)
+            except OSError:
+                pass
+
+
 def _atomic_write_json(path, data):
     """Atomic write via .tmp + os.replace. PID-suffixed tmp so two concurrent
     /bx:seo processes writing the same target don't interleave content in
@@ -1320,6 +1378,13 @@ def _read_findings_jsonl(path):
 
 
 def history_update(findings_jsonl, history_path, commit_sha, run_date):
+    """Serialised read-modify-write. See _rmw_lock: the atomic replace alone
+    does not stop a concurrent run's additions being discarded."""
+    with _rmw_lock(history_path):
+        return _history_update_unlocked(findings_jsonl, history_path, commit_sha, run_date)
+
+
+def _history_update_unlocked(findings_jsonl, history_path, commit_sha, run_date):
     """Group D: update finding-history.json with this run's findings.
 
     For each finding, increment run_count + update last_seen. New findings get
@@ -1422,6 +1487,13 @@ def _add_days(date_str, days):
 
 
 def watchpoint_emit(findings_jsonl, watchpoints_path, commit_sha, run_date):
+    """Serialised read-modify-write. See _rmw_lock: the atomic replace alone
+    does not stop a concurrent run's additions being discarded."""
+    with _rmw_lock(watchpoints_path):
+        return _watchpoint_emit_unlocked(findings_jsonl, watchpoints_path, commit_sha, run_date)
+
+
+def _watchpoint_emit_unlocked(findings_jsonl, watchpoints_path, commit_sha, run_date):
     """Group D: auto-emit watchpoint entries for findings with
     code_changed_since_gsc_window=true.
 
@@ -1492,6 +1564,13 @@ def watchpoint_emit(findings_jsonl, watchpoints_path, commit_sha, run_date):
 
 
 def watchpoint_check(watchpoints_path, q2_pages_path, run_date):
+    """Serialised read-modify-write. See _rmw_lock: the atomic replace alone
+    does not stop a concurrent run's additions being discarded."""
+    with _rmw_lock(watchpoints_path):
+        return _watchpoint_check_unlocked(watchpoints_path, q2_pages_path, run_date)
+
+
+def _watchpoint_check_unlocked(watchpoints_path, q2_pages_path, run_date):
     """Group D: at Step 1.6 Turn 1, evaluate watchpoints whose recheck date
     has elapsed. Auto-evict watchpoints > WATCHPOINT_EVICT_DAYS old.
 

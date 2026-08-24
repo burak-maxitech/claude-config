@@ -2,6 +2,27 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.5.1 — 2026-08-24
+
+### Fixed
+
+- **Lost update in `gsc-parse-helper.py`'s finding-history / watchpoints writes** (dogfood
+  finding C02). `_atomic_write_json` made the final `os.replace` atomic — its own docstring says
+  the PID-suffixed tmp exists so "two concurrent /bx:seo processes writing the same target don't
+  interleave content" — but that only closes half the race. Two runs could still read the same
+  pre-mutation state and have the second replace silently discard the first's additions: a
+  `run_count` increment reverts, a watchpoint refresh vanishes, and the escalation threshold
+  downstream then misses a regression because the increment never persisted.
+
+  `history_update`, `watchpoint_emit` and `watchpoint_check` now hold an `O_EXCL` advisory lock
+  across the whole read-modify-write, degrading to unlocked after ~10s so a run is never blocked.
+  Measured, not assumed: 12 concurrent processes without the lock lost **10 of 12** updates; with
+  it, 12/12 survive and no stale lock remains.
+
+  The lock deliberately does not age-check inside its retry loop, for the reason documented in
+  v2.5.0's shell fix — a check that fails for any reason reads as "stale", unlinks a live lock,
+  and admits several writers at once.
+
 ## 2.5.0 — 2026-08-24
 
 ### Fixed
