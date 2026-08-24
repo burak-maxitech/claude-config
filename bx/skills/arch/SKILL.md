@@ -216,7 +216,8 @@ each sub-step names what it consumes.
 ### 5.1 Sanity gate (complexity delta)
 
 Applies to **any finding that claims a complexity reduction** — i.e. any finding returning a
-non-null `ccn_*` or `cognitive_*` pair, whatever its dimension. Drop it only when it reduces
+non-null `ccn_*` or `cognitive_*` pair, whatever its dimension or catalog entry. `R01` and `R09`
+are named below as illustrations, not as the only entries the gate covers. Drop it only when it reduces
 *neither* metric: `ccn_projected >= ccn_current` **AND** `cognitive_projected >= cognitive_current`.
 A finding that lowers either one survives.
 
@@ -251,21 +252,48 @@ rank = severity_weight × certainty × leverage / effort_weight
   identically, which is the difference between a linter's output and an architecture review's.
 - Simplification findings are additionally multiplied by **`ln(lines_deletable + 1)`** — natural
   log, multiplicative — so big deletions float up.
-- **Ties** break by: severity, then certainty, then lower effort, then `location` string. Ranking
-  must be deterministic across runs.
+- **Ties** break by, in order: **higher** severity, **higher** certainty, **lower** effort, then
+  `location` string ascending. Ranking must be deterministic across runs.
 
 ### 5.4 Deduplicate
 
-Two findings are **the same location** when they name the same file **and their line ranges overlap
-or nest**. A single line inside another finding's range counts as overlapping. (Exact-string
-matching is not enough: `orders.ts:22` and `orders.ts:20-24` are the same defect seen twice.)
+**Dedup targets the same *defect* reported twice — not two defects that happen to sit in the same
+code.** Both conditions must hold:
+
+1. **Same file, and line ranges that overlap or nest.** (Exact-string matching is not enough:
+   `orders.ts:22` and `orders.ts:20-24` are one defect seen twice.)
+2. **The same claim.** Either both cite the *same* `cite_catalog_entry`, or they cite a
+   **known-overlapping pair** — the entries two scanners are expected to both find:
+
+   | Pair | Why both fire |
+   |------|---------------|
+   | `R03` (flag argument) / `S03` (always-same parameter) | Same parameter, two framings |
+   | `R12` (memoize recursion) / performance `missing memoization` | Same function |
+   | `X01` (unbounded result set) / performance `payload size` | Same query |
+   | `R07` (decompose god function) / structure `god function` | Same function, two scanners |
+
+**Co-location is not duplication.** A god-function finding spanning `orders.ts:7-30` *contains* a
+swallowed exception at `:22`, a race at `:16-19`, and a deletable null check at `:11` — four
+different defects in one function. Merging them would erase three of them, zero a
+`lines_deletable`, and empty the performance group. They stay four findings; what relates them is a
+**theme**, which is exactly what 5.9 is for. If a rule here would collapse findings that a reader
+would want listed separately, it is the wrong rule.
 
 Merging is **not** discarding:
 
-- The **higher-ranked** finding supplies every scalar field — severity, certainty, effort,
-  dimension, complexity pairs.
+- The **higher-ranked** finding supplies `location`, `title`, and the scalar fields — severity,
+  effort, dimension, complexity pairs.
 - The lower-ranked one contributes its `title`, `evidence`, and `cite_catalog_entry` as an
   additional perspective on the merged finding.
+- **`lines_deletable` is never inherited or zeroed** — the merged finding keeps the highest value
+  any member reported. Merging must not destroy a deletion total.
+- **Each perspective keeps its own `certainty`.** Dimension-keyed filters in 5.8 read the certainty
+  *of the perspective they matched*, not the merged scalar — otherwise a certainty-0.5 performance
+  suspect absorbed into a certainty-0.85 robustness finding stops being a suspect, which is the
+  same disappearing act `merged_dimensions` exists to prevent.
+- **Rank is not recomputed** after merging. The pre-merge rank of the surviving finding stands.
+- Merges are pairwise and repeat to a fixed point: if A merges with B and B with C, the result is
+  one finding — but only where each pair independently satisfies both conditions above.
 - The merged finding carries **`merged_dimensions`** — every dimension and catalog family that went
   into it. **Every dimension-keyed filter downstream reads `merged_dimensions`, not `dimension`.**
   Without this, a performance suspect merged into a robustness finding silently vanishes from the
@@ -303,7 +331,7 @@ before using them:
   The flag is unreliable; route the finding to **Documented-Decision Conflicts** for confirmation
   rather than treating it as clean. Never silently flip the flag.
 - **A finding whose location also appears in that same scanner's `*_suppressed` list** — the scanner
-  contradicted itself. Surface it under **Scanner Conflicts** with both of its own stated reasons.
+  contradicted itself. Compare against the finding's **original** pre-merge location. Surface it under **Scanner Conflicts** with both of its own stated reasons.
 
 ### 5.8 Group
 
@@ -314,8 +342,12 @@ before using them:
 - **Documented-decision conflicts** — `respects_documented_decision == false`, plus anything 5.7
   routed here. Separate section, requires user confirmation. (Especially important for
   simplification: a documented "we keep this abstraction for X" must override a deletion.)
-- **Performance suspects** — `performance` ∈ `merged_dimensions` AND `certainty < 0.7`. Framed as
-  "measure, don't refactor blindly."
+  **Exclusive:** a finding in this group appears *only* here, never also in Quick wins or Strategic
+  refactors — it is not actionable until the user confirms intent.
+- **Performance suspects** — `performance` ∈ `merged_dimensions` AND that perspective's own
+  `certainty < 0.7` (see 5.4 — not the merged scalar). Framed as "measure, don't refactor blindly."
+  Groups other than Documented-decision conflicts are **not** mutually exclusive: a finding may
+  appear in both Quick wins and Performance suspects.
 - **Scanner conflicts** — the same location where `arch-simplification` wants to delete a check and
   `arch-robustness` wants one added (S06 vs an `E` entry), plus the self-contradictions from 5.7.
   Both readings surface together; the orchestrator does **not** silently pick a winner. One of the
@@ -324,6 +356,10 @@ before using them:
 ### 5.9 Synthesize themes
 
 The report opens with a judgment, not a list.
+
+**Count findings as they stand after 5.4** — a merged finding counts once. Because 5.4 only merges
+genuine duplicates, co-located findings arrive here intact, which is what makes a
+"one function concentrates six defects" cluster visible as a theme at all.
 
 1. **Cluster** the surviving findings three ways — by shared module or directory prefix, by shared
    layer-boundary crossing (from Step 1), and by shared root mechanism (one concrete construct: a
