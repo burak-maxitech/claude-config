@@ -248,4 +248,7 @@
 - [x] `/bx:evolve` full run; watermark released 2.1.228 → 2.1.241 after a freeze held since S53
 - [x] S37 install-smoke-test leftover closed — `claude plugin validate --strict` wired into `/bx:save` Part 8
 - [x] First real archive rotation (`docs/key-decisions.md` 100k → 49k, volume 1 written)
-- [x] Eight plugin versions shipped and pushed: v2.2.0 → v2.6.0
+- [x] `/bx:tests` dogfooded — twice; Step 0 fixture-as-stack, then severity calibration + `coverage_negatives`
+- [x] `/bx:clean` scoped run — `session-start-context.ps1` proven unwired, kept deliberately
+- [x] Shared `scan-exclusions.md` owner created; `/bx:arch` + `/bx:tests` repointed across 14 sites
+- [x] Nine plugin versions shipped and pushed: v2.2.0 → v2.8.0

@@ -8,13 +8,13 @@ Last Updated: 2026-08-24 (Session 58)
 
 | Area | Status |
 |------|--------|
-| Skills (11) | Complete — `/bx:arch` and `/bx:evolve` dogfooded end-to-end S58 |
+| Skills (11) | Complete — `/bx:arch`, `/bx:evolve`, `/bx:tests`, `/bx:clean` dogfooded S58; only `/bx:health` never run |
 | Subagents (20) | Complete — `arch-robustness` added S58 |
-| Plugin packaging (`bx`) | **v2.6.0 pushed S58**; install smoke-test now automated (Part 8 step 2b, `claude plugin validate --strict`). Local cache on 2.5.1 — `/plugin update bx` needed. Symlink retirement still pending |
+| Plugin packaging (`bx`) | **v2.8.0 pushed S58**; install smoke-test automated (Part 8 step 2b). Local cache on 2.5.1 — `/plugin update bx` needed. Symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate still pending |
 | Cross-platform setup | Complete |
-| GitHub sync | Complete — main pushed through v2.6.0 (`db1f3b5`) |
+| GitHub sync | Complete — main pushed through v2.8.0 (`fed4403`) |
 | Documentation | Complete — schema v2 |
 
 ## Completed
@@ -46,18 +46,21 @@ See [completed-work.md](completed-work.md) for full checklist.
 5. **/simplify follow-up: move Part 7.7 rotation out of Part 7** into its own sibling Part — deletes the five "except 7.7" carve-outs; requires a blind rehearsal before shipping (deliberately skipped S57). The S59 spec's D4 proposes a Part 7.9 sibling on the same reasoning — do these together.
 6. **Resume the `/bx:webdesign` kaanarik run past review** — push through Phase 3 inject+verify; verify finding `dadac845`.
 7. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
-8. **Dogfood `/bx:tests` and `/bx:health`** — hardened S46, still never run end-to-end. `/bx:arch` and `/bx:evolve` were dogfooded S58 and each produced real skill defects on the first run; expect the same here.
+8. **Dogfood `/bx:health`** — the last skill never run end-to-end. Five skills were dogfooded S58 and every one produced defects on its first run; expect the same.
 9. **S37 plugin-packaging leftovers** — install smoke-test, symlink retirement, `Skill(bx-*)` → `Skill(bx:*)`.
 10. **`/bx:evolve` follow-ups** — fix Step 3.4's missing `applied` branch and store `source_excerpt` alongside the hash; stabilise the `bx:pain/<slug>` derivation. 18 open findings, incl. three fresh: `df34007f` (`/plugin install` auto-refresh — check whether `update` behaves the same before touching docs), `59d3bdac` (background-by-default dispatch — this run corroborated bx's fan-outs still block, so it is a documentation gap not a break), `3dd5decb` (`/code-review` ladder, predicted to reject as already-covered). Also: scan-docs allowlist candidate (`auto-mode-config`); shared `references/lane-contract.md`.
 11. **`/bx:seo` deferred items** — code-review leftovers (#5/#6/#7) + S25/S27/S29 refactors.
+12. **Commit regression tests for S58's two concurrency fixes** — `/bx:tests`' top-ranked finding. Both v2.5.0 (session-color mutex) and v2.5.1 (GSC `_rmw_lock`) were verified with throwaway controls that were never committed, so the evidence of correctness lives in commit messages rather than the repo. Port both harnesses: N racing processes, assert distinct results, no lost updates, no orphaned lock.
+13. **Resolve `bx/scripts/session-start-context.ps1`** — unwired since it was added (`/bx:clean`, S58). Either wire it (verify `hooks.json` supports OS-conditional commands first) or delete it with its README reference. Kept deliberately for now; do not let it drift out of parity.
+14. **Sweep the 13 remaining exclusion-list restatements** — `/bx:seo`, `/bx:webdesign` and `/bx:clean` still carry their own copies; the owner file `arch/references/scan-exclusions.md` lists them.
 
 ## Session History
 
 > Full history: [session-history.md](session-history.md)
 
 ### Last Session (Session 58) - 2026-08-24
-- **Recovered an outage-truncated session**, then swept the class its `/bx:evolve` run had flagged and left open: v2.1.233 removed the task-tracker tools from the default toolset and five skills promised behaviour that could not run. Canonical owner `task-tools.md` + a degraded path per skill (**v2.2.0**).
-- **`/bx:arch` review depth v2 (v2.3.0)** — 8 phases via `/bx:plan`. Fixed three rules that made architecture *worse* (S01 deleting Dependency Inversion, S06 deleting trust-boundary validation, a CCN-only gate deleting its own catalog's quick wins), then added the dimensions with zero coverage. Catalog 23 → 54; fifth scanner `arch-robustness`; calibrated finding contract; report opens with a thesis.
-- **First end-to-end dogfood found four skill defects** (**v2.4.0**) that six rehearsal waves could not — rehearsals feed scanners synthetic findings, so an empty category and an inverted trust flag are structurally invisible. Applied its four fix-eligible code findings (**v2.4.1**), then the remaining four (**v2.5.0–v2.5.1**).
-- **Both concurrency fixes were wrong until executed.** A 100ms backoff let 8 racers exceed a 5s cap and collide anyway; a defensive stale-reap destroyed *live* locks. Verified by measurement: 5/5 trials 8-way distinct, and 10-of-12 lost updates without the Python lock vs 12/12 with it.
-- **`/bx:evolve` full run released the watermark** (2.1.228 → 2.1.241, frozen since S53) and applied `claude plugin validate` into `/bx:save` Part 8 (**v2.6.0**), closing the S37 install-smoke-test leftover. Its own first run exposed a Step 3.4 branch that does not exist.
+- **Recovered an outage-truncated session**, then swept the class its `/bx:evolve` run had left open: v2.1.233 removed the task-tracker tools from the default toolset and five skills promised behaviour that could not run. Canonical owner `task-tools.md` + a degraded path per skill (**v2.2.0**).
+- **`/bx:arch` review depth v2 (v2.3.0)** — 8 phases via `/bx:plan`. Fixed three rules that made architecture *worse*, then added the dimensions with zero coverage. Catalog 23 → 54; fifth scanner `arch-robustness`; calibrated finding contract; report opens with a thesis. Six blind-rehearsal waves; the ≤2 bar was not met and it shipped on the severity curve.
+- **Five skills dogfooded end-to-end, every one produced defects on its first run** — `/bx:arch` (4, after those six waves), `/bx:evolve` (a Step 3.4 branch that does not exist), `/bx:tests` (twice: fixture-as-stack at Step 0, then severity calibration + missing `coverage_negatives`), `/bx:clean` (an unwired file with 5 maintenance commits). **v2.4.0–v2.8.0.**
+- **Both concurrency fixes were wrong until executed** — a backoff that let racers blow its own timeout, and a defensive stale-reap that deleted *live* locks. Verified by measurement: 5/5 trials 8-way distinct; 10-of-12 lost updates without the Python lock vs 12/12 with it. Neither control was committed — now Next Steps #12.
+- **Two long-open items closed:** the S37 install-smoke-test leftover (`claude plugin validate --strict` in `/bx:save` Part 8, **v2.6.0**) and the watermark freeze held since S53 (2.1.228 → 2.1.241).
