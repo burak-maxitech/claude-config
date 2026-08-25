@@ -337,7 +337,7 @@ claude-config/                         # marketplace repo
 │   │   └── hooks.json                 # SessionStart project-orientation injection
 │   ├── scripts/
 │   │   ├── session-start-context.sh   # SessionStart hook (Mac/Linux)
-│   │   └── session-start-context.ps1  # SessionStart hook (Windows)
+│   │   └── session-start-context.ps1  # Windows twin — kept in parity, NOT wired (see CLAUDE.md)
 │   └── skills/                        # 11 skills → /bx:<name> (each: SKILL.md + references/)
 │       ├── arch/                      # /bx:arch      — repo-wide architecture audit
 │       ├── clean/                     # /bx:clean     — codebase cleanup audit
