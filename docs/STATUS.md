@@ -10,11 +10,11 @@ Last Updated: 2026-09-08 (Session 59)
 |------|--------|
 | Skills (11) | Complete — `/bx:save` model-invocable S59; `/bx:evolve --full --fix` dogfooded S59; only `/bx:health` never run |
 | Subagents (20) | Complete — `arch-robustness` added S58 |
-| Plugin packaging (`bx`) | **v2.9.0 committed S59, push pending**; Part 8 step 2b now judges `claude plugin validate --json` on its `success` field. Local cache on 2.8.0 — `/plugin update bx` after push. Symlink retirement still pending |
+| Plugin packaging (`bx`) | **v2.9.0 pushed and installed S59** (`511b197`); Part 8 step 2b judges `claude plugin validate --json` on its `success` field. Local cache on 2.9.0; `/bx:save` confirmed visible to Claude after `/reload-plugins`. Symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate still pending |
 | Cross-platform setup | Complete |
-| GitHub sync | Complete — main pushed through v2.8.0 (`fed4403`); v2.9.0 commit awaits push |
+| GitHub sync | Complete — main pushed through v2.9.0 (`511b197`) |
 | Documentation | Complete — schema v2 |
 
 ## Completed
@@ -39,19 +39,18 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## Next Steps
 
-1. **Push v2.9.0, then `/plugin update bx`** — the cache is on 2.8.0; until it updates, `/bx:save` is still invisible to Claude in interactive sessions (the flag flip only reaches sessions through the marketplace).
-2. **Doc tiering — decision pass on the `/doctor` findings (S59)** — spec drafted at [superpowers/specs/2026-08-24-bx-doc-tiering-design.md](superpowers/specs/2026-08-24-bx-doc-tiering-design.md); status Draft, 8 decisions open, nothing implemented. Field evidence from a `/doctor` run on a repo that uses `/bx:save` every session: CLAUDE.md at 31.1k chars (2.6× the 12k soft cap) with `## Known Issues / Blockers` at 48% of it — the one required section with no cap, no shrinker and no archive destination. Recommended split: ship the Known Issues governor + relocate-don't-delete + the derivable-content clause first; hold the `.claude/rules/` path-scoped tier behind a second gate. Pairs with #5.
-3. **Finish the `cc` session naming/coloring rollout (S55)** — run the live gate, then dispatch the single fix wave listed in `## In Progress`.
-4. **Doc-schema v2 fixture verification** — the deferred live `/bx:save` runs against the six fixture cases (see `## In Progress`), plus the post-merge minors batch from both plans.
-5. **/simplify follow-up: move Part 7.7 rotation out of Part 7** into its own sibling Part — deletes the five "except 7.7" carve-outs; requires a blind rehearsal before shipping (deliberately skipped S57). The S59 spec's D4 proposes a Part 7.9 sibling on the same reasoning — do these together.
-6. **Resume the `/bx:webdesign` kaanarik run past review** — push through Phase 3 inject+verify; verify finding `dadac845`.
-7. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
-8. **Dogfood `/bx:health`** — the last skill never run end-to-end. Five skills were dogfooded S58 and every one produced defects on its first run; expect the same.
-9. **S37 plugin-packaging leftovers** — symlink retirement and the launcher-script symlink check (install smoke-test and the `Skill(bx-*)` sweep are closed).
-10. **`/bx:evolve` follow-ups** — (a) hand-triage the 18 carried-forward open findings from their stored titles; S59 proved neither a follow-up `--fix` nor `--full --fix` can reach them (fix mode gates same-run findings only; the changelog window floors at v2.1.203; the lanes drop already-implemented deltas); (b) store `source_excerpt` in state.json so carried-forward entries become fix-eligible; (c) add an `applied` branch and a same-`source_url` dedup to Step 3.4 — v2.1.233 re-entered as `e1e67d43` beside applied `5d1459d5`; (d) reword the default-mode closing line, which oversells a second pass; (e) stabilise the `bx:pain/<slug>` derivation. Also: scan-docs allowlist candidate (`auto-mode-config`); shared `references/lane-contract.md`.
-11. **`/bx:seo` deferred items** — code-review leftovers (#5/#6/#7) + S25/S27/S29 refactors.
-12. **Commit regression tests for S58's two concurrency fixes** — `/bx:tests`' top-ranked finding. Both v2.5.0 (session-color mutex) and v2.5.1 (GSC `_rmw_lock`) were verified with throwaway controls that were never committed, so the evidence of correctness lives in commit messages rather than the repo. Port both harnesses: N racing processes, assert distinct results, no lost updates, no orphaned lock.
-13. **Sweep the 13 remaining exclusion-list restatements** — `/bx:seo`, `/bx:webdesign` and `/bx:clean` still carry their own copies; the owner file `arch/references/scan-exclusions.md` lists them.
+1. **Doc tiering — decision pass on the `/doctor` findings (S59)** — spec drafted at [superpowers/specs/2026-08-24-bx-doc-tiering-design.md](superpowers/specs/2026-08-24-bx-doc-tiering-design.md); status Draft, 8 decisions open, nothing implemented. Field evidence from a `/doctor` run on a repo that uses `/bx:save` every session: CLAUDE.md at 31.1k chars (2.6× the 12k soft cap) with `## Known Issues / Blockers` at 48% of it — the one required section with no cap, no shrinker and no archive destination. Recommended split: ship the Known Issues governor + relocate-don't-delete + the derivable-content clause first; hold the `.claude/rules/` path-scoped tier behind a second gate. Pairs with #4.
+2. **Finish the `cc` session naming/coloring rollout (S55)** — run the live gate, then dispatch the single fix wave listed in `## In Progress`.
+3. **Doc-schema v2 fixture verification** — the deferred live `/bx:save` runs against the six fixture cases (see `## In Progress`), plus the post-merge minors batch from both plans.
+4. **/simplify follow-up: move Part 7.7 rotation out of Part 7** into its own sibling Part — deletes the five "except 7.7" carve-outs; requires a blind rehearsal before shipping (deliberately skipped S57). The S59 spec's D4 proposes a Part 7.9 sibling on the same reasoning — do these together.
+5. **Resume the `/bx:webdesign` kaanarik run past review** — push through Phase 3 inject+verify; verify finding `dadac845`.
+6. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45.
+7. **Dogfood `/bx:health`** — the last skill never run end-to-end. Five skills were dogfooded S58 and every one produced defects on its first run; expect the same.
+8. **S37 plugin-packaging leftovers** — symlink retirement and the launcher-script symlink check (install smoke-test and the `Skill(bx-*)` sweep are closed).
+9. **`/bx:evolve` follow-ups** — (a) hand-triage the 18 carried-forward open findings from their stored titles; S59 proved neither a follow-up `--fix` nor `--full --fix` can reach them (fix mode gates same-run findings only; the changelog window floors at v2.1.203; the lanes drop already-implemented deltas); (b) store `source_excerpt` in state.json so carried-forward entries become fix-eligible; (c) add an `applied` branch and a same-`source_url` dedup to Step 3.4 — v2.1.233 re-entered as `e1e67d43` beside applied `5d1459d5`; (d) reword the default-mode closing line, which oversells a second pass; (e) stabilise the `bx:pain/<slug>` derivation. Also: scan-docs allowlist candidate (`auto-mode-config`); shared `references/lane-contract.md`.
+10. **`/bx:seo` deferred items** — code-review leftovers (#5/#6/#7) + S25/S27/S29 refactors.
+11. **Commit regression tests for S58's two concurrency fixes** — `/bx:tests`' top-ranked finding. Both v2.5.0 (session-color mutex) and v2.5.1 (GSC `_rmw_lock`) were verified with throwaway controls that were never committed, so the evidence of correctness lives in commit messages rather than the repo. Port both harnesses: N racing processes, assert distinct results, no lost updates, no orphaned lock.
+12. **Sweep the 13 remaining exclusion-list restatements** — `/bx:seo`, `/bx:webdesign` and `/bx:clean` still carry their own copies; the owner file `arch/references/scan-exclusions.md` lists them.
 
 ## Session History
 
@@ -62,4 +61,4 @@ See [completed-work.md](completed-work.md) for full checklist.
 - **`/bx:evolve` ran twice** — a delta run (2.1.241 → 2.1.263, 4 findings) and `--full --fix` (50 releases, 1 gated edit approved). Three findings applied by hand between them: `claude plugin validate --json` judged on `success` in Part 8, `/reload-plugins` headless notes, `/doctor` trim check cross-referenced in doc-schema.md.
 - **`session-start-context.ps1` deleted.** The hooks reference lists no per-OS command field; `.sh`-only via Git Bash is the deliberate scope. Three README leftovers cleaned.
 - **Two evolve defects found by execution:** a follow-up `--fix` cannot gate the prior run's findings (no `source_excerpt`, watermark already advanced), and `--full` is a 50-release window that never re-emits the 18 older open findings — hand triage is the only path. Same-release re-emits under a new capability string enter as duplicates.
-- **Not yet pushed:** v2.9.0 commit; `/plugin update bx` afterwards.
+- **Shipped:** v2.9.0 committed (`511b197`), pushed, installed via `/plugin update bx` + `/reload-plugins`; `bx:save` now appears in Claude's skill list.
