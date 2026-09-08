@@ -1,8 +1,8 @@
 {
   "watermark": {
-    "last_changelog_version": "2.1.241",
-    "docs_checked_at": "2026-08-24",
-    "community_checked_at": "2026-08-24"
+    "last_changelog_version": "2.1.263",
+    "docs_checked_at": "2026-09-08",
+    "community_checked_at": "2026-09-08"
   },
   "decisions": [
     {
@@ -433,6 +433,72 @@
       "class": "opportunity",
       "title": "`claude plugin validate` is the documented local smoke-test — wire it into /bx:save Part 8 to close the S37 install-smoke-test leftover",
       "note": "Docs lane, severity medium, certainty 0.6. ORCHESTRATOR-VERIFIED THIS RUN: the command exists (claude plugin validate [--strict] <path>), and bx passes both plain and --strict, as does the marketplace manifest at repo root. Proposed: add a validate step to mode-update.md Part 8 alongside the version bump, surfacing errors/warnings at the commit checkpoint. Closes the install-smoke-test half of the S37 plugin-packaging leftovers open since Session 37. APPLIED 2026-08-24 (same-run --fix): mode-update.md Part 8 gains step 2b — run `claude plugin validate ./bx --strict` after the version bump and before the commit, plus `claude plugin validate .` for the root marketplace manifest. Pass reports one line; fail/warn surfaces output verbatim and asks fix-now-or-commit-anyway (never a veto — a warning is information, not a block); --silent reports and commits anyway since its contract is zero prompts; command-not-found skips silently so an older harness never fails a save. bx/skills/save/SKILL.md allowed-tools gained Bash(claude:*) per the S45 enumeration rule — without it the new step would prompt on every save. Dogfooded on itself: bx and the root marketplace manifest both pass plain and --strict. Shipped in plugin v2.6.0."
+    },
+    {
+      "finding_id": "83d36fa2e7a55bd3721e8efbc749f1dbc5a736c9",
+      "decision": "applied",
+      "date": "2026-09-08",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.259",
+      "affected_capability": "bx:save/plugin-validate-smoke-test",
+      "source_content_hash": "71894c842cabbb2d44eb52d5d81489dce531363c",
+      "class": "best_practice",
+      "title": "`claude plugin validate --json` gives a machine-readable report — parse it in /bx:save Part 8 step 2b instead of prose",
+      "note": "Part 8 step 2b now runs `claude plugin validate ./bx --strict --json` (and `. --json` for the marketplace) and judges on the top-level `success` field plus manifest.errors/warnings; README contributors note updated. workflow.md's Aug-2026 history row left untouched (record of past state)."
+    },
+    {
+      "finding_id": "e6fab951a2169c8bba1bd8ffa54cba4a37021cc1",
+      "decision": "applied",
+      "date": "2026-09-08",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.260",
+      "affected_capability": "bx:builtins/reload-plugins",
+      "source_content_hash": "d0930abe45c42a9e631c033f1c4b91999fd1cded",
+      "class": "opportunity",
+      "title": "`/reload-plugins` now works in headless sessions (v2.1.260) — plugin-refresh guidance only describes the interactive path",
+      "note": "Added the 2.1.260 headless-availability note at both `/reload-plugins` sites: fix-mode-evolve.md post-pass steps and webdesign setup-stitch-mcp.md."
+    },
+    {
+      "finding_id": "b1397bf6e4411a928b85a9a20e11d214f8207b98",
+      "decision": "rejected",
+      "date": "2026-09-08",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.260",
+      "affected_capability": "bx:skills/skill-tool-invocation",
+      "source_content_hash": "31d78382b9fb2e0b25fe381dcbbb0798b97c4b09",
+      "class": "best_practice",
+      "title": "`Skill(name)` rules now match nested `<dir>:name` skills (v2.1.260) — relevant to webdesign's `stitch-design:*` calls",
+      "note": "No `Skill(stitch-design…)` permission rule exists in bx, so there is nothing to change; the lane itself reported no edit needed. Revisit only if such a rule is added — five webdesign references use the nested `stitch-design:<name>` form."
+    },
+    {
+      "finding_id": "7b54fbc1b1f0ac71374606a220d27ad75fbd35e1",
+      "decision": "applied",
+      "date": "2026-09-08",
+      "source_url": "https://code.claude.com/docs/en/hooks",
+      "affected_capability": "bx:scripts/session-start-context-ps1",
+      "source_content_hash": "4e0d78d3490d9074fcbc793d01843a0c474b2f87",
+      "class": "opportunity",
+      "title": "hooks.json has no per-OS command field — only a per-hook `shell` field or a dispatcher wrapper; resolves the S58 open question on `session-start-context.ps1`",
+      "note": "Deleted bx/scripts/session-start-context.ps1: never wired, hooks.json has no per-OS command field per the hooks reference, and the .sh already runs on Windows via Git Bash. README tree, CLAUDE.md Known Issues and STATUS.md Next Steps #13 updated; Windows-without-Git-Bash is now explicitly out of scope."
+    },
+    {
+      "finding_id": "e1e67d4317b31981a1eff15305968c62c9f04ce0",
+      "decision": "applied",
+      "date": "2026-09-08",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.233",
+      "affected_capability": "bx:skills/task-tracker-tools",
+      "source_content_hash": "2a57cd608b92b649834b722a83392044b7608f08",
+      "class": "breakage",
+      "title": "Todo/task-tracking tools removed by default on newer models (v2.1.233) — degraded paths per skill",
+      "note": "Duplicate of 5d1459d5 (same v2.1.233 release, re-emitted under bx:skills/task-tracker-tools instead of bx:arch/plan-mode-taskcreate-handoff). Already applied in v2.2.0 (task-tools.md + degraded paths); no edit. Closed by the orchestrator, not the gate — Step 3.4 has no applied branch and no cross-capability dedup."
+    },
+    {
+      "finding_id": "c0a336b6e22b9d0c818dcf4f1f582b26d5ff63dc",
+      "decision": "applied",
+      "date": "2026-09-08",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.206",
+      "affected_capability": "bx:save/doc-schema-v2",
+      "source_content_hash": "80697e49512266a511a51e40dc21969f22f9de8e",
+      "class": "opportunity",
+      "title": "`/doctor` trim check proposes cutting codebase-derivable content from CLAUDE.md (v2.1.206) — cross-reference it in the doc-schema owner file",
+      "note": "Added a derivable-content paragraph to doc-schema.md's v2 layout section naming `/doctor`'s trim check (2.1.206+) and cross-referencing mode-update.md Part 4.3; approved in the --full --fix gate."
     }
   ]
 }

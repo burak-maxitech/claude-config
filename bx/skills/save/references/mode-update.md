@@ -861,16 +861,22 @@ After all documentation updates **and rollups** are complete, remind the user to
    run the official local smoke test:
 
    ```
-   claude plugin validate ./bx --strict
+   claude plugin validate ./bx --strict --json
    ```
 
    `--strict` treats warnings as errors, which is what you want at a commit checkpoint: unrecognized
    frontmatter keys and missing metadata are tolerated by the runtime but are exactly the drift this
-   step exists to catch. Also validate the marketplace manifest with `claude plugin validate .` when
-   `.claude-plugin/marketplace.json` exists at the repo root.
+   step exists to catch. Also validate the marketplace manifest with `claude plugin validate . --json`
+   when `.claude-plugin/marketplace.json` exists at the repo root.
 
-   - **Passes** → report one line (`plugin validate: passed`) and continue to step 3.
-   - **Fails or warns** → surface the output verbatim and ask whether to fix now or commit anyway.
+   `--json` (Claude Code 2.1.259+) returns a machine-readable report. **Judge the outcome from its
+   fields, not from prose:** the top-level `success` boolean is the verdict; `manifest.errors`,
+   `manifest.warnings` and `contents` carry the specifics. If the CLI rejects `--json` (older Claude
+   Code), re-run without the flag and read the prose output instead.
+
+   - **Passes** (`"success": true`) → report one line (`plugin validate: passed`) and continue to step 3.
+   - **Fails or warns** (`"success": false`, or any non-empty `manifest.errors` / `manifest.warnings`)
+     → surface the `errors` and `warnings` entries verbatim and ask whether to fix now or commit anyway.
      Do NOT block the commit on your own judgement; a validation warning is information for the
      user, not a veto. In `--silent` mode, report the failure in the run summary and commit anyway —
      the flag's contract is zero prompts, and silently *skipping* the commit would be worse than

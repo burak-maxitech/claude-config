@@ -79,7 +79,7 @@ Each session is launched **named after the project and color-coded**, so paralle
 
 Updates are on-demand; the plugin is explicitly versioned (semver in `bx/.claude-plugin/plugin.json`, history in [`CHANGELOG.md`](CHANGELOG.md)), and the `version` field is the update cache key — `/plugin update bx` installs a new version whenever it has been bumped, and a pushed commit that doesn't bump it is not offered as an update. (If you use the `cc` launcher, it runs this refresh automatically on every launch — so you can skip these two commands.) Claude Code 2.1.216 made skills and commands edited *during* a session appear in the slash menu without a restart — but that covers in-place edits to files already loaded, not pulling a new commit from the marketplace, so the two commands above are still how you pick up someone else's changes.
 
-**Contributors only** — if you edited skills in a local clone: bump `version` in `bx/.claude-plugin/plugin.json` and add a [`CHANGELOG.md`](CHANGELOG.md) entry (the version is the update cache key — pushing without a bump means `/plugin update` reports "already at the latest version" and nobody receives the change; `/bx:save`'s commit step does the bump for you, and since v2.6.0 also runs `claude plugin validate ./bx --strict` at the same checkpoint so a manifest or frontmatter problem surfaces before the push rather than at install time), then `git commit` → `git push` and run the two commands above to pick up your own change.
+**Contributors only** — if you edited skills in a local clone: bump `version` in `bx/.claude-plugin/plugin.json` and add a [`CHANGELOG.md`](CHANGELOG.md) entry (the version is the update cache key — pushing without a bump means `/plugin update` reports "already at the latest version" and nobody receives the change; `/bx:save`'s commit step does the bump for you, and since v2.6.0 also runs `claude plugin validate ./bx --strict --json` at the same checkpoint so a manifest or frontmatter problem surfaces before the push rather than at install time), then `git commit` → `git push` and run the two commands above to pick up your own change.
 
 <details>
 <summary><strong>Migrating an existing machine from the old symlink setup</strong> — click to expand. <em>Only relevant if you used this repo before it became a plugin (you have <code>~/.claude/skills</code> symlinked into a clone). New teammates: skip this entirely.</em></summary>
@@ -244,7 +244,7 @@ The `bx/agents/` folder contains 19 subagent definitions used by skills (namespa
 
 ## Optional: SessionStart hook for auto-orientation
 
-The repo ships `bx/scripts/session-start-context.{sh,ps1}` — a cheap (<1s) read-only script that emits project orientation as system context at the start of every Claude Code session, before the user's first prompt. It eliminates the need to type `/bx:resume` for routine starts (deep orientation still works via the explicit slash command).
+The repo ships `bx/scripts/session-start-context.sh` — a cheap (<1s) read-only script that emits project orientation as system context at the start of every Claude Code session, before the user's first prompt. It eliminates the need to type `/bx:resume` for routine starts (deep orientation still works via the explicit slash command).
 
 **What it emits:**
 - Branch + uncommitted-file count + age of last commit
@@ -278,7 +278,7 @@ Add to the target project's `.claude/settings.json`:
 }
 ```
 
-The plugin hook (`bx/hooks/hooks.json`) wires only the `.sh`. On Windows, swap to `.ps1` and prefix with `pwsh -NoProfile -File ` — that's the manual alternative for Windows users without Git Bash; it carries the same dual-layout logic as the `.sh` and parses cleanly on both PowerShell 7 and Windows PowerShell 5.1.
+The plugin hook (`bx/hooks/hooks.json`) wires the `.sh`, which also runs on Windows through Git Bash (Claude Code's default hook shell there). There is no PowerShell variant: `hooks.json` has no per-OS command field, so a Windows machine without Git Bash is out of scope for the hook (the former `.ps1` twin was removed 2026-09-08).
 
 ### Install (global, all projects)
 
@@ -336,8 +336,7 @@ claude-config/                         # marketplace repo
 │   ├── hooks/
 │   │   └── hooks.json                 # SessionStart project-orientation injection
 │   ├── scripts/
-│   │   ├── session-start-context.sh   # SessionStart hook (Mac/Linux)
-│   │   └── session-start-context.ps1  # Windows twin — kept in parity, NOT wired (see CLAUDE.md)
+│   │   └── session-start-context.sh   # SessionStart hook (bash; runs on Windows via Git Bash)
 │   └── skills/                        # 11 skills → /bx:<name> (each: SKILL.md + references/)
 │       ├── arch/                      # /bx:arch      — repo-wide architecture audit
 │       ├── clean/                     # /bx:clean     — codebase cleanup audit

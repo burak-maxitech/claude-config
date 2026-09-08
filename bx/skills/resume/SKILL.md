@@ -267,7 +267,7 @@ Once you've presented the summary and user confirms direction:
 
 1. **Start working** on the agreed task
 2. **Reference docs** as needed during development
-3. **At end of session**, remind user: "Run `/bx:save` to save progress"
+3. **At end of session**, when the user signals they are wrapping up or asks to save progress, invoke `/bx:save` yourself via the Skill tool (it is model-invocable); do not just tell the user to run it
 
 ---
 

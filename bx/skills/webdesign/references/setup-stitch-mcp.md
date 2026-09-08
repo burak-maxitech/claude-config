@@ -45,7 +45,7 @@ This skill drives Google Stitch through its MCP + Google's official skills. Set 
    npx plugins add google-labs-code/stitch-skills --scope project --target claude-code
    ```
 
-Then **restart Claude Code** (or `/reload-plugins` — a newly-added MCP server's tools appear only on reconnect) and re-run `/bx:webdesign`.
+Then **restart Claude Code** (or `/reload-plugins` — a newly-added MCP server's tools appear only on reconnect; since Claude Code 2.1.260 the command also works in headless `-p` / SDK sessions) and re-run `/bx:webdesign`.
 ```
 
 > 🔒 **Secret hygiene (API-key mode).** The `claude mcp add` command the wizard prints embeds your **raw API key** in a `--header`. Run it in the external terminal, **never via `!`**, so the key never lands in the Claude Code transcript. If the wizard wrote the key to `.env`, confirm `.env` is gitignored (`git check-ignore .env`) before any commit. Use `-s user`, **not** `-s project` — `-s project` writes `./.mcp.json` into the repo and risks committing the key. (The `.env` copy is redundant once the key is in `~/.claude.json` for the `http` transport; it can be deleted afterward.)

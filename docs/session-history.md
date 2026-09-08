@@ -213,3 +213,23 @@
 - Run `/plugin update bx` — main is v2.8.0, the cache 2.5.1, so three versions of skill fixes are not live
 - Commit regression tests for the two concurrency fixes; their evidence is still only in commit messages
 - Dogfood `/bx:health`, the last skill never run
+
+### Session 59 - 2026-09-08
+**What happened:**
+- `/bx:evolve` delta run: watermark 2.1.241 → 2.1.263 (13 releases, 11 doc pages, community degraded 4/5). Four findings; CLAUDE.md's "frozen at 2.1.228" claim found stale. Then applied by hand rather than via a follow-up `--fix`: `83d36fa2` (Part 8 step 2b uses `claude plugin validate --strict --json`, verdict from `success` + `manifest.errors/warnings`), `e6fab951` (`/reload-plugins` headless since 2.1.260 noted in fix-mode-evolve.md and setup-stitch-mcp.md), `7b54fbc1` (deleted `bx/scripts/session-start-context.ps1`; README, CLAUDE.md, STATUS.md updated), `b1397bf6` rejected (no `Skill(stitch-design…)` rule exists).
+- User asked why Claude can never run `/bx:save` itself. Cause: `disable-model-invocation: true` (set S42) removes the description from context per the skills reference. Flipped to `false`, `/bx:resume` wrap-up step reworded to invoke it, workflow.md's "every bx skill is explicit-only" corrected, `.claude/settings.local.json` `Skill(bx:docs)` → `Skill(bx:save)`. Verified by headless A/B (`--plugin-dir ./bx` with cached plugin disabled → YES; cached 2.8.0 → NO, only `bx:plan` visible). Feedback memory saved. v2.8.0 → **v2.9.0**.
+- `/bx:evolve --full --fix`: 50 releases (window floor v2.1.203), 11 pages, community degraded. One gated edit approved (`c0a336b6`: doc-schema.md now names `/doctor`'s trim check and cross-references mode-update.md Part 4.3); `e1e67d43` closed as a duplicate of applied `5d1459d5` (same v2.1.233 release, different capability string); `83d36fa2` re-emitted and suppressed as already applied. The 18 older open findings were NOT re-emitted — my claim that `--full --fix` would gate them was wrong.
+- Two README leftovers from the `.ps1` deletion (lines 247, 281) caught during consolidation, one by the docs lane.
+
+**Files created/modified:**
+- `bx/skills/save/SKILL.md` (flag), `bx/skills/save/references/mode-update.md` (Part 8 step 2b `--json`), `bx/skills/save/references/doc-schema.md` (`/doctor` paragraph)
+- `bx/skills/resume/SKILL.md` (wrap-up step invokes save), `bx/skills/evolve/references/fix-mode-evolve.md`, `bx/skills/webdesign/references/setup-stitch-mcp.md` (headless `/reload-plugins` notes)
+- `bx/scripts/session-start-context.ps1` — deleted
+- `bx/.claude-plugin/plugin.json` 2.8.0 → 2.9.0, `CHANGELOG.md` 2.9.0 entry
+- `README.md` (validate `--json`, hook tree, Windows paragraph), `workflow.md` (`/loop` caveat), `CLAUDE.md` Known Issues (ps1 resolved, watermark line, `--fix` follow-up defect), `docs/STATUS.md` Next Steps #13
+- `docs/upstream/state.json` — 6 new entries, 6 verdicts; watermark 2.1.263 · 2026-09-08
+
+**Next session should:**
+- Push v2.9.0 and run `/plugin update bx`, then confirm Claude can invoke `/bx:save` interactively
+- Hand-triage the 18 carried-forward evolve findings; fix Step 3.4 (`applied` branch, same-URL dedup) and store `source_excerpt`
+- Dogfood `/bx:health`

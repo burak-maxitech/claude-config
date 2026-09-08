@@ -252,3 +252,9 @@
 - [x] `/bx:clean` scoped run — `session-start-context.ps1` proven unwired, kept deliberately
 - [x] Shared `scan-exclusions.md` owner created; `/bx:arch` + `/bx:tests` repointed across 14 sites
 - [x] Nine plugin versions shipped and pushed: v2.2.0 → v2.8.0
+- [x] `/bx:save` model-invocable (`disable-model-invocation: false`), resume wrap-up invokes it, headless A/B verified — `bx/skills/save/SKILL.md`, `bx/skills/resume/SKILL.md`, `workflow.md`, `.claude/settings.local.json`
+- [x] `/bx:evolve` delta run 2.1.241 → 2.1.263 + `--full --fix` run; five findings resolved (4 applied, 1 rejected) — `docs/upstream/state.json`
+- [x] Part 8 step 2b judges `claude plugin validate --strict --json` on `success` — `bx/skills/save/references/mode-update.md`, `README.md`
+- [x] `session-start-context.ps1` deleted; hooks.json has no per-OS field — `bx/scripts/`, `README.md`, `CLAUDE.md`, `docs/STATUS.md`
+- [x] doc-schema.md names `/doctor`'s trim check — `bx/skills/save/references/doc-schema.md`
+- [x] bx v2.9.0 — `bx/.claude-plugin/plugin.json`, `CHANGELOG.md`

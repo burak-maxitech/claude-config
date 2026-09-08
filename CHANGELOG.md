@@ -2,6 +2,41 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.9.0 — 2026-09-08
+
+### Changed
+
+- **`/bx:save` is model-invocable again.** S42 flipped `disable-model-invocation` to `true` to
+  make the skill explicit-only. Per the official skills reference, that flag also removes the
+  skill's description from Claude's context, so Claude could not run the end-of-session save
+  itself and always asked the user to. Flipped back to `false` (`/bx:plan` already was), and
+  `/bx:resume`'s wrap-up step now says to invoke `/bx:save` via the Skill tool rather than
+  "remind user". The save's own consent gates (migration, commit) still apply when Claude
+  invokes it. workflow.md's `/loop` caveat no longer claims every bx skill is explicit-only.
+
+- **`/bx:save` Part 8 step 2b judges `claude plugin validate` by its `--json` report.** Both
+  invocations (`./bx --strict` and the marketplace `.`) now pass `--json` (Claude Code 2.1.259+)
+  and the pass/fail verdict comes from the top-level `success` field plus `manifest.errors` /
+  `manifest.warnings`, not from reading prose. Older CLIs that reject the flag fall back to the
+  prose path. (`/bx:evolve` finding `83d36fa2`.)
+
+- **`/reload-plugins` headless note.** Both places that tell the user to refresh the plugin cache
+  (fix-mode-evolve.md post-pass steps, setup-stitch-mcp.md) now note the command also works in
+  headless `-p` / SDK sessions since Claude Code 2.1.260. (`/bx:evolve` finding `e6fab951`.)
+
+- **doc-schema.md names `/doctor`'s trim check.** The owner of the CLAUDE.md contract now states
+  the derivable-content rule and cross-references mode-update.md Part 4.3, so a `/doctor` trim
+  proposal (Claude Code 2.1.206+) reads as input to the size target rather than licence to drop a
+  required section. (`/bx:evolve --full --fix` finding `c0a336b6`.)
+
+### Removed
+
+- **`bx/scripts/session-start-context.ps1`.** Never wired: `hooks.json` registered only the `.sh`
+  from the day the `.ps1` was added, and the official hooks reference lists no per-OS command
+  field, so the file could only ever run behind a dispatcher wrapper that cannot be verified from
+  a Mac. The `.sh` already runs on Windows via Git Bash. `.sh`-only is now the deliberate scope;
+  README tree, CLAUDE.md Known Issues and STATUS.md updated. (`/bx:evolve` finding `7b54fbc1`.)
+
 ## 2.8.0 — 2026-08-24
 
 ### Fixed

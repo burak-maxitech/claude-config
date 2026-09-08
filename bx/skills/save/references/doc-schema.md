@@ -40,6 +40,12 @@ and resume idempotently, never as complete.
     docs/session-history.md      unchanged archive
     docs/archive/                rotated volumes — see Archives below
 
+CLAUDE.md holds what Claude cannot derive from the codebase. Since Claude Code 2.1.206,
+`/doctor` proposes trimming checked-in CLAUDE.md files by cutting derivable content (tech
+stack, common commands, key paths, architecture patterns); `mode-update.md` Part 4.3 applies
+the same rule to memory sync. Treat a `/doctor` trim proposal as input to the ~7k target above,
+never as licence to drop a required section.
+
 `Last Updated:` is deliberately present in BOTH files. After the split CLAUDE.md may sit
 untouched for weeks while state churns daily; the staleness signal must follow the state or
 `/bx:resume` and the SessionStart hook report false freshness.
