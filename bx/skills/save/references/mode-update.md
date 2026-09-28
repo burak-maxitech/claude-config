@@ -76,12 +76,13 @@ Compose this structure and pass it to `save-writer` as the task prompt (fill eve
 
 - `project_root` — absolute repo path.
 - `today` — current date (e.g. `2026-05-29`). Resolve it from the session's current date supplied by the environment; if that's unavailable, fall back to the most recent commit date from the Step 0.1 `git log` (`git log -1 --date=short`). Do not invoke a bare `date` command — it isn't in `allowed-tools`.
-- `claude_md_deltas` — exact `old → new` string pairs (or "replace block under `## Section` with: …") for CLAUDE.md sections the session changed: the `Last Updated:` line, `## Key Decisions` (Part 1.6) and `## Known Issues / Blockers` (Part 1.7 — a blocker resolved or added this session). **Instructions only** — no state sections. Source the *old* strings verbatim from the CLAUDE.md you read in Step 0.
+- `claude_md_deltas` — exact `old → new` string pairs (or "replace block under `## Section` with: …") for CLAUDE.md sections the session changed: the `Last Updated:` line, `## Key Decisions` (Part 1.6) and `## Known Issues / Blockers` (Part 1.7 — a blocker added or reworded this session; a blocker **resolved** this session goes in `known_issue_moves`, never here). **Instructions only** — no state sections. Source the *old* strings verbatim from the CLAUDE.md you read in Step 0.
 - `status_md_deltas` — the same, for `docs/STATUS.md`: its `Last Updated:` line, Current Status rows (Part 1.2), the `## Completed` summary line if the drain changed the completed count (Part 0 / Part 1.3), In Progress (Part 1.4) and Next Steps (Part 1.5). Source the *old* strings verbatim from the docs/STATUS.md you read in Step 0 (or, on a v1 repo where STATUS.md is absent, from CLAUDE.md's state sections, per Step 0.1).
 - `status_md_session_block` — the full replacement text for STATUS.md's `## Session History` last-session block (Part 1.8 format, ≤5 bullets). New field name under schema v2 — the block lives in STATUS.md now, not CLAUDE.md.
 - `session_history_entry` — the detailed entry for `docs/session-history.md` (Part 1.8 format, capped).
 - `completed_items` — `- [x] …` lines from the task drain (may be empty).
 - `decision_rows` — a list of `| decision | rationale |` rows, **one per** genuinely architectural decision made this session (Part 1.6 criteria); empty list if none. Most sessions have 0–1, but a session that locks in several architectural decisions lists each as its own row (don't drop the extras).
+- `known_issue_moves` — a list, **one item per** issue this session resolved (Part 1.7); empty list if none. Each item carries: `entry` (the entry's full text, verbatim from the CLAUDE.md you read in Step 0 — it is both the archive body and the removal `old_string`), `title` (≤10 words, taken from the entry's lead), `status` (`resolved`), `session` (e.g. `S60`), and `commit` (the short hash that resolved it, or `none`).
 
 ### Dispatch
 
@@ -90,6 +91,7 @@ Dispatch one `save-writer` subagent via the Agent tool with `subagent_type: "bx:
 `save-writer` reports on two channels, matching `doc-migrator.md`'s convention: `notes:` is advisory, `warnings:` is the channel that compels action. `warnings:` itself carries two distinct sub-cases (see `save-writer.md`'s Output section) that call for different responses — do not treat every non-`none` `warnings:` as a re-dispatch trigger. Handle each:
 - **`notes:` non-`none`** (a density-cap: a field exceeded the prose caps) → tighten the offending field, note it in your report, do NOT re-dispatch.
 - **`warnings:` non-`none`, unmatched delta** (an `old_string` didn't match, so that CLAUDE.md or docs/STATUS.md section was left un-updated) → re-source the exact current string from the CLAUDE.md / docs/STATUS.md you read in Step 0 (or re-read the affected lines) and re-dispatch **only** those deltas. This is the one case where re-dispatch IS warranted — silently leaving a section stale is the failure mode this guards against.
+- **`warnings:` non-`none`, unmatched known-issue removal** (the entry was archived, but its text was not found verbatim in CLAUDE.md, so it was not removed) → re-read the affected lines of CLAUDE.md and re-dispatch **only** a `claude_md_deltas` removal for that entry. Do NOT re-send the `known_issue_moves` item — the archive copy already exists.
 - **`warnings:` non-`none`, schema-v1 `docs/STATUS.md`-absent fallback** (save-writer routed `status_md_deltas` and `status_md_session_block` to CLAUDE.md because `docs/STATUS.md` doesn't exist yet) → confirm the v1 routing was expected (migration hasn't run on this repo), log it in your report, do NOT re-dispatch.
 - Both `notes:` and `warnings:` read `none` → done, no re-dispatch.
 
@@ -256,7 +258,7 @@ behind. Because the repo is on the legacy layout, every link written back into C
 | 1.4 In Progress | docs/STATUS.md |
 | 1.5 Next Steps | docs/STATUS.md |
 | 1.6 Key Decisions | CLAUDE.md (+ append to docs/key-decisions.md) |
-| 1.7 Known Issues / Blockers | CLAUDE.md |
+| 1.7 Known Issues / Blockers | CLAUDE.md (+ append to docs/known-issues.md) |
 | 1.8 Session History | docs/STATUS.md (+ append to docs/session-history.md) |
 
 1.1 Documentation Links stays in CLAUDE.md and is unrelated to the `> Session state:` pointer
@@ -337,10 +339,25 @@ Target: **CLAUDE.md's `## Key Decisions` table** (unchanged from v1 — this sta
    - Include a link at the bottom: `> Full decision log: [docs/key-decisions.md](docs/key-decisions.md)`
 
 ### 1.7 Known Issues / Blockers
-Target: **CLAUDE.md's `## Known Issues / Blockers` section** (unchanged from v1). Update with any new issues found:
-- Add new issues discovered
-- Remove resolved issues
-- Mark "None currently" if empty
+Target: **CLAUDE.md's `## Known Issues / Blockers` section** (unchanged from v1), plus the
+`docs/known-issues.md` archive (format owned by `doc-schema.md`'s Archives section).
+
+An **entry** is one blank-line-separated block inside the section: a paragraph, or a
+top-level bullet with its continuation lines. The `> Session state:` pointer line that
+follows the section is not an entry and never moves.
+
+- **Add** new issues discovered this session, as new entries at the end of the section.
+- **Relocate resolved issues; do not delete them.** Put each issue this session resolved in
+  the packet's `known_issue_moves` with `status: resolved`, the resolving session, and the
+  commit hash where one exists. Do not also write a `claude_md_deltas` removal for it:
+  `save-writer` archives the entry first and removes it second, so a failed append can
+  never lose it.
+- **An issue is resolved when the session that resolved it says so — never inferred from
+  absence of mention.** A blocker nobody discussed this session is still a blocker.
+- An entry an earlier session marked resolved in place stays where it is on the Save Path.
+  Part 7.3's shrinker moves it on `--full`.
+- Write `None currently.` when the last entry leaves; replace that line when the first
+  entry arrives.
 
 ### 1.8 Session History
 Target: **docs/STATUS.md's `## Session History` section** (brief), plus the `docs/session-history.md` archive (detailed). Session history is split between docs/STATUS.md (brief) and docs/session-history.md (detailed).

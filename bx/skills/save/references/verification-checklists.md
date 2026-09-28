@@ -51,6 +51,7 @@ Saved session [N] ([mode], [path]):
   session-history.md   — appended S[N] (+[X] lines)
   completed-work.md    — +[M] items          (omit if none)
   key-decisions.md     — +N rows              (omit if none)
+  known-issues.md      — +J entries           (omit if none)
 [--full only] README.md / docs/*.md — [summary of edits]
 [--full only] rollups  — [Part 5/6/7 results, or "none triggered"]
 Drift: [drift warnings, or "none"]
@@ -94,6 +95,7 @@ For UPDATE mode the change report is assembled from the `save-writer` subagent's
 - [ ] docs/STATUS.md Completed section is a summary line + link (NOT a full checklist)
 - [ ] Completed items appended to docs/completed-work.md
 - [ ] New key decisions appended to docs/key-decisions.md
+- [ ] Issues resolved this session were moved to docs/known-issues.md, not deleted; no issue was treated as resolved because it went unmentioned
 - [ ] CLAUDE.md Key Decisions table has only important architectural decisions (~20 max)
 - [ ] docs/STATUS.md status reflects current state
 - [ ] CLAUDE.md and docs/STATUS.md link to actual docs/ files (including reference files)

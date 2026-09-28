@@ -1,6 +1,6 @@
 ---
 name: save-writer
-description: Applies session-save documentation edits handed off by the /bx:save skill — writes CLAUDE.md / docs/STATUS.md and appends to the session-history / completed-work / key-decisions archives (via anchored tail reads, never full-archive reads) from a structured update packet. Used by the bx:save skill. Do not invoke independently.
+description: Applies session-save documentation edits handed off by the /bx:save skill — writes CLAUDE.md / docs/STATUS.md and appends to the session-history / completed-work / key-decisions / known-issues archives (via anchored tail reads, never full-archive reads) from a structured update packet. Used by the bx:save skill. Do not invoke independently.
 model: sonnet
 tools: Read, Edit, Write, Grep, Glob, Bash(wc:*)
 ---
@@ -18,6 +18,7 @@ The packet contains:
 - `session_history_entry` — the full detailed entry to append to `docs/session-history.md` (already capped per the density rules below).
 - `completed_items` — list of `- [x] …` lines to append to `docs/completed-work.md` (may be empty).
 - `decision_rows` — a list of `| decision | rationale |` table rows to append (may be empty).
+- `known_issue_moves` — a list of issues leaving CLAUDE.md's `## Known Issues / Blockers` (may be empty). Each item has `entry` (full text, verbatim), `title`, `status` (`resolved` or `open`), `session`, and `commit` (a short hash, or `none`). An item with `status: open` also carries `summary` — the one-line summary + link that replaces the entry in CLAUDE.md.
 
 You do NOT call `TaskList` — the orchestrator already drained it (or skipped the drain, when the task tools were unavailable or `--skip-tasks` was passed) and folded the result into `status_md_deltas` / `completed_items`.
 
@@ -47,10 +48,30 @@ You do NOT call `TaskList` — the orchestrator already drained it (or skipped t
    ---
    ```
 7. **If `decision_rows` is non-empty**, also append each row (same order) to `docs/key-decisions.md` using the anchor rule below.
-8. **Do NOT** run rollups, README sync, or auto-memory sync — those stay with the orchestrator (`--full` mode only).
-9. **Do NOT** echo any file's full contents back. Return only the change report.
+8. **If `known_issue_moves` is non-empty**, handle each item in order — **archive first, remove second**:
 
-(Steps 4-9 are unaffected by the schema-v1 fallback: `decision_rows` always targets CLAUDE.md and `docs/key-decisions.md`, `session_history_entry` always targets `docs/session-history.md`, and `completed_items` always targets `docs/completed-work.md`, regardless of which schema version steps 2-3 wrote to.)
+   a. **Append to `docs/known-issues.md`.** Find the last entry header's line number with one Grep tool call (pattern `^### `, `output_mode: content`, `-n: true`, `-o: true`, `head_limit: 0`; take the final match), offset-Read from that line to the end of the file as your Edit anchor, and append after it with one blank line between entries. Never read the file in full. The appended block, for `status: resolved`:
+      ```markdown
+      ### <title> — Resolved <session> (<today>), commit <commit>
+
+      <entry, verbatim>
+      ```
+      Omit `, commit <commit>` when `commit` is `none`. For `status: open` the header is `### <title> — Open, moved <session> (<today>)`. If the file is missing, create it with this header first, and append the first entry after the `---` line:
+      ```markdown
+      # Known Issues Archive
+
+      > Issues moved out of [CLAUDE.md](../CLAUDE.md) by `/bx:save`. `Resolved` entries are
+      > history; `Open` entries are still live and linked from CLAUDE.md.
+
+      ---
+      ```
+   b. **Only after the append succeeded, remove `entry` from CLAUDE.md** with an exact-string Edit covering the entry and one adjacent blank line. If `entry` is not found verbatim, do NOT fuzzy-match: leave CLAUDE.md unchanged and record an unmatched known-issue removal under `warnings:` (quote the item's `title`). The archive copy stays. A duplicate is harmless; a loss is not.
+   c. **For `status: open`**, the removal in (b) is a replacement instead: put the item's `summary` line in the entry's place. An open issue never leaves CLAUDE.md without one.
+   d. If the section is left with no entries, write `None currently.` as its body. Never edit or move the `> Session state:` pointer line that follows the section.
+9. **Do NOT** run rollups, README sync, or auto-memory sync — those stay with the orchestrator (`--full` mode only).
+10. **Do NOT** echo any file's full contents back. Return only the change report.
+
+(Steps 4-10 are unaffected by the schema-v1 fallback: `decision_rows` always targets CLAUDE.md and `docs/key-decisions.md`, `session_history_entry` always targets `docs/session-history.md`, `completed_items` always targets `docs/completed-work.md`, and `known_issue_moves` always targets CLAUDE.md and `docs/known-issues.md`, regardless of which schema version steps 2-3 wrote to.)
 
 ## Anchor rule for `docs/key-decisions.md`
 
@@ -74,7 +95,7 @@ The packet content arrives already capped. Do NOT rewrite or expand it. If `sess
 
 Two channels, do not conflate them — matching `doc-migrator.md`'s convention:
 - **`notes:` is advisory.** A density-cap overage (above). The orchestrator reports it and tightens next run; it never blocks or re-dispatches anything.
-- **`warnings:` compels the orchestrator to act.** An unmatched delta (steps 2-3 above — the orchestrator re-sources the exact string and re-dispatches just that delta), or the schema-v1 `docs/STATUS.md`-absent fallback (steps 2-3 above — the orchestrator confirms the v1 routing was expected).
+- **`warnings:` compels the orchestrator to act.** An unmatched delta (steps 2-3 above — the orchestrator re-sources the exact string and re-dispatches just that delta), an unmatched known-issue removal (step 8b — the entry is archived but still in CLAUDE.md), or the schema-v1 `docs/STATUS.md`-absent fallback (steps 2-3 above — the orchestrator confirms the v1 routing was expected).
 
 Use the literal string `none` for each when there is nothing to report.
 
@@ -86,6 +107,7 @@ files:
   docs/session-history.md: appended S<N> (+<X> lines)
   docs/completed-work.md: +<M> items     # omit line if completed_items empty
   docs/key-decisions.md: +<K> rows        # omit line if decision_rows empty
+  docs/known-issues.md: +<J> entries      # omit line if known_issue_moves empty
 notes: <density-cap overages, or "none">
 warnings: <unmatched deltas, or the v1 STATUS.md-absent fallback note, or "none">
 ```
