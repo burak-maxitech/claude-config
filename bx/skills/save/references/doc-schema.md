@@ -45,7 +45,12 @@ CLAUDE.md holds what Claude cannot derive from the codebase. Since Claude Code 2
 `/doctor` proposes trimming checked-in CLAUDE.md files by cutting derivable content (tech
 stack, common commands, key paths, architecture patterns); `mode-update.md` Part 4.3 applies
 the same rule to memory sync. Treat a `/doctor` trim proposal as input to the ~7k target above,
-never as licence to drop a required section.
+never as licence to drop a required section. `/doctor prompt-audit` (2.1.283+) is the
+companion check for stale or contradictory instructions; same rule applies.
+
+Size is measured in **chars, not lines**. Anthropic's memory docs suggest under 200 lines
+per CLAUDE.md, but bx-managed files carry long table rows and paragraphs: a 62-line CLAUDE.md
+has measured 13.6k chars, passing the line test while over the 12k soft cap.
 
 `Last Updated:` is deliberately present in BOTH files. After the split CLAUDE.md may sit
 untouched for weeks while state churns daily; the staleness signal must follow the state or

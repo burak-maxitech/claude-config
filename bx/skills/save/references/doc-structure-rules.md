@@ -51,6 +51,7 @@ CLAUDE.md has a ~7k char target because it is read into context every session, a
 - **Moving a Key Decisions row from CLAUDE.md → `docs/key-decisions.md` is preservation.** The row still exists; it is one level less eager to load.
 - **Collapsing a run of `Complete` status rows into a summary line is preservation** — as long as the individual entries land in `docs/completed-work.md` with any unique notes before they leave CLAUDE.md.
 - **Compressing a session history block to a one-liner with commit hashes is preservation** — the full prose is recoverable via `git show <hash>`.
+- **Derivable facts are recoverable, and recoverable content may leave CLAUDE.md.** A fact a session can obtain in one command — the stack from `package.json`, the remote from `git remote -v`, the project path from the cwd — is preserved by that command, not by CLAUDE.md. This is the same rule as the session-history one-liner, applied to `## Project Overview`. It does **not** extend to `## Key Decisions` or `## Known Issues / Blockers`, whose content is *why*, and is derivable from nothing. `/bx:save` only names such facts as trim candidates (`mode-update.md` Part 1.9); the user decides whether they go.
 
 The "when in doubt, keep it" rule applies to *information*, not to *location*. When CLAUDE.md would otherwise grow past its targets, moving content to its designated reference file is the correct action — not an exception to preservation.
 

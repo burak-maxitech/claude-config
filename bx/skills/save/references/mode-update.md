@@ -33,7 +33,7 @@ From the gathered context:
 - **Filtered commit list** (commits since Last Updated) → feeds the session entry + drift probes.
 - **Diff file list** → tells you whether README/`docs/` changed (drift signal; drives the `--full` recommendation).
 - **TaskList state** → drives the task drain (Part 0) and the In Progress / Next Steps deltas.
-- **CLAUDE.md size + docs/STATUS.md size + Key Decisions row count + session count** — cheap: `wc -c CLAUDE.md docs/STATUS.md docs/session-history.md docs/key-decisions.md docs/completed-work.md docs/known-issues.md` for size (omit docs/STATUS.md — and any archive — from the command when the file does not exist); count the Key Decisions table rows with the **Grep tool** (`output_mode: count`, pattern `^\| `); and (for the drift probe only) count sessions with the **Grep tool** (`output_mode: count`, pattern `^### Session`) on `docs/session-history.md` — not a full read. Use the Grep tool (not shell `grep`) for the two counts so no extra Bash permission is needed; `wc`/`awk`/`sort` are declared in `allowed-tools`. These drive the drift warnings and the `--full` rollup gates.
+- **CLAUDE.md size + docs/STATUS.md size + Key Decisions row count + session count** — cheap: `wc -c CLAUDE.md docs/STATUS.md docs/session-history.md docs/key-decisions.md docs/completed-work.md docs/known-issues.md` for size (omit docs/STATUS.md — and any archive — from the command when the file does not exist); count the Key Decisions table rows with the **Grep tool** (`output_mode: count`, pattern `^\| `); and (for the drift probe only) count sessions with the **Grep tool** (`output_mode: count`, pattern `^### Session`) on `docs/session-history.md` — not a full read. Use the Grep tool (not shell `grep`) for the two counts so no extra Bash permission is needed; `wc`/`awk`/`sort` are declared in `allowed-tools`. These drive the drift warnings and the `--full` rollup gates. Also measure CLAUDE.md's per-section sizes with Part 7.2's `awk` command (no `sort` needed); the `## Known Issues / Blockers` figure and the largest section's name feed two drift lines below.
 
 ## Step 0.1: Path Routing
 
@@ -102,10 +102,12 @@ Dispatch one `save-writer` subagent via the Agent tool with `subagent_type: "bx:
 >  - Key Decisions table in CLAUDE.md at [M] rows (cap 20)
 >  - README.md or `docs/*.md` touched in [K] commits since last full sweep
 >  - CLAUDE.md at [X]k chars (target ~7k, soft cap 12k) — Part 7 size-pressure rollup will fire on `--full`
+>  - CLAUDE.md at [X]k chars — over the 9k advisory rung; largest section `## [name]` ([N] chars); no shrinker fires below 12k
+>  - `## Known Issues / Blockers` at [N] chars (threshold 4000) — the resolved-first rollup fires on `--full` once CLAUDE.md is over its soft cap
 >  - docs/STATUS.md at [Y]k chars (target ~10k, soft cap 20k) — Part 7 size-pressure rollup will fire on `--full`
 >  - docs/[archive].md at [Z]k chars — rotation fires at 100k on `--full` (Part 7.7)"
 
-Show the archive line only for an archive at ≥90k chars (approaching or over the 100k rotation threshold).
+Show the archive line only for an archive at ≥90k chars (approaching or over the 100k rotation threshold). Show the soft-cap line when CLAUDE.md is over 12k and the advisory-rung line when it is over 9k and at or under 12k — never both. Show the Known Issues line when that section is over 4000 chars, whatever the file size.
 
 If no probe fires, omit the warning entirely.
 
@@ -403,8 +405,24 @@ Target: **docs/STATUS.md's `## Session History` section** (brief), plus the `doc
 
 ### 1.9 Size Check (early advisory)
 
-Measure both files. CLAUDE.md target ~7k, soft cap 12k. docs/STATUS.md target ~10k, soft
-cap 20k. Warn per file when over its soft cap and name which Part 7 shrinker will fire.
+Measure both files. CLAUDE.md target ~7k, advisory rung 9k, soft cap 12k. docs/STATUS.md
+target ~10k, soft cap 20k. Warn per file when over its soft cap and name which Part 7
+shrinker will fire.
+
+**CLAUDE.md over 9k and at or under 12k — the advisory rung.** No shrinker fires in this
+band, so say so instead of staying silent. Run Part 7.2's `awk` command on CLAUDE.md, name
+the largest section, and take no action:
+
+> "CLAUDE.md is [X]k chars — over the 9k advisory rung, under the 12k soft cap. Largest
+>  section: `## [name]` ([N] chars). No shrinker fires below 12k."
+
+If `## Project Overview` states derivable facts (`doc-structure-rules.md`, Pruning Is
+Preservation), list them in the same advisory as trim candidates. Do not remove them.
+
+Two optional checks the user can run themselves, named here so the advisory can point at
+them: `/doctor`'s trim check (Claude Code 2.1.206+) proposes cuts of derivable content, and
+`/doctor prompt-audit` (2.1.283+) reports stale or contradictory instructions across
+CLAUDE.md, rules, skills and subagents. Both only propose; `/bx:save` runs neither.
 
 This is the early advisory only — active enforcement happens in **Part 7 (Size-Pressure Rollup)** after Parts 5/6 have had a chance to bring the files under threshold via count-based rollups. If 1.9 fires for a file, expect Part 7 to also fire for that file.
 
@@ -712,12 +730,16 @@ For each section over its threshold, propose a specific shrinker. The thresholds
 | Section | Threshold | Shrinker action |
 |---|---|---|
 | CLAUDE.md `## Key Decisions` (any variant: `(condensed)` etc.) | 8000 chars | **Size-based rollup** — move oldest rows (FIFO from top, same anchor rule as Part 6.3) to `docs/key-decisions.md` until section is under 6000 chars. Runs even when row count is ≤20. Adds `Rolled up from CLAUDE.md → docs/key-decisions.md in S<N> by size pressure` suffix to each moved row's rationale. |
+| CLAUDE.md `## Known Issues / Blockers` | 4000 chars | **Resolved-first rollup** — entries and the resolved test are defined under this table. Move resolved entries (topmost first) to `docs/known-issues.md` until the section is under 2500 chars or no resolved entry remains. Only if the section is then still over 4000 chars, move open entries (topmost first) until it is under 4000 chars, leaving in place of each a one-line summary + `→ [docs/known-issues.md](docs/known-issues.md)` link. Never leave an open issue with no trace in CLAUDE.md. |
 | docs/STATUS.md `## In Progress` | 3000 chars | **Per-item collapse** — for each bullet, trim prose to 2-3 sentences + commit hash refs / file paths preserved. Move completed sub-bullets (`✅`, "Done", "Shipped", strikethrough) to `docs/completed-work.md`. Do NOT delete items entirely — collapse text only. |
 | docs/STATUS.md `## Next Steps` | 3000 chars | **Flatten + extract detail** — collapse sub-section headers (`### High Priority`, `### Queued`, `### Nice to Have`) into a flat top-10 priority-ordered list. For items with 3+ sentences of detail, move detail to `docs/next-steps-backlog.md` (create if missing); keep 1-sentence summary + `→ next-steps-backlog.md#<anchor>` link (STATUS.md-relative — it already sits in `docs/`). |
 | docs/STATUS.md `## Session History` (last-session block) | 2000 chars | **Bullet trim** — if the last-session block has >5 bullets, trim to top 3 (most architecturally significant) + append `> Full session detail: session-history.md S<N>` reference. |
 | docs/STATUS.md `## Completed` (foregrounded feature paragraph) | 1500 chars | **Paragraph trim** — replace foregrounded multi-sentence paragraph with a single bullet pointing at `completed-work.md`. Keep the count summary line. |
 
 `## Architecture Summary` is not in this table: that section no longer exists in CLAUDE.md under schema v2 — it lives in `docs/architecture.md`, which Part 7 does not size-manage. Sections not in this table (project-specific like `## Quick Commands`, `## Don't Modify`, `## Environment Variables` in CLAUDE.md) are **tolerated as-is** — Part 7 only acts on known shrinkable sections. If a project-specific section is the dominant bloat source, Part 7 reports it but takes no action, deferring to user judgment.
+This clause covers project-specific sections only. Every section `claude-md-sections.md` lists as required has a row above, except `## Project Overview`, which has no threshold (7.2 shows `—`; its only governor is Part 1.9's derivable-facts advisory). A required section reaching this clause any other way is a bug in this table: report it as one.
+
+**Known Issues entries.** Entry boundaries are Part 1.7's; the `> Session state:` pointer line is not an entry. An entry is **resolved** iff its lead — the opening bold phrase, or the first sentence when there is none — contains the whole word `resolved`, in any case. `unresolved` is not a match, and the word appearing later in the body does not count. Every other entry is **open**. Topmost = oldest, the same FIFO convention as Part 6.1. Archive each moved entry with the append procedure and header format of `save-writer.md` step 8a — a resolved entry takes the session its lead names, or this session when it names none; an open entry takes `Open, moved S<N>` for this session — and **archive first, remove second**. An open entry already reduced to a one-line summary + link is never moved again (7.5 rule 4). Re-measure the section after each move; stop as soon as the stated bound is met.
 
 ### 7.4 Per-section consent gate
 
