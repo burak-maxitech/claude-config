@@ -3,7 +3,8 @@ name: health
 description: "Looks at the current repo state (git status, branch, recent commits, CLAUDE.md In Progress / Next Steps, open PR) and suggests which existing skills to run in what order for technical-debt / code-health work. Pure advisor — never invokes other skills, never edits files. Use when unsure which skill to reach for next, or when entering an unfamiliar repo and wanting a sequenced plan."
 disable-model-invocation: true
 effort: low
-allowed-tools: Read, Glob, Bash(git:*), Bash(ls:*), Bash(gh:*), Bash(wc:*), Bash(grep:*), Bash(head:*), Bash(awk:*), Bash(tr:*)
+allowed-tools: Read, Glob, Bash(git:*), Bash(ls:*), Bash(gh:*), Bash(wc:*), Bash(grep:*), Bash(head:*), Bash(awk:*), Bash(tr:*), Bash(echo:*)
+disallowed-tools: Edit, Write, NotebookEdit, Agent
 ---
 
 # /bx:health — Skill Routing Advisor
