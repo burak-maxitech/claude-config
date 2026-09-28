@@ -66,7 +66,8 @@ repo and rarely changes; re-reading it every session is the single most expensiv
 this skill can have.
 
 **Do NOT read by default:** `docs/session-history.md`, `docs/completed-work.md`,
-`docs/key-decisions.md`, `docs/architecture.md`. These are archives; `deep` mode reads them.
+`docs/key-decisions.md`, `docs/architecture.md`, `docs/known-issues.md`. These are archives;
+`deep` mode reads them, except `docs/known-issues.md`, which is grep-on-demand in every mode.
 
 ---
 
@@ -285,6 +286,7 @@ Once you've presented the summary and user confirms direction:
 | Need older context | Check `docs/session-history.md` for archived sessions |
 | Need full completed list | Check `docs/completed-work.md` |
 | Need full decision log | Check `docs/key-decisions.md` |
+| Need a resolved or moved issue | Grep `docs/known-issues.md` |
 
 ---
 

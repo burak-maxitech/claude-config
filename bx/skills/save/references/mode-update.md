@@ -33,7 +33,7 @@ From the gathered context:
 - **Filtered commit list** (commits since Last Updated) → feeds the session entry + drift probes.
 - **Diff file list** → tells you whether README/`docs/` changed (drift signal; drives the `--full` recommendation).
 - **TaskList state** → drives the task drain (Part 0) and the In Progress / Next Steps deltas.
-- **CLAUDE.md size + docs/STATUS.md size + Key Decisions row count + session count** — cheap: `wc -c CLAUDE.md docs/STATUS.md docs/session-history.md docs/key-decisions.md docs/completed-work.md` for size (omit docs/STATUS.md — and any archive — from the command when the file does not exist); count the Key Decisions table rows with the **Grep tool** (`output_mode: count`, pattern `^\| `); and (for the drift probe only) count sessions with the **Grep tool** (`output_mode: count`, pattern `^### Session`) on `docs/session-history.md` — not a full read. Use the Grep tool (not shell `grep`) for the two counts so no extra Bash permission is needed; `wc`/`awk`/`sort` are declared in `allowed-tools`. These drive the drift warnings and the `--full` rollup gates.
+- **CLAUDE.md size + docs/STATUS.md size + Key Decisions row count + session count** — cheap: `wc -c CLAUDE.md docs/STATUS.md docs/session-history.md docs/key-decisions.md docs/completed-work.md docs/known-issues.md` for size (omit docs/STATUS.md — and any archive — from the command when the file does not exist); count the Key Decisions table rows with the **Grep tool** (`output_mode: count`, pattern `^\| `); and (for the drift probe only) count sessions with the **Grep tool** (`output_mode: count`, pattern `^### Session`) on `docs/session-history.md` — not a full read. Use the Grep tool (not shell `grep`) for the two counts so no extra Bash permission is needed; `wc`/`awk`/`sort` are declared in `allowed-tools`. These drive the drift warnings and the `--full` rollup gates.
 
 ## Step 0.1: Path Routing
 
@@ -57,7 +57,7 @@ New entries are capped — this keeps writing fast and keeps `/bx:resume` lean. 
 
 ## Save Path (default)
 
-The orchestrator owns everything that needs conversation context or user input; the `save-writer` subagent owns the file reads/writes. The orchestrator does NOT edit `CLAUDE.md`, `docs/STATUS.md`, `session-history.md`, `completed-work.md`, or `key-decisions.md` itself — it composes the packet and dispatches.
+The orchestrator owns everything that needs conversation context or user input; the `save-writer` subagent owns the file reads/writes. The orchestrator does NOT edit `CLAUDE.md`, `docs/STATUS.md`, `session-history.md`, `completed-work.md`, `key-decisions.md`, or `known-issues.md` itself — it composes the packet and dispatches.
 
 **Sequence:**
 
@@ -457,7 +457,8 @@ Before iterating file-by-file, pre-load the whole `docs/` tree in one turn:
    two calls). Root docs other than README.md and CLAUDE.md — `workflow.md`, contributor
    guides — are otherwise maintained by nothing and drift silently.
 2. **Exclude the auto-managed archives from the read set:** `docs/session-history.md`,
-   `docs/key-decisions.md`, `docs/completed-work.md`, `docs/next-steps-backlog.md` — the
+   `docs/key-decisions.md`, `docs/completed-work.md`, `docs/known-issues.md`,
+   `docs/next-steps-backlog.md` — the
    canonical set is defined in `doc-schema.md`'s Archives section; this list follows it.
    They are this skill's own append-only outputs (save-writer and Parts 5-7 maintain them),
    never sync inputs, and Part 3 never edits them — but they grow with project age, so
@@ -721,7 +722,7 @@ Default action is `no` if user dismisses without explicit choice (don't apply de
 
 When executing any shrinker:
 
-1. **Move, never delete.** Every shrinker writes the trimmed content to a reference file before removing from its source file (CLAUDE.md or docs/STATUS.md, per 7.3). The `docs/architecture.md`, `docs/next-steps-backlog.md`, and `docs/completed-work.md` files are the destinations. If a destination doesn't exist, create it with a standard header.
+1. **Move, never delete.** Every shrinker writes the trimmed content to a reference file before removing from its source file (CLAUDE.md or docs/STATUS.md, per 7.3). The `docs/architecture.md`, `docs/next-steps-backlog.md`, `docs/completed-work.md`, `docs/key-decisions.md`, and `docs/known-issues.md` files are the destinations. If a destination doesn't exist, create it with a standard header.
 2. **Preserve commit refs.** Specific commit hashes (`abc1234`, `commit X`), file paths, and links MUST survive into either the trimmed summary or the extracted detail file — these are search anchors users rely on.
 3. **Surface the destination.** Every shrinker's output gains a `> Full [thing]: [path.md](path.md)` link (relative to the file the shrinker ran on) so future `/bx:resume` sessions can chase the detail.
 4. **Don't compound losses.** If a section was already shrunk to a summary in a prior run (detectable by the `> Full [thing]:` link), Part 7 does NOT trim further. Re-prompt only fires when the user has manually re-grown the section.
@@ -736,9 +737,10 @@ If a file is still over its soft cap after all consents: log a final warning for
 
 ### 7.7 Archive rotation
 
-The three history archives grow forever by design — `docs/session-history.md` (one line per
+The four history archives grow forever by design — `docs/session-history.md` (one line per
 rolled-up session plus 5 full entries), `docs/key-decisions.md` (one row per decision),
-`docs/completed-work.md` (several lines per session). No automatic path reads them in full
+`docs/completed-work.md` (several lines per session), `docs/known-issues.md` (one `### `
+entry per issue that left CLAUDE.md). No automatic path reads them in full
 (Part 3.0 excludes them; save-writer appends via tail reads), so growth is disk-only — but
 deliberate reads (deep resume, a human opening the file, a 2000-line Read page) get clumsy
 past ~100k chars. Rotation moves the oldest entries, byte-verbatim, into numbered volumes
@@ -749,7 +751,7 @@ symptom and take no action.
 **If `--skip-rotation` is in `$ARGUMENTS`, skip this step entirely.** (Note `--skip-size-pressure`
 skips all of Part 7, this step included; 7.1's early exit does NOT skip this step.)
 
-Measure the three archives (`wc -c`, omitting any that do not exist). For each file over
+Measure the four archives (`wc -c`, omitting any that do not exist). For each file over
 **100k chars**, independently:
 
 1. **Consent (first rotation of each archive).** The sentinel is the rotation note in
@@ -777,13 +779,18 @@ Measure the three archives (`wc -c`, omitting any that do not exist). For each f
    1 if none. **Filenames only — never read a volume's contents.**
 
 4. **Choose the cut.** The oldest entries move from the top of the file's entry region
-   (all three archives order oldest-first), cutting only at whole-entry
+   (all four archives order oldest-first), cutting only at whole-entry
    boundaries — a `### Session` header line, a complete `|` table row, a whole checklist
-   line — until the live file would be at or under **50k chars** — the minimum number of
+   line, a `### ` entry header (known-issues) — until the live file would be at or under
+   **50k chars** — the minimum number of
    whole entries needed to reach that target (half the threshold, so rotation
    does not re-fire every run). The protected tail never moves: the 5 most recent sessions
    (session-history, matching Part 5's window), the newest 20 rows (key-decisions, matching
-   Part 6's target), this session's just-appended items (completed-work). Never compress,
+   Part 6's target), this session's just-appended items (completed-work), and in
+   known-issues every entry from the first `Open`-tagged header onward — the cut never
+   extends past the first `Open` entry, even when that leaves the live file over 50k,
+   because CLAUDE.md links to `Open` entries and a volume is read by nothing. If the first
+   entry is `Open`, nothing moves: report that and take no action. Never compress,
    reword, or reorder anything — Part 5 owns compression and has already run. Locate the
    boundaries by line number with Grep (`-n`); call **H** the last line of the live file's
    header region and **L** the last line of the final entry being moved.

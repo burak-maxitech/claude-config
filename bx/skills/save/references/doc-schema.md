@@ -38,6 +38,7 @@ and resume idempotently, never as complete.
     docs/completed-work.md       unchanged archive
     docs/key-decisions.md        unchanged archive
     docs/session-history.md      unchanged archive
+    docs/known-issues.md         issues moved out of CLAUDE.md; created on demand
     docs/archive/                rotated volumes — see Archives below
 
 CLAUDE.md holds what Claude cannot derive from the codebase. Since Claude Code 2.1.206,
@@ -62,7 +63,8 @@ consent prompt, and quoted verbatim again in the run's report.
 ## Archives
 
 The canonical set of **auto-managed archives**: `docs/session-history.md`,
-`docs/key-decisions.md`, `docs/completed-work.md`, plus `docs/next-steps-backlog.md`
+`docs/key-decisions.md`, `docs/completed-work.md`, `docs/known-issues.md` (created on
+demand, the first time an issue leaves CLAUDE.md), plus `docs/next-steps-backlog.md`
 (created on demand by a size-pressure shrinker). Exclusion lists elsewhere — `mode-update.md`
 Steps 0.3/3.0, the resume skill's do-not-read list — follow this set; extend it here first.
 
@@ -72,6 +74,14 @@ automatic path reads an archive in full**, so growth is disk-only. Rotation — 
 thresholds owned by `mode-update.md` Part 7.7 — moves the oldest entries of an oversized
 archive byte-verbatim into numbered volumes under `docs/archive/`; volumes are read by
 nothing automatic, ever — they are grep-on-demand history.
+
+`docs/known-issues.md` holds every issue that has left CLAUDE.md's
+`## Known Issues / Blockers`, oldest first, one `### ` entry each. The entry header carries
+the status: `### <title> — Resolved S<N> (<date>)`, optionally `, commit <hash>`, or
+`### <title> — Open, moved S<N> (<date>)`. The entry body is the issue's text, verbatim. A
+`Resolved` entry leaves nothing behind in CLAUDE.md; an `Open` entry always leaves a one-line
+summary + link there. This section owns the file's existence and format. Its lifecycle is
+owned by `mode-update.md`: Part 1.7 (relocation) and Part 7.3 (size threshold).
 
 ## v1 layout (legacy)
 
