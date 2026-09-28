@@ -344,9 +344,12 @@ Target: **CLAUDE.md's `## Key Decisions` table** (unchanged from v1 — this sta
 Target: **CLAUDE.md's `## Known Issues / Blockers` section** (unchanged from v1), plus the
 `docs/known-issues.md` archive (format owned by `doc-schema.md`'s Archives section).
 
-An **entry** is one blank-line-separated block inside the section: a paragraph, or a
-top-level bullet with its continuation lines. The `> Session state:` pointer line that
-follows the section is not an entry and never moves.
+An **entry** is one non-empty blank-line-separated block inside the section: a paragraph, or
+a top-level bullet with its continuation lines. A block whose first line starts with `>` is
+not an entry: that covers the `> Session state:` pointer line that follows the section, which
+never moves, and the `> Archived issues:` link Part 7.3 adds. An entry's **title** is its
+lead (the opening bold phrase, or the first sentence when there is none) without bold
+markers or trailing punctuation.
 
 - **Add** new issues discovered this session, as new entries at the end of the section.
 - **Relocate resolved issues; do not delete them.** Put each issue this session resolved in
@@ -739,7 +742,15 @@ For each section over its threshold, propose a specific shrinker. The thresholds
 `## Architecture Summary` is not in this table: that section no longer exists in CLAUDE.md under schema v2 — it lives in `docs/architecture.md`, which Part 7 does not size-manage. Sections not in this table (project-specific like `## Quick Commands`, `## Don't Modify`, `## Environment Variables` in CLAUDE.md) are **tolerated as-is** — Part 7 only acts on known shrinkable sections. If a project-specific section is the dominant bloat source, Part 7 reports it but takes no action, deferring to user judgment.
 This clause covers project-specific sections only. Every section `claude-md-sections.md` lists as required has a row above, except `## Project Overview`, which has no threshold (7.2 shows `—`; its only governor is Part 1.9's derivable-facts advisory). A required section reaching this clause any other way is a bug in this table: report it as one.
 
-**Known Issues entries.** Entry boundaries are Part 1.7's; the `> Session state:` pointer line is not an entry. An entry is **resolved** iff its lead — the opening bold phrase, or the first sentence when there is none — contains the whole word `resolved`, in any case. `unresolved` is not a match, and the word appearing later in the body does not count. Every other entry is **open**. Topmost = oldest, the same FIFO convention as Part 6.1. Archive each moved entry with the append procedure and header format of `save-writer.md` step 8a — a resolved entry takes the session its lead names, or this session when it names none; an open entry takes `Open, moved S<N>` for this session — and **archive first, remove second**. An open entry already reduced to a one-line summary + link is never moved again (7.5 rule 4). Re-measure the section after each move; stop as soon as the stated bound is met.
+**Known Issues entries.** Entry boundaries are Part 1.7's; the `> Session state:` pointer line is not an entry. An entry is **resolved** iff its lead — the opening bold phrase, or the first sentence when there is none — contains the whole word `resolved`, in any case. `unresolved` is not a match, and the word appearing later in the body does not count. Every other entry is **open**. Topmost = oldest, the same FIFO convention as Part 6.1.
+
+Part 7 runs on the orchestrator, so this shrinker edits the two files directly: it builds no packet and dispatches no `save-writer`. It borrows only the append procedure and header format of `save-writer.md` step 8a, with `<title>` being the entry's title as Part 1.7 defines it. A resolved entry takes the **last** session its lead names (`The S5 deadlock is resolved (S6)` → `S6`), or this session when it names none; an open entry takes `Open, moved S<N>` for this session. Handle one entry completely — **archive first, remove second** — before starting the next. A title that repeats the status word (`… is RESOLVED (S3) — Resolved S3`) is fine; do not reword it.
+
+One consent in 7.4 covers both phases. Measure the section with 7.2's `awk` count, re-measure after each move, and stop the moment the bound for the current phase is met: under 2500 for the resolved phase, under 4000 for the open phase.
+
+The line that replaces a moved open entry is `**<lead>** <one sentence, 25 words at most, saying what is still broken> → [docs/known-issues.md](docs/known-issues.md)`, in the entry's original position. `**<lead>**` is the entry's opening bold phrase exactly as it stood, punctuation included. The sentence is written from the entry's own body and names the specific failure; a generic placeholder ("still broken, see archive") leaves the issue with no real trace and is not allowed. When the body states no failure detail, write the sentence from the lead's own subject. Archive entries land in the order they are moved, so resolved entries precede the open ones moved in the same run. That line is the marker 7.5 rule 4 looks for in this section: an entry already in that form is never moved or trimmed again.
+
+7.5 rule 3 is met in this section by one link, never duplicated: `> Archived issues: [docs/known-issues.md](docs/known-issues.md)` as the last block of the section, with one blank line above it and one blank line between it and the `> Session state:` pointer line. Add it before the first move, so that every measurement, including the ones that decide when to stop, already counts it. It is not an entry and it does not stop this shrinker running again: the section is re-examined whenever it is over threshold.
 
 ### 7.4 Per-section consent gate
 
@@ -828,7 +839,8 @@ Measure the four archives (`wc -c`, omitting any that do not exist). For each fi
    Part 6's target), this session's just-appended items (completed-work), and in
    known-issues every entry from the first `Open`-tagged header onward — the cut never
    extends past the first `Open` entry, even when that leaves the live file over 50k,
-   because CLAUDE.md links to `Open` entries and a volume is read by nothing. If the first
+   because CLAUDE.md links to `Open` entries and a volume is read by nothing. When the
+   `Open` entry makes 50k unreachable, move every entry before it. If the first
    entry is `Open`, nothing moves: report that and take no action. Never compress,
    reword, or reorder anything — Part 5 owns compression and has already run. Locate the
    boundaries by line number with Grep (`-n`); call **H** the last line of the live file's

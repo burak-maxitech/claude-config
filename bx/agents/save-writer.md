@@ -48,15 +48,15 @@ You do NOT call `TaskList` — the orchestrator already drained it (or skipped t
    ---
    ```
 7. **If `decision_rows` is non-empty**, also append each row (same order) to `docs/key-decisions.md` using the anchor rule below.
-8. **If `known_issue_moves` is non-empty**, handle each item in order — **archive first, remove second**:
+8. **If `known_issue_moves` is non-empty**, handle each item in order, finishing one item (a through d) before starting the next — **archive first, remove second**:
 
-   a. **Append to `docs/known-issues.md`.** Find the last entry header's line number with one Grep tool call (pattern `^### `, `output_mode: content`, `-n: true`, `-o: true`, `head_limit: 0`; take the final match), offset-Read from that line to the end of the file as your Edit anchor, and append after it with one blank line between entries. Never read the file in full. The appended block, for `status: resolved`:
+   a. **Append to `docs/known-issues.md`.** The append is unconditional: it does not depend on the entry being found in CLAUDE.md. Find the last entry header's line number with one Grep tool call (pattern `^### `, `output_mode: content`, `-n: true`, `-o: true`, `head_limit: 0`; take the final match), offset-Read from that line to the end of the file as your Edit anchor, and append after it with one blank line between entries. Never read the file in full. The appended block, for `status: resolved`:
       ```markdown
       ### <title> — Resolved <session> (<today>), commit <commit>
 
       <entry, verbatim>
       ```
-      Omit `, commit <commit>` when `commit` is `none`. For `status: open` the header is `### <title> — Open, moved <session> (<today>)`. If the file is missing, create it with this header first, and append the first entry after the `---` line:
+      Omit `, commit <commit>` when `commit` is `none`. For `status: open` the header is `### <title> — Open, moved <session> (<today>)`. If the file is missing, create it with this header first, and append the first entry after the `---` line, separated from it by one blank line:
       ```markdown
       # Known Issues Archive
 
@@ -65,9 +65,9 @@ You do NOT call `TaskList` — the orchestrator already drained it (or skipped t
 
       ---
       ```
-   b. **Only after the append succeeded, remove `entry` from CLAUDE.md** with an exact-string Edit covering the entry and one adjacent blank line. If `entry` is not found verbatim, do NOT fuzzy-match: leave CLAUDE.md unchanged and record an unmatched known-issue removal under `warnings:` (quote the item's `title`). The archive copy stays. A duplicate is harmless; a loss is not.
+   b. **Only after the append succeeded, remove `entry` from CLAUDE.md** with an exact-string Edit covering the entry and the blank line after it (for the section's last entry, the blank line before it instead, so the section still ends with one blank line above whatever follows). The section header always keeps exactly one blank line below it. Match `entry` byte for byte, trailing spaces included. If `entry` is not found verbatim, do NOT fuzzy-match: leave CLAUDE.md unchanged and record an unmatched known-issue removal under `warnings:` (quote the item's `title`). The archive copy stays. A duplicate is harmless; a loss is not.
    c. **For `status: open`**, the removal in (b) is a replacement instead: put the item's `summary` line in the entry's place. An open issue never leaves CLAUDE.md without one.
-   d. If the section is left with no entries, write `None currently.` as its body. Never edit or move the `> Session state:` pointer line that follows the section.
+   d. If a removal leaves the section with no entries, write `None currently.` as its body: one blank line after the header, that line, one blank line after it. This body replaces whatever spacing (b) left behind. A section that already reads `None currently.` is left as it is. A known-issue removal is counted in the report as `-<J> known issues`, not as a delta. Never edit or move the `> Session state:` pointer line that follows the section.
 9. **Do NOT** run rollups, README sync, or auto-memory sync — those stay with the orchestrator (`--full` mode only).
 10. **Do NOT** echo any file's full contents back. Return only the change report.
 
@@ -102,7 +102,7 @@ Use the literal string `none` for each when there is nothing to report.
 Return this compact report and nothing else (no file contents):
 ```
 files:
-  CLAUDE.md: <old>k → <new>k chars (<N> deltas[, +<K> decision rows])
+  CLAUDE.md: <old>k → <new>k chars (<N> deltas[, +<K> decision rows][, -<J> known issues])
   docs/STATUS.md: <old>k → <new>k chars (session block + <N> deltas)
   docs/session-history.md: appended S<N> (+<X> lines)
   docs/completed-work.md: +<M> items     # omit line if completed_items empty
