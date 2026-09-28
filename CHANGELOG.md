@@ -2,6 +2,69 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.10.0 — 2026-09-28
+
+### Added
+
+- **`docs/known-issues.md`, a fifth auto-managed archive.** `## Known Issues / Blockers` was the
+  one required CLAUDE.md section with no cap, no shrinker and no archive destination; a field
+  `/doctor` run found it at 14.9k chars, 48% of a 31.1k CLAUDE.md. Issues that leave CLAUDE.md
+  now land here, one `### ` entry each, tagged `Resolved` or `Open, moved`. Rotates at 100k like
+  the other archives; rotation never cuts past the first `Open` entry.
+
+- **Known Issues shrinker (Part 7.3).** Threshold 4000 chars. Resolved entries move first, until
+  the section is under 2500 or none remain. Open entries move only while the section is still
+  over 4000, and each leaves a one-line summary + link behind.
+
+- **9k advisory rung (Part 1.9).** Nothing acted between the ~7k target and the 12k soft cap.
+  Between 9k and 12k the save now names the largest section. No shrinker fires below 12k.
+
+- **Derivable-content clause.** A fact one command recovers (stack, remote, cwd) may leave
+  `## Project Overview`. Advisory only: `/bx:save` names candidates and removes nothing.
+
+- **`omitClaudeMd: true` on six scanner subagents** (`upstream-*`, `seo-content`,
+  `seo-technical`, `seo-gsc-insights`; Claude Code 2.1.271+). They take everything from the
+  dispatch prompt, so they no longer load CLAUDE.md. The arch, test and cleanup scanners keep
+  it: a target repo's recorded decisions are what stop them flagging deliberate design.
+  (`/bx:evolve` finding `c0379ca1`.)
+
+- **`/bx:health` declares `disallowed-tools: Edit, Write, NotebookEdit, Agent`**, enforcing the
+  read-only invariant its prose already stated. (`/bx:evolve` finding `10294db5`.)
+
+- **Version-bump guard outside the skill.** `scripts/check-plugin-version-bump.sh`, an opt-in
+  `.githooks/pre-push`, and a GitHub Actions workflow fail when `bx/` changed but `version` did
+  not. Until now only `/bx:save` Part 8 checked, so a hand-made push had no guard.
+
+### Changed
+
+- **Resolved issues are relocated, not deleted.** Part 1.7 said "Remove resolved issues", the one
+  place `/bx:save` contradicted its own *content moves, it does not disappear* rule. They now
+  travel in a new `known_issue_moves` packet field, and `save-writer` archives first and removes
+  second. An issue is resolved only when the session says so, never because it went unmentioned.
+
+- **Part 7.3's tolerated-as-is clause covers project-specific sections only.** A required section
+  falling through it is now a reportable bug.
+
+- **Size is measured in chars, not lines.** doc-schema.md says so explicitly, and names
+  `/doctor prompt-audit` (2.1.283+) beside the `/doctor` trim check. Anthropic's 200-line
+  guidance passes a 62-line CLAUDE.md that measures 13.6k chars. (`/bx:evolve` finding `55ba40ea`,
+  partially applied; the `.claude/rules/` tier stays gated.)
+
+- **`/bx:evolve`'s docs lane watches three more pages:** `plugins/loading`,
+  `plugins/cli-reference` and `plugin-evals`, which now own contracts the older `plugins` and
+  `plugins-reference` URLs no longer carry.
+
+### Fixed
+
+- **`/bx:resume` and `/bx:health` injected commands their `allowed-tools` did not list.** Inline
+  `!` injections used `echo` and `head`; since Claude Code 2.1.271 auto mode applies
+  default-mode permission rules to them, and 2.1.284 made auto mode the default. Both lists now
+  name what the injections run. (`/bx:evolve` finding `2e4e9a8b`.)
+
+- **Doc notes:** fix-mode-evolve.md lists v2.1.268 as a third unverified data point on
+  `/reload-plugins`; setup-stitch-mcp.md names `claude mcp login stitch`. (Findings `ee81fa43`,
+  `7e849e74`.)
+
 ## 2.9.0 — 2026-09-08
 
 ### Changed
