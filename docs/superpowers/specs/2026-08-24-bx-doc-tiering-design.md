@@ -1,9 +1,9 @@
 # Design: bx doc tiering — the rules tier, and the section with no governor
 
 **Date:** 2026-08-24
-**Status:** Draft — problem evidenced, **decisions open** (no user decision pass yet)
+**Status:** Decided — decision pass held 2026-09-28 (S60); all 8 accepted, #3 and #6 amended. Phase 1 (D1, D2, D3, D7, D8) approved for planning; phase 2 (D4, D5, D6) gated.
 **Author:** Session 59 with Claude
-**Ships as:** bx plugin v2.4.0 (proposed — MINOR: new behavior, no breaking schema change)
+**Ships as:** bx plugin v2.10.0 (MINOR: new behavior, no breaking schema change; the draft's v2.4.0 was overtaken by S58–S59 releases)
 **Supersedes:** the twice-parked `.claude/rules/` item (`docs/key-decisions.md:60`; deferred
 again in `plans/2026-08-17-bx-doc-schema-v2.md:1865` and
 `specs/2026-08-17-bx-doc-schema-v2-design.md:324`)
@@ -66,6 +66,17 @@ Corroborated locally *(measured, this repo)*:
 ```
 
 Already the #2 section here, growing, and unreachable by any shrinker.
+
+Re-measured at the decision pass *(measured, this repo, 2026-09-28)*:
+
+```
+  8304  ## Key Decisions             (threshold 8000 — fires on the next --full)
+  4611  ## Known Issues / Blockers   (over the 4000 threshold decided below)
+   551  ## Project Overview
+        CLAUDE.md total: 13,606      (over the 12k soft cap)
+```
+
+Seven entries, two marked RESOLVED: this repo is a live test case for D3.
 
 ### 2. Resolved blockers are deleted, not relocated
 
@@ -143,9 +154,10 @@ the wrong number, and today the target is decoration.
 
 ---
 
-## Open decisions
+## Decisions
 
-**Not locked.** These are recommendations for a decision pass, not settled choices.
+**Locked 2026-09-28 (S60).** All eight accepted by the user; #3 and #6 carry amendments,
+recorded under the table. The Recommendation column is the decision except where amended.
 
 | # | Question | Recommendation | Why |
 |---|---|---|---|
@@ -157,6 +169,20 @@ the wrong number, and today the target is decoration.
 | 6 | Criticality predicate | **Prohibition-shaped content is ineligible, permanently** | Direct encoding of the doctor's rule. Cheap to state, cheap to check, and the failure it prevents is the expensive one. |
 | 7 | Derivable-content rule | **Generalize the existing `git show` clause; apply to Project Overview only** | It is a one-line extension of a rule bx already holds, not a new policy. Scoping it to Project Overview keeps it away from Key Decisions and Known Issues. |
 | 8 | Target vs cap | **Keep ~7k as the stated design target; add a 9k advisory rung** | Closes the dead band without moving the soft cap, which existing repos are calibrated against. |
+
+Amendments made at the decision pass:
+
+- **(3, 4) The 2500 target is chased with resolved entries only.** Resolved entries move until
+  the section is under 2500 or none remain. Unresolved entries are touched only while the
+  section is still over the 4000 *threshold*; they are never moved merely to reach the target.
+  Reason: on this repo, moving the two resolved entries leaves the section near 3k, and the
+  draft rule would then have compressed live blockers to hit a number.
+- **(6) Invariant 5 warns, it does not fail.** The prohibition-shaped predicate stands as the
+  eligibility filter for the advisory report. As a checker invariant it is a warning: a
+  hand-written rule such as "never edit generated files in `src/gen/`" is legitimately
+  path-scoped, and a hard failure would reject correct files. Phase 2; revisit at that gate.
+- **Open question 2 resolved: `docs/known-issues.md` carries both** resolved and unresolved
+  entries. Every unresolved entry moved there keeps a one-line summary + link in CLAUDE.md.
 
 Rationale for the close calls:
 
@@ -218,7 +244,7 @@ New row, matching the existing format:
 
 | Section | Threshold | Shrinker action |
 |---|---|---|
-| CLAUDE.md `## Known Issues / Blockers` | 4000 chars | **Resolved-first rollup** — move resolved entries to `docs/known-issues.md` (oldest first) until the section is under 2500 chars. If still over with no resolved entries left, move oldest *unresolved* entries, keeping a one-line summary + link in CLAUDE.md. Never leave an unresolved blocker with no T1 trace. |
+| CLAUDE.md `## Known Issues / Blockers` | 4000 chars | **Resolved-first rollup** — move resolved entries to `docs/known-issues.md` (oldest first) until the section is under 2500 chars or no resolved entries remain. Only if the section is then still over the 4000 **threshold** (not the 2500 target), move oldest *unresolved* entries until it is under 4000, keeping a one-line summary + link in CLAUDE.md. Never leave an unresolved blocker with no T1 trace. |
 
 Also closes the unanswerable-cell defect: 7.2's "Over threshold?" column now resolves for every
 required section, and 7.3's tolerated-as-is clause is narrowed to say explicitly that it covers
@@ -252,9 +278,10 @@ must learn that `.claude/rules/*.md` exists — otherwise the first user who han
 
 - **Invariant 2** counts `.claude/rules/*.md` bytes in the conserved total when the directory
   is present.
-- **New Invariant 5:** no file under `.claude/rules/` may contain a prohibition-shaped line.
-  This is the criticality rule made mechanically checkable, and it holds for hand-written rules
-  files too.
+- **New Invariant 5 (warning, not failure — amended at the decision pass):** a
+  prohibition-shaped line in a file under `.claude/rules/` is reported as a warning naming the
+  file and line. This is the criticality rule made mechanically checkable; it warns rather
+  than fails because a path-scoped prohibition can be legitimate in a hand-written rules file.
 - `--before` snapshot comparison extends to the same set.
 
 ### D6 — `/bx:resume` learns the tier exists
@@ -317,10 +344,13 @@ curve instead.
 
 1. `assert-doc-schema.sh` passes on all existing fixtures, with unchanged behavior for repos
    that have no `.claude/rules/` directory.
-2. New fixture: a repo *with* `.claude/rules/`, one file containing a prohibition → Invariant 5
-   must fail it.
+2. New fixture (phase 2): a repo *with* `.claude/rules/`, one file containing a prohibition →
+   Invariant 5 must warn on it, naming file and line, without failing the run.
 3. New fixture: Known Issues at 6k with three resolved entries → D3 shrinks it under 2500 by
    moving resolved entries only.
+3a. New fixture: Known Issues at 6k with one small resolved entry → D3 moves the resolved
+   entry, then moves oldest unresolved entries only until the section is under 4000 (not
+   2500), each leaving a one-line summary + link.
 4. Blind rehearsal of D2 + D3 + D4's report text.
 5. **Field check, not a fixture:** re-run `/doctor` on the external repo after a `--full` save
    and confirm CLAUDE.md moved toward the target. Fixtures prove the instructions are
@@ -332,8 +362,8 @@ curve instead.
 
 1. **Does a rules file's `paths:` glob match on read, on edit, or both?** Determines whether
    D6's "not currently loaded" line is accurate. Needs the memory page.
-2. **Should `docs/known-issues.md` carry resolved entries only, or both?** D2/D3 currently let
-   both land there. Resolved-only is cleaner to read; both is simpler to implement.
+2. ~~Should `docs/known-issues.md` carry resolved entries only, or both?~~ **Resolved
+   2026-09-28: both** — see the amendments under Decisions.
 3. **Was the external repo's CLAUDE.md ever edited outside `save-writer`?** Its
    `settings.local.json` permanently carries `Bash(sed -i '113,116d' CLAUDE.md)`, `Bash(sed -i
    's|+ vintage Chrono24…')`, and `Bash(perl -0pi -e '…')`. `/bx:save` writes CLAUDE.md through

@@ -1,8 +1,8 @@
 {
   "watermark": {
-    "last_changelog_version": "2.1.263",
-    "docs_checked_at": "2026-09-08",
-    "community_checked_at": "2026-09-08"
+    "last_changelog_version": "2.1.284",
+    "docs_checked_at": "2026-09-28",
+    "community_checked_at": "2026-09-28"
   },
   "decisions": [
     {
@@ -499,6 +499,61 @@
       "class": "opportunity",
       "title": "`/doctor` trim check proposes cutting codebase-derivable content from CLAUDE.md (v2.1.206) — cross-reference it in the doc-schema owner file",
       "note": "Added a derivable-content paragraph to doc-schema.md's v2 layout section naming `/doctor`'s trim check (2.1.206+) and cross-referencing mode-update.md Part 4.3; approved in the --full --fix gate."
+    },
+    {
+      "finding_id": "55ba40ea001bc6b5b8bff26555481caa3eeafc7f",
+      "decision": "open",
+      "date": "2026-09-28",
+      "source_url": "https://code.claude.com/docs/en/memory",
+      "affected_capability": "bx:pain/claude-md-over-its-size-target-with-no-path-scoped-rules-tier",
+      "source_content_hash": "a513170929d351fa7843dbb1a613a43a55273504",
+      "class": "opportunity",
+      "title": "Memory docs name path-scoped `.claude/rules/` as the CLAUDE.md overflow tier and add `/doctor prompt-audit` (v2.1.283) — bx has neither",
+      "note": "Docs lane, severity medium, certainty 0.65. Official corroboration of the doc-tiering spec (docs/superpowers/specs/2026-08-24-bx-doc-tiering-design.md) problem 3. ORCHESTRATOR NOTE: the docs' 200-line yardstick is a poor fit for bx-managed files — this repo's CLAUDE.md is 62 lines but 13,606 chars, so a line count passes a file that is over the 12k char soft cap. Keep chars as the measure. The rules tier itself stays in the spec's gated phase 2; the prompt-audit cross-reference is a phase 1 candidate."
+    },
+    {
+      "finding_id": "2e4e9a8b9ef2a5d15262847267179f91b3d47d5e",
+      "decision": "open",
+      "date": "2026-09-28",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.271",
+      "affected_capability": "bx:skills/dynamic-injection",
+      "source_content_hash": "b4027e19e31b871ee36f1a4eeda0d37b9b24705a",
+      "class": "best_practice",
+      "title": "Auto mode now applies default-mode permission rules to a skill's inline `!` commands (v2.1.271) — /bx:resume and /bx:health inject `echo`/`head` not in their allowed-tools",
+      "note": "Changelog lane, severity medium, certainty 0.4. ORCHESTRATOR-VERIFIED the gap: bx/skills/resume/SKILL.md allowed-tools has no Bash(head:*) or Bash(echo:*) yet injects `ls -1 | head -30` and three `|| echo` fallbacks; bx/skills/health/SKILL.md has head but no Bash(echo:*) and uses `|| echo` in six injections. NOT verified as a live prompt: this session ran /bx:resume and its injection completed. 2.1.284 makes auto mode the default when no mode is configured, which widens exposure. Related to open finding 093df977 (v2.1.214 fail-closed redirects)."
+    },
+    {
+      "finding_id": "ee81fa4328610ec4f86d14b987cd8b2283bcb2ce",
+      "decision": "open",
+      "date": "2026-09-28",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.268",
+      "affected_capability": "bx:builtins/reload-plugins",
+      "source_content_hash": "dc28e6a6fc0699bdefb7e63153159b1dc2f0b163",
+      "class": "best_practice",
+      "title": "`/plugin` install/enable/disable now applies on menu close, no `/reload-plugins` needed (v2.1.268) — third data point for the hedged note in fix-mode-evolve.md",
+      "note": "Changelog lane, severity low, certainty 0.5. Covers install/enable/disable, not a cache refresh to a new marketplace commit. Add 2.1.268 to the hedged list in fix-mode-evolve.md; keep the manual `/plugin update bx` + `/reload-plugins` steps."
+    },
+    {
+      "finding_id": "c0379ca1853ac9b9efdbc8403036e104b441e82d",
+      "decision": "open",
+      "date": "2026-09-28",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.271",
+      "affected_capability": "bx:agents/tools-frontmatter",
+      "source_content_hash": "e5ef0425b004cbf05ae88449ad7223f3d173184e",
+      "class": "opportunity",
+      "title": "`omitClaudeMd` agent frontmatter (v2.1.271) — read-only scanner subagents could skip CLAUDE.md, cutting per-dispatch context",
+      "note": "Changelog lane, severity low, certainty 0.4. ORCHESTRATOR CHECK: five agents mention CLAUDE.md in their own text (arch-simplification, doc-migrator, geo-generative, save-writer, test-coverage) and must be excluded or reviewed first; the lane's candidate list wrongly included arch-simplification, geo-generative and test-coverage. Relevant while CLAUDE.md is over its size target: every one of the 20 subagent dispatches pays for it."
+    },
+    {
+      "finding_id": "161ae1821578ccf044251efaa1b7ce2eca195ae5",
+      "decision": "open",
+      "date": "2026-09-28",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.269",
+      "affected_capability": "bx:pain/bx-health-never-run-end-to-end",
+      "source_content_hash": "ad6af63e5b379dcede03b749e8568adfc8e02cde",
+      "class": "opportunity",
+      "title": "`claude plugin eval` (v2.1.269) runs a plugin eval suite with scored, reproducible results — bx has no committed eval suite",
+      "note": "Changelog lane, severity low, certainty 0.4; cross-lane corroborated by the docs lane (https://code.claude.com/docs/en/skills, 'Evaluate and iterate on a skill', certainty 0.5), merged here per Step 3.5. Eval format is not interchangeable with skill-creator's evals.json; the full spec is on the plugin-evals page, which is not on the scan-docs allowlist. Needs its own design; requires git 2.31+."
     }
   ]
 }
