@@ -2,6 +2,7 @@
 name: upstream-docs
 description: Scans a pinned allowlist of official Claude Code doc pages for best-practice changes affecting the bx plugin. Used by the bx:evolve skill. Do not invoke independently.
 model: sonnet
+omitClaudeMd: true
 tools: Read, Grep, Glob, WebFetch
 ---
 

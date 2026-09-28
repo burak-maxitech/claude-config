@@ -2,6 +2,7 @@
 name: upstream-changelog
 description: Scans Anthropic's claude-code releases/CHANGELOG since a watermark for renames, deprecations, and new capabilities that intersect the bx plugin's capability inventory. Used by the bx:evolve skill. Do not invoke independently.
 model: sonnet
+omitClaudeMd: true
 tools: Read, Grep, Glob, Bash(gh:*), WebFetch
 ---
 

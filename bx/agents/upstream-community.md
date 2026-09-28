@@ -2,6 +2,7 @@
 name: upstream-community
 description: Bounded community-content sweep for emergent Claude Code patterns; emits advisory-only findings. Used by the bx:evolve skill. Do not invoke independently.
 model: sonnet
+omitClaudeMd: true
 tools: Read, Grep, Glob, WebSearch, WebFetch
 ---
 
