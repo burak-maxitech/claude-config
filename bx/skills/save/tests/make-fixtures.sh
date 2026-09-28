@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# make-fixtures.sh - build the ten doc-schema fixture repos.
+# make-fixtures.sh - build the thirteen doc-schema fixture repos.
 # Usage: make-fixtures.sh <dest-dir>
 # Each fixture is a real git repo so the clean-tree guard can be exercised.
 # bash 3.2 compatible.
@@ -410,6 +410,99 @@ Last Updated: 2026-08-01 (Session 1)
 MD
 }
 
+filler() {  # <count> -- <count> 50-char sentences on one line, no trailing newline
+    _i=1; _out=""
+    while [ "$_i" -le "$1" ]; do
+        _out="${_out}Detail $(printf '%02d' "$_i") of this issue, kept for fixture weight. "
+        _i=$((_i + 1))
+    done
+    printf '%s' "$_out"
+}
+
+ki_head() {  # <path> -- v2 CLAUDE.md up to and including the Known Issues header
+    cat > "$1/CLAUDE.md" <<'MD'
+<!-- bx-doc-schema: 2 -->
+# CLAUDE.md
+
+Last Updated: 2026-08-01 (Session 9)
+
+## Project Overview
+
+Fixture project for the Known Issues governor.
+
+## Key Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| Use widgets | They compose better than gadgets. |
+
+> Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
+
+## Known Issues / Blockers
+
+MD
+}
+
+ki_entry() {  # <path> <lead> <filler-count> [extra-sentence]
+    printf '**%s** %s%s\n\n' "$2" "$(filler "$3")" "${4:-}" >> "$1/CLAUDE.md"
+}
+
+ki_tail() {  # <path> -- the pointer line, then a v2 STATUS.md
+    printf '%s\n' '> Session state: [docs/STATUS.md](docs/STATUS.md)' >> "$1/CLAUDE.md"
+    mkdir -p "$1/docs"
+    cat > "$1/docs/STATUS.md" <<'MD'
+# Project Status
+
+> Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
+
+Last Updated: 2026-08-01 (Session 9)
+
+## Current Status
+
+| Area | Status |
+|------|--------|
+| Widgets | Complete |
+
+## Completed
+
+2 tasks completed. See [completed-work.md](completed-work.md) for full checklist.
+
+## In Progress
+
+**Widget refactor** — halfway through, see `src/widget.py`.
+
+## Next Steps
+
+1. Finish the widget refactor
+
+## Session History
+
+> Full history: [session-history.md](session-history.md)
+
+### Last Session (Session 9) - 2026-08-01
+- Built the widget
+MD
+}
+
+write_ki_rotate_archive() {  # <path> -- a >100k docs/known-issues.md, Open entry at #60
+    mkdir -p "$1/docs"
+    cat > "$1/docs/known-issues.md" <<'MD'
+# Known Issues Archive
+
+> Issues moved out of [CLAUDE.md](../CLAUDE.md) by `/bx:save`. `Resolved` entries are
+> history; `Open` entries are still live and linked from CLAUDE.md.
+
+---
+MD
+    _n=1
+    while [ "$_n" -le 160 ]; do
+        if [ "$_n" -eq 60 ]; then _hdr="### Issue $_n — Open, moved S$_n (2026-01-01)"
+        else _hdr="### Issue $_n — Resolved S$_n (2026-01-01)"; fi
+        printf '\n%s\n\n**Issue %s (S%s).** %s\n' "$_hdr" "$_n" "$_n" "$(filler 13)" >> "$1/docs/known-issues.md"
+        _n=$((_n + 1))
+    done
+}
+
 # fx-v0: a git repo with no CLAUDE.md at all
 init_repo "$DEST/fx-v0"
 echo "# Readme" > "$DEST/fx-v0/README.md"
@@ -495,6 +588,51 @@ stub_docs "$DEST/fx-arch-preexisting" completed-work key-decisions session-histo
 write_architecture_md "$DEST/fx-arch-preexisting"
 commit_all "$DEST/fx-arch-preexisting" "init"
 echo "fx-arch-preexisting (legacy layout, docs/architecture.md pre-existing & matching)"
+
+# fx-ki-resolved: v2, Known Issues ~6k with three RESOLVED entries (~3.9k) and
+# three open ones (~2.1k). The 7.3 shrinker must get under 2500 by moving the
+# resolved entries ONLY.
+init_repo "$DEST/fx-ki-resolved"
+ki_head  "$DEST/fx-ki-resolved"
+ki_entry "$DEST/fx-ki-resolved" "Widget cache corruption is RESOLVED (S3)." 25
+ki_entry "$DEST/fx-ki-resolved" "Gadget sync stalls on large batches (S4)." 13
+ki_entry "$DEST/fx-ki-resolved" "The S5 import deadlock is resolved (S6)." 25
+ki_entry "$DEST/fx-ki-resolved" "Exporter drops the final row (S7)." 13
+ki_entry "$DEST/fx-ki-resolved" "Flaky auth refresh: RESOLVED by retry (S8)." 25
+ki_entry "$DEST/fx-ki-resolved" "Report totals are off by one (S9)." 13
+ki_tail  "$DEST/fx-ki-resolved"
+stub_docs "$DEST/fx-ki-resolved" completed-work key-decisions session-history
+commit_all "$DEST/fx-ki-resolved" "init"
+echo "fx-ki-resolved (v2, Known Issues ~6k, three resolved entries)"
+
+# fx-ki-unresolved: v2, Known Issues ~6k with ONE small resolved entry and seven
+# open ones. After the resolved entry moves the section is still over 4000, so
+# the shrinker moves the oldest OPEN entries until it is under 4000 -- not 2500.
+# Two traps: entry 2's lead says "unresolved", entry 3's BODY says "resolved".
+# Both are open.
+init_repo "$DEST/fx-ki-unresolved"
+ki_head  "$DEST/fx-ki-unresolved"
+ki_entry "$DEST/fx-ki-unresolved" "Widget cache corruption is RESOLVED (S3)." 7
+ki_entry "$DEST/fx-ki-unresolved" "Gadget sync stall is still unresolved (S4)." 15
+ki_entry "$DEST/fx-ki-unresolved" "Importer deadlock under load (S5)." 15 "It was resolved upstream once, then regressed."
+ki_entry "$DEST/fx-ki-unresolved" "Exporter drops the final row (S6)." 15
+ki_entry "$DEST/fx-ki-unresolved" "Report totals are off by one (S7)." 15
+ki_entry "$DEST/fx-ki-unresolved" "Auth refresh is flaky on cold start (S8)." 15
+ki_entry "$DEST/fx-ki-unresolved" "Scheduler skips the DST hour (S9)." 15
+ki_entry "$DEST/fx-ki-unresolved" "Uploads over 2GB time out (S9)." 15
+ki_tail  "$DEST/fx-ki-unresolved"
+stub_docs "$DEST/fx-ki-unresolved" completed-work key-decisions session-history
+commit_all "$DEST/fx-ki-unresolved" "init"
+echo "fx-ki-unresolved (v2, Known Issues ~6k, one resolved entry, two lead/body traps)"
+
+# fx-ki-rotate: v2 with a >100k docs/known-issues.md whose 60th entry is Open.
+# Part 7.7 must cut entries 1-59 only: the cut never extends past the first
+# Open entry, even though the live file then stays over the 50k target.
+init_repo "$DEST/fx-ki-rotate"
+write_v2_pair "$DEST/fx-ki-rotate"
+write_ki_rotate_archive "$DEST/fx-ki-rotate"
+commit_all "$DEST/fx-ki-rotate" "init"
+echo "fx-ki-rotate   (v2, docs/known-issues.md >100k, Open entry at #60)"
 
 echo ""
 echo "Fixtures built in $DEST"
