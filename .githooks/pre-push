@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# pre-push - block a push to main that changes the plugin without a version bump.
+# Enable once per clone:  git config core.hooksPath .githooks
+# Bypass for one push:    git push --no-verify
+#
+# git feeds one line per ref on stdin: <local ref> <local sha> <remote ref> <remote sha>
+
+set -uo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+status=0
+while read -r _local_ref local_sha remote_ref remote_sha; do
+    [ "$remote_ref" = "refs/heads/main" ] || continue
+    case "$local_sha" in *[!0]*) ;; *) continue ;; esac   # deleting the ref
+    ( cd "$ROOT" && bash scripts/check-plugin-version-bump.sh "$remote_sha" "$local_sha" ) || status=1
+done
+exit "$status"

@@ -5,3 +5,4 @@
 # which run as real shell processes.
 *.sh    text eol=lf
 bx/bin/* text eol=lf
+.githooks/* text eol=lf
