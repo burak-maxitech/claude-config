@@ -106,9 +106,10 @@ Next steps:
   pick up edits until refreshed. Since Claude Code 2.1.260 `/reload-plugins` is also available in
   headless (`-p` / SDK) sessions, so a scripted pass can refresh without an interactive relaunch. (Claude Code 2.1.216 fixed mid-session skill/command edits not
   appearing in the slash menu until restart, and v2.1.221 made plugins installed from `/plugin`
-  activate immediately "when safe". Neither has been verified to cover a plugin-cache refresh
-  pulling a new marketplace commit — and "when safe" is undefined upstream — so keep running
-  the refresh until a smoke-test confirms otherwise.)
+  activate immediately "when safe", and v2.1.268 made a plugin installed, enabled or disabled
+  from `/plugin` take effect when the menu closes. None of the three has been verified to cover
+  a plugin-cache refresh pulling a new marketplace commit — and "when safe" is undefined
+  upstream — so keep running the refresh until a smoke-test confirms otherwise.)
 - For any SKILL.md that received non-trivial edits, consider the S42 content-review treatment:
   invoke skill-creator's qualitative review on the updated skill before the next real run.
 - To undo, run `/rewind` (or `Esc Esc` on an empty prompt) — one rewind reverts the whole pass

@@ -39,7 +39,7 @@ This skill drives Google Stitch through its MCP + Google's official skills. Set 
    - **API key (Direct)** — simplest. No gcloud, no GCP project, no billing. You paste a Stitch API key; the wizard offers to store it in a `.env` file.
    - **gcloud / Google login** — Application Default Credentials against a GCP project (this path is the one that needs **billing enabled**, the **Stitch API enabled**, and Owner/Editor on the project).
 
-   When it finishes, the wizard **prints the exact `claude mcp add …` command to run — copy that one.** It differs by auth mode (e.g. an `http` transport with an `X-Goog-Api-Key` header for API-key mode — NOT a fixed `… -- npx … proxy` command, and NOT `-e GOOGLE_CLOUD_PROJECT=…`). Keep the server name `stitch` and use **`-s user`** so it saves to `~/.claude.json`, outside the repo.
+   When it finishes, the wizard **prints the exact `claude mcp add …` command to run — copy that one.** It differs by auth mode (e.g. an `http` transport with an `X-Goog-Api-Key` header for API-key mode — NOT a fixed `… -- npx … proxy` command, and NOT `-e GOOGLE_CLOUD_PROJECT=…`). Keep the server name `stitch` and use **`-s user`** so it saves to `~/.claude.json`, outside the repo. If the server then reports it needs authentication, `claude mcp login stitch` (Claude Code 2.1.186+; add `--no-browser` over SSH) signs in from the shell; the interactive `/mcp` menu does the same.
 2. **Install Google's Stitch skills:**
    ```
    npx plugins add google-labs-code/stitch-skills --scope project --target claude-code

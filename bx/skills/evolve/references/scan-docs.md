@@ -23,6 +23,9 @@ Verified 2026-06-09; `permissions` added 2026-07-22 (S50); `checkpointing` + `co
 | `https://code.claude.com/docs/en/skills` | skill authoring — SKILL.md frontmatter, invocation control, subagent execution, dynamic context injection | loads directly |
 | `https://code.claude.com/docs/en/plugins` | plugin creation — manifest schema, directory layout, skills/agents/hooks packaging, marketplace submission | loads directly |
 | `https://code.claude.com/docs/en/plugins-reference` | plugin technical reference — complete schema specs, CLI commands, version management, monitors, LSP servers | loads directly |
+| `https://code.claude.com/docs/en/plugins/loading` | plugin loading — versions and updates, the `version` field as update cache key, auto-update | added 2026-09-28; `plugins` and `plugins-reference` now return overview/manifest pages that no longer own this contract |
+| `https://code.claude.com/docs/en/plugins/cli-reference` | plugin CLI — `claude plugin validate` flags, `/reload-plugins`, install/update commands | added 2026-09-28 |
+| `https://code.claude.com/docs/en/plugin-evals` | plugin evals — `claude plugin eval` suite format, graders, thresholds | added 2026-09-28 |
 | `https://code.claude.com/docs/en/hooks` | hook events — lifecycle points, matcher patterns, handler types, JSON schemas, exit codes, async/HTTP/MCP/prompt hooks | loads directly (page title is "Hooks reference"; the `/hooks-reference` path 404s) |
 | `https://code.claude.com/docs/en/settings` | settings — scope hierarchy, settings files, permissions, allowed-tools syntax, env vars | loads directly |
 | `https://code.claude.com/docs/en/permissions` | permission rules — `Tool(param:value)` parameter matching, `Agent(<name>)` subagent rules, Bash/Read/Edit specifier syntax, allow/ask/deny precedence, wildcards, working directories | loads directly |
