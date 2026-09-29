@@ -27,10 +27,10 @@ All notable changes to the `bx` plugin, newest first. Versioning follows [semver
 - **Derivable-content clause.** A fact one command recovers (stack, remote, cwd) may leave
   `## Project Overview`. Advisory only: `/bx:save` names candidates and removes nothing.
 
-- **`omitClaudeMd: true` on six scanner subagents** (`upstream-*`, `seo-content`,
-  `seo-technical`, `seo-gsc-insights`; Claude Code 2.1.271+). They take everything from the
-  dispatch prompt, so they no longer load CLAUDE.md. The arch, test and cleanup scanners keep
-  it: a target repo's recorded decisions are what stop them flagging deliberate design.
+- **`omitClaudeMd: true` on the three `upstream-*` subagents** (Claude Code 2.1.271+). They run
+  only in this repo and take everything from the dispatch prompt, so they no longer load
+  CLAUDE.md. Every scanner that reads a target repo (arch, test, cleanup, seo, geo) keeps it:
+  that repo's recorded decisions are what stop a scanner flagging deliberate design.
   (`/bx:evolve` finding `c0379ca1`.)
 
 - **`/bx:health` declares `disallowed-tools: Edit, Write, NotebookEdit, Agent`**, enforcing the
@@ -65,6 +65,10 @@ All notable changes to the `bx` plugin, newest first. Versioning follows [semver
   `!` injections used `echo` and `head`; since Claude Code 2.1.271 auto mode applies
   default-mode permission rules to them, and 2.1.284 made auto mode the default. Both lists now
   name what the injections run. (`/bx:evolve` finding `2e4e9a8b`.)
+
+- **`/bx:health` read session state from CLAUDE.md**, where doc schema v2 no longer keeps it, so
+  on a migrated repo it saw empty `In Progress` and `Next Steps`. It now reads
+  `docs/STATUS.md` when that file exists and names the file it read.
 
 - **Doc notes:** fix-mode-evolve.md lists v2.1.268 as a third unverified data point on
   `/reload-plugins`; setup-stitch-mcp.md names `claude mcp login stitch`. (Findings `ee81fa43`,

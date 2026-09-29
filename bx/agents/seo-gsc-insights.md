@@ -2,7 +2,6 @@
 name: seo-gsc-insights
 description: Scans Google Search Console API digests (Search Analytics + URL Inspection) + git-history change digest passed by the /bx:seo orchestrator. Emits traffic-aware finding records with score_impact:0 (info-only, enforced orchestrator-side). Used by the bx:seo skill. Do not invoke independently.
 model: sonnet
-omitClaudeMd: true
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(jq:*), Bash(cat:*), Bash(head:*)
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: health
-description: "Looks at the current repo state (git status, branch, recent commits, CLAUDE.md In Progress / Next Steps, open PR) and suggests which existing skills to run in what order for technical-debt / code-health work. Pure advisor — never invokes other skills, never edits files. Use when unsure which skill to reach for next, or when entering an unfamiliar repo and wanting a sequenced plan."
+description: "Looks at the current repo state (git status, branch, recent commits, In Progress / Next Steps from docs/STATUS.md or CLAUDE.md, open PR) and suggests which existing skills to run in what order for technical-debt / code-health work. Pure advisor — never invokes other skills, never edits files. Use when unsure which skill to reach for next, or when entering an unfamiliar repo and wanting a sequenced plan."
 disable-model-invocation: true
 effort: low
 allowed-tools: Read, Glob, Bash(git:*), Bash(ls:*), Bash(gh:*), Bash(wc:*), Bash(grep:*), Bash(head:*), Bash(awk:*), Bash(tr:*), Bash(echo:*)
@@ -37,16 +37,23 @@ git log --oneline -10 2>/dev/null || echo "(no commits)"
 gh pr view --json number,state,title 2>/dev/null || echo "(no open PR or gh unavailable)"
 ```
 
-### CLAUDE.md sections (Current Status / In Progress / Next Steps / Last Updated)
+### Session state (Current Status / In Progress / Next Steps / Last Updated)
+
+Doc schema v2 keeps these sections in `docs/STATUS.md`; a v1 repo keeps them in CLAUDE.md. The
+snapshot names the file it read. Wherever this skill says "CLAUDE.md `In Progress`",
+"`Next Steps`" or "`Last Updated`", it means that state file.
+
 ```!
-if [ -f CLAUDE.md ]; then
-  grep -i "Last Updated" CLAUDE.md | head -1
+STATE=CLAUDE.md; [ -f docs/STATUS.md ] && STATE=docs/STATUS.md
+if [ -f "$STATE" ]; then
+  echo "(state file: $STATE)"
+  grep -i "Last Updated" "$STATE" | head -1
   echo "---"
-  awk '/^## /{f=0} /^## Current Status/{f=1} f' CLAUDE.md | head -25
+  awk '/^## /{f=0} /^## Current Status/{f=1} f' "$STATE" | head -25
   echo "---"
-  awk '/^## /{f=0} /^## In Progress/{f=1} f' CLAUDE.md | head -20
+  awk '/^## /{f=0} /^## In Progress/{f=1} f' "$STATE" | head -20
   echo "---"
-  awk '/^## /{f=0} /^## Next Steps/{f=1} f' CLAUDE.md | head -20
+  awk '/^## /{f=0} /^## Next Steps/{f=1} f' "$STATE" | head -20
 else
   echo "(no CLAUDE.md at repo root)"
 fi

@@ -542,7 +542,7 @@
       "source_content_hash": "e5ef0425b004cbf05ae88449ad7223f3d173184e",
       "class": "opportunity",
       "title": "`omitClaudeMd` agent frontmatter (v2.1.271) — read-only scanner subagents could skip CLAUDE.md, cutting per-dispatch context",
-      "note": "APPLIED 2026-09-28 (v2.10.0), NARROWER than the lane proposed. `omitClaudeMd: true` added to 6 agents only: upstream-changelog, upstream-docs, upstream-community, seo-content, seo-technical, seo-gsc-insights. Excluded on purpose: the five agents whose own text references CLAUDE.md (arch-simplification, doc-migrator, geo-generative, save-writer, test-coverage — three of which the lane wrongly listed as candidates), and the arch-*, test-*, cleanup-* scanners, because a target repo's CLAUDE.md carries the decisions that stop those scanners flagging deliberate design as a defect. `claude plugin validate ./bx --strict --json` passes with the key on 2.1.284. Runtime effect not measured."
+      "note": "APPLIED 2026-09-28 (v2.10.0), NARROWER than the lane proposed: `omitClaudeMd: true` on the three upstream-* agents only. They run only in claude-config and take everything from the dispatch prompt. Every scanner that reads a target repo (arch-*, test-*, cleanup-*, seo-*, geo-generative) keeps CLAUDE.md, because that repo's recorded decisions are what stop a scanner flagging deliberate design; seo-* carried the flag briefly and were reverted the same session after review. `claude plugin validate ./bx --strict --json` passes with the key on 2.1.284, though the validator may not check agent frontmatter. Runtime effect not measured."
     },
     {
       "finding_id": "161ae1821578ccf044251efaa1b7ce2eca195ae5",

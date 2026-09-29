@@ -69,7 +69,7 @@ For UPDATE mode the change report is assembled from the `save-writer` subagent's
 - [ ] docs/STATUS.md Completed section is a summary + link (NOT full checklist)
 - [ ] CLAUDE.md Key Decisions has ~20 max rows + link to full log
 - [ ] docs/STATUS.md Session History has only last session (3-5 bullets) + link
-- [ ] Reference files created as needed (docs/completed-work.md, docs/key-decisions.md, docs/session-history.md)
+- [ ] Reference files created as needed (docs/completed-work.md, docs/key-decisions.md, docs/session-history.md, docs/known-issues.md)
 - [ ] CLAUDE.md and docs/STATUS.md both have a "Last Updated" timestamp
 - [ ] CLAUDE.md is ~7k chars; docs/STATUS.md is ~10k chars
 - [ ] docs/ folder has specifications

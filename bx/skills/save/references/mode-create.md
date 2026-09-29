@@ -100,7 +100,7 @@ compatibility (see `claude-md-sections.md`). Session state lives in the sibling
 | [Detected pattern/choice] | [Inferred or documented reason] |
 | [Another decision] | [Reason] |
 
-<!-- Reference files (docs/completed-work.md, docs/key-decisions.md, docs/session-history.md) will be created by /bx:save as content accumulates -->
+<!-- Reference files (docs/completed-work.md, docs/key-decisions.md, docs/session-history.md, docs/known-issues.md) will be created by /bx:save as content accumulates -->
 
 ---
 
@@ -109,7 +109,9 @@ compatibility (see `claude-md-sections.md`). Session state lives in the sibling
 - [ ] [Any detected TODOs, FIXMEs, or issues]
 - [ ] [Blockers preventing progress]
 
-*None currently* - if no issues detected
+None currently.
+
+<!-- Write exactly "None currently." when no issues were detected, and drop the two bullets above. -->
 
 ---
 

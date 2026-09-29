@@ -109,7 +109,7 @@ files:
   docs/key-decisions.md: +<K> rows        # omit line if decision_rows empty
   docs/known-issues.md: +<J> entries      # omit line if known_issue_moves empty
 notes: <density-cap overages, or "none">
-warnings: <unmatched deltas, or the v1 STATUS.md-absent fallback note, or "none">
+warnings: <unmatched deltas, unmatched known-issue removals, a refused Known Issues block-replace, or the v1 STATUS.md-absent fallback note, or "none">
 ```
 On the schema-v1 fallback, omit the `docs/STATUS.md` line entirely and fold its content into
-CLAUDE.md's line instead: `CLAUDE.md: <old>k → <new>k chars (session block + <N> deltas[, +<K> decision rows])`.
+CLAUDE.md's line instead: `CLAUDE.md: <old>k → <new>k chars (session block + <N> deltas[, +<K> decision rows][, -<J> known issues])`.

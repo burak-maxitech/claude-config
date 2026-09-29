@@ -4,7 +4,7 @@ When documentation structure exists, update to reflect current state.
 
 ## Step 0: Scoped Context Gather
 
-Gather only what the orchestrator needs to *route* and *compose the packet*. The big append-only archives (`docs/key-decisions.md`, `docs/completed-work.md`, `docs/session-history.md`) are NOT read here on the default (fast) path — the `save-writer` subagent reads `session-history.md` off the main thread, and the other two are append-only (the orchestrator never reads *from* them to write the packet). Reading all archives up front was the single biggest cost of the old flow (~60k tokens/run).
+Gather only what the orchestrator needs to *route* and *compose the packet*. The big append-only archives (`docs/key-decisions.md`, `docs/completed-work.md`, `docs/session-history.md`, `docs/known-issues.md`) are NOT read here on the default (fast) path — the `save-writer` subagent reads `session-history.md` off the main thread, and the other two are append-only (the orchestrator never reads *from* them to write the packet). Reading all archives up front was the single biggest cost of the old flow (~60k tokens/run).
 
 ### 0.1 Single parallel turn — issue these together
 
@@ -435,7 +435,7 @@ them: `/doctor`'s trim check (Claude Code 2.1.206+) proposes cuts of derivable c
 `/doctor prompt-audit` (2.1.283+) reports stale or contradictory instructions across
 CLAUDE.md, rules, skills and subagents. Both only propose; `/bx:save` runs neither.
 
-This is the early advisory only — active enforcement happens in **Part 7 (Size-Pressure Rollup)** after Parts 5/6 have had a chance to bring the files under threshold via count-based rollups. If 1.9 fires for a file, expect Part 7 to also fire for that file.
+This is the early advisory only — active enforcement happens in **Part 7 (Size-Pressure Rollup)** after Parts 5/6 have had a chance to bring the files under threshold via count-based rollups. If the soft-cap warning fires for a file, expect Part 7 to also fire for that file; the 9k advisory rung on its own means Part 7 will not.
 
 ### 1.10 Cap Enforcement
 
@@ -762,7 +762,7 @@ A verbatim archive body must not break the archive's own structure, which keys o
 
 Measure the section with 7.2's `awk` count, re-measure after each move, and stop the moment the bound for the current phase is met: under 2500 for the resolved phase, under 4000 for the open phase.
 
-The line that replaces a moved open entry is `**<lead>** <one sentence, 25 words at most, saying what is still broken> → [docs/known-issues.md](docs/known-issues.md)`, in the entry's original position. `**<lead>**` is the entry's opening bold phrase exactly as it stood, punctuation included. The sentence is written from the entry's own body and names the specific failure; a generic placeholder ("still broken, see archive") leaves the issue with no real trace and is not allowed. When the body states no failure detail, write the sentence from the lead's own subject. Either way, state only what the entry itself says: no inferred cause, consequence or fix status. Archive entries land in the order they are moved, so resolved entries precede the open ones moved in the same run. That line is the marker 7.5 rule 4 looks for in this section: an entry already in that form is never moved or trimmed again.
+The line that replaces a moved open entry is `**<lead>** <one sentence, 25 words at most, saying what is still broken> → [docs/known-issues.md](docs/known-issues.md)`, in the entry's original position. `**<lead>**` is the entry's opening bold phrase exactly as it stood, punctuation included; when the lead was not bold (a bullet or a plain first sentence), bold it here. The sentence is written from the entry's own body and names the specific failure; a generic placeholder ("still broken, see archive") leaves the issue with no real trace and is not allowed. When the body states no failure detail, write the sentence from the lead's own subject. Either way, state only what the entry itself says: no inferred cause, consequence or fix status. Archive entries land in the order they are moved, so resolved entries precede the open ones moved in the same run. That line is the marker 7.5 rule 4 looks for in this section: an entry already in that form is never moved or trimmed again.
 
 7.5 rule 3 is met in this section by one link, never duplicated: `> Archived issues: [docs/known-issues.md](docs/known-issues.md)` as the last block of the section, with one blank line above it and one blank line between it and the `> Session state:` pointer line. Add it before the first move, so that every measurement, including the ones that decide when to stop, already counts it. It is not an entry and it does not stop this shrinker running again: the section is re-examined whenever it is over threshold.
 
@@ -788,7 +788,7 @@ When executing any shrinker:
 
 1. **Move, never delete.** Every shrinker writes the trimmed content to a reference file before removing from its source file (CLAUDE.md or docs/STATUS.md, per 7.3). The `docs/architecture.md`, `docs/next-steps-backlog.md`, `docs/completed-work.md`, `docs/key-decisions.md`, and `docs/known-issues.md` files are the destinations. If a destination doesn't exist, create it with a standard header.
 2. **Preserve commit refs.** Specific commit hashes (`abc1234`, `commit X`), file paths, and links MUST survive into either the trimmed summary or the extracted detail file — these are search anchors users rely on.
-3. **Surface the destination.** Every shrinker's output gains a `> Full [thing]: [path.md](path.md)` link (relative to the file the shrinker ran on) so future `/bx:resume` sessions can chase the detail.
+3. **Surface the destination.** (Known Issues meets rules 3 and 4 its own way — see 7.3.) Every shrinker's output gains a `> Full [thing]: [path.md](path.md)` link (relative to the file the shrinker ran on) so future `/bx:resume` sessions can chase the detail.
 4. **Don't compound losses.** If a section was already shrunk to a summary in a prior run (detectable by the `> Full [thing]:` link), Part 7 does NOT trim further. Re-prompt only fires when the user has manually re-grown the section.
 
 ### 7.6 Report
@@ -920,7 +920,7 @@ git history.
 
 ### 7.8 Idempotency
 
-Part 7 is safe to re-run. The shrinkers detect already-shrunk state via the `> Full [thing]:` sentinel link and skip those sections. The only way a re-shrunk section grows again is user editing — which is fine, and Part 7 will catch it next run.
+Part 7 is safe to re-run. The shrinkers detect already-shrunk state via the `> Full [thing]:` sentinel link and skip those sections. `## Known Issues / Blockers` is the exception (7.3): it is re-examined whenever it is over threshold, and its per-entry summary lines are what is never moved twice. The only way a re-shrunk section grows again is user editing — which is fine, and Part 7 will catch it next run.
 
 ---
 
