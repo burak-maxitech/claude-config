@@ -107,13 +107,45 @@ text.
 
 ## Result
 
-| Rehearsal | Final new-text ambiguity count | Bar (≤ 2) |
+**The ≤ 2 bar was NOT met on raw counts.** It was met only on restricted, author-scored
+counts, and the final reviewer rejected recording that as "met". Read the table accordingly.
+
+| Rehearsal | Final raw count | Final new-text count (author-scored) |
 |---|---|---|
-| R1 | 2 (wave 2) | met |
-| R2 | 2 (wave 3) | met |
-| R3 | 2 (wave 2) | met |
-| R4 | 1 (wave 1), closed | met |
+| R1 | 10 (wave 2) | 2 |
+| R2 | 11 (wave 3) | 2 |
+| R3 | 9 (wave 2) | 2 |
+| R4 | 11 (wave 1) | 1, closed |
 
 The edits made after each rehearsal's final wave were not themselves rehearsed. They are
 one-sentence additions that close a named gap, but that is an argument, not a measurement.
 The first real `/bx:save --full` on a repo over the 12k cap is the remaining proof.
+
+## Final review and confirming rehearsal
+
+A fresh whole-branch review (most capable model) found seven Important defects that no
+rehearsal reached, because the fixtures were synthetic: every fixture entry was a single
+bold-led paragraph with an unambiguous lead. The defects: the bare word "resolved"
+misclassifying open issues; multi-paragraph and bullet entries; an open phase that could grow
+the section; archive `Open` entries that never stop being open; a block-replace delta removing
+an entry before it is archived; README/CHANGELOG overstating when the shrinker runs; the CI
+guard passing an unbumped PR. All seven were fixed in commit `e511475`, each text fix pinned
+by a lint check watched failing first (K17–K22).
+
+One confirming rehearsal then ran against the revised text and a fixture with a third trap
+(a lead using "resolved" in its technical sense):
+
+| Check | Expected | Result |
+|---|---|---|
+| Classification of 8 entries | 1 resolved, 7 open, all three traps open | as expected |
+| Consent prompt lists titles per class | yes | yes |
+| Section chars | 2500..3999 | 3817 |
+| Open entries moved | 3, topmost first | 3 |
+
+Raw ambiguity count: 12. One was a real defect: the agent's replacement sentences added
+claims the entries never made ("exports land in the wrong place", "no fix has landed"). The
+text now forbids inferred cause, consequence or fix status. That last edit is unrehearsed.
+
+**Not rehearsed at all:** multi-paragraph entries, tight bullet lists, the 300-char floor,
+archive liveness in rotation, and the block-replace refusal. These rules exist only as text
+and lint strings.
