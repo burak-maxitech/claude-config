@@ -21,8 +21,14 @@ jobs:
       - name: Plugin changed without a version bump?
         env:
           EVENT: ${{ github.event_name }}
-          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.base_ref }}
           PUSH_BEFORE: ${{ github.event.before }}
         run: |
-          if [ "$EVENT" = "pull_request" ]; then base="$PR_BASE"; else base="$PUSH_BEFORE"; fi
-          bash scripts/check-plugin-version-bump.sh "$base" HEAD
+          # For a pull request HEAD is the merge of the PR into the base branch, so compare
+          # against the base branch TIP: both sides then carry any bump main already took,
+          # and only the PR's own bump can make the versions differ.
+          if [ "$EVENT" = "pull_request" ]; then base="origin/$BASE_REF"; else base="$PUSH_BEFORE"; fi
+          out="$(bash scripts/check-plugin-version-bump.sh "$base" HEAD)"; status=$?
+          echo "$out"
+          case "$out" in *skipped*) echo "::warning::version-bump guard skipped: $out" ;; esac
+          exit "$status"

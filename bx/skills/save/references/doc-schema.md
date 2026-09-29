@@ -84,8 +84,10 @@ nothing automatic, ever — they are grep-on-demand history.
 `## Known Issues / Blockers`, oldest first, one `### ` entry each. The entry header carries
 the status: `### <title> — Resolved S<N> (<date>)`, optionally `, commit <hash>`, or
 `### <title> — Open, moved S<N> (<date>)`. The entry body is the issue's text, verbatim. A
-`Resolved` entry leaves nothing behind in CLAUDE.md; an `Open` entry always leaves a one-line
-summary + link there. This section owns the file's existence and format. Its lifecycle is
+`Resolved` entry leaves nothing behind in CLAUDE.md; an `Open` entry leaves a one-line
+summary + link there for as long as the issue is open. Headers are never rewritten: when an
+`Open` issue is later fixed, its summary line is archived as a new `Resolved` entry and the
+older `Open` entry simply stops being live. This section owns the file's existence and format. Its lifecycle is
 owned by `mode-update.md`: Part 1.7 (relocation) and Part 7.3 (size threshold).
 
 ## v1 layout (legacy)

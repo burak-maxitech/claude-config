@@ -76,7 +76,7 @@ Compose this structure and pass it to `save-writer` as the task prompt (fill eve
 
 - `project_root` — absolute repo path.
 - `today` — current date (e.g. `2026-05-29`). Resolve it from the session's current date supplied by the environment; if that's unavailable, fall back to the most recent commit date from the Step 0.1 `git log` (`git log -1 --date=short`). Do not invoke a bare `date` command — it isn't in `allowed-tools`.
-- `claude_md_deltas` — exact `old → new` string pairs (or "replace block under `## Section` with: …") for CLAUDE.md sections the session changed: the `Last Updated:` line, `## Key Decisions` (Part 1.6) and `## Known Issues / Blockers` (Part 1.7 — a blocker added or reworded this session; a blocker **resolved** this session goes in `known_issue_moves`, never here). **Instructions only** — no state sections. Source the *old* strings verbatim from the CLAUDE.md you read in Step 0.
+- `claude_md_deltas` — exact `old → new` string pairs (or "replace block under `## Section` with: …") for CLAUDE.md sections the session changed: the `Last Updated:` line, `## Key Decisions` (Part 1.6) and `## Known Issues / Blockers` (Part 1.7 — a blocker added or reworded this session; a blocker **resolved** this session goes in `known_issue_moves`, not here). For `## Known Issues / Blockers` use exact `old → new` pairs only, never the block-replace form, and never a pair that touches an entry listed in `known_issue_moves`: deltas are applied before the archive step, so either would remove an issue before it is archived. **Instructions only** — no state sections. Source the *old* strings verbatim from the CLAUDE.md you read in Step 0.
 - `status_md_deltas` — the same, for `docs/STATUS.md`: its `Last Updated:` line, Current Status rows (Part 1.2), the `## Completed` summary line if the drain changed the completed count (Part 0 / Part 1.3), In Progress (Part 1.4) and Next Steps (Part 1.5). Source the *old* strings verbatim from the docs/STATUS.md you read in Step 0 (or, on a v1 repo where STATUS.md is absent, from CLAUDE.md's state sections, per Step 0.1).
 - `status_md_session_block` — the full replacement text for STATUS.md's `## Session History` last-session block (Part 1.8 format, ≤5 bullets). New field name under schema v2 — the block lives in STATUS.md now, not CLAUDE.md.
 - `session_history_entry` — the detailed entry for `docs/session-history.md` (Part 1.8 format, capped).
@@ -88,10 +88,10 @@ Compose this structure and pass it to `save-writer` as the task prompt (fill eve
 
 Dispatch one `save-writer` subagent via the Agent tool with `subagent_type: "bx:save-writer"`, passing the packet as the prompt (serialize as labeled sections). Await its change report.
 
-`save-writer` reports on two channels, matching `doc-migrator.md`'s convention: `notes:` is advisory, `warnings:` is the channel that compels action. `warnings:` itself carries two distinct sub-cases (see `save-writer.md`'s Output section) that call for different responses — do not treat every non-`none` `warnings:` as a re-dispatch trigger. Handle each:
+`save-writer` reports on two channels, matching `doc-migrator.md`'s convention: `notes:` is advisory, `warnings:` is the channel that compels action. `warnings:` itself carries three distinct sub-cases (see `save-writer.md`'s Output section) that call for different responses — do not treat every non-`none` `warnings:` as a re-dispatch trigger. Handle each:
 - **`notes:` non-`none`** (a density-cap: a field exceeded the prose caps) → tighten the offending field, note it in your report, do NOT re-dispatch.
 - **`warnings:` non-`none`, unmatched delta** (an `old_string` didn't match, so that CLAUDE.md or docs/STATUS.md section was left un-updated) → re-source the exact current string from the CLAUDE.md / docs/STATUS.md you read in Step 0 (or re-read the affected lines) and re-dispatch **only** those deltas. This is the one case where re-dispatch IS warranted — silently leaving a section stale is the failure mode this guards against.
-- **`warnings:` non-`none`, unmatched known-issue removal** (the entry was archived, but its text was not found verbatim in CLAUDE.md, so it was not removed) → re-read the affected lines of CLAUDE.md and re-dispatch **only** a `claude_md_deltas` removal for that entry. Do NOT re-send the `known_issue_moves` item — the archive copy already exists.
+- **`warnings:` non-`none`, unmatched known-issue removal** (the entry was archived, but its text was not found verbatim in CLAUDE.md, so it was not removed) → re-read the affected lines of CLAUDE.md and re-dispatch **only** a `claude_md_deltas` removal for that entry. This is the one case where a delta may remove a Known Issues entry, and it is safe because the archive copy already exists. Do NOT re-send the `known_issue_moves` item.
 - **`warnings:` non-`none`, schema-v1 `docs/STATUS.md`-absent fallback** (save-writer routed `status_md_deltas` and `status_md_session_block` to CLAUDE.md because `docs/STATUS.md` doesn't exist yet) → confirm the v1 routing was expected (migration hasn't run on this repo), log it in your report, do NOT re-dispatch.
 - Both `notes:` and `warnings:` read `none` → done, no re-dispatch.
 
@@ -344,14 +344,22 @@ Target: **CLAUDE.md's `## Key Decisions` table** (unchanged from v1 — this sta
 Target: **CLAUDE.md's `## Known Issues / Blockers` section** (unchanged from v1), plus the
 `docs/known-issues.md` archive (format owned by `doc-schema.md`'s Archives section).
 
-An **entry** is one non-empty blank-line-separated block inside the section: a paragraph, or
-a top-level bullet with its continuation lines. A block whose first line starts with `>` is
-not an entry: that covers the `> Session state:` pointer line that follows the section, which
-never moves, and the `> Archived issues:` link Part 7.3 adds. An entry's **title** is its
-lead (the opening bold phrase, or the first sentence when there is none) without bold
-markers or trailing punctuation.
+An **entry** starts at a **lead** and runs to just before the next lead, the next block
+whose first line starts with `>`, or the end of the section. A lead is a line that opens with
+a bold phrase (`**…**`) or a top-level bullet (`- `, `* `, `1. `, with or without a
+`[ ]`/`[x]` checkbox). Everything under a lead belongs to that entry: continuation
+paragraphs, code blocks, nested bullets, sub-headings. If the section has no bold or bullet
+leads at all, each blank-line-separated paragraph is an entry and its first sentence is the
+lead.
 
-- **Add** new issues discovered this session, as new entries at the end of the section.
+Not entries, and never moved: a block whose first line starts with `>` (the
+`> Session state:` pointer line that follows the section, and the `> Archived issues:` link
+Part 7.3 adds), and the placeholder `None currently.` in any emphasis or with any trailing
+note. An entry's **title** is its lead without bold markers, bullet or checkbox, or trailing
+punctuation.
+
+- **Add** new issues discovered this session, as new entries after the last entry and above
+  any `>` block.
 - **Relocate resolved issues; do not delete them.** Put each issue this session resolved in
   the packet's `known_issue_moves` with `status: resolved`, the resolving session, and the
   commit hash where one exists. Do not also write a `claude_md_deltas` removal for it:
@@ -742,11 +750,17 @@ For each section over its threshold, propose a specific shrinker. The thresholds
 `## Architecture Summary` is not in this table: that section no longer exists in CLAUDE.md under schema v2 — it lives in `docs/architecture.md`, which Part 7 does not size-manage. Sections not in this table (project-specific like `## Quick Commands`, `## Don't Modify`, `## Environment Variables` in CLAUDE.md) are **tolerated as-is** — Part 7 only acts on known shrinkable sections. If a project-specific section is the dominant bloat source, Part 7 reports it but takes no action, deferring to user judgment.
 This clause covers project-specific sections only. Every section `claude-md-sections.md` lists as required has a row above, except `## Project Overview`, which has no threshold (7.2 shows `—`; its only governor is Part 1.9's derivable-facts advisory). A required section reaching this clause any other way is a bug in this table: report it as one.
 
-**Known Issues entries.** Entry boundaries are Part 1.7's; the `> Session state:` pointer line is not an entry. An entry is **resolved** iff its lead — the opening bold phrase, or the first sentence when there is none — contains the whole word `resolved`, in any case. `unresolved` is not a match, and the word appearing later in the body does not count. Every other entry is **open**. Topmost = oldest, the same FIFO convention as Part 6.1.
+**Known Issues entries.** Entry boundaries are Part 1.7's; the `> Session state:` pointer line is not an entry. An entry is **resolved** iff its lead carries a resolved **status form**: the whole word `RESOLVED` in capitals; or `is resolved`, `was resolved` or `now resolved` followed by the end of the lead, punctuation, `(`, `by` or `in`; or a checked `[x]` box. The bare word is not enough: `unresolved`, `not resolved`, `partially resolved`, and the technical sense (`paths are resolved against cwd`) are all open, and the word appearing later in the body does not count. Every other entry is **open**. When in doubt, the entry is open: an open entry keeps a trace in CLAUDE.md, a wrongly resolved one leaves none. Topmost = oldest, the same FIFO convention as Part 6.1.
 
 Part 7 runs on the orchestrator, so this shrinker edits the two files directly: it builds no packet and dispatches no `save-writer`. It borrows only the append procedure and header format of `save-writer.md` step 8a, with `<title>` being the entry's title as Part 1.7 defines it. A resolved entry takes the **last** session its lead names (`The S5 deadlock is resolved (S6)` → `S6`), or this session when it names none; an open entry takes `Open, moved S<N>` for this session. Handle one entry completely — **archive first, remove second** — before starting the next. A title that repeats the status word (`… is RESOLVED (S3) — Resolved S3`) is fine; do not reword it.
 
-One consent in 7.4 covers both phases. Measure the section with 7.2's `awk` count, re-measure after each move, and stop the moment the bound for the current phase is met: under 2500 for the resolved phase, under 4000 for the open phase.
+One consent in 7.4 covers both phases, and for this section the 7.4 prompt lists the titles it will move, under two headings: *resolved — leaves CLAUDE.md entirely* and *open — replaced by a one-line summary*. The user is approving a classification, so they must see it.
+
+The open phase moves only an entry of at least 300 chars: a shorter one would be replaced by a line about as long as itself, and the section would not shrink. Skip shorter entries, keeping topmost-first order among the rest. When the section is still over 4000 and no remaining open entry qualifies, stop and report that the section is over threshold with nothing left worth moving.
+
+A verbatim archive body must not break the archive's own structure, which keys on `### `: write any body line that starts with `#` with a leading backslash (`\###`). That is the only change ever made to an archived body.
+
+Measure the section with 7.2's `awk` count, re-measure after each move, and stop the moment the bound for the current phase is met: under 2500 for the resolved phase, under 4000 for the open phase.
 
 The line that replaces a moved open entry is `**<lead>** <one sentence, 25 words at most, saying what is still broken> → [docs/known-issues.md](docs/known-issues.md)`, in the entry's original position. `**<lead>**` is the entry's opening bold phrase exactly as it stood, punctuation included. The sentence is written from the entry's own body and names the specific failure; a generic placeholder ("still broken, see archive") leaves the issue with no real trace and is not allowed. When the body states no failure detail, write the sentence from the lead's own subject. Archive entries land in the order they are moved, so resolved entries precede the open ones moved in the same run. That line is the marker 7.5 rule 4 looks for in this section: an entry already in that form is never moved or trimmed again.
 
@@ -837,11 +851,15 @@ Measure the four archives (`wc -c`, omitting any that do not exist). For each fi
    does not re-fire every run). The protected tail never moves: the 5 most recent sessions
    (session-history, matching Part 5's window), the newest 20 rows (key-decisions, matching
    Part 6's target), this session's just-appended items (completed-work), and in
-   known-issues every entry from the first `Open`-tagged header onward — the cut never
-   extends past the first `Open` entry, even when that leaves the live file over 50k,
-   because CLAUDE.md links to `Open` entries and a volume is read by nothing. When the
-   `Open` entry makes 50k unreachable, move every entry before it. If the first
-   entry is `Open`, nothing moves: report that and take no action. Never compress,
+   known-issues every entry from the first **live** `Open`-tagged header onward — the cut
+   never extends past the first live `Open` entry, even when that leaves the live file over
+   50k, because CLAUDE.md links to it and a volume is read by nothing. An `Open` entry is
+   live while a line in CLAUDE.md's `## Known Issues / Blockers` still starts with its title
+   (one Grep per `Open` header, on CLAUDE.md only). Once the issue is fixed and its summary
+   line has left CLAUDE.md, the entry is no longer live and rotates like a resolved one; its
+   header is never rewritten, because archives are append-only. When a live `Open` entry
+   makes 50k unreachable, move every entry before it. If the first entry is a live `Open`
+   one, nothing moves: report that and take no action. Never compress,
    reword, or reorder anything — Part 5 owns compression and has already run. Locate the
    boundaries by line number with Grep (`-n`); call **H** the last line of the live file's
    header region and **L** the last line of the final entry being moved.

@@ -77,6 +77,17 @@ echo "--- D7 / D8: derivable content, advisory rung ---"
 has K11 "$RULES" 'Derivable facts are recoverable' "doc-structure-rules.md carries the derivable-content clause"
 has K12 "$UPDATE" 'advisory rung 9k' "Part 1.9 names the 9k advisory rung"
 
+echo "--- final-review fixes: classification, entry shape, progress, liveness ---"
+has K17 "$UPDATE" 'status form' "resolved test requires a status form, not the bare word"
+has K17 "$UPDATE" 'When in doubt, the entry is open' "doubtful entries default to open"
+has K18 "$UPDATE" 'lists the titles' "7.4 consent for Known Issues lists the titles per class"
+has K19 "$UPDATE" 'runs to just before the next lead' "an entry spans lead to next lead"
+has K19 "$WRITER" 'runs to just before the next lead' "save-writer uses the same entry span"
+has K20 "$UPDATE" 'at least 300 chars' "open phase only moves entries that shrink the section"
+has K21 "$UPDATE" 'no longer live' "7.7 treats an Open entry absent from CLAUDE.md as resolved"
+has K22 "$UPDATE" 'never the block-replace form' "Known Issues deltas may not block-replace"
+has K22 "$WRITER" 'refuse a block-replace' "save-writer refuses a Known Issues block-replace"
+
 echo "--- drift sweep: Known Issues thresholds ---"
 drift=0
 while IFS= read -r hit; do

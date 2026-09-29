@@ -10,11 +10,16 @@ All notable changes to the `bx` plugin, newest first. Versioning follows [semver
   one required CLAUDE.md section with no cap, no shrinker and no archive destination; a field
   `/doctor` run found it at 14.9k chars, 48% of a 31.1k CLAUDE.md. Issues that leave CLAUDE.md
   now land here, one `### ` entry each, tagged `Resolved` or `Open, moved`. Rotates at 100k like
-  the other archives; rotation never cuts past the first `Open` entry.
+  the other archives; rotation never cuts past the first `Open` entry that CLAUDE.md still
+  links to.
 
 - **Known Issues shrinker (Part 7.3).** Threshold 4000 chars. Resolved entries move first, until
   the section is under 2500 or none remain. Open entries move only while the section is still
-  over 4000, and each leaves a one-line summary + link behind.
+  over 4000, and each leaves a one-line summary + link behind. It runs on `--full` only, only
+  when CLAUDE.md is over its 12k soft cap, and only with consent (never under `--silent`); the
+  consent prompt lists which entries it classified as resolved and which as open. "Resolved"
+  needs a status form in the entry's lead (`RESOLVED`, `is resolved`, a checked box): the bare
+  word does not count, so "paths are resolved against cwd" stays open.
 
 - **9k advisory rung (Part 1.9).** Nothing acted between the ~7k target and the 12k soft cap.
   Between 9k and 12k the save now names the largest section. No shrinker fires below 12k.

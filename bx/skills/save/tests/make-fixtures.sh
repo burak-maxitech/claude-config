@@ -608,14 +608,14 @@ echo "fx-ki-resolved (v2, Known Issues ~6k, three resolved entries)"
 # fx-ki-unresolved: v2, Known Issues ~6k with ONE small resolved entry and seven
 # open ones. After the resolved entry moves the section is still over 4000, so
 # the shrinker moves the oldest OPEN entries until it is under 4000 -- not 2500.
-# Two traps: entry 2's lead says "unresolved", entry 3's BODY says "resolved".
-# Both are open.
+# Three traps: entry 2's lead says "unresolved", entry 3's BODY says "resolved",
+# entry 4's lead uses "resolved" in its technical sense. All three are open.
 init_repo "$DEST/fx-ki-unresolved"
 ki_head  "$DEST/fx-ki-unresolved"
 ki_entry "$DEST/fx-ki-unresolved" "Widget cache corruption is RESOLVED (S3)." 7
 ki_entry "$DEST/fx-ki-unresolved" "Gadget sync stall is still unresolved (S4)." 15
 ki_entry "$DEST/fx-ki-unresolved" "Importer deadlock under load (S5)." 15 "It was resolved upstream once, then regressed."
-ki_entry "$DEST/fx-ki-unresolved" "Exporter drops the final row (S6)." 15
+ki_entry "$DEST/fx-ki-unresolved" "Export paths are resolved against cwd (S6)." 15
 ki_entry "$DEST/fx-ki-unresolved" "Report totals are off by one (S7)." 15
 ki_entry "$DEST/fx-ki-unresolved" "Auth refresh is flaky on cold start (S8)." 15
 ki_entry "$DEST/fx-ki-unresolved" "Scheduler skips the DST hour (S9)." 15
@@ -623,7 +623,7 @@ ki_entry "$DEST/fx-ki-unresolved" "Uploads over 2GB time out (S9)." 15
 ki_tail  "$DEST/fx-ki-unresolved"
 stub_docs "$DEST/fx-ki-unresolved" completed-work key-decisions session-history
 commit_all "$DEST/fx-ki-unresolved" "init"
-echo "fx-ki-unresolved (v2, Known Issues ~6k, one resolved entry, two lead/body traps)"
+echo "fx-ki-unresolved (v2, Known Issues ~6k, one resolved entry, three lead/body traps)"
 
 # fx-ki-rotate: v2 with a >100k docs/known-issues.md whose 60th entry is Open.
 # Part 7.7 must cut entries 1-59 only: the cut never extends past the first

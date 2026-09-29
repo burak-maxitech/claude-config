@@ -20,10 +20,12 @@ bash "$SCRIPT_DIR/make-fixtures.sh" "$TMP" > /dev/null || { echo "make-fixtures.
 section_size() {   # <CLAUDE.md> -- chars in ## Known Issues / Blockers (mode-update.md 7.2's count)
     awk '/^## /{f=($0=="## Known Issues / Blockers"); next} f{n+=length($0)+1} END{print n+0}' "$1"
 }
-resolved_size() {  # <CLAUDE.md> -- chars in entries whose bold lead holds the word "resolved"
+resolved_size() {  # <CLAUDE.md> -- chars in entries whose bold lead carries a resolved STATUS FORM (mode-update.md 7.3)
     awk '/^## /{f=($0=="## Known Issues / Blockers"); next}
          f && /^[*][*]/ { lead=$0; sub(/[*][*] .*/, "", lead)
-                          if (tolower(lead) ~ /(^|[^a-z])resolved([^a-z]|$)/) n+=length($0)+2 }
+                          low=tolower(lead)
+                          if (lead ~ /(^|[^A-Za-z])RESOLVED([^A-Za-z]|$)/ ||
+                              low ~ /(^|[^a-z])(is|was|now) resolved( *[(]| by | in |[.:;,]|$)/) n+=length($0)+2 }
          END{print n+0}' "$1"
 }
 between() {  # <label> <value> <min> <max>
