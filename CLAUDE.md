@@ -1,7 +1,7 @@
 <!-- bx-doc-schema: 2 -->
 # CLAUDE.md
 
-Last Updated: 2026-09-08 (Session 59)
+Last Updated: 2026-09-28 (Session 60)
 
 ## Project Overview
 
@@ -38,6 +38,8 @@ Last Updated: 2026-09-08 (Session 59)
 | A negative result needs three states, not two (S58) | "Clean" and "found nothing" are different claims from "the precondition does not exist". `snapshot_heavy` on a repo with no snapshot mechanism is **unavailable**, not clean; reporting it as clean asserts coverage the scan never had. `/bx:tests` gained `coverage_negatives` with unavailable/clean, sharpening the binary version `/bx:arch` shipped in v2.4.0. (v2.8.0) |
 | `/bx:save` is model-invocable; the S42 explicit-only flag is reversed (S59, 2026-09-08) | `disable-model-invocation: true` also removes a skill's description from Claude's context, so Claude could never run the end-of-session save and always punted to the user. Proven by a headless A/B: with the flag `false` the skill is visible, with `true` only `/bx:plan` was. `/bx:resume`'s wrap-up step now invokes it. (v2.9.0) |
 | `/bx:evolve --fix` only gates same-run findings, and `--full` is bounded to 50 releases (S59) | Fix mode needs `source_excerpt`, which state.json does not store, so a follow-up `--fix` cannot act on the prior run's findings, and the end-of-run watermark advance means the changelog lane never re-emits them; `--full` re-audits only the `gh` window (floor v2.1.203) and the lanes drop deltas bx already handles. The 18 older open findings are therefore reachable only by hand triage. Same-release re-emits under a different capability string enter as new findings (no `applied` branch, no same-URL dedup). |
+| Synthetic fixtures bound what a rehearsal can find (S60, 2026-09-28) | Four blind rehearsals passed every outcome check on the Known Issues governor, then one fresh whole-branch review found seven defects, because every fixture entry was a single bold paragraph with an unambiguous lead. Rehearse against entries shaped like real ones, and keep the fresh reviewer: it is the only context that did not write the fixtures. |
+| Known Issues is classified by status form, never by the bare word (S60) | "Resolved" means `RESOLVED`, `is/was/now resolved`, or a checked box in the entry's lead; "paths are resolved against cwd" and "not resolved" are open. Doubt resolves to open, because an open entry keeps a trace in CLAUDE.md and a wrongly resolved one leaves none. (v2.10.0) |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -47,7 +49,7 @@ Last Updated: 2026-09-08 (Session 59)
 
 **Plugin-versioning sharp edge (S54):** `version` in `bx/.claude-plugin/plugin.json` is the plugin's update cache key — a push that changes `bx/**` without bumping it is never offered to users (`/plugin update` reports "already at the latest version"). `/bx:save` Part 8 enforces the bump; manual committers follow the README contributors note. History in `CHANGELOG.md`.
 
-**18 open upstream findings** live in `docs/upstream/state.json`. Watermark: **changelog 2.1.263 · docs/community 2026-09-08** (S59 delta run, 2026-09-08 — the S53-era freeze at 2.1.228 was lifted by S58's full run). S59 applied three of its four new findings by hand (`83d36fa2` validate `--json`, `e6fab951` reload-plugins headless note, `7b54fbc1` `.ps1` deletion) and rejected `b1397bf6`.
+**18 open upstream findings** live in `docs/upstream/state.json`. Watermark: **changelog 2.1.284 · docs/community 2026-09-28** (S60 delta run). S60 found five new findings and applied four by hand plus two from the backlog (`10294db5`, `7e849e74`); `161ae182` (`claude plugin eval`) and the rules-tier half of `55ba40ea` stay open.
 
 **`start-claude.ps1` cannot be parsed by Windows PowerShell 5.1 (pre-existing, found S55).** The file is BOM-less UTF-8 containing seven non-ASCII characters (em-dashes and an arrow); WinPS 5.1 decodes a BOM-less `.ps1` as the ANSI codepage, so `—` becomes `â€"` and the trailing quote terminates a string early — 2 parse errors on 5.1, 0 on pwsh 7. Predates this branch (`git show d78105e:` confirms), and the user runs pwsh 7, but README tells teammates to install `cc` without naming a host. Fix queued in the S55 fix wave: replace the seven characters with ASCII.
 
@@ -58,5 +60,9 @@ Last Updated: 2026-09-08 (Session 59)
 **The unwired `bx/scripts/session-start-context.ps1` is RESOLVED by deletion (S59, 2026-09-08).** The official hooks reference lists every command-hook field (`command`, `args`, `async`, `asyncRewake`, `shell`) and none selects a script per OS; the only Windows-without-Git-Bash path is a dispatcher wrapper, which cannot be verified from this machine. The `.sh` already runs on Windows via Git Bash, so `.sh`-only is now the deliberate scope (`/bx:evolve` docs-lane finding `7b54fbc1`).
 
 **`/bx:evolve` Step 3.4 has no `applied` branch (S58, found by running it).** The decision-log filter defines branches for `rejected`+unchanged, `rejected`+changed, `deferred`, and `open`-or-new — but not `applied`. A re-emitted applied finding matches none of them, so whether it duplicates or vanishes is undefined; it manifests whenever the watermark has not advanced past the release that produced it. Entries also store `source_content_hash` but not `source_excerpt`, so a re-check cannot compare content without re-fetching. Related: the `bx:pain/<slug>` convention derives from prose that gets reworded, so the same concern re-hashes to new IDs over time (4 entries already carry an older cache-staleness slug). **Also (S59): a follow-up `--fix` run cannot act on the previous run's findings** — fix-mode gates only findings re-emitted in the same run, and the watermark advance at the end of every run means the changelog lane never re-emits them; so the default-mode closing line "Run `/bx:evolve --fix` to act on the open Tier-1 findings" oversells a second pass. Storing `source_excerpt` (above) is the fix; until then, pass `--fix` on the same run, use `--full --fix`, or apply by hand.
+
+**v2.10.0 is built but unmerged, and five of its rules are unexecuted (S60, 2026-09-28).** Branch `feat/doc-tiering-phase1` (13 commits) holds the Known Issues governor. Blind rehearsals passed every outcome check, but the ≤2 ambiguity bar was NOT met on raw counts (9–16), and a fresh whole-branch review then found seven defects the synthetic fixtures could not reach. Multi-paragraph entries, tight bullet lists, the 300-char floor, archive liveness in rotation and the block-replace refusal exist only as text and lint strings. The first real `/bx:save --full` after install is the test. Log: `docs/superpowers/plans/2026-09-28-bx-doc-tiering-phase1-rehearsals.md`.
+
+**`/bx:health` reads session state from CLAUDE.md, which schema v2 moved (found S60).** Its pre-injection greps `## Current Status`, `## In Progress` and `## Next Steps` in CLAUDE.md; on a migrated repo those live in `docs/STATUS.md`, so the skill sees empty state. Not fixed: it was outside the approved S60 scope.
 
 > Session state: [docs/STATUS.md](docs/STATUS.md)

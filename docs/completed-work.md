@@ -258,3 +258,8 @@
 - [x] `session-start-context.ps1` deleted; hooks.json has no per-OS field — `bx/scripts/`, `README.md`, `CLAUDE.md`, `docs/STATUS.md`
 - [x] doc-schema.md names `/doctor`'s trim check — `bx/skills/save/references/doc-schema.md`
 - [x] bx v2.9.0 — `bx/.claude-plugin/plugin.json`, `CHANGELOG.md`
+- [x] Doc tiering decision pass: 8 decisions locked, 2 amended - docs/superpowers/specs/2026-08-24-bx-doc-tiering-design.md
+- [x] Doc tiering phase 1 built as v2.10.0 (unmerged): Known Issues archive, relocation, shrinker, 9k rung, derivable-content clause - bx/skills/save/references/, bx/agents/save-writer.md
+- [x] /bx:evolve delta run 2.1.263 → 2.1.284; six findings applied by hand - docs/upstream/state.json, bx/skills/resume, bx/skills/health, bx/agents, bx/skills/evolve/references
+- [x] Version-bump guard: script, pre-push hook, CI workflow - scripts/, .githooks/, .github/workflows/
+- [x] Known Issues governance lint (28 checks) and three fixtures - bx/skills/save/tests/

@@ -233,3 +233,22 @@
 - Push v2.9.0 and run `/plugin update bx`, then confirm Claude can invoke `/bx:save` interactively
 - Hand-triage the 18 carried-forward evolve findings; fix Step 3.4 (`applied` branch, same-URL dedup) and store `source_excerpt`
 - Dogfood `/bx:health`
+
+### Session 60 - 2026-09-28
+**What happened:**
+- Doc-tiering decision pass: all 8 decisions accepted; #3 amended (2500 target chased with resolved entries only), #6 amended (Invariant 5 warns, not fails). Spec moved to Decided.
+- Built phase 1 (D1, D2, D3, D7, D8) as v2.10.0 on `feat/doc-tiering-phase1`: `docs/known-issues.md` archive, `known_issue_moves` packet field, Part 7.3 shrinker row, 9k rung, derivable-content clause. See commits `579a979`..`a57014d`.
+- `/bx:evolve` delta run (2.1.263 → 2.1.284): applied `2e4e9a8b`, `ee81fa43`, `c0379ca1`, `10294db5`, `7e849e74`, half of `55ba40ea`; added three doc pages to the scan allowlist; added a version-bump guard (`3828540`).
+- Blind rehearsals (3 waves + 1 confirming): every outcome check passed; ambiguity bar not met on raw counts. Final review found 7 Important defects (bare-word "resolved", entry span, open-phase growth, archive liveness, block-replace, README overstatement, CI PR base), fixed in `e511475`.
+- Found but not fixed: `/bx:health` reads state sections from CLAUDE.md (moved to STATUS.md by schema v2).
+
+**Files created/modified:**
+- `bx/skills/save/references/mode-update.md`, `doc-schema.md`, `doc-structure-rules.md`, `claude-md-sections.md`, `verification-checklists.md`; `bx/agents/save-writer.md` - Known Issues governor
+- `bx/skills/save/tests/check-known-issues-governance.sh`, `test-known-issues-fixtures.sh`, `make-fixtures.sh` - lint (28 checks) and three fixtures
+- `scripts/check-plugin-version-bump.sh` + test, `.githooks/pre-push`, `.github/workflows/plugin-version.yml` - version-bump guard
+- `bx/skills/resume/SKILL.md`, `bx/skills/health/SKILL.md`, six `bx/agents/*.md`, `bx/skills/evolve/references/*` - evolve findings
+- `docs/superpowers/plans/2026-09-28-bx-doc-tiering-phase1.md` + `-rehearsals.md`, `docs/upstream/state.json`
+
+**Next session should:**
+- Settle the five open decisions, merge, push, install v2.10.0
+- Dogfood `/bx:save --full` on this repo and expect defects

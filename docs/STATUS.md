@@ -2,7 +2,7 @@
 
 > Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
 
-Last Updated: 2026-09-08 (Session 59)
+Last Updated: 2026-09-28 (Session 60)
 
 ## Current Status
 
@@ -10,7 +10,7 @@ Last Updated: 2026-09-08 (Session 59)
 |------|--------|
 | Skills (11) | Complete — `/bx:save` model-invocable S59; `/bx:evolve --full --fix` dogfooded S59; only `/bx:health` never run |
 | Subagents (20) | Complete — `arch-robustness` added S58 |
-| Plugin packaging (`bx`) | **v2.9.0 pushed and installed S59** (`511b197`); Part 8 step 2b judges `claude plugin validate --json` on its `success` field. Local cache on 2.9.0; `/bx:save` confirmed visible to Claude after `/reload-plugins`. Symlink retirement still pending |
+| Plugin packaging (`bx`) | **v2.10.0 built S60 on branch `feat/doc-tiering-phase1`, NOT merged, pushed or installed.** v2.9.0 pushed and installed S59 (`511b197`); Part 8 step 2b judges `claude plugin validate --json` on its `success` field. Local cache on 2.9.0; `/bx:save` confirmed visible to Claude after `/reload-plugins`. Symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate still pending |
 | Cross-platform setup | Complete |
@@ -27,7 +27,9 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## In Progress
 
-**Doc schema v2 post-merge verification (S56–57).** The first `/bx:save --full` on schema v2 ran S57: Part 5 found all older sessions already compressed, Parts 6/7 under caps, and rotation did NOT fire — `docs/key-decisions.md` sits at ~98k, just under the 100k trigger, so the first real rotation lands on an upcoming `--full`. Still owed from the deferred Task 10 skill-steps: live `/bx:save` runs against the fixtures (fx-v2 no-op, fx-partial resume, fx-dirty skip, fx-v1-envvars keep path, fx-v1-sparse scaffold, fx-v1-ineligible decline). Post-merge minors parked in both plans: backlog symptom measurement (7.7's clause is unreachable), checker fence-strip/CR robustness, mode-migrate declines-bullet v1-only phrasing, resume Quick Reference partial row, structure-rules cell wording.
+**Doc tiering phase 1 — built on `feat/doc-tiering-phase1`, awaiting merge decision (S60).** v2.10.0: `docs/known-issues.md` archive, relocate-don't-delete, Known Issues shrinker (4000/2500), 9k advisory rung, derivable-content clause, version-bump guard, six `/bx:evolve` findings. Open with the user: narrow `omitClaudeMd` to the three `upstream-*` agents; fix `/bx:health`'s v1 state read; clean eight stale-text sites; merge + push; enable the pre-push hook. Plan: `docs/superpowers/plans/2026-09-28-bx-doc-tiering-phase1.md`.
+
+**Doc schema v2 post-merge verification (S56–57).** The first `/bx:save --full` on schema v2 ran S57: Part 5 found all older sessions already compressed, Parts 6/7 under caps, and rotation did not fire then. It has since fired: `docs/archive/key-decisions-1.md` exists and the live `docs/key-decisions.md` measured 53k on 2026-09-28 (S60). Still owed from the deferred Task 10 skill-steps: live `/bx:save` runs against the fixtures (fx-v2 no-op, fx-partial resume, fx-dirty skip, fx-v1-envvars keep path, fx-v1-sparse scaffold, fx-v1-ineligible decline). Post-merge minors parked in both plans: backlog symptom measurement (7.7's clause is unreachable), checker fence-strip/CR robustness, mode-migrate declines-bullet v1-only phrasing, resume Quick Reference partial row, structure-rules cell wording.
 
 **Per-project `cc` session naming + coloring — built, 2 items open (S55).** Unchanged from S55: the human live gate (`cc claude-config`: prompt bar colored? name chip + tab title? no model turn?) and one batched fix wave held until the gate reports (ASCII-sweep `start-claude.ps1`, `try/catch` guard, `ToLowerInvariant()`, 0-byte registry handling, case-insensitivity assertion, stale plan/spec sweep). Spec: `docs/superpowers/specs/2026-08-12-cc-session-naming-design.md`.
 
@@ -39,7 +41,7 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## Next Steps
 
-1. **Doc tiering — decision pass on the `/doctor` findings (S59)** — spec drafted at [superpowers/specs/2026-08-24-bx-doc-tiering-design.md](superpowers/specs/2026-08-24-bx-doc-tiering-design.md); status Draft, 8 decisions open, nothing implemented. Field evidence from a `/doctor` run on a repo that uses `/bx:save` every session: CLAUDE.md at 31.1k chars (2.6× the 12k soft cap) with `## Known Issues / Blockers` at 48% of it — the one required section with no cap, no shrinker and no archive destination. Recommended split: ship the Known Issues governor + relocate-don't-delete + the derivable-content clause first; hold the `.claude/rules/` path-scoped tier behind a second gate. Pairs with #4.
+1. **Land and dogfood v2.10.0 (S60)** — settle the five open decisions in `## In Progress`, merge `feat/doc-tiering-phase1`, push, `/plugin update bx` + `/reload-plugins`, then run `/bx:save --full` here: CLAUDE.md is over 12k with Known Issues over 4000, so the new shrinker fires. Expect defects; five rules have never executed. Phase 2 (`.claude/rules/` tier, spec D4–D6) stays gated; re-verify `paths:` against the memory docs first. Pairs with #4.
 2. **Finish the `cc` session naming/coloring rollout (S55)** — run the live gate, then dispatch the single fix wave listed in `## In Progress`.
 3. **Doc-schema v2 fixture verification** — the deferred live `/bx:save` runs against the six fixture cases (see `## In Progress`), plus the post-merge minors batch from both plans.
 4. **/simplify follow-up: move Part 7.7 rotation out of Part 7** into its own sibling Part — deletes the five "except 7.7" carve-outs; requires a blind rehearsal before shipping (deliberately skipped S57). The S59 spec's D4 proposes a Part 7.9 sibling on the same reasoning — do these together.
@@ -56,9 +58,9 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 > Full history: [session-history.md](session-history.md)
 
-### Last Session (Session 59) - 2026-09-08
-- **`/bx:save` is model-invocable again (v2.9.0).** Root cause: `disable-model-invocation: true` (S42) hides the skill's description from Claude entirely. Headless A/B proved the flip; `/bx:resume` now invokes save at wrap-up; local `Skill(bx:docs)` allow entry renamed to `Skill(bx:save)`.
-- **`/bx:evolve` ran twice** — a delta run (2.1.241 → 2.1.263, 4 findings) and `--full --fix` (50 releases, 1 gated edit approved). Three findings applied by hand between them: `claude plugin validate --json` judged on `success` in Part 8, `/reload-plugins` headless notes, `/doctor` trim check cross-referenced in doc-schema.md.
-- **`session-start-context.ps1` deleted.** The hooks reference lists no per-OS command field; `.sh`-only via Git Bash is the deliberate scope. Three README leftovers cleaned.
-- **Two evolve defects found by execution:** a follow-up `--fix` cannot gate the prior run's findings (no `source_excerpt`, watermark already advanced), and `--full` is a 50-release window that never re-emits the 18 older open findings — hand triage is the only path. Same-release re-emits under a new capability string enter as duplicates.
-- **Shipped:** v2.9.0 committed (`511b197`), pushed, installed via `/plugin update bx` + `/reload-plugins`; `bx:save` now appears in Claude's skill list.
+### Last Session (Session 60) - 2026-09-28
+- **Doc tiering decided and phase 1 built (v2.10.0, unmerged).** All 8 spec decisions accepted with two amendments; Known Issues gets an archive (`docs/known-issues.md`), relocate-don't-delete, and a resolved-first shrinker. Branch `feat/doc-tiering-phase1`, 13 commits.
+- **`/bx:evolve` delta run** (2.1.263 → 2.1.284, 19 releases): 5 findings, 4 applied by hand plus 2 from the backlog; 18 remain open.
+- **Version-bump guard added outside the skill:** script, opt-in pre-push hook, GitHub Actions workflow (9/9 tests; workflow never run).
+- **Rehearsals passed outcomes but not the ambiguity bar** (raw 9–16 vs ≤2); a fresh whole-branch review found seven defects synthetic fixtures could not reach, all fixed (`e511475`).
+- **Not done:** merge, push, install, dogfood; `/bx:health` still reads state from CLAUDE.md.
