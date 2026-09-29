@@ -10,11 +10,11 @@ Last Updated: 2026-09-28 (Session 60)
 |------|--------|
 | Skills (11) | Complete — `/bx:save` model-invocable S59; `/bx:evolve --full --fix` dogfooded S59; only `/bx:health` never run |
 | Subagents (20) | Complete — `arch-robustness` added S58 |
-| Plugin packaging (`bx`) | **v2.10.0 built S60 on branch `feat/doc-tiering-phase1`, NOT merged, pushed or installed.** v2.9.0 pushed and installed S59 (`511b197`); Part 8 step 2b judges `claude plugin validate --json` on its `success` field. Local cache on 2.9.0; `/bx:save` confirmed visible to Claude after `/reload-plugins`. Symlink retirement still pending |
+| Plugin packaging (`bx`) | **v2.10.0 merged to main and pushed S60; NOT yet installed** (`/plugin update bx` + `/reload-plugins` owed, local cache still 2.9.0). Version-bump guard added: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate still pending |
 | Cross-platform setup | Complete |
-| GitHub sync | Complete — main pushed through v2.9.0 (`511b197`) |
+| GitHub sync | Complete — main pushed through v2.10.0 (S60) |
 | Documentation | Complete — schema v2 |
 
 ## Completed
@@ -27,7 +27,7 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## In Progress
 
-**Doc tiering phase 1 — built on `feat/doc-tiering-phase1`, awaiting merge decision (S60).** v2.10.0: `docs/known-issues.md` archive, relocate-don't-delete, Known Issues shrinker (4000/2500), 9k advisory rung, derivable-content clause, version-bump guard, six `/bx:evolve` findings. Open with the user: narrow `omitClaudeMd` to the three `upstream-*` agents; fix `/bx:health`'s v1 state read; clean eight stale-text sites; merge + push; enable the pre-push hook. Plan: `docs/superpowers/plans/2026-09-28-bx-doc-tiering-phase1.md`.
+**Doc tiering phase 1 — merged as v2.10.0, install and dogfood owed (S60).** `docs/known-issues.md` archive, relocate-don't-delete, Known Issues shrinker (4000/2500), 9k advisory rung, derivable-content clause, version-bump guard, six `/bx:evolve` findings, `/bx:health` state-file fix. `omitClaudeMd` is on the three `upstream-*` agents only. Still open: deferred minors (guard checks inequality not increase; guard tests not hermetic against `commit.gpgsign`; lint and fixture tests not in CI; `save-writer`'s unreachable `status: open` path). Plan: `docs/superpowers/plans/2026-09-28-bx-doc-tiering-phase1.md`.
 
 **Doc schema v2 post-merge verification (S56–57).** The first `/bx:save --full` on schema v2 ran S57: Part 5 found all older sessions already compressed, Parts 6/7 under caps, and rotation did not fire then. It has since fired: `docs/archive/key-decisions-1.md` exists and the live `docs/key-decisions.md` measured 53k on 2026-09-28 (S60). Still owed from the deferred Task 10 skill-steps: live `/bx:save` runs against the fixtures (fx-v2 no-op, fx-partial resume, fx-dirty skip, fx-v1-envvars keep path, fx-v1-sparse scaffold, fx-v1-ineligible decline). Post-merge minors parked in both plans: backlog symptom measurement (7.7's clause is unreachable), checker fence-strip/CR robustness, mode-migrate declines-bullet v1-only phrasing, resume Quick Reference partial row, structure-rules cell wording.
 
@@ -41,7 +41,7 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## Next Steps
 
-1. **Land and dogfood v2.10.0 (S60)** — settle the five open decisions in `## In Progress`, merge `feat/doc-tiering-phase1`, push, `/plugin update bx` + `/reload-plugins`, then run `/bx:save --full` here: CLAUDE.md is over 12k with Known Issues over 4000, so the new shrinker fires. Expect defects; five rules have never executed. Phase 2 (`.claude/rules/` tier, spec D4–D6) stays gated; re-verify `paths:` against the memory docs first. Pairs with #4.
+1. **Install and dogfood v2.10.0 (S60)** — `/plugin update bx` + `/reload-plugins`, then run `/bx:save --full` here: CLAUDE.md is over 12k with Known Issues over 4000, so the new shrinker fires. Expect defects; five rules have never executed. Confirm the `plugin version bump` workflow ran green on the merge push. Phase 2 (`.claude/rules/` tier, spec D4–D6) stays gated; re-verify `paths:` against the memory docs first. Pairs with #4.
 2. **Finish the `cc` session naming/coloring rollout (S55)** — run the live gate, then dispatch the single fix wave listed in `## In Progress`.
 3. **Doc-schema v2 fixture verification** — the deferred live `/bx:save` runs against the six fixture cases (see `## In Progress`), plus the post-merge minors batch from both plans.
 4. **/simplify follow-up: move Part 7.7 rotation out of Part 7** into its own sibling Part — deletes the five "except 7.7" carve-outs; requires a blind rehearsal before shipping (deliberately skipped S57). The S59 spec's D4 proposes a Part 7.9 sibling on the same reasoning — do these together.
@@ -63,4 +63,4 @@ See [completed-work.md](completed-work.md) for full checklist.
 - **`/bx:evolve` delta run** (2.1.263 → 2.1.284, 19 releases): 5 findings, 4 applied by hand plus 2 from the backlog; 18 remain open.
 - **Version-bump guard added outside the skill:** script, opt-in pre-push hook, GitHub Actions workflow (9/9 tests; workflow never run).
 - **Rehearsals passed outcomes but not the ambiguity bar** (raw 9–16 vs ≤2); a fresh whole-branch review found seven defects synthetic fixtures could not reach, all fixed (`e511475`).
-- **Not done:** merge, push, install, dogfood; `/bx:health` still reads state from CLAUDE.md.
+- **Merged and pushed; not done:** install and dogfood. `/bx:health` now reads `docs/STATUS.md` on v2 repos; `omitClaudeMd` narrowed to `upstream-*`.
