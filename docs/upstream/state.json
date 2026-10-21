@@ -2,41 +2,57 @@
   "watermark": {
     "last_changelog_version": "2.1.284",
     "docs_checked_at": "2026-09-28",
-    "community_checked_at": "2026-09-28"
+    "community_checked_at": "2026-09-28",
+    "changelog_gap": null
   },
   "decisions": [
     {
-      "finding_id": "19758d30cc26fa685165dd097016e14db07d1390",
-      "decision": "open",
-      "date": "2026-06-10",
+      "finding_id": "cf1e0d24c7a64f86e7a396ecf56fe05c260c5d22",
+      "decision": "rejected",
+      "date": "2026-10-20",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.157",
-      "affected_capability": "bx:pain/plugin-cache-staleness-after-every-push-activation-gap",
+      "affected_capability": "bx:pain/plugin-versioning-sharp-edge",
       "source_content_hash": "785424ad5b68f0760468190381a317b46bd386b2",
       "class": "opportunity",
       "title": "Plugins in `.claude/skills` auto-load (no marketplace) — could eliminate the activation gap",
-      "note": null
+      "note": "superseded by 15742589 (same concern, docs-sourced); the activation gap was addressed by explicit semver versioning + the version-bump guard (S54/S60)",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "0e4083ea819b9600c8026a07bb67d2f31d16cea5",
+      "finding_id": "793f1bccfa734d279a821e5c51512e679e0fe602",
       "decision": "open",
       "date": "2026-06-10",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.152",
-      "affected_capability": "bx:pain/plugin-cache-staleness-after-every-push-activation-gap",
+      "affected_capability": "bx:pain/plugin-versioning-sharp-edge",
       "source_content_hash": "abba11c823427c5701e96bd1c442233dd5152cfb",
       "class": "opportunity",
       "title": "`/reload-skills` — lighter alternative to `/reload-plugins` for skills-only updates",
-      "note": null
+      "note": null,
+      "proposed_edit": "Name `/reload-skills` as the lighter refresh when only SKILL.md files changed (hooks, agents and .mcp.json still need `/reload-plugins`): in fix-mode-evolve.md's post-pass 'Next steps' block (`/reload-plugins` → `/reload-plugins` (or `/reload-skills` for SKILL.md-only edits)) and in README's 'Updating to the latest version' paragraph.",
+      "affected_files": [
+        "bx/skills/evolve/references/fix-mode-evolve.md",
+        "README.md"
+      ],
+      "source_excerpt": null,
+      "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.152"
     },
     {
-      "finding_id": "4a3fa09531e53c27eb9c10cd0c086cbf7896109f",
+      "finding_id": "d4be57579e90f7da1688a3260acbf277c70564e9",
       "decision": "applied",
       "date": "2026-06-10",
       "source_url": "https://code.claude.com/docs/en/commands",
-      "affected_capability": "bx:pain/permission-prompts-when-allowed-tools-misses-a-command",
+      "affected_capability": "bx:pain/permission-prompts-allowed-tools-misses",
       "source_content_hash": "42a117810085bb27e6eab6d0ff0ff7dc1e8ca418",
       "class": "opportunity",
       "title": "`/fewer-permission-prompts` bundled skill — auto-generate allowed-tools allowlist",
-      "note": "Added a 'Reducing permission prompts' subsection to workflow.md Tips & Best Practices recommending the built-in /fewer-permission-prompts as first diagnostic, with the fix-allowed-tools-for-the-long-term caveat."
+      "note": "Added a 'Reducing permission prompts' subsection to workflow.md Tips & Best Practices recommending the built-in /fewer-permission-prompts as first diagnostic, with the fix-allowed-tools-for-the-long-term caveat.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "10294db5bf2e4be2976331555836059fe41b1419",
@@ -47,40 +63,56 @@
       "source_content_hash": "2385b9613aa4e922e0c4a751f706df6ea61eb90e",
       "class": "opportunity",
       "title": "Enforce /bx:health read-only invariant via `disallowed-tools` frontmatter (v2.1.152)",
-      "note": "APPLIED 2026-09-28 (v2.10.0): bx/skills/health/SKILL.md frontmatter gained `disallowed-tools: Edit, Write, NotebookEdit, Agent` (Agent replaces the original note's `Task`, renamed upstream). Passes `claude plugin validate --strict`. /bx:health has still never been run end to end, so the enforcement itself is unobserved."
+      "note": "APPLIED 2026-09-28 (v2.10.0): bx/skills/health/SKILL.md frontmatter gained `disallowed-tools: Edit, Write, NotebookEdit, Agent` (Agent replaces the original note's `Task`, renamed upstream). Passes `claude plugin validate --strict`. /bx:health has still never been run end to end, so the enforcement itself is unobserved.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "1c627424253f182a2c65f252d9636b16f1a8b487",
-      "decision": "open",
-      "date": "2026-06-10",
+      "finding_id": "2b12295ad023f29b79fed5291f46dd5b3512a926",
+      "decision": "rejected",
+      "date": "2026-10-20",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.143",
-      "affected_capability": "bx:pain/stitch-mcp-stitch-skills-plugin-not-yet-installed",
+      "affected_capability": "bx:pain/stitch-stitch-skills-plugin-installed",
       "source_content_hash": "e88154859f9976681c693a3dff0e2a823f747adc",
       "class": "opportunity",
       "title": "Declare `stitch-skills` as a plugin dependency in bx plugin.json (v2.1.143 dependency enforcement)",
-      "note": "User-directed registration. CAVEAT verified against release notes: v2.1.143 enforcement is enable/disable-time only (`plugin disable` refuses when depended-on; `plugin enable` force-enables transitive deps) — install-time resolution NOT confirmed; check code.claude.com/docs/en/plugins-reference before applying."
+      "note": "a plugin-wide dependency on a project-scoped, cross-marketplace plugin would burden every bx user for one skill; /bx:webdesign's setup step owns the stitch-skills install",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "83031ba59adfe9baf77b82c7ed7d4974e2b43186",
-      "decision": "open",
-      "date": "2026-06-10",
+      "decision": "rejected",
+      "date": "2026-10-20",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.163",
       "affected_capability": "bx:save/end-of-session-reminder",
       "source_content_hash": "34d5d92778546baac12592a79620cc50973ad08c",
       "class": "opportunity",
       "title": "Stop-hook `additionalContext` could automate the end-of-session /bx:save reminder (v2.1.163)",
-      "note": "User-directed registration. Stop/SubagentStop hooks can return hookSpecificOutput.additionalContext without being labeled a hook error — a Stop hook in bx/hooks/hooks.json could inject the '/bx:save before you go' reminder that workflow.md currently leaves to convention."
+      "note": "a Stop hook fires at the end of every turn, so the reminder would be noise; since v2.9.0 /bx:resume's wrap-up step invokes /bx:save itself",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "79708ccf0f8708f45131697305b2977c05ed465d",
-      "decision": "open",
-      "date": "2026-06-10",
+      "finding_id": "d0dd15323251ebb078c81455616f80befebff65e",
+      "decision": "rejected",
+      "date": "2026-10-20",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.139",
-      "affected_capability": "bx:pain/s37-leftovers-install-smoke-test-symlink-retirement-settings-skillbx-to-skillbx",
+      "affected_capability": "bx:pain/plugin-packaging-leftovers",
       "source_content_hash": "0ae0879f90feb85711d74b594cdbcb102e44f4ed",
       "class": "opportunity",
       "title": "`Skill(name *)` wildcard prefix-match fixed (v2.1.139) — unblocks the Skill(bx-*)→Skill(bx:*) settings migration",
-      "note": "User-directed registration. NOTE: changelog lane's digest also attributed this fix to v2.1.145 — verified against release bodies, it ships in v2.1.139 only. Also: .claude/settings.local.json is absent in this clone, so the migration may be moot — verify ~/.claude/settings.json on this machine before applying."
+      "note": "moot: S59 found no Skill(bx-*) anywhere in the repo and renamed the one stale local entry; the migration this unblocked no longer exists",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "f2751a1406a1bf98b04526922a99a070b77e2705",
@@ -91,7 +123,11 @@
       "source_content_hash": "574f2ccce96a19b2f3a21f43c4f8712c51913fd3",
       "class": "opportunity",
       "title": "SessionStart `CLAUDE_ENV_FILE` — persist env vars to all Bash calls (addresses no-env-var-persistence)",
-      "note": "Added CLAUDE_ENV_FILE blocks to session-start-context.sh + .ps1 persisting PYTHONIOENCODING=utf-8 + PYTHONUTF8=1 session-wide (guarded no-op when unset); updated both scripts' read-only design-rule comments. Smoke-check next session before retiring per-call UTF-8 prefixes in /bx:seo."
+      "note": "Added CLAUDE_ENV_FILE blocks to session-start-context.sh + .ps1 persisting PYTHONIOENCODING=utf-8 + PYTHONUTF8=1 session-wide (guarded no-op when unset); updated both scripts' read-only design-rule comments. Smoke-check next session before retiring per-call UTF-8 prefixes in /bx:seo.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "9ee52ef30490f4df98bda5571df5f36b11ad87db",
@@ -102,18 +138,26 @@
       "source_content_hash": "794f385fb6b77771d7971d90a0d4af5fd90b0b2a",
       "class": "best_practice",
       "title": "Task tool renamed to Agent (v2.1.63, alias retained) — bx frontmatter and prose still say Task",
-      "note": "Renamed bare `Task` to `Agent` in allowed-tools of 7 SKILL.md files (arch/clean/evolve/save/seo/tests/webdesign — webdesign + save/references/mode-update.md were orchestrator completeness catches beyond the lane's list) and updated tool-name prose in 5 skill bodies + README.md. TaskCreate/TaskList/TaskGet/TaskUpdate (task-tracker tools) deliberately untouched."
+      "note": "Renamed bare `Task` to `Agent` in allowed-tools of 7 SKILL.md files (arch/clean/evolve/save/seo/tests/webdesign — webdesign + save/references/mode-update.md were orchestrator completeness catches beyond the lane's list) and updated tool-name prose in 5 skill bodies + README.md. TaskCreate/TaskList/TaskGet/TaskUpdate (task-tracker tools) deliberately untouched.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "cc7d1af68a6439c079af3be007fe34799d9b983b",
-      "decision": "open",
-      "date": "2026-07-05",
+      "decision": "deferred",
+      "date": "2026-10-20",
       "source_url": "https://www.anthropic.com/news/claude-design-anthropic-labs",
       "affected_capability": "bx:webdesign/stitch-design-engine",
       "source_content_hash": "bf4bb0fc3bdb82d3386cd5ae8f83e9be631a468b",
       "class": "opportunity",
       "title": "Claude Design (Anthropic-native design engine) — candidate to replace Google Stitch in /bx:webdesign once it ships an API/MCP",
-      "note": "User-directed registration after this session's research (finding is NOT from the changelog/docs/community lanes — Claude Design is a separate Anthropic Labs product, launched 2026-04-17, Opus-powered). Strong long-term fit for the /bx:webdesign design engine: same vendor as the harness, codebase-aware design-system extraction (maps onto Phase 1), exports standalone HTML. BLOCKED today: Claude Design is interactive web-only with NO API/MCP/CLI, so the headless MCP-driven skill (generate_screen_from_text / get_screen / edit_screens, screen IDs persisted in state.json) has nothing to call — a swap is impossible now, not just inadvisable. Trigger: re-evaluate when Anthropic ships a Claude Design API/MCP or makes the 'Handoff to Claude Code' bundle scriptable; source_content_hash tracks the announcement's 'integrations coming weeks' line, so a change there re-raises this. Related v2 question worth a brainstorm: whether Opus-native restyle generation removes the need for ANY external design engine (Stitch or Claude Design) at all."
+      "note": "blocked until Claude Design exposes an API/MCP; the stored hash tracks the announcement's integrations line",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "dadac84562356de2f5e790d40e486378fb5d8e9d",
@@ -124,29 +168,44 @@
       "source_content_hash": "8c4286f68f39951fe5da76f1e38e895c145d7bb3",
       "class": "breakage",
       "title": "Auto-mode now blocks destructive git (`git clean -fd`, `restore`, `reset --hard`) — /bx:webdesign Phase-3 rollback may be intercepted (v2.1.183)",
-      "note": "Lane finding, certainty 0.55 — NOT yet verified against a live run. /bx:webdesign Phase 3's documented per-page-failure rollback (`git restore .` + `git clean -fd`) and the git-safety invariant may be auto-blocked by the new classifier unless the session reads as an explicit request to discard local work. VERIFY during the pending webdesign dogfood before treating as confirmed breakage; if intercepted, make the cleanup legible as agent-initiated or add a user-confirmation step before Phase 3 first runs. Also relevant: new `autoMode.classifyAllShell` setting (v2.1.193). ADDENDUM 2026-08-11: community lane surfaced Anthropic's OFFICIAL auto-mode engineering post (anthropic.com/engineering/claude-code-auto-mode) + docs page (code.claude.com/docs/en/auto-mode-config) confirming the classifier 'blocks anything irreversible' incl. destructive git on the working branch unless explicitly requested — authority upgrade for this finding's premise; the auto-mode-config page is a scan-docs allowlist candidate (owns the autoMode classifier contract). Verification during the kaanarik Phase-3 dogfood still required."
+      "note": "Lane finding, certainty 0.55 — NOT yet verified against a live run. /bx:webdesign Phase 3's documented per-page-failure rollback (`git restore .` + `git clean -fd`) and the git-safety invariant may be auto-blocked by the new classifier unless the session reads as an explicit request to discard local work. VERIFY during the pending webdesign dogfood before treating as confirmed breakage; if intercepted, make the cleanup legible as agent-initiated or add a user-confirmation step before Phase 3 first runs. Also relevant: new `autoMode.classifyAllShell` setting (v2.1.193). ADDENDUM 2026-08-11: community lane surfaced Anthropic's OFFICIAL auto-mode engineering post (anthropic.com/engineering/claude-code-auto-mode) + docs page (code.claude.com/docs/en/auto-mode-config) confirming the classifier 'blocks anything irreversible' incl. destructive git on the working branch unless explicitly requested — authority upgrade for this finding's premise; the auto-mode-config page is a scan-docs allowlist candidate (owns the autoMode classifier contract). Verification during the kaanarik Phase-3 dogfood still required.",
+      "proposed_edit": "Before Phase 3's first per-page rollback (`git restore .` + `git clean -fd`, phase3-inject.md), add an explicit user-confirmation step and phrase the cleanup as a user-requested discard of the failed injection, so auto mode's destructive-git classifier reads it as requested; keep the Phase 1 invariant text in step. Verify live on the kaanarik Phase-3 run before treating as confirmed breakage.",
+      "affected_files": [
+        "bx/skills/webdesign/references/phase3-inject.md",
+        "bx/skills/webdesign/references/phase1-extract.md"
+      ],
+      "source_excerpt": null,
+      "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.183 · https://code.claude.com/docs/en/auto-mode-config"
     },
     {
-      "finding_id": "15742589abb82a557a148d139f9f93e1783a0b14",
-      "decision": "open",
-      "date": "2026-07-05",
+      "finding_id": "0ed1e605a0082277002c0cc1edbee9a6583a03f8",
+      "decision": "deferred",
+      "date": "2026-10-20",
       "source_url": "https://code.claude.com/docs/en/plugins-reference",
-      "affected_capability": "bx:pain/plugin-cache-staleness-after-every-push-activation-gap",
+      "affected_capability": "bx:pain/plugin-versioning-sharp-edge",
       "source_content_hash": "cff46a25eda4ace8378d5b87cac7fe20f5121b21",
       "class": "opportunity",
       "title": "Skills-directory plugins (`<name>@skills-dir`) auto-load with no marketplace/cache — could close the activation gap (docs + v2.1.178)",
-      "note": "STRONGEST evidence yet for Next-Steps #1. A folder with `.claude-plugin/plugin.json` under `~/.claude/skills/` loads as `<name>@skills-dir` next session, discovered in place (not copied to the plugin cache) — personal-scope loads in every project with no install/update step, closing the plugin-cache-staleness/activation gap outright. Caveats: SKILL.md edits apply live but hooks/.mcp.json/agents/output-styles changes still need /reload-plugins; project-scope @skills-dir plugins don't walk up to repo root (launch from root). Cross-lane consolidated: docs plugins-reference (primary) corroborated by changelog v2.1.178 (nested .claude/skills contextual auto-load). Distinct-source companion to open findings 19758d30 (v2.1.157) + 0e4083ea (/reload-skills) under this same pain slug. Evaluate converting bx from marketplace→skills-dir; if adopted, update the S37 'Plugin approach' decision + README install steps. ADDENDUM 2026-07-22: the docs lane re-emitted this same finding_id from a DIFFERENT section of the same page — 'Version management', which states '/plugin update or auto-update fires' and confirms bx's omitted-`version` field means commit-SHA versioning ('users get updates on every new commit'). Implies an automatic update path may already exist alongside the manual step; the fetched section does not specify the auto-update trigger cadence or scope, so verify live behavior before softening the manual `/plugin update bx` + `/reload-plugins` instructions in README.md / workflow.md / fix-mode-evolve.md. stored source_content_hash intentionally left anchored to the original skills-dir excerpt (open entries have no hash-trigger semantics; Rules 3/5 cover rejected/deferred only)."
+      "note": "distribution-model decision (marketplace vs skills-dir); brainstorm when the activation gap next bites",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "7e849e742eca92b6dadb533e83047f885c8cfdb1",
+      "finding_id": "727810cc2e531d2ff015ff08d526384933f30b26",
       "decision": "applied",
       "date": "2026-09-28",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.186",
-      "affected_capability": "bx:pain/stitch-mcp-stitch-skills-plugin-not-yet-installed",
+      "affected_capability": "bx:pain/stitch-stitch-skills-plugin-installed",
       "source_content_hash": "f45abd71ecdc5829fbdf95e383b12ad86e601603",
       "class": "opportunity",
       "title": "`claude mcp login/logout` CLI (v2.1.186) — documents the Stitch MCP auth step without the interactive /mcp menu",
-      "note": "APPLIED 2026-09-28 (v2.10.0): setup-stitch-mcp.md step 1 now names `claude mcp login stitch` (2.1.186+, `--no-browser` over SSH) as the shell sign-in path beside the `/mcp` menu. The webdesign/SKILL.md cross-reference was not added: its registration note is about the tool-name prefix, not auth."
+      "note": "APPLIED 2026-09-28 (v2.10.0): setup-stitch-mcp.md step 1 now names `claude mcp login stitch` (2.1.186+, `--no-browser` over SSH) as the shell sign-in path beside the `/mcp` menu. The webdesign/SKILL.md cross-reference was not added: its registration note is about the tool-name prefix, not auth.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "2d6b0e5f3a6b1a6cd2b04e665a7512dfda66e64d",
@@ -157,7 +216,11 @@
       "source_content_hash": "b231ee16394e06e4d5260a00914ce7f0b6c21af7",
       "class": "opportunity",
       "title": "`Tool(param:value)` permission syntax e.g. `Agent(model:opus)` (v2.1.178) — permission-layer guard against the S43 Opus-subagent bug",
-      "note": "APPLIED 2026-07-05: added a 'Guarding subagent model routing: Agent(model:…) deny rules' subsection to workflow.md Tips & Best Practices (after the /fewer-permission-prompts entry) recommending an `Agent(model:opus)`/`Agent(model:haiku)` deny rule in .claude/settings.json as a permission-layer backstop atop the frontmatter model: sonnet declarations (guards the S43 Opus-subagent class of bug). Note: settings.local.json is absent in this clone (see finding 79708ccf) — the tip is advisory guidance, not wired up here."
+      "note": "APPLIED 2026-07-05: added a 'Guarding subagent model routing: Agent(model:…) deny rules' subsection to workflow.md Tips & Best Practices (after the /fewer-permission-prompts entry) recommending an `Agent(model:opus)`/`Agent(model:haiku)` deny rule in .claude/settings.json as a permission-layer backstop atop the frontmatter model: sonnet declarations (guards the S43 Opus-subagent class of bug). Note: settings.local.json is absent in this clone (see finding 79708ccf) — the tip is advisory guidance, not wired up here.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "afedb6db08fa8b59f577f0f6286cc9c5f6fd4dad",
@@ -168,73 +231,101 @@
       "source_content_hash": "08b670c683ddabb7f3601790bad659ec607d0fbb",
       "class": "best_practice",
       "title": "`user-invocable: false` is inert on plugin agents — remove from all 18 bx/agents/*.md (docs, cert 0.80)",
-      "note": "APPLIED 2026-07-05: removed the inert `user-invocable: false` line from all 18 bx/agents/*.md via a uniform perl sweep (`perl -i -ne 'print unless /^user-invocable: false$/'`); verified 0 remaining + all 18 frontmatter blocks intact. Docs confirm `user-invocable` is a SKILL.md-only field, inert on plugin subagents (dispatched via Agent+subagent_type, never the / menu). SKILL.md usage deliberately untouched."
+      "note": "APPLIED 2026-07-05: removed the inert `user-invocable: false` line from all 18 bx/agents/*.md via a uniform perl sweep (`perl -i -ne 'print unless /^user-invocable: false$/'`); verified 0 remaining + all 18 frontmatter blocks intact. Docs confirm `user-invocable` is a SKILL.md-only field, inert on plugin subagents (dispatched via Agent+subagent_type, never the / menu). SKILL.md usage deliberately untouched.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "b866308eeeda791f380d3de2a2f69ddde3d96538",
-      "decision": "open",
-      "date": "2026-07-05",
+      "finding_id": "56786d9808e5252343c123da92f7728c7da2bf2c",
+      "decision": "rejected",
+      "date": "2026-10-20",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.181",
-      "affected_capability": "bx:pain/s37-leftovers-install-smoke-test-symlink-retirement-settings-skillbx-to-skillbx",
+      "affected_capability": "bx:pain/plugin-packaging-leftovers",
       "source_content_hash": "b2cd9bd341b59886211694c64349f8e5d5067d7e",
       "class": "best_practice",
       "title": "v2.1.181 fixes settings ENOENT under symlinked ~/.claude — reduces urgency of S37 symlink retirement (informational)",
-      "note": "INFORMATIONAL — no action. Makes the OLD symlinked ~/.claude setup (README migration <details>) more crash-resistant on machines that haven't retired symlinks; does not advance or substitute for the planned retirement. Recorded so it isn't re-announced as new next run; reject in a --fix pass to clear."
+      "note": "informational; the S37 symlink-retirement plan is unchanged",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "eda8e3706c3ab3f8bd483ba4f7c967375b7975db",
-      "decision": "open",
-      "date": "2026-07-05",
+      "finding_id": "4978bdc5704ff92814d7cee33d37c57ae1b00aad",
+      "decision": "rejected",
+      "date": "2026-10-20",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.176",
-      "affected_capability": "bx:pain/s37-leftovers-install-smoke-test-symlink-retirement-settings-skillbx-to-skillbx",
+      "affected_capability": "bx:pain/plugin-packaging-leftovers",
       "source_content_hash": "4c2dd35d6b0b14aafbe5481bf02841fb6603c5d3",
       "class": "best_practice",
       "title": "v2.1.176 fixes Linux sandbox start under absolute-target symlinked settings — reduces urgency of S37 symlink retirement (informational)",
-      "note": "INFORMATIONAL — no action, same class as finding b866308e (different bug: absolute-target symlink on Linux sandbox vs. relative-target ENOENT). Reduces breakage risk for machines still on the old symlinked setup on Linux; does not change the retirement plan. Recorded to prevent re-announcement; reject in --fix to clear."
+      "note": "informational; the S37 symlink-retirement plan is unchanged",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "313c3669fbbab1587bb80ee0d8d2a45ae691be53",
+      "finding_id": "8049741d071bf451cd8dee3179582e7b8c8ffe1b",
       "decision": "applied",
       "date": "2026-07-22",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.216",
-      "affected_capability": "bx:pain/plugin-cache-staleness-after-every-push-activation-gap",
+      "affected_capability": "bx:pain/plugin-versioning-sharp-edge",
       "source_content_hash": "b8f5c73ce4688b1eb020f169f958bd5043cfba3d",
       "class": "opportunity",
       "title": "Skills/commands edited mid-session now appear in the slash menu without a restart (v2.1.216) — may soften the hard /reload-plugins requirement",
-      "note": "APPLIED 2026-07-22 as a HEDGED doc note, not a behavioural claim — v2.1.216's fix covers in-place edits to already-loaded skill/command files, which is a different mechanism from a plugin-cache refresh pulling a new marketplace commit; that distinction is unverified, so both edits keep the manual steps fully intact (no-remove-manual-steps convention). README.md 'Updating to the latest version': appended a sentence noting the 2.1.216 change and why `/plugin marketplace update` + `/plugin update bx` are still how you pick up someone else's commits. fix-mode-evolve.md 'Next steps': appended a parenthetical to the `/reload-plugins` bullet saying the same, ending 'keep running the refresh until someone confirms otherwise'. SCOPE CORRECTION: the lane listed workflow.md in affected_files, but its /plugin-update hits (lines 59, 87) are inside the `cc` launcher-script comments — launch-time behaviour, unrelated to mid-session refresh — so workflow.md was deliberately excluded. This is a scope fix, not a partial application under the S45 sibling-echo rule. Fourth distinct source under this pain slug (companions: 19758d30 v2.1.157, 0e4083ea /reload-skills, 15742589 plugins-reference), all still open."
+      "note": "APPLIED 2026-07-22 as a HEDGED doc note, not a behavioural claim — v2.1.216's fix covers in-place edits to already-loaded skill/command files, which is a different mechanism from a plugin-cache refresh pulling a new marketplace commit; that distinction is unverified, so both edits keep the manual steps fully intact (no-remove-manual-steps convention). README.md 'Updating to the latest version': appended a sentence noting the 2.1.216 change and why `/plugin marketplace update` + `/plugin update bx` are still how you pick up someone else's commits. fix-mode-evolve.md 'Next steps': appended a parenthetical to the `/reload-plugins` bullet saying the same, ending 'keep running the refresh until someone confirms otherwise'. SCOPE CORRECTION: the lane listed workflow.md in affected_files, but its /plugin-update hits (lines 59, 87) are inside the `cc` launcher-script comments — launch-time behaviour, unrelated to mid-session refresh — so workflow.md was deliberately excluded. This is a scope fix, not a partial application under the S45 sibling-echo rule. Fourth distinct source under this pain slug (companions: 19758d30 v2.1.157, 0e4083ea /reload-skills, 15742589 plugins-reference), all still open.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "e3964f2fac62df577611a95dc106fd27fa0d9424",
+      "finding_id": "8ab59bae4019fa505ff2f782523b2a9a1b32093f",
       "decision": "rejected",
       "date": "2026-07-22",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.216",
-      "affected_capability": "bx:pain/permission-prompts-when-allowed-tools-misses-a-command",
+      "affected_capability": "bx:pain/permission-prompts-allowed-tools-misses",
       "source_content_hash": "1d06738a540c75c71e5a7ec13798ab11f691c649",
       "class": "best_practice",
       "title": "v2.1.216 fixes Bash permission checking for compound statements with redirects inside `&&` lists — informational, covers patterns bx already uses",
-      "note": "REJECTED 2026-07-22 in the --fix pass — nothing to act on, which is the intended terminal state for an informational finding, not a disagreement with it. Upstream fixed a permission-classifier misjudgment in bx's favour: bx/bin/gsc-parse-helper (`command -v \"$cand\" >/dev/null 2>&1 && \"$cand\" -c '...'`) and bx/skills/seo/references/gsc-cache.md (`[ \"$NO_CACHE\" != \"1\" ] && [ -n \"$(find ... 2>/dev/null)\" ]`) use exactly the fixed compound-redirect shape. Rejected to clear it from the carried-forward list; per lifecycle Rule 3 it re-raises only if a future run re-emits it with a CHANGED source_content_hash. NOTE the tension with still-open finding 093df977 (v2.1.214) which pushes the opposite direction — fail-CLOSED on FD-redirects — and remains unverified; do not read this rejection as 'bx's redirect usage is confirmed safe'."
+      "note": "REJECTED 2026-07-22 in the --fix pass — nothing to act on, which is the intended terminal state for an informational finding, not a disagreement with it. Upstream fixed a permission-classifier misjudgment in bx's favour: bx/bin/gsc-parse-helper (`command -v \"$cand\" >/dev/null 2>&1 && \"$cand\" -c '...'`) and bx/skills/seo/references/gsc-cache.md (`[ \"$NO_CACHE\" != \"1\" ] && [ -n \"$(find ... 2>/dev/null)\" ]`) use exactly the fixed compound-redirect shape. Rejected to clear it from the carried-forward list; per lifecycle Rule 3 it re-raises only if a future run re-emits it with a CHANGED source_content_hash. NOTE the tension with still-open finding 093df977 (v2.1.214) which pushes the opposite direction — fail-CLOSED on FD-redirects — and remains unverified; do not read this rejection as 'bx's redirect usage is confirmed safe'.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "093df977517e69b869dfe2939f98f59ccb9bed07",
-      "decision": "open",
-      "date": "2026-07-22",
+      "finding_id": "3f6e25788cf2ab8461d3d118e5f217e192a6fe21",
+      "decision": "deferred",
+      "date": "2026-10-20",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.214",
-      "affected_capability": "bx:pain/permission-prompts-when-allowed-tools-misses-a-command",
+      "affected_capability": "bx:pain/permission-prompts-allowed-tools-misses",
       "source_content_hash": "ac19b8e3d76dd7d990b0124f5d1875b8943ec84c",
       "class": "best_practice",
       "title": "v2.1.214 Bash permission checks now fail CLOSED on file-descriptor redirect forms — may cause new prompts on bx's pervasive `2>/dev/null` usage",
-      "note": "Certainty 0.50 — NOT verified as a live regression. `2>/dev/null` / `2>&1` appears across bx/scripts/session-start-context.sh, bx/skills/health/SKILL.md (`!`-injected commands), bx/skills/resume/SKILL.md, bx/skills/seo/SKILL.md and bx/skills/seo/references/gsc-cache.md. Fail-closed means previously auto-approved forms now prompt. ACTION: smoke-check next session (run a few of these, watch for new prompts) before touching allowed-tools. Note the opposite direction from finding e3964f2f (v2.1.216 relaxes a different misclassification)."
+      "note": "smoke-check the eight `2>/dev/null` sites during the next /bx:health and /bx:resume deep runs; d29f48d (S60) may already be the fix",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "6ec5c1a02dbed0bb6c00559c1959597fde76d7a5",
+      "finding_id": "0398829cbb753faf7211418444d37b2ada7b7104",
       "decision": "applied",
       "date": "2026-07-22",
       "source_url": "https://code.claude.com/docs/en/skills",
-      "affected_capability": "bx:pain/permission-prompts-when-allowed-tools-misses-a-command",
+      "affected_capability": "bx:pain/permission-prompts-allowed-tools-misses",
       "source_content_hash": "06f734214b2cd1ca9380a6a580abd951c8010e8c",
       "class": "opportunity",
       "title": "`${CLAUDE_SKILL_DIR}` IS a real substitution per current docs — the S39-era 'not a real variable' comments in bx/bin/gsc-parse-helper + seo/SKILL.md are now factually stale",
-      "note": "APPLIED 2026-07-22 — corrected the stale claim in both files without weakening the S39 lesson. The precise correction: ${CLAUDE_SKILL_DIR} IS real, but Claude Code expands it only as text pre-processing of a skill's rendered markdown and of Bash rules in allowed-tools (v2.1.129+); it is NOT a shell variable, so anything reaching the shell with it unexpanded still gets an empty string — which is what the S33 bug actually was. bx/bin/gsc-parse-helper: rewrote the 'Why this wrapper exists' header comment. bx/skills/seo/SKILL.md ~line 903: rewrote the trailing parenthetical. DELIBERATELY PRESERVED: the ${CLAUDE_PLUGIN_ROOT} half of both warnings — that claim is still accurate (it is not exported to the Bash tool environment; the hooks.json usage is a different context). NOT DONE (deliberately deferred): collapsing the bin/ PATH-launcher indirection to `allowed-tools: Bash(${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py *)`. The launcher is verified working since S39 and /bx:seo has still never had a real run — do not touch the dispatch path before that run."
+      "note": "APPLIED 2026-07-22 — corrected the stale claim in both files without weakening the S39 lesson. The precise correction: ${CLAUDE_SKILL_DIR} IS real, but Claude Code expands it only as text pre-processing of a skill's rendered markdown and of Bash rules in allowed-tools (v2.1.129+); it is NOT a shell variable, so anything reaching the shell with it unexpanded still gets an empty string — which is what the S33 bug actually was. bx/bin/gsc-parse-helper: rewrote the 'Why this wrapper exists' header comment. bx/skills/seo/SKILL.md ~line 903: rewrote the trailing parenthetical. DELIBERATELY PRESERVED: the ${CLAUDE_PLUGIN_ROOT} half of both warnings — that claim is still accurate (it is not exported to the Bash tool environment; the hooks.json usage is a different context). NOT DONE (deliberately deferred): collapsing the bin/ PATH-launcher indirection to `allowed-tools: Bash(${CLAUDE_SKILL_DIR}/references/gsc-parse-helper.py *)`. The launcher is verified working since S39 and /bx:seo has still never had a real run — do not touch the dispatch path before that run.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "9aa8e1d0da727888b1d83e39a3d3cd8468127241",
@@ -245,7 +336,11 @@
       "source_content_hash": "59b96e84da470560f5e4bda98b4dfec9aff3c419",
       "class": "best_practice",
       "title": "Docs document only `Agent(<subagent-name>)` deny rules — the `Agent(model:opus)` tip applied 2026-07-05 is uncorroborated by the sub-agents/settings pages",
-      "note": "APPLIED 2026-07-22, but the lane's PREMISE WAS WRONG — resolved by orchestrator verification against https://code.claude.com/docs/en/permissions#match-by-input-parameter (outside the docs lane's pinned allowlist, which is why the lane missed it). `Agent(model:opus)` IS real and documented under 'Match by input parameter'; the v2.1.178-sourced tip applied in finding 2d6b0e5f was NOT wrong about the syntax. The finding survived for a different and more serious reason: the same docs section states 'a parameter the model omits is never matched', and the S43 bug was a GENERIC subagent dispatched with no `model` param at all — so the deny rule would never have fired on the exact bug the tip claimed to guard. Rewrote workflow.md's 'Guarding subagent model routing' section: 'permission-layer backstop' → 'partial permission-layer backstop', and replaced the 'Belt-and-suspenders … stops a regression from ever spawning a non-Sonnet bx agent' overclaim with the omitted-parameter limit + two further caveats (literal-input comparison before normalization, so alias `opus` matches but a full model ID does not; parameter rules valid in deny/ask only, never allow) and a pointer back to frontmatter `model:` + dispatch-by-name as the durable guard. LESSON for scan-docs.md: the pinned allowlist lacks the permissions page, which owns permission-rule syntax — consider adding it. Orchestrator normalized the lane's `bx:*/agent-model-deny-rule-syntax` to `bx:agents/...` per the bx:<skill>/<area> capability-string form."
+      "note": "APPLIED 2026-07-22, but the lane's PREMISE WAS WRONG — resolved by orchestrator verification against https://code.claude.com/docs/en/permissions#match-by-input-parameter (outside the docs lane's pinned allowlist, which is why the lane missed it). `Agent(model:opus)` IS real and documented under 'Match by input parameter'; the v2.1.178-sourced tip applied in finding 2d6b0e5f was NOT wrong about the syntax. The finding survived for a different and more serious reason: the same docs section states 'a parameter the model omits is never matched', and the S43 bug was a GENERIC subagent dispatched with no `model` param at all — so the deny rule would never have fired on the exact bug the tip claimed to guard. Rewrote workflow.md's 'Guarding subagent model routing' section: 'permission-layer backstop' → 'partial permission-layer backstop', and replaced the 'Belt-and-suspenders … stops a regression from ever spawning a non-Sonnet bx agent' overclaim with the omitted-parameter limit + two further caveats (literal-input comparison before normalization, so alias `opus` matches but a full model ID does not; parameter rules valid in deny/ask only, never allow) and a pointer back to frontmatter `model:` + dispatch-by-name as the durable guard. LESSON for scan-docs.md: the pinned allowlist lacks the permissions page, which owns permission-rule syntax — consider adding it. Orchestrator normalized the lane's `bx:*/agent-model-deny-rule-syntax` to `bx:agents/...` per the bx:<skill>/<area> capability-string form.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "282556d0e640d1562264172d91342ea4b71a68a9",
@@ -256,7 +351,11 @@
       "source_content_hash": "00d54295dd67e129e09c2f5ce944e7bb83e63222",
       "class": "best_practice",
       "title": "Built-in `/code-review` now runs as a background subagent (v2.1.218) — /bx:review's ladder framing assumes it blocks the conversation",
-      "note": "REJECTED 2026-07-30 -- no invalidated text to fix, and the proposed edit site was wrong. The lane proposed appending v2.1.218 background-subagent detail to bx/skills/review/SKILL.md's when_to_use. Orchestrator check found nothing in SKILL.md that v2.1.218 makes false: 'fast diff scan, daily default' is still accurate and the body never claims the built-in blocks. when_to_use is a TRIGGERING field consumed to judge skill relevance, so harness-version trivia there can only dilute trigger accuracy. The substance was applied instead under finding d1219059 (README.md + workflow.md ladder prose), which is where the ladder is defined for humans. Per Rule 3 this re-raises only if a future run re-emits it with a CHANGED source_content_hash."
+      "note": "REJECTED 2026-07-30 -- no invalidated text to fix, and the proposed edit site was wrong. The lane proposed appending v2.1.218 background-subagent detail to bx/skills/review/SKILL.md's when_to_use. Orchestrator check found nothing in SKILL.md that v2.1.218 makes false: 'fast diff scan, daily default' is still accurate and the body never claims the built-in blocks. when_to_use is a TRIGGERING field consumed to judge skill relevance, so harness-version trivia there can only dilute trigger accuracy. The substance was applied instead under finding d1219059 (README.md + workflow.md ladder prose), which is where the ladder is defined for humans. Per Rule 3 this re-raises only if a future run re-emits it with a CHANGED source_content_hash.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "d12190593f9f11d377a42ca31bf7fa821f1fd50a",
@@ -267,7 +366,11 @@
       "source_content_hash": "00d54295dd67e129e09c2f5ce944e7bb83e63222",
       "class": "best_practice",
       "title": "Ladder prose in README/workflow.md renders built-in `/code-review` as a synchronous step in arrow chains (v2.1.218 made it background)",
-      "note": "APPLIED 2026-07-30 across both ladder-definition sites, and absorbed the substance of rejected finding 282556d0. README.md review-ladder rung 2: added the effort confidence/coverage tradeoff and the v2.1.218 background-subagent behaviour (findings arrive asynchronously; a chained /code-review may still be in flight). workflow.md:310 Tiering line: added 'the arrows are a risk ladder, not a strict sequence' with the same v2.1.218 note. SCOPE CORRECTION: workflow.md:706/709 also contain /code-review -> /bx:review arrow chains but were deliberately EXCLUDED -- they sit inside a fenced block illustrating sample /bx:health OUTPUT, so editing them would corrupt an example of what the advisor prints rather than fix a ladder definition. This is a scope fix, not a partial application under the S45 sibling-echo rule."
+      "note": "APPLIED 2026-07-30 across both ladder-definition sites, and absorbed the substance of rejected finding 282556d0. README.md review-ladder rung 2: added the effort confidence/coverage tradeoff and the v2.1.218 background-subagent behaviour (findings arrive asynchronously; a chained /code-review may still be in flight). workflow.md:310 Tiering line: added 'the arrows are a risk ladder, not a strict sequence' with the same v2.1.218 note. SCOPE CORRECTION: workflow.md:706/709 also contain /code-review -> /bx:review arrow chains but were deliberately EXCLUDED -- they sit inside a fenced block illustrating sample /bx:health OUTPUT, so editing them would corrupt an example of what the advisor prints rather than fix a ladder definition. This is a scope fix, not a partial application under the S45 sibling-echo rule.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "d148067023cb1d84f13cf9aaece8da08a6b064f3",
@@ -278,18 +381,26 @@
       "source_content_hash": "f20e2e519357531f6913566db1c979da1f9b3630",
       "class": "opportunity",
       "title": "Official Code Review runs a dedicated false-positive verification step; /bx:review has none",
-      "note": "PARTIALLY APPLIED 2026-07-30 -- READ THIS BEFORE ASSUMING THE GAP IS CLOSED. Only the cheap 'verification bar' half landed: bx/skills/review/references/output-format.md gained Rule 8 requiring Critical/Important findings to name a concrete failure scenario (input/state/call sequence producing the wrong behaviour) cited to file:line rather than inferred from naming, downgrading to Suggestion otherwise -- mirroring the REVIEW.md verification-bar pattern in Anthropic's Code Review docs. DELIBERATELY NOT DONE: the actual architectural fix, i.e. the dedicated verification/refutation PASS that filters candidate findings against real code behaviour before they are presented. /bx:review remains a single-orchestrator, single-pass skill with no independent verification stage, and that compounds with its effort: high setting (see finding 069c9442). Applying a multi-agent topology through a --fix diff gate was rejected as unsafe for a skill that has never had a skill-creator content review or an eval suite. NEXT: brainstorm -> spec -> plan, then measure with skill-creator's eval loop; re-register as a fresh finding if a future run re-emits the capability."
+      "note": "PARTIALLY APPLIED 2026-07-30 -- READ THIS BEFORE ASSUMING THE GAP IS CLOSED. Only the cheap 'verification bar' half landed: bx/skills/review/references/output-format.md gained Rule 8 requiring Critical/Important findings to name a concrete failure scenario (input/state/call sequence producing the wrong behaviour) cited to file:line rather than inferred from naming, downgrading to Suggestion otherwise -- mirroring the REVIEW.md verification-bar pattern in Anthropic's Code Review docs. DELIBERATELY NOT DONE: the actual architectural fix, i.e. the dedicated verification/refutation PASS that filters candidate findings against real code behaviour before they are presented. /bx:review remains a single-orchestrator, single-pass skill with no independent verification stage, and that compounds with its effort: high setting (see finding 069c9442). Applying a multi-agent topology through a --fix diff gate was rejected as unsafe for a skill that has never had a skill-creator content review or an eval suite. NEXT: brainstorm -> spec -> plan, then measure with skill-creator's eval loop; re-register as a fresh finding if a future run re-emits the capability.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "0b6ef289b08869e88880bc9a218e692f7ed507f5",
-      "decision": "open",
-      "date": "2026-07-30",
+      "decision": "rejected",
+      "date": "2026-10-20",
       "source_url": "https://code.claude.com/docs/en/code-review",
       "affected_capability": "bx:review/output-format-severity",
       "source_content_hash": "bfef238afb60339a85bfa4fd7d3641a8300ace0d",
       "class": "opportunity",
       "title": "`ReportFindings` tool (v2.1.218) renders findings as a host-native list — /bx:review emits markdown tables only",
-      "note": "SCOPED RUN (review-only). ORCHESTRATOR-VERIFIED. references/output-format.md specifies a hand-rolled markdown severity table; the host can render a typed findings list instead when it requests one. Note the official severity taxonomy (Important / Nit / Pre-existing) differs from bx:review's (Critical / Important / Suggestions / Convention Violations) — 'Pre-existing' has no bx equivalent though SKILL.md Step 0 covers the concept in prose. Evaluate adopting ReportFindings and whether to add a pre-existing marker."
+      "note": "S53 ruling stands: ReportFindings is exclusive-of-text and would drop the Convention Violations, What's Good and verification sections; /bx:review keeps its markdown report",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "069c944227b0ac0cc66afec084cbba72cc466b82",
@@ -300,7 +411,11 @@
       "source_content_hash": "97ba3e061a0c6e53de08bbd9ef94ce67c34f7a1c",
       "class": "best_practice",
       "title": "`effort: high` widens the net and admits lower-confidence findings per official calibration — undocumented tradeoff in /bx:review",
-      "note": "APPLIED 2026-07-30. bx/skills/review/SKILL.md: added a 'Why effort: high, and what it costs' callout after the Fresh-session tip. States Anthropic's documented tradeoff (low/medium report only high-confidence findings; high through max cast a wider net and admit less certain ones), explicitly flags that whether a skill's effort: frontmatter inherits that exact calibration is NOT documented, and routes the user to --verify as the existing mitigation. The effort value itself was deliberately NOT changed -- high is correct for the thorough tier; the gap was that the cost went unstated."
+      "note": "APPLIED 2026-07-30. bx/skills/review/SKILL.md: added a 'Why effort: high, and what it costs' callout after the Fresh-session tip. States Anthropic's documented tradeoff (low/medium report only high-confidence findings; high through max cast a wider net and admit less certain ones), explicitly flags that whether a skill's effort: frontmatter inherits that exact calibration is NOT documented, and routes the user to --verify as the existing mitigation. The effort value itself was deliberately NOT changed -- high is correct for the thorough tier; the gap was that the cost went unstated.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "64d1a7ff330385f9ab1e3322a9e8a1c87e8960e7",
@@ -311,7 +426,11 @@
       "source_content_hash": "883156f6c14638ba39bd16dcb3fa9e73a6969d1c",
       "class": "breakage",
       "title": "`disable-model-invocation: true` may make the documented `/loop /bx:review` a no-op — official docs say a scheduled prompt reads as plain text",
-      "note": "APPLIED 2026-07-30 as a HEDGED caveat, deliberately NOT a removal (same treatment as S52 finding 313c3669). workflow.md: added an 'Unverified caveat' paragraph after the /loop caveats noting that all bx skills set disable-model-invocation: true and that Anthropic documents such a command being read as plain text when used as a SCHEDULED TASK's prompt. Both worked examples (/loop /bx:review and /loop /bx:clean --dry-run) left fully intact per the no-remove-manual-steps convention. SCOPE NOTE: the caveat covers /bx:clean too -- the flag is plugin-wide, not review-specific. STILL UNVERIFIED: /loop (ScheduleWakeup, session-scoped) and /schedule are different mechanisms; smoke-test and replace the hedge with a definitive statement."
+      "note": "APPLIED 2026-07-30 as a HEDGED caveat, deliberately NOT a removal (same treatment as S52 finding 313c3669). workflow.md: added an 'Unverified caveat' paragraph after the /loop caveats noting that all bx skills set disable-model-invocation: true and that Anthropic documents such a command being read as plain text when used as a SCHEDULED TASK's prompt. Both worked examples (/loop /bx:review and /loop /bx:clean --dry-run) left fully intact per the no-remove-manual-steps convention. SCOPE NOTE: the caveat covers /bx:clean too -- the flag is plugin-wide, not review-specific. STILL UNVERIFIED: /loop (ScheduleWakeup, session-scoped) and /schedule are different mechanisms; smoke-test and replace the hedge with a definitive statement.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "4ed0fc0c1903e2177418b06512d3127e2efe85ed",
@@ -322,7 +441,11 @@
       "source_content_hash": "eec0ef3de8b9dabbf9004a8a274a5d0ae8f78e8b",
       "class": "breakage",
       "title": "Checkpoint claim is factually wrong: checkpoints are created before each USER PROMPT, not before each edit",
-      "note": "APPLIED 2026-07-30 (scoped review-only run). bx/skills/review/SKILL.md: rewrote the post---fix closing line. Corrected 'Checkpoints are created automatically before each edit' -> checkpoints are captured before each USER PROMPT, so one /rewind reverts the whole Step-6 batch rather than a single edit. Also fixed two rider errors in the same sentence: Esc Esc opens the rewind menu only on an EMPTY prompt (otherwise it clears the input), and 'persist across sessions' is now stated as surviving a resume but deleted after 30 days (cleanupPeriodDays)."
+      "note": "APPLIED 2026-07-30 (scoped review-only run). bx/skills/review/SKILL.md: rewrote the post---fix closing line. Corrected 'Checkpoints are created automatically before each edit' -> checkpoints are captured before each USER PROMPT, so one /rewind reverts the whole Step-6 batch rather than a single edit. Also fixed two rider errors in the same sentence: Esc Esc opens the rewind menu only on an EMPTY prompt (otherwise it clears the input), and 'persist across sessions' is now stated as surviving a resume but deleted after 30 days (cleanupPeriodDays).",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "afe42f6014fccf76d32707b4b330d15dfdbd80b4",
@@ -333,7 +456,11 @@
       "source_content_hash": "995c2736b67fe5a2fa158a69ce09dc40a023cf19",
       "class": "breakage",
       "title": "Per-edit checkpoint-undo claim persists at 9 sites across 8 files (5 --fix skills + workflow.md) — S53 fixed only /bx:review",
-      "note": "APPLIED 2026-08-11 in the same-session --fix pass: all 9 sites edited across all 8 files (all-or-none per the S45 sibling-echo rule), each rewritten to the per-user-prompt framing modeled on review/SKILL.md:145. ORIGINAL FINDING: The exact wrong claim S53 corrected in bx/skills/review/SKILL.md:145 (finding 4ed0fc0c) survives everywhere else: checkpoints are per USER PROMPT, so one /rewind reverts a whole --fix batch, never a single edit. ORCHESTRATOR-VERIFIED sites via grep: clean/SKILL.md:137 ('finer-grained undo (single deletion, single edit)'), arch/SKILL.md:221 ('undo any individual edit'), arch/references/fix-mode.md:64 ('Per-edit undo ... step back through individual edits'), seo/references/fix-allowlist.md:338 ('Per-edit undo'), evolve/references/fix-mode-evolve.md:112 ('undo individual edits'), tests/SKILL.md:259 ('undo any individual edit'), tests/references/fix-mode-test.md:92 ('use /rewind to undo individually') + :147 ('Per-edit undo ... individual edits'), workflow.md:341 (implicit: 'Each edit is gated by per-finding diff preview. Use Esc Esc or /rewind to undo'). Model correction to copy: review/SKILL.md:145. Grep false positives excluded: seo/SKILL.md:522, save/references/mode-update.md:362 (unrelated 'individually'). This is exactly the S53 follow-up CLAUDE.md's Key Decisions predicted ('audit the other --fix skills for the same claim')."
+      "note": "APPLIED 2026-08-11 in the same-session --fix pass: all 9 sites edited across all 8 files (all-or-none per the S45 sibling-echo rule), each rewritten to the per-user-prompt framing modeled on review/SKILL.md:145. ORIGINAL FINDING: The exact wrong claim S53 corrected in bx/skills/review/SKILL.md:145 (finding 4ed0fc0c) survives everywhere else: checkpoints are per USER PROMPT, so one /rewind reverts a whole --fix batch, never a single edit. ORCHESTRATOR-VERIFIED sites via grep: clean/SKILL.md:137 ('finer-grained undo (single deletion, single edit)'), arch/SKILL.md:221 ('undo any individual edit'), arch/references/fix-mode.md:64 ('Per-edit undo ... step back through individual edits'), seo/references/fix-allowlist.md:338 ('Per-edit undo'), evolve/references/fix-mode-evolve.md:112 ('undo individual edits'), tests/SKILL.md:259 ('undo any individual edit'), tests/references/fix-mode-test.md:92 ('use /rewind to undo individually') + :147 ('Per-edit undo ... individual edits'), workflow.md:341 (implicit: 'Each edit is gated by per-finding diff preview. Use Esc Esc or /rewind to undo'). Model correction to copy: review/SKILL.md:145. Grep false positives excluded: seo/SKILL.md:522, save/references/mode-update.md:362 (unrelated 'individually'). This is exactly the S53 follow-up CLAUDE.md's Key Decisions predicted ('audit the other --fix skills for the same claim').",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "fab78c6a07c9db8a0fe6e7e081b955bd0e20179d",
@@ -344,7 +471,11 @@
       "source_content_hash": "3b2b9737cd58130a2958328ad969c70572157718",
       "class": "opportunity",
       "title": "Plugins from `/plugin` now activate immediately 'when safe' (v2.1.221) — smoke-test whether the /reload-plugins step can be narrowed",
-      "note": "APPLIED 2026-08-11 as a HEDGED extension of fix-mode-evolve.md's /reload-plugins parenthetical (manual steps fully intact per the no-remove-manual-steps convention; the smoke-test is still owed before any wording is dropped). setup-stitch-mcp.md:48 checked and deliberately NOT edited — its /reload-plugins is MCP-server-reconnect context, correct as-is. ORIGINAL FINDING: v2.1.221: `/plugin install` refreshes a stale marketplace catalog and retries before reporting not-found, and installed plugins 'activate immediately when safe, instead of always requiring /reload-plugins'. Second upstream signal in the same direction as applied finding 313c3669 (v2.1.216, hedged). 'When safe' is undefined in the release note, so do NOT assume resolved: smoke-test whether `/plugin update bx` activates without `/reload-plugins` on current CC, then either drop the 'always requiring /reload-plugins' framing in fix-mode-evolve.md's next-steps note or narrow the caveat to the 'when safe' boundary. Spot-check setup-stitch-mcp.md's /reload-plugins instruction too (different trigger — MCP tool reconnect — worth a footnote only). Fifth distinct source bearing on the plugin-cache-staleness pain slug (19758d30, 0e4083ea, 15742589, 313c3669)."
+      "note": "APPLIED 2026-08-11 as a HEDGED extension of fix-mode-evolve.md's /reload-plugins parenthetical (manual steps fully intact per the no-remove-manual-steps convention; the smoke-test is still owed before any wording is dropped). setup-stitch-mcp.md:48 checked and deliberately NOT edited — its /reload-plugins is MCP-server-reconnect context, correct as-is. ORIGINAL FINDING: v2.1.221: `/plugin install` refreshes a stale marketplace catalog and retries before reporting not-found, and installed plugins 'activate immediately when safe, instead of always requiring /reload-plugins'. Second upstream signal in the same direction as applied finding 313c3669 (v2.1.216, hedged). 'When safe' is undefined in the release note, so do NOT assume resolved: smoke-test whether `/plugin update bx` activates without `/reload-plugins` on current CC, then either drop the 'always requiring /reload-plugins' framing in fix-mode-evolve.md's next-steps note or narrow the caveat to the 'when safe' boundary. Spot-check setup-stitch-mcp.md's /reload-plugins instruction too (different trigger — MCP tool reconnect — worth a footnote only). Fifth distinct source bearing on the plugin-cache-staleness pain slug (19758d30, 0e4083ea, 15742589, 313c3669).",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "e15716add5c306d8554dfa7edaee68d1b3d99a5b",
@@ -355,7 +486,11 @@
       "source_content_hash": "cd257bb0f36e5f5db854f79b049b794a1579e6d6",
       "class": "best_practice",
       "title": "`/review` is now an alias of built-in `/code-review` (v2.1.223) — add a disambiguation vs /bx:review to README's ladder note",
-      "note": "APPLIED 2026-08-11: appended the /review-alias disambiguation to README.md's naming-churn sentence (review-ladder intro) — bare /review = built-in quick scan, not /bx:review. ORIGINAL FINDING: README.md's review-ladder block already tracks the built-in naming churn (/simplify→/code-review, reinstated /simplify, /ultrareview→/code-review ultra). v2.1.223 adds a third churn point: bare `/review` resolves to the lightweight built-in `/code-review` — a different tool from /bx:review (thorough custom skill). Since that block exists precisely to prevent naming confusion, add a one-line callout that `/review` (no prefix) = built-in quick scan, not /bx:review. Good low-effort --fix candidate."
+      "note": "APPLIED 2026-08-11: appended the /review-alias disambiguation to README.md's naming-churn sentence (review-ladder intro) — bare /review = built-in quick scan, not /bx:review. ORIGINAL FINDING: README.md's review-ladder block already tracks the built-in naming churn (/simplify→/code-review, reinstated /simplify, /ultrareview→/code-review ultra). v2.1.223 adds a third churn point: bare `/review` resolves to the lightweight built-in `/code-review` — a different tool from /bx:review (thorough custom skill). Since that block exists precisely to prevent naming confusion, add a one-line callout that `/review` (no prefix) = built-in quick scan, not /bx:review. Good low-effort --fix candidate.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "060ddae45708755eb02f0a2fcb77152517ebb013",
@@ -366,7 +501,11 @@
       "source_content_hash": "793f84a21e07b5bc62c49fd0615ee017bd946980",
       "class": "opportunity",
       "title": "code-review docs state the disable-model-invocation scheduled-prompt caveat as plain fact — firm up workflow.md's /loop hedge from 'speculative' to 'documented for the mechanism class'",
-      "note": "APPLIED 2026-08-11: workflow.md caveat retitled 'Partially confirmed' and now quotes the docs sentence verbatim — documented behavior for /schedule-style scheduled tasks; the /loop-specific half stays hedged and the smoke-test task remains open. ORIGINAL FINDING: The docs page now says outright: '/code-review is marked disable-model-invocation, so if you set it as a scheduled task's prompt, Claude reads it as plain text instead of running the review.' That upgrades the S53 hedge in workflow.md (~line 780) from speculation to officially-documented behavior for the mechanism class all bx skills fall into. STILL open: whether /loop (session-scoped ScheduleWakeup) is the same 'scheduled task' primitive as /schedule — the docs cross-reference a separate scheduled-tasks page not on the scan-docs allowlist. Proposed: cite the confirmation in the workflow.md caveat, keep the smoke-test recommendation (Next Steps task) until /loop specifically is verified. Companion to applied finding 64d1a7ff (same caveat, original registration)."
+      "note": "APPLIED 2026-08-11: workflow.md caveat retitled 'Partially confirmed' and now quotes the docs sentence verbatim — documented behavior for /schedule-style scheduled tasks; the /loop-specific half stays hedged and the smoke-test task remains open. ORIGINAL FINDING: The docs page now says outright: '/code-review is marked disable-model-invocation, so if you set it as a scheduled task's prompt, Claude reads it as plain text instead of running the review.' That upgrades the S53 hedge in workflow.md (~line 780) from speculation to officially-documented behavior for the mechanism class all bx skills fall into. STILL open: whether /loop (session-scoped ScheduleWakeup) is the same 'scheduled task' primitive as /schedule — the docs cross-reference a separate scheduled-tasks page not on the scan-docs allowlist. Proposed: cite the confirmation in the workflow.md caveat, keep the smoke-test recommendation (Next Steps task) until /loop specifically is verified. Companion to applied finding 64d1a7ff (same caveat, original registration).",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "5d1459d58f37a8ff5aaaf9ad3bb899bb2284cadb",
@@ -377,62 +516,86 @@
       "source_content_hash": "175e2a8218a504793090454638ff233f5526d49e",
       "class": "breakage",
       "title": "TaskCreate/TodoWrite unavailable by default on Sonnet 5 and newer models (v2.1.233) — /bx:arch --plan promises a 'TaskCreate-ready brief'",
-      "note": "APPLIED 2026-08-23 in the same-session --fix pass, both affected files edited (all-or-none per the S45 sibling-echo rule). bx/skills/arch/SKILL.md:101 — the --plan row's 'phased TaskCreate-ready brief' became 'phased brief ready to hand off to /bx:plan'; the env-var caveat was deliberately NOT put in the table cell (a one-cell entry cannot carry it legibly, and the same row already routes the reader to plan-mode.md). bx/skills/arch/references/plan-mode.md:5 — dropped '(or directly to TaskCreate)' from the intro sentence and added a 'Hand-off target' paragraph making /bx:plan the unconditional path and TaskCreate a conditional one, naming the CLAUDE_CODE_ENABLE_TODO_TOOLS=1 gate and the affected model list. The TaskCreate route was demoted, NOT deleted, per the no-remove-manual-steps convention. ORIGINAL FINDING: SCOPED RUN (arch-only; watermark frozen at 2.1.228 per the S53 convention). Changelog lane, severity high, certainty 0.90. v2.1.233 removed TaskCreate/TaskGet/TaskUpdate/TaskList + TodoWrite from the default toolset on Opus 4.8, Sonnet 5, Fable 5, Mythos 5 and newer; CLAUDE_CODE_ENABLE_TODO_TOOLS=1 restores them. Affects bx/skills/arch/SKILL.md:101 ('phased TaskCreate-ready brief' for --plan) and bx/skills/arch/references/plan-mode.md:5 ('or directly to TaskCreate'). ORCHESTRATOR-CORROBORATED LIVE: this very session (Opus 5) has no TaskCreate/TaskList in its toolset — /bx:resume Step 5 task hydration could not run for that reason, so this is observed behavior, not just a release-note inference. Proposed: qualify both sites with the CLAUDE_CODE_ENABLE_TODO_TOOLS=1 gate and demote 'directly to TaskCreate' to a conditional path, making /bx:plan (which owns its own hydration flow) the primary unconditional hand-off. SIBLING-ECHO WARNING (S45): the same TaskCreate assumption likely exists in bx/skills/resume/references/task-hydration.md, bx/skills/save (task drain), bx/skills/plan and bx/skills/clean — OUT OF SCOPE for this arch-scoped run and NOT swept here; a full run must audit them, so do not read a fix of the two arch sites as closing the class. SIBLING SWEEP CLOSED 2026-08-24 (S58 continuation): the class the S45 warning predicted was real and is now swept. Canonical owner created at bx/skills/save/references/task-tools.md (the fact, the availability check, per-skill degraded paths) per the S57 named-owner principle; the five satellites cite it and none restates the version, model list, or env-var name. Sites fixed: bx/skills/tests/SKILL.md:102 (identical 'phased TaskCreate-ready brief' phrasing), bx/skills/plan/SKILL.md + references/plan-and-tasks.md (approved plan document becomes the tracker; per-phase gating kept verbatim), bx/skills/resume/SKILL.md Step 5 + references/task-hydration.md (same selection folded into the Step 4 summary as a numbered list; pre-hydration stale check skipped), bx/skills/save/references/mode-update.md Part 0 + gather list + Save Path step 1 (absent tools == --skip-tasks), bx/agents/save-writer.md:22 (drain may have been skipped). arch's own plan-mode.md paragraph was refactored from a restatement into a citation of the new owner. CORRECTION to the original note's guess: bx/skills/clean has NO task-tool references and needed no change. All 7 cross-skill citations verified to resolve against their skill base directory; assert-doc-schema.sh + check-doc-rule-consistency.sh pass. Shipped in plugin v2.2.0."
+      "note": "APPLIED 2026-08-23 in the same-session --fix pass, both affected files edited (all-or-none per the S45 sibling-echo rule). bx/skills/arch/SKILL.md:101 — the --plan row's 'phased TaskCreate-ready brief' became 'phased brief ready to hand off to /bx:plan'; the env-var caveat was deliberately NOT put in the table cell (a one-cell entry cannot carry it legibly, and the same row already routes the reader to plan-mode.md). bx/skills/arch/references/plan-mode.md:5 — dropped '(or directly to TaskCreate)' from the intro sentence and added a 'Hand-off target' paragraph making /bx:plan the unconditional path and TaskCreate a conditional one, naming the CLAUDE_CODE_ENABLE_TODO_TOOLS=1 gate and the affected model list. The TaskCreate route was demoted, NOT deleted, per the no-remove-manual-steps convention. ORIGINAL FINDING: SCOPED RUN (arch-only; watermark frozen at 2.1.228 per the S53 convention). Changelog lane, severity high, certainty 0.90. v2.1.233 removed TaskCreate/TaskGet/TaskUpdate/TaskList + TodoWrite from the default toolset on Opus 4.8, Sonnet 5, Fable 5, Mythos 5 and newer; CLAUDE_CODE_ENABLE_TODO_TOOLS=1 restores them. Affects bx/skills/arch/SKILL.md:101 ('phased TaskCreate-ready brief' for --plan) and bx/skills/arch/references/plan-mode.md:5 ('or directly to TaskCreate'). ORCHESTRATOR-CORROBORATED LIVE: this very session (Opus 5) has no TaskCreate/TaskList in its toolset — /bx:resume Step 5 task hydration could not run for that reason, so this is observed behavior, not just a release-note inference. Proposed: qualify both sites with the CLAUDE_CODE_ENABLE_TODO_TOOLS=1 gate and demote 'directly to TaskCreate' to a conditional path, making /bx:plan (which owns its own hydration flow) the primary unconditional hand-off. SIBLING-ECHO WARNING (S45): the same TaskCreate assumption likely exists in bx/skills/resume/references/task-hydration.md, bx/skills/save (task drain), bx/skills/plan and bx/skills/clean — OUT OF SCOPE for this arch-scoped run and NOT swept here; a full run must audit them, so do not read a fix of the two arch sites as closing the class. SIBLING SWEEP CLOSED 2026-08-24 (S58 continuation): the class the S45 warning predicted was real and is now swept. Canonical owner created at bx/skills/save/references/task-tools.md (the fact, the availability check, per-skill degraded paths) per the S57 named-owner principle; the five satellites cite it and none restates the version, model list, or env-var name. Sites fixed: bx/skills/tests/SKILL.md:102 (identical 'phased TaskCreate-ready brief' phrasing), bx/skills/plan/SKILL.md + references/plan-and-tasks.md (approved plan document becomes the tracker; per-phase gating kept verbatim), bx/skills/resume/SKILL.md Step 5 + references/task-hydration.md (same selection folded into the Step 4 summary as a numbered list; pre-hydration stale check skipped), bx/skills/save/references/mode-update.md Part 0 + gather list + Save Path step 1 (absent tools == --skip-tasks), bx/agents/save-writer.md:22 (drain may have been skipped). arch's own plan-mode.md paragraph was refactored from a restatement into a citation of the new owner. CORRECTION to the original note's guess: bx/skills/clean has NO task-tool references and needed no change. All 7 cross-skill citations verified to resolve against their skill base directory; assert-doc-schema.sh + check-doc-rule-consistency.sh pass. Shipped in plugin v2.2.0.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "59d3bdac80106bf6e20bd6b7115e2681cd552e89",
-      "decision": "open",
-      "date": "2026-08-24",
+      "decision": "applied",
+      "date": "2026-10-20",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.232",
       "affected_capability": "bx:skills/agent-dispatch-background-default",
       "source_content_hash": "0000000000000000000000000000000000000000",
       "class": "breakage",
       "title": "v2.1.232 makes non-teammate Agent spawns background-by-default in interactive sessions; verify bx's synchronous fan-outs still block",
-      "note": "Changelog lane, severity high, certainty 0.65. v2.1.232: subagent forking on by default and non-teammate agent spawns in interactive sessions now run in the background by default. bx dispatches synchronous fan-outs that then consolidate results: /bx:evolve Step 2 (3 lanes), /bx:clean Step 1 (3 cleanup-* agents), /bx:arch Step 4 (5 arch-* agents), /bx:save (save-writer), /bx:tests (3 agents). ORCHESTRATOR-CORROBORATED: this very run dispatched 3 lanes and did receive all 3 results before consolidating, so the wait behavior is intact in practice for Agent-tool dispatch with an explicit subagent_type. Proposed: audit the 4 files matching subagent_type plus the arch/tests/clean fan-outs and state explicitly that the orchestrator awaits all dispatched agents, so the assumption is documented rather than incidental."
+      "note": "explicit await statements already present in arch/clean/evolve/seo/tests SKILL.md; verified by every fan-out run since S58 (S61 triage)",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "df34007f15b9ddf028c401c92205d29b40c92a0f",
-      "decision": "open",
-      "date": "2026-08-24",
+      "finding_id": "f2c43716be6ded3bd9b61e977f7e8521b3d85d11",
+      "decision": "rejected",
+      "date": "2026-10-20",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.232",
-      "affected_capability": "bx:pain/plugin-cache-staleness-skills-run-from-cache-a-bx-push-without-a-version-bump-reaches-no-user",
+      "affected_capability": "bx:pain/plugin-versioning-sharp-edge",
       "source_content_hash": "0000000000000000000000000000000000000000",
       "class": "opportunity",
       "title": "/plugin install now refreshes the marketplace first — README/workflow install instructions may be able to drop the manual marketplace-update step",
-      "note": "Changelog lane, severity high, certainty 0.6. Covers /plugin install only, NOT /plugin update. The version-bump-as-cache-key mechanism may still be required for updates. Verify the update path before touching update-side instructions."
+      "note": "README's install block already carries no manual marketplace refresh (marketplace add + install); the update path is outside this finding's scope",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "03c9a5759b41f154e90c83b6283616c734948adc",
-      "decision": "open",
-      "date": "2026-08-24",
+      "finding_id": "9448550dfacb53847c2b1e6c580c1ef8da96ddb8",
+      "decision": "rejected",
+      "date": "2026-10-20",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.229",
-      "affected_capability": "bx:pain/plugin-cache-staleness-skills-run-from-cache-a-bx-push-without-a-version-bump-reaches-no-user",
+      "affected_capability": "bx:pain/plugin-versioning-sharp-edge",
       "source_content_hash": "0000000000000000000000000000000000000000",
       "class": "opportunity",
       "title": "Plugin marketplace `command` sources with mode:link re-resolve per session without a restart",
-      "note": "Changelog lane, severity high, certainty 0.45. Described for a local command printing a plugin directory (e.g. an IDE); may not map onto a git-hosted marketplace like burak-tools. Needs verification before any doc change."
+      "note": "command / mode:link marketplace sources do not apply to a git-hosted marketplace like burak-tools",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "3dd5decbd91eb6e396e2c73721795f7a19c3cd56",
-      "decision": "open",
-      "date": "2026-08-24",
+      "decision": "rejected",
+      "date": "2026-10-20",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.232",
       "affected_capability": "bx:review/builtin-code-review-ladder",
       "source_content_hash": "0000000000000000000000000000000000000000",
       "class": "best_practice",
       "title": "/code-review at high/xhigh/max now also runs as a background agent",
-      "note": "Changelog lane, severity low, certainty 0.4. Likely a no-op: the ladder prose was generalized to 'background' when v2.1.218 shipped (finding d1219059..., applied). A near-identical v2.1.218 signal was REJECTED as already-covered (finding 282556d0...); expect the same outcome. Confirm no effort-level-specific synchronous claim survives in the 15 files referencing /code-review."
+      "note": "already covered by the generalized 'runs as a background subagent since v2.1.218' wording in README and workflow.md (same ruling as finding 282556d0)",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "b56599023ccc3b81871106b9b323570f3e98afb7",
+      "finding_id": "cb4ee0d917cb75404c09c8a1d15ceaf67f5d041a",
       "decision": "applied",
       "date": "2026-08-24",
       "source_url": "https://code.claude.com/docs/en/plugins",
-      "affected_capability": "bx:pain/s37-plugin-packaging-leftovers-install-smoke-test-symlink-retirement",
+      "affected_capability": "bx:pain/plugin-packaging-leftovers",
       "source_content_hash": "0000000000000000000000000000000000000000",
       "class": "opportunity",
       "title": "`claude plugin validate` is the documented local smoke-test — wire it into /bx:save Part 8 to close the S37 install-smoke-test leftover",
-      "note": "Docs lane, severity medium, certainty 0.6. ORCHESTRATOR-VERIFIED THIS RUN: the command exists (claude plugin validate [--strict] <path>), and bx passes both plain and --strict, as does the marketplace manifest at repo root. Proposed: add a validate step to mode-update.md Part 8 alongside the version bump, surfacing errors/warnings at the commit checkpoint. Closes the install-smoke-test half of the S37 plugin-packaging leftovers open since Session 37. APPLIED 2026-08-24 (same-run --fix): mode-update.md Part 8 gains step 2b — run `claude plugin validate ./bx --strict` after the version bump and before the commit, plus `claude plugin validate .` for the root marketplace manifest. Pass reports one line; fail/warn surfaces output verbatim and asks fix-now-or-commit-anyway (never a veto — a warning is information, not a block); --silent reports and commits anyway since its contract is zero prompts; command-not-found skips silently so an older harness never fails a save. bx/skills/save/SKILL.md allowed-tools gained Bash(claude:*) per the S45 enumeration rule — without it the new step would prompt on every save. Dogfooded on itself: bx and the root marketplace manifest both pass plain and --strict. Shipped in plugin v2.6.0."
+      "note": "Docs lane, severity medium, certainty 0.6. ORCHESTRATOR-VERIFIED THIS RUN: the command exists (claude plugin validate [--strict] <path>), and bx passes both plain and --strict, as does the marketplace manifest at repo root. Proposed: add a validate step to mode-update.md Part 8 alongside the version bump, surfacing errors/warnings at the commit checkpoint. Closes the install-smoke-test half of the S37 plugin-packaging leftovers open since Session 37. APPLIED 2026-08-24 (same-run --fix): mode-update.md Part 8 gains step 2b — run `claude plugin validate ./bx --strict` after the version bump and before the commit, plus `claude plugin validate .` for the root marketplace manifest. Pass reports one line; fail/warn surfaces output verbatim and asks fix-now-or-commit-anyway (never a veto — a warning is information, not a block); --silent reports and commits anyway since its contract is zero prompts; command-not-found skips silently so an older harness never fails a save. bx/skills/save/SKILL.md allowed-tools gained Bash(claude:*) per the S45 enumeration rule — without it the new step would prompt on every save. Dogfooded on itself: bx and the root marketplace manifest both pass plain and --strict. Shipped in plugin v2.6.0.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "83d36fa2e7a55bd3721e8efbc749f1dbc5a736c9",
@@ -443,7 +606,11 @@
       "source_content_hash": "71894c842cabbb2d44eb52d5d81489dce531363c",
       "class": "best_practice",
       "title": "`claude plugin validate --json` gives a machine-readable report — parse it in /bx:save Part 8 step 2b instead of prose",
-      "note": "Part 8 step 2b now runs `claude plugin validate ./bx --strict --json` (and `. --json` for the marketplace) and judges on the top-level `success` field plus manifest.errors/warnings; README contributors note updated. workflow.md's Aug-2026 history row left untouched (record of past state)."
+      "note": "Part 8 step 2b now runs `claude plugin validate ./bx --strict --json` (and `. --json` for the marketplace) and judges on the top-level `success` field plus manifest.errors/warnings; README contributors note updated. workflow.md's Aug-2026 history row left untouched (record of past state).",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "e6fab951a2169c8bba1bd8ffa54cba4a37021cc1",
@@ -454,7 +621,11 @@
       "source_content_hash": "d0930abe45c42a9e631c033f1c4b91999fd1cded",
       "class": "opportunity",
       "title": "`/reload-plugins` now works in headless sessions (v2.1.260) — plugin-refresh guidance only describes the interactive path",
-      "note": "Added the 2.1.260 headless-availability note at both `/reload-plugins` sites: fix-mode-evolve.md post-pass steps and webdesign setup-stitch-mcp.md."
+      "note": "Added the 2.1.260 headless-availability note at both `/reload-plugins` sites: fix-mode-evolve.md post-pass steps and webdesign setup-stitch-mcp.md.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "b1397bf6e4411a928b85a9a20e11d214f8207b98",
@@ -465,7 +636,11 @@
       "source_content_hash": "31d78382b9fb2e0b25fe381dcbbb0798b97c4b09",
       "class": "best_practice",
       "title": "`Skill(name)` rules now match nested `<dir>:name` skills (v2.1.260) — relevant to webdesign's `stitch-design:*` calls",
-      "note": "No `Skill(stitch-design…)` permission rule exists in bx, so there is nothing to change; the lane itself reported no edit needed. Revisit only if such a rule is added — five webdesign references use the nested `stitch-design:<name>` form."
+      "note": "No `Skill(stitch-design…)` permission rule exists in bx, so there is nothing to change; the lane itself reported no edit needed. Revisit only if such a rule is added — five webdesign references use the nested `stitch-design:<name>` form.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "7b54fbc1b1f0ac71374606a220d27ad75fbd35e1",
@@ -476,7 +651,11 @@
       "source_content_hash": "4e0d78d3490d9074fcbc793d01843a0c474b2f87",
       "class": "opportunity",
       "title": "hooks.json has no per-OS command field — only a per-hook `shell` field or a dispatcher wrapper; resolves the S58 open question on `session-start-context.ps1`",
-      "note": "Deleted bx/scripts/session-start-context.ps1: never wired, hooks.json has no per-OS command field per the hooks reference, and the .sh already runs on Windows via Git Bash. README tree, CLAUDE.md Known Issues and STATUS.md Next Steps #13 updated; Windows-without-Git-Bash is now explicitly out of scope."
+      "note": "Deleted bx/scripts/session-start-context.ps1: never wired, hooks.json has no per-OS command field per the hooks reference, and the .sh already runs on Windows via Git Bash. README tree, CLAUDE.md Known Issues and STATUS.md Next Steps #13 updated; Windows-without-Git-Bash is now explicitly out of scope.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "e1e67d4317b31981a1eff15305968c62c9f04ce0",
@@ -487,7 +666,11 @@
       "source_content_hash": "2a57cd608b92b649834b722a83392044b7608f08",
       "class": "breakage",
       "title": "Todo/task-tracking tools removed by default on newer models (v2.1.233) — degraded paths per skill",
-      "note": "Duplicate of 5d1459d5 (same v2.1.233 release, re-emitted under bx:skills/task-tracker-tools instead of bx:arch/plan-mode-taskcreate-handoff). Already applied in v2.2.0 (task-tools.md + degraded paths); no edit. Closed by the orchestrator, not the gate — Step 3.4 has no applied branch and no cross-capability dedup."
+      "note": "Duplicate of 5d1459d5 (same v2.1.233 release, re-emitted under bx:skills/task-tracker-tools instead of bx:arch/plan-mode-taskcreate-handoff). Already applied in v2.2.0 (task-tools.md + degraded paths); no edit. Closed by the orchestrator, not the gate — Step 3.4 has no applied branch and no cross-capability dedup.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "c0a336b6e22b9d0c818dcf4f1f582b26d5ff63dc",
@@ -498,18 +681,26 @@
       "source_content_hash": "80697e49512266a511a51e40dc21969f22f9de8e",
       "class": "opportunity",
       "title": "`/doctor` trim check proposes cutting codebase-derivable content from CLAUDE.md (v2.1.206) — cross-reference it in the doc-schema owner file",
-      "note": "Added a derivable-content paragraph to doc-schema.md's v2 layout section naming `/doctor`'s trim check (2.1.206+) and cross-referencing mode-update.md Part 4.3; approved in the --full --fix gate."
+      "note": "Added a derivable-content paragraph to doc-schema.md's v2 layout section naming `/doctor`'s trim check (2.1.206+) and cross-referencing mode-update.md Part 4.3; approved in the --full --fix gate.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "55ba40ea001bc6b5b8bff26555481caa3eeafc7f",
-      "decision": "open",
-      "date": "2026-09-28",
+      "finding_id": "5b91feb3b02059944c5d30c0fa8d7a2951368b87",
+      "decision": "deferred",
+      "date": "2026-10-20",
       "source_url": "https://code.claude.com/docs/en/memory",
-      "affected_capability": "bx:pain/claude-md-over-its-size-target-with-no-path-scoped-rules-tier",
+      "affected_capability": "bx:pain/claude-md-over-size-target",
       "source_content_hash": "a513170929d351fa7843dbb1a613a43a55273504",
       "class": "opportunity",
       "title": "Memory docs name path-scoped `.claude/rules/` as the CLAUDE.md overflow tier and add `/doctor prompt-audit` (v2.1.283) — bx has neither",
-      "note": "PARTIALLY APPLIED 2026-09-28 (v2.10.0), entry left OPEN for the unapplied half. Applied: mode-update.md Part 1.9 and doc-schema.md now name `/doctor prompt-audit` (2.1.283+) beside the `/doctor` trim check, and doc-schema.md states size is measured in chars, not lines — the docs' 200-line yardstick passes this repo's 62-line CLAUDE.md at 13,606 chars, over the 12k soft cap. NOT applied: the `.claude/rules/` path-scoped tier, which is phase 2 of docs/superpowers/specs/2026-08-24-bx-doc-tiering-design.md (D4-D6) and stays gated; this finding is its official corroboration. workflow.md:185 not expanded for the same reason."
+      "note": "remaining half = doc-tiering Phase 2 (.claude/rules tier, spec D4-D6), gated on re-verifying `paths:` against the memory docs",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "2e4e9a8b9ef2a5d15262847267179f91b3d47d5e",
@@ -520,7 +711,11 @@
       "source_content_hash": "b4027e19e31b871ee36f1a4eeda0d37b9b24705a",
       "class": "best_practice",
       "title": "Auto mode now applies default-mode permission rules to a skill's inline `!` commands (v2.1.271) — /bx:resume and /bx:health inject `echo`/`head` not in their allowed-tools",
-      "note": "APPLIED 2026-09-28 (hand-applied, v2.10.0). Gap verified by grep before editing: /bx:resume injected `ls -1 | head -30` and three `|| echo` fallbacks with neither Bash(head:*) nor Bash(echo:*) in allowed-tools; /bx:health used `|| echo` in six injections without Bash(echo:*). Added Bash(head:*) + Bash(echo:*) to resume and Bash(echo:*) to health. NOT verified as a live prompt before the fix: the pre-fix /bx:resume injection completed in this session. Related open finding 093df977 (v2.1.214 fail-closed redirects) is untouched."
+      "note": "APPLIED 2026-09-28 (hand-applied, v2.10.0). Gap verified by grep before editing: /bx:resume injected `ls -1 | head -30` and three `|| echo` fallbacks with neither Bash(head:*) nor Bash(echo:*) in allowed-tools; /bx:health used `|| echo` in six injections without Bash(echo:*). Added Bash(head:*) + Bash(echo:*) to resume and Bash(echo:*) to health. NOT verified as a live prompt before the fix: the pre-fix /bx:resume injection completed in this session. Related open finding 093df977 (v2.1.214 fail-closed redirects) is untouched.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "ee81fa4328610ec4f86d14b987cd8b2283bcb2ce",
@@ -531,7 +726,11 @@
       "source_content_hash": "dc28e6a6fc0699bdefb7e63153159b1dc2f0b163",
       "class": "best_practice",
       "title": "`/plugin` install/enable/disable now applies on menu close, no `/reload-plugins` needed (v2.1.268) — third data point for the hedged note in fix-mode-evolve.md",
-      "note": "APPLIED 2026-09-28 (v2.10.0): fix-mode-evolve.md's hedged parenthetical now lists v2.1.268 as a third unverified data point. Manual `/plugin update bx` + `/reload-plugins` steps kept intact."
+      "note": "APPLIED 2026-09-28 (v2.10.0): fix-mode-evolve.md's hedged parenthetical now lists v2.1.268 as a third unverified data point. Manual `/plugin update bx` + `/reload-plugins` steps kept intact.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
       "finding_id": "c0379ca1853ac9b9efdbc8403036e104b441e82d",
@@ -542,18 +741,26 @@
       "source_content_hash": "e5ef0425b004cbf05ae88449ad7223f3d173184e",
       "class": "opportunity",
       "title": "`omitClaudeMd` agent frontmatter (v2.1.271) — read-only scanner subagents could skip CLAUDE.md, cutting per-dispatch context",
-      "note": "APPLIED 2026-09-28 (v2.10.0), NARROWER than the lane proposed: `omitClaudeMd: true` on the three upstream-* agents only. They run only in claude-config and take everything from the dispatch prompt. Every scanner that reads a target repo (arch-*, test-*, cleanup-*, seo-*, geo-generative) keeps CLAUDE.md, because that repo's recorded decisions are what stop a scanner flagging deliberate design; seo-* carried the flag briefly and were reverted the same session after review. `claude plugin validate ./bx --strict --json` passes with the key on 2.1.284, though the validator may not check agent frontmatter. Runtime effect not measured."
+      "note": "APPLIED 2026-09-28 (v2.10.0), NARROWER than the lane proposed: `omitClaudeMd: true` on the three upstream-* agents only. They run only in claude-config and take everything from the dispatch prompt. Every scanner that reads a target repo (arch-*, test-*, cleanup-*, seo-*, geo-generative) keeps CLAUDE.md, because that repo's recorded decisions are what stop a scanner flagging deliberate design; seo-* carried the flag briefly and were reverted the same session after review. `claude plugin validate ./bx --strict --json` passes with the key on 2.1.284, though the validator may not check agent frontmatter. Runtime effect not measured.",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     },
     {
-      "finding_id": "161ae1821578ccf044251efaa1b7ce2eca195ae5",
-      "decision": "open",
-      "date": "2026-09-28",
+      "finding_id": "fe90acdffcdce0d4de7db1c2174531d13a8c4dcf",
+      "decision": "deferred",
+      "date": "2026-10-20",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.269",
-      "affected_capability": "bx:pain/bx-health-never-run-end-to-end",
+      "affected_capability": "bx:pain/dogfood-bx-health",
       "source_content_hash": "ad6af63e5b379dcede03b749e8568adfc8e02cde",
       "class": "opportunity",
       "title": "`claude plugin eval` (v2.1.269) runs a plugin eval suite with scored, reproducible results — bx has no committed eval suite",
-      "note": "Changelog lane, severity low, certainty 0.4; cross-lane corroborated by the docs lane (https://code.claude.com/docs/en/skills, 'Evaluate and iterate on a skill', certainty 0.5), merged here per Step 3.5. Eval format is not interchangeable with skill-creator's evals.json; the full spec is on the plugin-evals page, which is not on the scan-docs allowlist. Needs its own design; requires git 2.31+."
+      "note": "needs its own design pass (eval suite in the plugin-evals format); pairs with the /bx:health dogfood",
+      "proposed_edit": null,
+      "affected_files": [],
+      "source_excerpt": null,
+      "citation": null
     }
   ]
 }

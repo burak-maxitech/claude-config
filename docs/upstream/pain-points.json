@@ -1,0 +1,198 @@
+{
+  "pain_points": [
+    {
+      "id": "plugin-versioning-sharp-edge",
+      "text": "Plugin-versioning sharp edge (S54)",
+      "source": "claude-md",
+      "status": "active",
+      "aliases": [
+        "plugin-cache-staleness-after-every-push-activation-gap",
+        "plugin-cache-staleness-skills-run-from-cache-a-bx-push-without-a-version-bump-reaches-no-user"
+      ],
+      "first_seen": "2026-06-10",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "open-upstream-findings",
+      "text": "18 open upstream findings",
+      "source": "claude-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "bx-arch-shipped-without-meeting",
+      "text": "`/bx:arch` v2 shipped without meeting its own acceptance bar (S58)",
+      "source": "claude-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "bx-evolve-step-applied-branch",
+      "text": "`/bx:evolve` Step 3.4 has no `applied` branch (S58, found by running it)",
+      "source": "claude-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "v2-10-0-first-real-full",
+      "text": "v2.10.0's first real `--full` ran S61 (2026-10-20); the open phase of the Known Issues shrinker is still unexecuted",
+      "source": "claude-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "bx-save-full-defects-found",
+      "text": "Fix the two `/bx:save --full` defects found S61",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "revise-bx-evolve",
+      "text": "Revise `/bx:evolve`",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "doc-schema-fixture-verification",
+      "text": "Doc-schema v2 fixture verification",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "simplify-follow-up-move-part",
+      "text": "/simplify follow-up: move Part 7.7 rotation out of Part 7",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "resume-bx-webdesign-kaanarik-past",
+      "text": "Resume the `/bx:webdesign` kaanarik run past review",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "real-bx-seo-against-burakarik-com",
+      "text": "Real `/bx:seo` run against burakarik.com",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "dogfood-bx-health",
+      "text": "Dogfood `/bx:health`",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [
+        "bx-health-never-run-end-to-end"
+      ],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "plugin-packaging-leftovers",
+      "text": "S37 plugin-packaging leftovers",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [
+        "s37-leftovers-install-smoke-test-symlink-retirement-settings-skillbx-to-skillbx",
+        "s37-plugin-packaging-leftovers-install-smoke-test-symlink-retirement"
+      ],
+      "first_seen": "2026-08-24",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "bx-evolve-follow-ups",
+      "text": "`/bx:evolve` follow-ups",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "bx-seo-deferred-items",
+      "text": "`/bx:seo` deferred items",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "commit-regression-tests-concurrency",
+      "text": "Commit regression tests for S58's two concurrency fixes",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "sweep-remaining-exclusion-list",
+      "text": "Sweep the 13 remaining exclusion-list restatements",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    },
+    {
+      "id": "stitch-stitch-skills-plugin-installed",
+      "text": "Stitch MCP + stitch-skills plugin not yet installed",
+      "source": "claude-md",
+      "status": "retired",
+      "aliases": [
+        "stitch-mcp-stitch-skills-plugin-not-yet-installed"
+      ],
+      "first_seen": "2026-09-28",
+      "last_seen": "2026-09-28"
+    },
+    {
+      "id": "permission-prompts-allowed-tools-misses",
+      "text": "permission prompts when allowed-tools misses a command",
+      "source": "claude-md",
+      "status": "retired",
+      "aliases": [
+        "permission-prompts-when-allowed-tools-misses-a-command"
+      ],
+      "first_seen": "2026-06-10",
+      "last_seen": "2026-06-10"
+    },
+    {
+      "id": "claude-md-over-size-target",
+      "text": "CLAUDE.md over its size target with no path-scoped rules tier",
+      "source": "claude-md",
+      "status": "retired",
+      "aliases": [
+        "claude-md-over-its-size-target-with-no-path-scoped-rules-tier"
+      ],
+      "first_seen": "2026-10-20",
+      "last_seen": "2026-10-20"
+    }
+  ]
+}

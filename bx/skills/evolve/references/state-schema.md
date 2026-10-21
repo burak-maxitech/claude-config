@@ -191,12 +191,12 @@ The registry gives every pain point a stable id that survives rewording. `/bx:ev
 
 **Sources and leads.** A pain point is an entry of CLAUDE.md's `## Known Issues / Blockers` (entry and lead exactly as `save/references/mode-update.md` Part 1.7 defines them — a bold phrase or a top-level bullet; the `> Archived issues:` and `> Session state:` blocks are not entries) or a numbered item of `docs/STATUS.md`'s `## Next Steps`. The **lead** is the bold phrase when the item opens with one, otherwise the text before the first ` — ` or `. `. `text` is the lead with `**`, list markers and the trailing `:`/`.` removed.
 
-**Significant words** are the lead's lowercase alphanumeric tokens of four or more characters, excluding `this that with from into when then than they have been will skill skills still after before`. Code spans count as words (`start-claude.ps1` → `start-claude.ps1`).
+**Significant words** are the lead's lowercase tokens — runs of letters and digits joined by `-`, `.` or `:` — with at least four alphanumerics, possessive `'s` dropped, excluding `this that with from into when then than they have been will skill skills still after before`. Code spans count as words (`start-claude.ps1` → `start-claude.ps1`, `/bx:arch` → `bx:arch`).
 
 **Matching, in order, for each lead read this run:**
 1. An active or retired entry whose `text`'s significant words share at least three with the lead's first six significant words → that entry (update `text`, `source`, `last_seen`; set `active`).
 2. Else an entry one of whose `aliases`, read as words split on `-`, shares at least three with those six → that entry, same updates.
-3. Else a new entry: `id` = the first four significant words joined by `-` (truncate to 40 chars; on collision append `-2`, `-3`, …), `aliases: []`, `first_seen = last_seen = today`, `active`.
+3. Else a new entry: `id` = the first four significant words, each reduced to `[a-z0-9-]`, joined by `-`, dropping trailing words that would push the id past 40 chars (on collision append `-2`, `-3`, …); `aliases: []`, `first_seen = last_seen = today`, `active`.
 
 Two leads may not match the same entry in one run: if they do, the second lead gets a new entry and the orchestrator notes the near-duplicate in the report footer. After all leads are processed, every entry not matched this run becomes `retired` (its `last_seen` unchanged). Nothing is ever removed.
 
