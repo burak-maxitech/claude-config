@@ -1,0 +1,16 @@
+{
+  "today": "2026-10-20",
+  "capability_inventory": [
+    "bx:save/plugin-validate",
+    "bx:save/session-start-hook",
+    "bx:health/routing",
+    "bx:plan/task-tools",
+    "bx:review/report-findings",
+    "bx:review/output-format",
+    "bx:evolve/changelog-window",
+    "bx:skills/task-tracker-tools"
+  ],
+  "pain_point_list": [
+    "changelog window gap"
+  ]
+}

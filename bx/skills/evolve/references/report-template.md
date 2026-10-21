@@ -229,6 +229,10 @@ Findings headline math:
 Decision-log filters applied this run:
   4 rejected findings suppressed (source_content_hash unchanged — source not rewritten since rejection)
   1 rejected finding re-raised (source_content_hash changed → transitioned to open)
+  3 applied findings suppressed (source_content_hash unchanged — includes 1 sentinel entry whose live hash is now stored)
+  1 applied finding re-raised (source_content_hash changed → transitioned to open)
+  2 matched to a stored entry by source_url (capability string differed from the stored one)
+  1 same-source collapse at Step 3.2 (two lane findings merged before hashing)
 
 Watermark: changelog 2.1.145 → 2.1.170 · docs 2026-05-10 → 2026-06-09 · community 2026-05-10 → 2026-06-09
 
@@ -241,4 +245,4 @@ Discarded findings (per lane — each lane reports its own composition):
   community lane: 0 discarded
 ```
 
-The "Decision-log filters" line makes the suppression count explicit. If zero findings were suppressed, render "0 rejected findings suppressed." If a community lane was skipped, its watermark line shows the old value with a note: `community 2026-05-10 → (skipped — no advance)`.
+The "Decision-log filters" block makes every suppression and merge count explicit; render each of its six lines every run, with `0` where nothing happened (the sentinel clause then reads "includes 0 sentinel entries"), so the headline math is auditable against the lanes' raw finding counts. Singular/plural wording is free; the numbers and the line order are fixed. "Open entries written this run" counts new `open` entries plus entries that transitioned to `open` this run. If a community lane was skipped, its watermark line shows the old value with a note: `community 2026-05-10 → (skipped — no advance)`.

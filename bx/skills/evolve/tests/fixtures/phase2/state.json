@@ -1,0 +1,89 @@
+{
+  "watermark": {
+    "last_changelog_version": "2.1.299",
+    "docs_checked_at": "2026-10-01",
+    "community_checked_at": "2026-10-01",
+    "changelog_gap": null
+  },
+  "decisions": [
+    {
+      "finding_id": "4efe0c67387198f2c0e4b2b9c7d8481d04c93969",
+      "decision": "applied",
+      "date": "2026-10-01",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.300",
+      "affected_capability": "bx:save/plugin-validate",
+      "source_content_hash": "38e3b364fec43abb78b82413825fe26dcb5ddf96",
+      "class": "best_practice",
+      "title": "plugin validate --json for CI",
+      "note": "Part 8 step 2b uses --json",
+      "proposed_edit": "Part 8 step 2b: add `--json`",
+      "affected_files": [
+        "bx/skills/save/references/mode-update.md"
+      ],
+      "source_excerpt": "### 2.1.300\n- `claude plugin validate` gains `--json` output for CI.",
+      "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.300"
+    },
+    {
+      "finding_id": "964c2c3aed07162ef6745d638ca616553e8557aa",
+      "decision": "applied",
+      "date": "2026-10-01",
+      "source_url": "https://code.claude.com/docs/en/hooks",
+      "affected_capability": "bx:save/session-start-hook",
+      "source_content_hash": "8a51665fef47ad522114445a314c67127dd831db",
+      "class": "best_practice",
+      "title": "SessionStart matcher list",
+      "note": "hooks.json already lists startup|resume|clear",
+      "proposed_edit": "hooks.json matcher: startup|resume|clear",
+      "affected_files": [
+        "bx/hooks/hooks.json"
+      ],
+      "source_excerpt": "### SessionStart\nRuns when a session starts. Matchers: startup, resume, clear.",
+      "citation": "https://code.claude.com/docs/en/hooks#sessionstart"
+    },
+    {
+      "finding_id": "347faa868cce2ea27ad73391c0f43d820b30ed86",
+      "decision": "rejected",
+      "date": "2026-10-01",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.301",
+      "affected_capability": "bx:health/routing",
+      "source_content_hash": "6d8e103e322b3fbb6daeff52c8236360c98d35c1",
+      "class": "best_practice",
+      "title": "effort key on routing advisors",
+      "note": "health already declares effort: low",
+      "proposed_edit": "add effort: low",
+      "affected_files": [
+        "bx/skills/health/SKILL.md"
+      ],
+      "source_excerpt": "### 2.1.301\n- `/bx:health`-style routing advisors should use the `effort` key.",
+      "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.301"
+    },
+    {
+      "finding_id": "9b7aa21b2ced8e97bf6340a0667d60e0af42a803",
+      "decision": "applied",
+      "date": "2026-10-01",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.302",
+      "affected_capability": "bx:plan/task-tools",
+      "source_content_hash": "0000000000000000000000000000000000000000",
+      "class": "breakage",
+      "title": "Task tools removed from default toolset",
+      "note": "task-tools.md owns the degraded path",
+      "proposed_edit": "cite task-tools.md",
+      "affected_files": [
+        "bx/skills/plan/SKILL.md"
+      ],
+      "source_excerpt": null,
+      "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.302"
+    },
+    {
+      "finding_id": "e1e67d4317b31981a1eff15305968c62c9f04ce0",
+      "decision": "applied",
+      "date": "2026-08-24",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.233",
+      "affected_capability": "bx:skills/task-tracker-tools",
+      "source_content_hash": "f461581d604ffd0eb107681a9f0ddc42bbca1c17",
+      "class": "breakage",
+      "title": "Task tools left the default toolset (v2.1.233)",
+      "note": "task-tools.md created S58"
+    }
+  ]
+}

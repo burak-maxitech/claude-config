@@ -230,6 +230,15 @@ A `deferred` entry re-surfaces in every report badged `[deferred <original date>
 
 Any later verdict (applied/rejected) overwrites the `deferred` entry per Rule 2 — the entry transitions fully to the new verdict.
 
+### Rule 6: `applied` findings use the same trigger-based re-raise as `rejected`
+
+An `applied` entry is never proactively re-fetched (Rule 3's reasoning applies unchanged). When a current run's lane re-emits a finding whose `finding_id` — or, failing an exact match, whose `source_url` plus overlapping `affected_files` (`SKILL.md` Step 3.4) — matches a stored `applied` entry, compare hashes:
+
+- **Hash unchanged, or stored hash is the sentinel:** suppress; footer counts "N applied (unchanged, suppressed)". Refresh what is missing from the live finding: a sentinel hash becomes the live hash (so the next comparison is real), a null `source_excerpt` becomes the live excerpt, and a legacy 9-key entry gains `proposed_edit`, `affected_files`, `source_excerpt`, `citation`. `decision`, `date` and `note` are untouched. These refreshes are Checkpoint-1 writes.
+- **Hash changed:** surface badged `[re-raised — source changed since application]`. Update the stored entry: `decision` → `open`, `source_content_hash` → new hash, `date` → today, `note` → `"was applied: "` + the previous note, `title` → the live finding's one-line `upstream_delta` (the new text is why it re-raised), and refresh `proposed_edit`, `affected_files`, `source_excerpt`, `citation` from the live finding. `class` keeps its stored value.
+
+**Why:** the docs lane is stateless and re-reads every allowlisted page on every run, so every applied docs finding re-emits forever. Without this rule those re-emits land in no branch at all — the pre-2.11.0 defect that let a v2.1.233 finding re-enter the log beside its own applied twin under a different capability string.
+
 ---
 
 ## Update mechanics
@@ -238,7 +247,7 @@ The orchestrator rewrites the entire file at exactly three sanctioned checkpoint
 
 **Three-checkpoint rule:**
 
-1. **Checkpoint 1 — end of Step 4** (new `open` entries, re-raise transitions, and Rule-5 deferred hash updates): written before the report is rendered so report and state agree. This is the only *decision-log* write in default-mode runs (the Checkpoint-3 watermark write still happens at Step 6).
+1. **Checkpoint 1 — end of Step 4** (new `open` entries, re-raise transitions, Rule-5 deferred hash updates, Rule-6 refreshes of applied entries, and the pain-registry write): written before the report is rendered so report and state agree. This is the only *decision-log* write in default-mode runs (the Checkpoint-3 watermark write still happens at Step 6).
 2. **Checkpoint 2 — end of the `--fix` pass, OR immediately on abort**: one write covering all verdicts of the pass. Record verdicts in-context as the pass proceeds; do not write after each verdict.
 3. **Checkpoint 3 — Step 6 watermark advance**: the watermark-field update write. May be merged with the nearest prior checkpoint — Checkpoint 2 in `--fix` runs, or Checkpoint 1 in default runs (lane statuses are known by Step 3, so the watermark values are already final at the CP1 write) — write both together in a single Write call.
 
@@ -246,7 +255,7 @@ The orchestrator rewrites the entire file at exactly three sanctioned checkpoint
 
 1. **Read** `docs/upstream/state.json` via the Read tool at the start of the run (Step 0). Deserialize into an in-context object.
 2. **Modify** the in-context object as findings are evaluated and verdicts recorded throughout the run. Do not write between checkpoints.
-3. **Validate** the modified object before writing: confirm the `decisions` array has no duplicate `finding_id` values; confirm all required fields are present on every entry in schema order; confirm `decision` values are in the allowed enum set; confirm `finding_id` and `source_content_hash` are 40 lowercase hex characters (the sentinel counts; `""` does not); confirm each `finding_id` equals `sha1(source_url|affected_capability)`; confirm every `bx:pain/<id>` capability names an `id` (not an alias) in `docs/upstream/pain-points.json`. These checks are mechanical: run `python -I bx/skills/evolve/tests/check-state.py .` after the Write and treat a non-zero exit as a validation failure to report (the pre-write in-context check and the post-write script must agree). **On ANY validation failure, do NOT write the file.** Report the validation failure in the run output and leave `state.json` untouched so the previous valid state is preserved.
+3. **Validate** the modified object before writing: confirm the `decisions` array has no duplicate `finding_id` values; confirm all required fields are present on every entry in schema order (legacy 9-key entries are exempt from the four 2.11.0 fields — they warn, never fail); confirm `decision` values are in the allowed enum set; confirm `finding_id` and `source_content_hash` are 40 lowercase hex characters (the sentinel counts; `""` does not); confirm each `finding_id` equals `sha1(source_url|affected_capability)`; confirm every `bx:pain/<id>` capability names an `id` (not an alias) in `docs/upstream/pain-points.json`. These checks are mechanical: run `python -I bx/skills/evolve/tests/check-state.py .` after the Write and treat a non-zero exit as a validation failure to report (the pre-write in-context check and the post-write script must agree). **On ANY validation failure, do NOT write the file.** Report the validation failure in the run output and leave `state.json` untouched so the previous valid state is preserved.
 4. **Write** the validated object back to `docs/upstream/state.json` via the Write tool, serialized as pretty-printed JSON (2-space indent, keys in schema order). The Write tool is an atomic overwrite — no temp file needed.
 
 **Why no shell-based writes:** shell state does not persist across Bash tool calls in Claude Code. A `jq` command that reads from a file in one Bash call and writes in another has no guaranteed consistency if the run interleaves tool calls. The Read-modify-in-context-Write pattern keeps the entire state transition inside a single logical unit the orchestrator controls, with no shell state assumptions.

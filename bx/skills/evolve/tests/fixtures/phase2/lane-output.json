@@ -1,0 +1,164 @@
+{
+  "changelog": {
+    "lane_status": "ok",
+    "releases_scanned": 6,
+    "newest_version_seen": "2.1.305",
+    "findings": [
+      {
+        "finding_id": null,
+        "class": "best_practice",
+        "tier": "official",
+        "severity": "medium",
+        "certainty": 0.8,
+        "affected_files": [
+          "bx/skills/save/references/mode-update.md"
+        ],
+        "upstream_delta": "plugin validate --json",
+        "proposed_edit": "use --json",
+        "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.300",
+        "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.300",
+        "affected_capability": "bx:save/plugin-validate",
+        "source_excerpt": "### 2.1.300\n- `claude plugin validate` gains `--json` output for CI."
+      },
+      {
+        "finding_id": null,
+        "class": "best_practice",
+        "tier": "official",
+        "severity": "low",
+        "certainty": 0.7,
+        "affected_files": [
+          "bx/skills/health/SKILL.md"
+        ],
+        "upstream_delta": "effort key",
+        "proposed_edit": "add effort: low",
+        "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.301",
+        "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.301",
+        "affected_capability": "bx:health/routing",
+        "source_excerpt": "### 2.1.301\n- `/bx:health`-style routing advisors should use the `effort` key."
+      },
+      {
+        "finding_id": null,
+        "class": "breakage",
+        "tier": "official",
+        "severity": "high",
+        "certainty": 1.0,
+        "affected_files": [
+          "bx/skills/plan/SKILL.md"
+        ],
+        "upstream_delta": "Task tools removed",
+        "proposed_edit": "cite task-tools.md",
+        "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.302",
+        "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.302",
+        "affected_capability": "bx:plan/task-tools",
+        "source_excerpt": "### 2.1.302\n- TaskCreate/TaskList removed from the default toolset on current models."
+      },
+      {
+        "finding_id": null,
+        "class": "opportunity",
+        "tier": "official",
+        "severity": "medium",
+        "certainty": 0.6,
+        "affected_files": [
+          "bx/skills/review/SKILL.md",
+          "README.md"
+        ],
+        "upstream_delta": "ReportFindings tool",
+        "proposed_edit": "offer ReportFindings output",
+        "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.303",
+        "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.303",
+        "affected_capability": "bx:review/report-findings",
+        "source_excerpt": "### 2.1.303\n- New ReportFindings tool."
+      },
+      {
+        "finding_id": null,
+        "class": "breakage",
+        "tier": "official",
+        "severity": "high",
+        "certainty": 0.9,
+        "affected_files": [
+          "bx/skills/evolve/references/scan-changelog.md"
+        ],
+        "upstream_delta": "gh api releases pagination default changed",
+        "proposed_edit": "paginate",
+        "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.304",
+        "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.304",
+        "affected_capability": "bx:evolve/changelog-window",
+        "source_excerpt": "### 2.1.304\n- Releases API pagination."
+      },
+      {
+        "finding_id": null,
+        "class": "breakage",
+        "tier": "official",
+        "severity": "medium",
+        "certainty": 0.5,
+        "affected_files": [
+          "bx/skills/evolve/references/scan-changelog.md",
+          "bx/skills/evolve/SKILL.md"
+        ],
+        "upstream_delta": "window gap: the pagination default change breaks the 50-release assumption",
+        "proposed_edit": "record a gap",
+        "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.304",
+        "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.304",
+        "affected_capability": "bx:pain/changelog-window-gap",
+        "source_excerpt": "### 2.1.304\n- Releases API pagination."
+      },
+      {
+        "finding_id": null,
+        "class": "breakage",
+        "tier": "official",
+        "severity": "high",
+        "certainty": 1.0,
+        "affected_files": [
+          "bx/skills/save/references/task-tools.md"
+        ],
+        "upstream_delta": "Task tools not default",
+        "proposed_edit": "document degraded path",
+        "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.233",
+        "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.233",
+        "affected_capability": "bx:skills/task-tracker-tools-v2",
+        "source_excerpt": "### 2.1.233\n- Task tools are no longer in the default toolset."
+      }
+    ]
+  },
+  "docs": {
+    "lane_status": "ok",
+    "findings": [
+      {
+        "finding_id": null,
+        "class": "best_practice",
+        "tier": "official",
+        "severity": "medium",
+        "certainty": 0.8,
+        "affected_files": [
+          "bx/hooks/hooks.json"
+        ],
+        "upstream_delta": "SessionStart gained a compact matcher",
+        "proposed_edit": "matcher: startup|resume|clear|compact",
+        "citation": "https://code.claude.com/docs/en/hooks#sessionstart",
+        "source_url": "https://code.claude.com/docs/en/hooks",
+        "affected_capability": "bx:save/session-start-hook",
+        "source_excerpt": "### SessionStart\nRuns when a session starts. Matchers: startup, resume, clear, compact."
+      },
+      {
+        "finding_id": null,
+        "class": "opportunity",
+        "tier": "official",
+        "severity": "low",
+        "certainty": 0.5,
+        "affected_files": [
+          "bx/skills/review/SKILL.md"
+        ],
+        "upstream_delta": "code-review doc describes host-native findings",
+        "proposed_edit": "mention in ladder",
+        "citation": "https://code.claude.com/docs/en/code-review",
+        "source_url": "https://code.claude.com/docs/en/code-review",
+        "affected_capability": "bx:review/output-format",
+        "source_excerpt": "## Findings\nRendered natively."
+      }
+    ]
+  },
+  "community": {
+    "lane_status": "skipped",
+    "findings": []
+  }
+}
