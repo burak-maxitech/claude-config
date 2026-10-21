@@ -105,7 +105,7 @@ For UPDATE mode the change report is assembled from the `save-writer` subagent's
 - [ ] Size-pressure rollup (Part 7) ran when CLAUDE.md exceeded 12k or docs/STATUS.md exceeded 20k post-Parts 5/6 (checked independently, per file), or skipped silently when both were under threshold — except 7.7 archive rotation, which still runs on --full (its trigger is archive size, not live-file size)
 - [ ] (Fast path) `save-writer` subagent was dispatched with the update packet and returned a change report — no full-file contents echoed in the response
 - [ ] (Fast path) README.md / docs/*.md / rollups were NOT touched (those are `--full` only) — drift warnings surfaced instead
-- [ ] (`--full` only) README sync, docs/*.md sync, and rollups ran on the orchestrator after the writer returned
+- [ ] (`--full` only) README sync, docs/*.md sync, and rollups ran on the orchestrator **before** the writer was dispatched, and the session entry carries a `Full sweep:` bullet when any of them changed a file
 - [ ] README.md matches current features
 - [ ] README.md links to actual docs/ files
 - [ ] Relevant docs/*.md files updated

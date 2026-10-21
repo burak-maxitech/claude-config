@@ -269,3 +269,6 @@
 - [x] `/bx:evolve` revision shipped as bx 2.11.0 — stored edits, applied branch, pain registry, paginated changelog, fix-eligible carry-forwards, allowlist candidates, check-state validator - bx/skills/evolve/, bx/skills/evolve/tests/, .github/workflows/plugin-version.yml, CHANGELOG.md
 - [x] 18 carried-forward upstream findings hand-triaged (10 rejected, 1 applied, 5 deferred, 2 kept); state.json migrated to the 2.11.0 schema; pain registry bootstrapped - docs/upstream/state.json, docs/upstream/pain-points.json
 - [x] First real `/bx:evolve` delta + `--fix` on 2.11.0: 8 findings applied, 7 doc pages pinned, agent `tools:` specifier enforcement disproved live - README.md, workflow.md, bx/skills/webdesign/references/, bx/skills/evolve/references/scan-docs.md, bx/scripts/session-start-context.sh, docs/architecture.md
+- [x] S62: `/bx:save --full` sweep-before-writer ordering + saving-based open-phase rule (bx 2.12.0)
+- [x] S62: `/bx:evolve` lane-freshness skip, edit-shape re-grep, pain-id match (2.12.0)
+- [x] S62: `lane-contract.md`, docs page-hash probe + `watermark.docs_pages`, pinned `capabilities.json`, community discovery feed (2.12.0)

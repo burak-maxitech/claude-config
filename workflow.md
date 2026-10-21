@@ -541,12 +541,12 @@ No flags. No arguments. Always read-only.
 /bx:evolve                 # Research upstream changes since watermark → report with citations
 /bx:evolve --fix           # Apply approved findings behind per-finding diff gates
 /bx:evolve --full          # Ignore the watermark — from-scratch audit (the S33 treatment)
-/bx:evolve --no-community  # Official-only fast pass (skips the advisory community lane)
+/bx:evolve --no-community  # Skip the discovery search for unpinned official pages
 ```
 
 **Flow:**
 1. Reads `docs/upstream/state.json` for the committed watermark date.
-2. Dispatches three parallel Sonnet subagents (`upstream-changelog`, `upstream-docs`, `upstream-community`) to research Anthropic changes since the watermark.
+2. Dispatches up to three parallel Sonnet subagents (`upstream-changelog`, `upstream-docs`, `upstream-community`) to research Anthropic changes since the watermark — skipping any lane whose watermark already equals its head, and sending the docs lane only the pages whose content hash changed.
 3. Gates each finding against the bx plugin's capability inventory — surfaces gaps, not noise.
 4. Renders a cited report of actionable findings (new features to adopt, deprecated patterns to retire, docs drift to fix).
 5. `--fix` walks you through each finding with a per-finding diff preview before applying.

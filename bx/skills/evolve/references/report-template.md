@@ -13,7 +13,7 @@ Normal case:
 ```
 ## /bx:evolve — upstream delta report
 
-**Breakage: N · Best-practice: M · Opportunities: K · Advisory (community): J**
+**Breakage: N · Best-practice: M · Opportunities: K · Discovery candidates: J**
 ```
 
 Numbers from Step 3 consolidation. All-zero special case — render instead:
@@ -47,14 +47,14 @@ One line per lane. Render even if a lane was skipped or unavailable.
 |-------------|------------|----------------------------------------|
 | changelog   | ok         | 2.1.145 → 2.1.170 (25 releases)       |
 | docs        | ok         | 2026-05-10 → 2026-06-09               |
-| community   | degraded   | 2026-05-10 → 2026-06-09 (2/5 sources) |
+| community   | degraded   | 2026-05-10 → 2026-06-09 (2/5 fetched, 1 candidate) |
 ```
 
-**Lane statuses:** `ok` (ran fully), `degraded` (ran partially — network errors, partial results), `skipped` (user passed `--no-community`), `unavailable` (tool or auth failure prevented the lane from running).
+**Lane statuses:** `ok` (ran fully), `degraded` (ran partially — network errors, partial results), `skipped` (user passed `--no-community`), `unavailable` (tool or auth failure prevented the lane from running), `current` (not dispatched — SKILL.md Step 1.5 found the watermark already equal to the lane's head).
 
 For the changelog lane, the "Range covered" shows `<old watermark version> → <new version>` and the count of releases processed this run, then ` · <pages_fetched> page(s)`. If `last_changelog_version` was null (first run), render the old end as "beginning". When the lane filled part of a recorded gap this run, render the count as `(<total> releases: <delta> new + <gap_fill_scanned> gap fill)`. When the lane reported a gap this run (new or still open), append ` (gap: <after> → <before> unscanned)` to the cell; when the lane closed a gap this run, append ` (gap <after> → <before> closed)`; when the lane's scan_note says the anchor tag was not present, append ` (anchor tag absent; sliced at <version>)` so the old end of the range is not mistaken for a live tag. For a skipped or unavailable lane, render `—`.
 
-For docs and community lanes, the "Range covered" shows `<old *_checked_at> → today`. If the old timestamp was null (first run), render the old end as "first run". For a skipped or unavailable lane, render `—`.
+For docs and community lanes, the "Range covered" shows `<old *_checked_at> → today`. If the old timestamp was null (first run), render the old end as "first run". For a skipped or unavailable lane, render `—`. For a current lane, render `— (watermark = head: <value>)`, e.g. `— (watermark = head: 2.1.306)`, `— (watermark = head: 22/22 pages unchanged, inventory unchanged)` for docs, or `— (watermark = head: checked today)` for community. For a docs lane that ran, append the probe's numbers to the range: `2026-10-20 → today (3 of 22 pages scanned: 2 changed, 1 new; 19 unchanged)` — or `(22 of 22 pages: inventory changed)` when the inventory forced a full read.
 
 **Unavailable lane status detail:** when a lane's status is `unavailable`, include the sentinel's `upstream_delta` field (the verbatim errors from the failed fetch/auth attempts) as the status detail in that lane's row. This is the one place sentinel content renders — the sentinel is never written to the decision log and never appears in Sections 2–4.
 
@@ -67,7 +67,7 @@ Below the table, one line per release processed by the changelog lane. These lin
 - ...
 ```
 
-If the changelog lane was skipped or unavailable, render: "Changelog entries: (lane unavailable — watermark not advanced)".
+If the changelog lane was skipped or unavailable, render: "Changelog entries: (lane unavailable — watermark not advanced)". If it was current, render: "Changelog entries: none — no release since <watermark>".
 
 ---
 
@@ -149,38 +149,27 @@ Empty state: render the header row plus one row: `| — | — | — | None — n
 
 ---
 
-## Section 3 — Advisory (Community)
+## Section 3 — Discovery (official sources not yet pinned)
 
-> **[advisory — community source, not fix-eligible]**
-
-Advisory findings are informational only. They use "consider" phrasing. They are never offered to `--fix` mode (even if the user passes `--fix`). They never appear in Section 2's breakage/best_practice/opportunity tables.
+Since bx 2.12.0 the community lane emits no findings; it returns `allowlist_candidates` — official pages and `anthropics/*` maintainer posts that own a contract bx depends on and are not on `scan-docs.md`'s pinned allowlist. This section renders those, merged with the candidates the other lanes and the orchestrator reported (SKILL.md Step 3.1 de-duplicates by canonical URL). Each is offered as a new allowlist row in `--fix`; none is a finding and none is written to the decision log.
 
 ```
-## Advisory (community)
+## Discovery (official sources not yet pinned)
 
-> [advisory — community source, not fix-eligible]
-
-| Rank | Title                                              | Cert | Source                  |
-|------|----------------------------------------------------|------|-------------------------|
-| 1    | Consider using `--dangerously-skip-permissions`... | 0.55 | community.anthropic.com |
+| # | URL                                               | Owns                          | bx depends via                 | Found by  |
+|---|---------------------------------------------------|-------------------------------|--------------------------------|-----------|
+| 1 | https://code.claude.com/docs/en/statusline        | statusLine settings contract  | bx:docs/builtin:color          | community |
+| 2 | https://code.claude.com/docs/en/plugins/testing   | plugin eval suite format      | bx:pain/plugin-eval-design     | changelog |
 ```
 
-Below the table, a brief note per finding (one or two sentences, "consider" phrasing):
-
-```
-**#1 — Consider evaluating `--dangerously-skip-permissions` for CI**
-
-Community discussion reports that CI runs using `--dangerously-skip-permissions` eliminate
-permission prompts in fully-automated contexts. Consider whether your `/bx:save --silent` runs
-in CI would benefit from this flag, given that `--silent` already resolves prompts to safe
-defaults in interactive sessions.
-```
+Below the table, one line per row: the candidate's one-line reason as the lane wrote it (what changed or what the page defines).
 
 Empty states:
 
-- Community lane ran but found nothing: render "None — community lane found nothing relevant to the plugin this run."
-- Community lane was skipped: render "None — community lane skipped via `--no-community`."
-- Community lane was unavailable: render "None — community lane unavailable this run (tool or auth failure). Re-run without `--no-community` to retry."
+- Every lane ran and no candidate qualified: render "None — no unpinned official source found this run."
+- Community lane was skipped: render "None from discovery — community lane skipped via `--no-community`." (candidates from the official lanes, if any, still render above this line).
+- Community lane was unavailable: render "None from discovery — community lane unavailable this run (tool or auth failure). Re-run without `--no-community` to retry."
+- Community lane was current: render "None from discovery — community lane already checked today; not re-run."
 
 ---
 
@@ -220,13 +209,13 @@ Render as a horizontal-rule-separated block at the end of the report. The math i
 Lane status:
 - changelog:   ok        (25 releases fetched, 25 processed)
 - docs:        ok        (4 pages fetched, 4 processed)
-- community:   degraded  (3 searches run, 2 pages fetched, 1 fetch failed)
+- community:   degraded  (3 searches run, 2 pages fetched, 1 fetch failed, 1 candidate)
 
 Findings headline math:
   Breakage:      2 (after suppression)
   Best-practice: 3 (after suppression)
   Opportunities: 1 (after suppression)
-  Advisory:      1
+  Discovery candidates: 1 (Section 3; not findings)
 
 Decision-log filters applied this run:
   4 rejected findings suppressed (source_content_hash unchanged — source not rewritten since rejection)
@@ -244,7 +233,9 @@ Open entries written this run: 7
 Discarded findings (per lane — each lane reports its own composition):
   changelog lane: 3 discarded
   docs lane:      1 discarded
-  community lane: 0 discarded
+  community lane: 0 discarded (candidates failing Step 4: 2)
+
+Inventory: 434 pinned capabilities · no drift   # or: drift +3 −1 — regenerate with build-capabilities.py --write (offered in --fix)
 
 Allowlist candidates (official pages not on scan-docs.md's pinned list — offered as edits in --fix):
   https://code.claude.com/docs/en/plugin-evals — owns the `claude plugin eval` suite format (changelog lane, v2.1.269)

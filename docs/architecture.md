@@ -14,7 +14,7 @@ claude-config/                         # marketplace repo
 │   ├── hooks/hooks.json               # SessionStart project-orientation injection
 │   ├── scripts/                       # session-start-context.sh (bash; runs on Windows via Git Bash — the .ps1 twin was removed S59)
 │   └── skills/                        # 11 skills (SKILL.md + references/) → /bx:<name>
-│       ├── arch/    clean/   evolve/  health/
+│       ├── arch/    clean/   evolve/  health/   # evolve also: capabilities.json (pinned inventory), scripts/, tests/ (2.12.0)
 │       ├── plan/    resume/  review/
 │       ├── save/    seo/     tests/   # save = /bx:save; save/tests/ holds the doc-schema suite
 │       └── webdesign/                  # /bx:webdesign — visual re-skin via Stitch MCP

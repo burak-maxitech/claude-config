@@ -3,7 +3,9 @@
     "last_changelog_version": "2.1.306",
     "docs_checked_at": "2026-10-20",
     "community_checked_at": "2026-10-20",
-    "changelog_gap": null
+    "changelog_gap": null,
+    "docs_pages": {},
+    "inventory_hash": null
   },
   "decisions": [
     {

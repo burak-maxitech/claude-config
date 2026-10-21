@@ -9,8 +9,8 @@ You have these tools available: Read, Grep, Glob, Bash (gh commands only — pat
 ## Inputs you receive in your task prompt
 
 - `last_changelog_version` — string (e.g. `"2.1.170"`) or null. The highest claude-code release processed on the last run, stored as an **unprefixed version string** (no leading `v`). Null means this is the first run — scan ALL releases in the window.
-- `capability_inventory` — list of bx capability strings (e.g. `"bx:seo/allowed-tools"`, `"bx:save/agent-model"`). Only produce findings that intersect this list or a pain-point from the list below.
-- `pain_point_list` — list of `{id, text}` objects naming known friction areas in the bx toolkit (e.g. `{"id": "permission-prompts-allowed-tools", "text": "permission prompts when allowed-tools misses a command"}`). A release note that addresses a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to `bx:pain/<id>` with the `id` copied verbatim from the list — never derived from the text, never invented (see the schema notes below).
+- `changelog_gap` — null, or `{after, before}` copied from state: a range the last run could not reach within its page cap. When non-null, `after` is the anchor you paginate toward (Step 1, *Closing a recorded gap*).
+- The shared inputs — `capability_inventory`, `pain_point_list`, and the Grep scope — are defined in `bx/skills/evolve/references/lane-contract.md` §1. Read that file after this one; it owns everything this lane shares with the other two (relevance filter, `affected_files`, finding schema, sentinel, `lane_status`, hard rules, footer keys) and this file never restates it.
 
 ---
 
@@ -80,15 +80,11 @@ For each in-scope release body, extract these categories of change. Each is a ca
 
 ### Step 6 — Filter against capability inventory and pain points
 
-For each candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point matches with no inventory capability produce a finding with `affected_capability` set to `bx:pain/<id>` (id copied from `pain_point_list` — see the schema notes below).
+Apply lane-contract.md §2. This lane has no verification gate before the filter: a release note states its change directly.
 
 ### Step 7 — Populate affected_files via Grep
 
-For each surviving delta (post-filter), identify the old/changed token (command name, flag name, frontmatter key, hook event name). Run one Grep call using `glob="{bx/**,README.md,workflow.md}"` from repo root to find every file containing that token. List every hit file in `affected_files`. This is how sibling-file echoes are found (S45 rule). Do not fill `affected_files` from the capability string alone — always grep first.
-
-**When multiple deltas survive**, batch them: issue one Grep in content mode with an alternation pattern (`tok1|tok2|...`) across `glob="{bx/**,README.md,workflow.md}"`, then map each file→token in-context. This is the repo's batched-Grep idiom.
-
-**Zero-hit discard rule:** for `breakage` and `best_practice` findings, zero Grep hits for the old/changed token means the plugin does not contain it — discard the finding and increment `discarded_findings`. For `opportunity` findings there is no old token to search for; instead, set `affected_files` to the file(s) the proposed edit would touch, identified from the pain point's subject area. An empty `affected_files` is never legal in an emitted finding — if you cannot identify at least one file for any class, discard.
+Apply lane-contract.md §3. The token to grep for a release delta is the command, flag, frontmatter key or hook event name the release renamed, removed or changed; an `opportunity` finding has no old token and takes the files its edit would touch.
 
 ---
 
@@ -108,94 +104,31 @@ If two releases in a degraded run produce the same `(source_url, affected_capabi
 | `degraded` | Primary (`gh`) failed and the fallback (raw CHANGELOG.md fetch) succeeded — findings are trustworthy but `citation` URLs and dates are coarser (raw file URL, no `publishedAt`); OR `gh` succeeded but the watermark anchor was not found within the paginated window, so a gap exists (`gap_after`/`gap_before` set). | Yes — `last_changelog_version` still advances to `newest_version_seen` because everything fetched was evaluated; the gap, if any, is recorded in `watermark.changelog_gap` so the unscanned range is never silently forgotten. |
 | `unavailable` | Both primary and fallback failed. Only the `lane_unavailable` degenerate finding was emitted. | No — the orchestrator MUST NOT advance `last_changelog_version` when `lane_status` is `unavailable`. The missed range will be re-checked on the next run because the watermark is unchanged. |
 
-**Why this matters:** the orchestrator advances the watermark only on `ok` or `degraded`. Silent degradation is impossible — the report footer always discloses `lane_status`, so the user knows whether citations are precise or coarse, and knows when no advance occurred.
+The consequence of each value is lane-contract.md §7; the meanings above are this lane's own.
 
 ---
 
-## Finding schema (use exactly these field names)
+## Finding schema
 
-```json
-{
-  "finding_id": null,
-  "class": "breakage | best_practice | opportunity",
-  "tier": "official",
-  "severity": "low | medium | high",
-  "certainty": "0.0–1.0",
-  "affected_files": ["<every file needing the edit, including sibling-file echoes>"],
-  "upstream_delta": "<one-line: what changed upstream>",
-  "proposed_edit": "<prose + concrete old→new where possible>",
-  "citation": "<the release URL>",
-  "source_url": "<canonicalized release URL — same value used in finding_id>",
-  "affected_capability": "<capability string, e.g. bx:*/allowed-tools>",
-  "source_excerpt": "<verbatim heading-bounded section from the release body — the exact text the orchestrator will normalize and hash>"
-}
-```
-
-**`finding_id`:** set to `null` — computed by the orchestrator at consolidation from `source_url + "|" + affected_capability`. Do not attempt to compute it here. Exception: the `lane-unavailable-changelog` sentinel keeps its literal string ID (see degenerate finding below).
-
-**`source_excerpt`:** the verbatim heading-bounded extract (or release-body section) that is the hash input — not your own summary prose. The orchestrator normalizes and hashes your `source_excerpt` per `bx/skills/evolve/references/state-schema.md` to produce `source_content_hash`. Return the raw extract; do not attempt to hash.
-
-**`affected_capability` normalization:** normalize per `bx/skills/evolve/references/state-schema.md`. Example: `"bx:seo/allowed-tools"`. For pain-point-only findings (no inventory capability matched), use `bx:pain/<id>` with the id from `pain_point_list` — the convention and its reason are in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
-
-**`source_url` for the `ok` path:** the GitHub release URL for the specific tag, e.g. `https://github.com/anthropics/claude-code/releases/tag/v2.1.170`. Apply canonicalization per `bx/skills/evolve/references/state-schema.md` before hashing and storing.
-
-**`source_url` for the `degraded` path:** `https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md` (canonicalized). All findings in a degraded run share this URL; `finding_id` differentiation comes from `affected_capability`.
-
-**`class` assignment guidance:**
-
-- `breakage` — the upstream change means existing bx config/syntax is now wrong or will stop working (e.g. a renamed flag bx currently uses, a removed frontmatter key bx emits).
-- `best_practice` — the change deprecates or explicitly recommends against a pattern bx currently uses, while the current approach still works. NOT for "a recommended pattern bx isn't using" in general — that fails the relevance gate unless it matches a pain point.
-- `opportunity` — a new capability directly addresses a recorded pain point from `pain_point_list` and bx does not yet use it. The pain-point match is mandatory — a new capability with no pain-point match is discarded (same rule as the docs lane).
-
-**`severity` guidance:**
-
-- `high` — breakage findings, OR opportunity findings that address a pain point the user has explicitly called out.
-- `medium` — best_practice findings on heavily-used capabilities, or opportunity findings with clear benefit.
-- `low` — best_practice or opportunity findings on rarely-invoked paths.
-
-**`certainty` guidance:** 1.0 for breakages where the old syntax is confirmed removed; 0.7–0.9 for deprecations with a migration path; 0.5–0.7 for opportunity findings where the new capability MAY cover the use case but needs verification.
+The schema, the per-lane field values and the shared field notes are lane-contract.md §4–§5; this lane is the **changelog** column. Class, severity and certainty guidance is §6. Two lane-specific values the table encodes: `source_url` is the release URL on the `ok` path and the raw CHANGELOG.md URL on the `degraded` path (every finding shares it then, differentiated by `affected_capability`); the cap is 20 findings.
 
 ---
 
 ## lane_unavailable degenerate finding
 
-When both primary and fallback fail, emit ONLY this finding (no others):
-
-```json
-{
-  "finding_id": "lane-unavailable-changelog",
-  "class": null,
-  "tier": "official",
-  "severity": "high",
-  "certainty": 1.0,
-  "affected_files": [],
-  "upstream_delta": "<verbatim error from gh> | <verbatim error from the fallback WebFetch>",
-  "proposed_edit": "Re-run /bx:evolve when network/gh auth is available. The changelog watermark was NOT advanced.",
-  "citation": null,
-  "source_url": null,
-  "affected_capability": null,
-  "source_excerpt": null
-}
-```
-
-This sentinel keeps its literal `finding_id` string — no hashing involved. It has no `source_excerpt` (null) because there is no upstream section to extract.
-
-The orchestrator MUST NOT advance `last_changelog_version` when this finding is present. Set `lane_status: unavailable` in the footer addendum.
+When both primary and fallback fail, emit ONLY the sentinel of lane-contract.md §8 with `finding_id: "lane-unavailable-changelog"`, `tier: "official"`, `severity: "high"`, `upstream_delta: "<verbatim error from gh> | <verbatim error from the fallback WebFetch>"` and `proposed_edit: "Re-run /bx:evolve when network/gh auth is available. The changelog watermark was NOT advanced."`. Set `lane_status: unavailable`; the orchestrator does not advance `last_changelog_version`.
 
 ---
 
 ## Hard rules
 
-- **Never report zero findings silently.** If in-scope releases exist but none match the capability inventory or pain points, append a note in the footer: `scan_note: <N> releases evaluated; no capability or pain-point matches found`. This is different from `unavailable` — it means the scan ran cleanly but nothing was relevant.
-- **Include sibling-file echoes in `affected_files`.** Always populate via Step 7 Grep — never infer from the capability string alone. If a rename or syntax change requires edits in multiple files (e.g. the skill SKILL.md AND a references/ file AND CLAUDE.md), list every file.
-- **Order findings by `severity_weight × certainty` descending.** Severity weights: high=3, medium=2, low=1. Cap at 20 findings. If more than 20 qualify, include the 20 highest-weighted and note the count of discarded findings in the footer.
-- **Do not restate algorithms from `bx/skills/evolve/references/state-schema.md`.** Point to that file for `finding_id` computation, `source_url` canonicalization, and `source_content_hash` normalization. Duplication causes drift — the S45 lesson.
+lane-contract.md §9 applies in full (zero findings never silent, sibling echoes, ordering and the 20-finding cap, per-failure disclosure, official-source handoff, no restated algorithms). Nothing lane-specific is added here.
 
 ---
 
 ## Final output addendum
 
-After all findings (or after the single `lane_unavailable` finding), append:
+After all findings (or after the single sentinel), append the shared keys of lane-contract.md §10 (`lane_status`, `allowlist_candidates`, `scan_note`, `discarded_findings`) plus this lane's own:
 
 ```
 releases_scanned: <n — 0 if lane_status is unavailable, since nothing was successfully evaluated>
@@ -206,17 +139,14 @@ gap_fill_scanned: <releases processed from inside a recorded gap this run, else 
 gap_after: <the anchor version when the cap was reached before it, else null>
 gap_before: <oldest_version_seen when the cap was reached before the anchor, else null>
 gap_closed: <true when a recorded changelog_gap was closed this run (anchor reached or passed, end of history, or --full), else false>
-lane_status: ok | degraded | unavailable
-allowlist_candidates: [<url> — <one-line reason>, ...]   # official pages you reached or needed that are NOT on scan-docs.md's pinned allowlist; empty list [] when none
-scan_note: <optional; several notes may apply in one run — join them with ` | ` in the order they arose (a single note may itself contain `; `). Used when the scan ran cleanly but found zero capability matches, when the 50-release window was exhausted on a null watermark, when the anchor tag was not present and the slice fell to the next older release, when the cap was reached before the anchor (gap recorded), or when the anchor predates the release history>
-discarded_findings: <count of findings dropped by the 20-finding cap PLUS zero-hit affected_files discards from Step 7, or 0>
 releases_digest: [<unprefixed version> — <publishedAt date> — <one-line summary>, ...]   # one entry per in-scope release processed; the summary is the body's first bullet (else its first non-heading line), trimmed to one line; on the degraded path (CHANGELOG.md fallback) the date field is omitted since publishedAt is unavailable
 ```
+
+`scan_note` uses for this lane: zero capability matches on a clean run, the 50-release window exhausted on a null watermark, the anchor tag absent and the slice fallen to the next older release, the cap reached before the anchor (gap recorded), the anchor predating the release history.
 
 `releases_digest` feeds the report's Section 1 per-release lines. Include one entry for every release that was in scope (i.e., every release fetched and evaluated, regardless of whether it produced a finding). If `lane_status` is `unavailable`, emit an empty list `[]`.
 
 **Zero-new-releases case:** when `last_changelog_version` equals the newest release tag in the window (i.e., no in-scope releases exist since the watermark), set `releases_scanned: 0`, `lane_status: ok`, and `newest_version_seen` to the incoming `last_changelog_version` value (a no-op advance). Never emit `null` for `newest_version_seen` on an `ok` run — the orchestrator advances the watermark to this value, and `null` would clobber the stored watermark and force a full rescan on the next run.
 
-`allowlist_candidates` is required (an empty list is valid): when a release note points at a docs page for the detail of a change that intersects the inventory, and that page is not on `scan-docs.md`'s pinned allowlist, list it with the reason — the docs lane cannot see a page nobody pinned.
+`allowlist_candidates` for this lane: when a release note points at a docs page for the detail of a change that intersects the inventory, and that page is not on `scan-docs.md`'s pinned allowlist, list it with the reason — the docs lane cannot see a page nobody pinned.
 
-These power the report footer and the orchestrator's watermark-advance decision.

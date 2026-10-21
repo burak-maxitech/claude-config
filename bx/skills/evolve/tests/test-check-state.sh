@@ -50,6 +50,8 @@ plant missing-field  "del d['decisions'][0]['title']"                           
 plant bad-key-order  "e=d['decisions'][0]; n=e.pop('note'); d['decisions'][0]=dict([('note',n)]+list(e.items()))" "keys must be in schema order"
 plant bad-decision   "d['decisions'][0]['decision']='maybe'"                                     "not in"
 plant id-mismatch    "d['decisions'][0]['affected_capability']='bx:other/thing'"                 "does not equal sha1"
+plant bad-docs-pages "d['watermark']['docs_pages']={'https://x':{'hash':'abc','scanned':'2026-01-01'}}" "docs_pages"
+plant bad-inv-hash   "d['watermark']['inventory_hash']='nope'"                                     "inventory_hash"
 
 # pain registry: a state whose bx:pain/<x> points at an alias or an unknown id must fail
 plant_reg() {  # <name> <python-expression mutating `d` (state) and `r` (registry)> <expected-substring>

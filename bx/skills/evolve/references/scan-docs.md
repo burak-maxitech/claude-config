@@ -8,9 +8,9 @@ You have these tools available: Read, Grep, Glob, WebFetch. Use WebFetch for all
 
 ## Inputs you receive in your task prompt
 
-- `docs_checked_at` — ISO date string (YYYY-MM-DD) or null. The date the docs pages were last fetched and compared against the capability inventory. Null means this is the first run. This field frames the report ("docs checked as of <date>") but does NOT gate what you fetch — you always re-read all allowlisted pages on every run and compare against the live capability inventory (see Delta detection below).
-- `capability_inventory` — list of bx capability strings (e.g. `"bx:seo/allowed-tools"`, `"bx:save/agent-model"`). Only produce findings that intersect this list or a pain point from the list below.
-- `pain_point_list` — list of `{id, text}` objects naming known friction areas in the bx toolkit (e.g. `{"id": "permission-prompts-allowed-tools", "text": "permission prompts when allowed-tools misses a command"}`). Official guidance that addresses a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to `bx:pain/<id>` with the `id` copied verbatim from the list — never derived from the text, never invented (see the schema notes below).
+- `docs_checked_at` — ISO date string (YYYY-MM-DD) or null. The date the docs pages were last fetched and compared against the capability inventory. It frames the report only ("docs checked as of <date>"); it does NOT gate what you fetch — `pages_to_scan` does.
+- `pages_to_scan` — the allowlisted URLs to fetch this run, chosen by the orchestrator (SKILL.md Step 1.5) from a content-hash probe of every allowlisted page: the pages whose text changed since the hash stored at the last run, pages with no stored hash, pages whose probe failed, or every page when the capability inventory changed or `--full` was passed. Fetch exactly these — no more (a page not listed is unchanged and its findings are already in the decision log) and no fewer (a listed page you do not fetch is reported in `pages_failed`, never silently dropped). The list is never empty: when nothing needs scanning the orchestrator does not dispatch this lane.
+- The shared inputs — `capability_inventory`, `pain_point_list`, and the Grep scope — are defined in `bx/skills/evolve/references/lane-contract.md` §1. Read that file after this one; it owns everything this lane shares with the other two (relevance filter, `affected_files`, finding schema, sentinel, `lane_status`, hard rules, footer keys) and this file never restates it.
 
 ---
 
@@ -49,21 +49,19 @@ This lane fetches ONLY these allowlisted URLs. Following a link is allowed only 
 
 ---
 
-## Delta detection — no version watermark
+## Delta detection — content hashes, not a version
 
-Docs pages are not versioned like releases. The comparison baseline is the **capability inventory** (what the bx plugin currently does), NOT memory of past page content. `docs_checked_at` only frames the report ("docs checked as of <date>"); it does NOT define what to check.
+Docs pages are not versioned like releases, so this lane has two baselines. The **content hash** of each page (`watermark.docs_pages` in state.json, probed by the orchestrator before dispatch with `bx/skills/evolve/scripts/docs-page-hashes.py`) decides *which pages* you read: an unchanged page cannot yield a finding the decision log does not already hold — open and deferred entries carry forward, applied and rejected ones re-raise only when their source changes — unless the **capability inventory** changed, in which case every page is re-read because the comparison itself changed. Within a page you read, the baseline is the inventory: compare the guidance against what the bx plugin currently does and emit findings for any gap. Until bx 2.12.0 this lane re-read all allowlisted pages every run (~180k tokens); the probe reads none of them into context.
 
-Every run: re-read all allowlisted pages, compare guidance against the inventory, and emit findings for any gap. This is why the lane stays cheap and stateless — there is no stored "last seen" page content to diff against.
-
-The orchestrator advances `docs_checked_at` only on `ok` or `degraded` (per `bx/skills/evolve/references/state-schema.md` Rule 4).
+`docs_checked_at` only frames the report. The orchestrator advances it, and stores the hash of each page you fetched successfully, only on `ok` or `degraded` (lane-contract.md §7).
 
 ---
 
 ## Method
 
-### Step 1 — Fetch each allowlisted page
+### Step 1 — Fetch each page in `pages_to_scan`
 
-For each URL in the pinned allowlist above, call `WebFetch` using that URL's "Capability area" column (from the allowlist table) as the fetch prompt focus — ask for the full page content relevant to that specific area. Do not use a single generic prompt enumerating all areas for every URL; the per-row capability area is the fetch focus.
+For each URL in `pages_to_scan` (each is a row of the allowlist above), call `WebFetch` using that row's "Capability area" column as the fetch prompt focus — ask for the full page content relevant to that specific area. Do not use a single generic prompt enumerating all areas for every URL; the per-row capability area is the fetch focus.
 
 **Failure definition:** A fetch fails if WebFetch returns an error, a redirect to an unrelated page, or empty content where content is expected. On any failure: record the URL and error in `pages_failed` for the footer addendum and continue with the remaining URLs. Never silently skip a failed fetch — the footer must name every failure explicitly.
 
@@ -71,9 +69,9 @@ For each URL in the pinned allowlist above, call `WebFetch` using that URL's "Ca
 
 **Truncation rule (Claude Code 2.1.290+):** WebFetch stops at about 100,000 characters and reports how much of the page was left unread. If a fetch reports unread text, call the same URL again with `offset` set to the reported position, and repeat until the page is complete; treat the parts as one page. If the page is still incomplete when you stop, record the URL in `pages_failed` with the reason `truncated at <position> of <total>` — a half-read page is partial coverage, not a clean fetch. (The hooks and sub-agents pages exceed the limit.)
 
-**Verbatim-extract requirement (hash stability):** for each guidance item that becomes a candidate delta, capture the **verbatim page text** of the smallest heading-bounded section containing that guidance — from its own heading to the next same-or-higher-level heading. That verbatim extract (not WebFetch's summary prose) is what gets returned as `source_excerpt`. Hashing a summary hashes noise: WebFetch's model-processed output varies between calls, causing the hash to change even when the underlying guidance is unchanged — which re-raises every rejected finding on every run (state-schema Rule 3). The verbatim extract is the only stable hash input; the orchestrator normalizes and hashes it.
+**Verbatim extract:** for each guidance item that becomes a candidate delta, capture the verbatim page text of the smallest heading-bounded section containing it, from its own heading to the next same-or-higher heading — that is the `source_excerpt`, never WebFetch's summary prose (lane-contract.md §5 says why: hash stability).
 
-**Issue all allowlisted WebFetch calls in a single message — they are independent; tally `lane_status` after all return.** Do not stop early on a failure — fetch all, then tally.
+**Issue all WebFetch calls for `pages_to_scan` in a single message — they are independent; tally `lane_status` after all return.** Do not stop early on a failure — fetch all, then tally.
 
 ### Step 2 — Extract candidate deltas per page
 
@@ -88,10 +86,7 @@ For each successfully fetched page, extract guidance that falls into either cate
 
 Each is a candidate delta — proceed to Step 3 before emitting as a finding.
 
-**Class assignment guidance** (derives directly from Step 2's extraction categories):
-- `breakage` — category (a): guidance says the plugin's current form is deprecated, removed, or broken (e.g. a frontmatter key bx uses has been renamed or removed, a hook event has been dropped). Certainty 1.0 if removal is confirmed; 0.7–0.9 if deprecated-with-migration-path.
-- `best_practice` — category (a) only: guidance explicitly recommends AGAINST a pattern bx currently uses (deprecation callout, anti-pattern warning) but the current approach still works. NOT for "a pattern bx isn't using" in general — only for guidance that calls out bx's existing behavior as not recommended. Certainty 0.7–0.9.
-- `opportunity` — category (b) only: a new capability in the docs directly addresses a recorded pain point from `pain_point_list` and bx does not yet use it. The pain-point match is mandatory — a new capability with no pain-point match is discarded. Certainty 0.5–0.7.
+**Class assignment** is lane-contract.md §6: category (a) yields `breakage` (the current form is deprecated, removed or broken) or `best_practice` (recommended against, still works); category (b) yields `opportunity`.
 
 ### Step 3 — Verification gate
 
@@ -105,124 +100,54 @@ Only candidates that survive the verification gate proceed to Step 4.
 
 ### Step 4 — Filter against capability inventory and pain points
 
-For each verified candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point-only findings use `affected_capability: bx:pain/<id>` with the id copied from `pain_point_list` (see the schema notes below).
+Apply lane-contract.md §2 to the candidates that survived Step 3.
 
 ### Step 5 — Populate affected_files via Grep
 
-For each surviving delta, identify the old/changed token (frontmatter key, hook event name, settings key, command name, flag name). Run one Grep call using `glob="{bx/**,README.md,workflow.md}"` from repo root to find every file containing that token. List every hit file in `affected_files`.
-
-This is how sibling-file echoes are found (S45 rule: a rework isn't done until its echoes are swept from sibling files). Do not fill `affected_files` from the capability string alone — always grep first.
-
-**When multiple deltas survive**, batch them: issue one Grep in content mode with an alternation pattern (`tok1|tok2|...`) across `glob="{bx/**,README.md,workflow.md}"`, then map each file→token in-context. This is the repo's batched-Grep idiom.
-
-**Zero-hit grep rule:** for `breakage` and `best_practice` findings, zero Grep hits for the old/changed token means the plugin does not contain it — discard the finding and increment the discarded count in the footer. (The verification gate in Step 3 should have caught this; Step 5 is the final check.) For `opportunity` findings, there is no old token to search for; instead, set `affected_files` to the file(s) the proposed edit would touch, identified from the pain point's subject area. An empty `affected_files` is never legal in an emitted finding — if you cannot identify at least one file, discard the finding.
+Apply lane-contract.md §3. The token is the frontmatter key, hook event name, settings key, command name or flag the guidance contradicts; Step 3 should already have found it in a bx file, and this is the final check.
 
 ---
 
 ## lane_status definitions
 
-`lane_status` must be one of these three values. It is declared in the footer addendum and governs `docs_checked_at` advancement.
+`lane_status` is declared in the footer addendum; its consequence for `docs_checked_at` and the stored page hashes is lane-contract.md §7. For this lane the values mean:
 
-| Value | Meaning | `docs_checked_at` advances? |
-|---|---|---|
-| `ok` | Every allowlisted page fetched successfully. | Yes — advances to today. |
-| `degraded` | At least one page fetched, at least one failed. Findings are trustworthy but coverage is partial — failed pages' capability areas were NOT checked this run. | Yes — advances to today. The failed URLs are disclosed in the footer so the user knows which areas had partial coverage. |
-| `unavailable` | Every fetch failed. Only the degenerate `lane_unavailable` finding is emitted. | No — the orchestrator MUST NOT advance `docs_checked_at`. The missed check will be re-run next run because the watermark is unchanged. |
+| Value | Meaning |
+|---|---|
+| `ok` | Every page in `pages_to_scan` fetched successfully. |
+| `degraded` | At least one page fetched, at least one failed. Findings are trustworthy but coverage is partial — failed pages' capability areas were NOT checked this run; the orchestrator keeps their old hash so they are re-scanned next run. |
+| `unavailable` | Every fetch failed. Only the sentinel is emitted; `docs_checked_at` and the page hashes do not advance. |
 
-**No fallback method exists for this lane.** Unlike the changelog lane (which falls back from `gh` to raw CHANGELOG.md), the docs lane has only one method: WebFetch the allowlisted URLs. If all fetches fail, the lane is `unavailable`. There is no mixed-source ambiguity.
-
-The orchestrator advances `docs_checked_at` only on `ok` or `degraded`, per `bx/skills/evolve/references/state-schema.md` Rule 4.
+**No fallback method exists for this lane.** Unlike the changelog lane (which falls back from `gh` to raw CHANGELOG.md), the docs lane has only one method: WebFetch the pages in `pages_to_scan`. If all fetches fail, the lane is `unavailable`. There is no mixed-source ambiguity.
 
 ---
 
-## Finding schema (use exactly these field names)
+## Finding schema
 
-```json
-{
-  "finding_id": null,
-  "class": "breakage | best_practice | opportunity",
-  "tier": "official",
-  "severity": "low | medium | high",
-  "certainty": "0.0–1.0",
-  "affected_files": ["<every file needing the edit, including sibling-file echoes>"],
-  "upstream_delta": "<one-line: what the docs say vs what bx currently does>",
-  "proposed_edit": "<prose + concrete old→new where possible>",
-  "citation": "<the allowlisted doc URL — same as source_url for this lane>",
-  "source_url": "<canonicalized allowlisted URL — same value used in finding_id>",
-  "affected_capability": "<capability string, e.g. bx:*/allowed-tools>",
-  "source_excerpt": "<verbatim heading-bounded section from the fetched page — the exact text the orchestrator will normalize and hash>"
-}
-```
-
-**`finding_id`:** set to `null` — computed by the orchestrator at consolidation from `source_url + "|" + affected_capability`. Do not attempt to compute it here. Exception: the `lane-unavailable-docs` sentinel keeps its literal string ID (see degenerate finding below).
-
-**`source_excerpt`:** the verbatim heading-bounded section extract (per the verbatim-extract requirement in Step 1) — never WebFetch's summary prose (summaries are unstable across calls; see Step 1 for why). The orchestrator normalizes and hashes your `source_excerpt` per `bx/skills/evolve/references/state-schema.md` to produce `source_content_hash`. Return the raw extract; do not attempt to hash.
-
-**`affected_capability` normalization:** normalize per `bx/skills/evolve/references/state-schema.md`. For pain-point-only findings (no inventory capability matched), use `bx:pain/<id>` with the id from `pain_point_list` — the convention is defined in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
-
-**`source_url`:** the canonicalized allowlisted URL for the page the finding comes from (e.g. `https://code.claude.com/docs/en/hooks`). Apply canonicalization per `bx/skills/evolve/references/state-schema.md` before hashing and storing. For this lane, `citation` and `source_url` always have the same value.
-
-**`severity` guidance:**
-- `high` — breakage findings, OR opportunity findings that directly address a pain point the user has explicitly called out.
-- `medium` — best_practice findings on heavily-used capabilities, or opportunity findings with clear benefit.
-- `low` — best_practice or opportunity findings on rarely-invoked paths.
-
-**Cap:** max 15 findings, ordered `severity_weight × certainty` descending. Severity weights: high=3, medium=2, low=1 (same as changelog lane). If more than 15 qualify, include the 15 highest-weighted and note the count of discarded findings in the footer.
+The schema, the per-lane field values and the shared field notes are lane-contract.md §4–§5; this lane is the **docs** column. Class, severity and certainty guidance is §6. Lane-specific values the table encodes: `citation` and `source_url` are the same allowlisted URL; a contradiction Step 3 could not confirm in a bx file is capped at `certainty: 0.5` or discarded; the cap is 15 findings.
 
 ---
 
 ## lane_unavailable degenerate finding
 
-When every allowlisted URL fails, emit ONLY this finding (no others):
-
-```json
-{
-  "finding_id": "lane-unavailable-docs",
-  "class": null,
-  "tier": "official",
-  "severity": "high",
-  "certainty": 1.0,
-  "affected_files": [],
-  "upstream_delta": "<verbatim errors from each failed WebFetch call>",
-  "proposed_edit": "Re-run /bx:evolve when network is available; docs_checked_at was NOT advanced.",
-  "citation": null,
-  "source_url": null,
-  "affected_capability": null,
-  "source_excerpt": null
-}
-```
-
-This sentinel keeps its literal `finding_id` string — no hashing involved. It has no `source_excerpt` (null) because there is no upstream section to extract.
-
-Set `lane_status: unavailable` in the footer addendum. The orchestrator MUST NOT advance `docs_checked_at` when this finding is present.
+When every page in `pages_to_scan` fails, emit ONLY the sentinel of lane-contract.md §8 with `finding_id: "lane-unavailable-docs"`, `tier: "official"`, `severity: "high"`, `upstream_delta: "<verbatim errors from each failed WebFetch call>"` and `proposed_edit: "Re-run /bx:evolve when network is available; docs_checked_at was NOT advanced."`. Set `lane_status: unavailable`.
 
 ---
 
 ## Hard rules
 
-- **Never report zero findings silently.** If all pages were fetched but none of the guidance contradicts bx or addresses a pain point, append a note in the footer: `scan_note: <N> pages evaluated; no capability or pain-point matches found`. This is different from `unavailable` — it means the scan ran cleanly but nothing was relevant.
-- **Include sibling-file echoes in `affected_files`.** Always populate via Step 5 Grep — never infer from the capability string alone. If official guidance changes a key used in multiple files (e.g. a SKILL.md frontmatter key used in 7 skills + README), list every file.
-- **Per-URL failure is explicit.** Every failed fetch is named in `pages_failed` in the footer. A partial success (some pages ok, some failed) → `lane_status: degraded`, not `ok`.
-- **Do not restate algorithms from `bx/skills/evolve/references/state-schema.md`.** Point to that file for `finding_id` computation, `source_url` canonicalization, and `source_content_hash` normalization. Duplication causes drift — the S45 lesson.
-- **Do not follow links beyond one hop to a same-page anchor.** The pinned allowlist is the full scope of this lane.
+lane-contract.md §9 applies in full. One rule is this lane's own: **do not follow links beyond one hop to a same-page anchor.** The pinned allowlist is the full scope of this lane, and `pages_to_scan` is this run's slice of it.
 
 ---
 
 ## Final output addendum
 
-After all findings (or after the single `lane_unavailable` finding), append:
+After all findings (or after the single sentinel), append the shared keys of lane-contract.md §10 (`lane_status`, `allowlist_candidates`, `scan_note`, `discarded_findings`) plus this lane's own:
 
 ```
-pages_fetched: <n — count of allowlisted URLs that returned content successfully>
-pages_failed: [<url>: <error>, ...]   # empty list [] if all succeeded
-lane_status: ok | degraded | unavailable
-scan_note: <optional — used when scan ran cleanly but zero capability matches found, or other non-error observations>
-allowlist_candidates: [<url> — <one-line reason>, ...]   # official pages you reached or needed that are NOT on scan-docs.md's pinned allowlist; empty list [] when none
-discarded_findings: <count of findings dropped by the 15-finding cap PLUS zero-hit affected_files discards from Step 5 PLUS verification-gate discards from Step 3, or 0>
+pages_fetched: <n of <count of pages_to_scan> — pages that returned content successfully>
+pages_failed: [<url>: <error>, ...]   # empty list [] if all succeeded; a page in pages_to_scan you did not fetch is listed here, never silently dropped
 ```
 
-`allowlist_candidates` is required (an empty list is a valid value). A candidate is an official `code.claude.com` or `anthropic.com` page that is the canonical owner of a contract bx depends on and is not in the table above — typically one an allowlisted page links to for the detail you needed, or one the completeness rule (above) told you was missing. Name the capability area the page would cover. The orchestrator renders candidates in the report footer and, in `--fix`, offers each as an edit adding a row to this table.
+`allowlist_candidates` for this lane: an official `code.claude.com` or `anthropic.com` page that is the canonical owner of a contract bx depends on and is not in the table above — typically one an allowlisted page links to for the detail you needed, or one the completeness rule (above) told you was missing. Name the capability area the page would cover; the orchestrator offers it as a new allowlist row in `--fix`.
 
-**Zero-findings-but-all-pages-checked case:** set `pages_fetched` to the count of allowlist rows successfully fetched, `pages_failed` to its real contents (empty list only if truly no fetches failed), `lane_status` to what actually happened (`ok` only if every allowlisted page fetched successfully; `degraded` if any page failed even though zero findings emerged from the pages that did succeed), and use `scan_note` to explain that no gaps were found. Never return an empty finding list without a `scan_note` — that is indistinguishable from a partial run.
-
-These power the report footer and the orchestrator's `docs_checked_at` advance decision.

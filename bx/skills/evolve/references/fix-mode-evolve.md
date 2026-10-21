@@ -8,7 +8,7 @@ Apply upstream-driven edits to plugin files with per-finding diff preview. **Ups
 
 A finding is fix-eligible only if **all** of the following hold. Check each in order; a single failure routes the finding to display-only (it appears in the report but is not offered for application).
 
-1. **`tier: official`** — the finding originates from the changelog or docs lane, not the community lane. A carried-forward (Section 4) entry always passes this rule: advisory findings are never written to the decision log, so every stored entry is official by construction (no `tier` field is stored). Advisory findings (community source) are never fix-eligible, regardless of the `--fix` flag. Why: community sources are not authoritative — acting on them without human review inverts the skill's risk model.
+1. **`tier: official`** — the finding originates from the changelog or docs lane. (The community lane emits no findings since 2.12.0; the rule stays for any stored or legacy entry.) A carried-forward (Section 4) entry always passes this rule: advisory findings are never written to the decision log, so every stored entry is official by construction (no `tier` field is stored). Advisory findings (community source) are never fix-eligible, regardless of the `--fix` flag. Why: community sources are not authoritative — acting on them without human review inverts the skill's risk model.
 
 2. **Current decision-log state is `open` or re-raised, with a stored edit** — the finding has `decision: "open"` in `docs/upstream/state.json` (including entries re-raised from `rejected` or `applied` because their `source_content_hash` changed) AND its stored `proposed_edit` is non-null and `affected_files` is non-empty. A legacy entry (no stored edit) is display-only, badged `[legacy — no stored edit]`, until a lane re-emits it (Rule 6 fills the fields) or the one-time triage does. `deferred` findings that were re-emitted by a lane re-surface in the report (Section 2 when re-emitted live, Section 4 when carried forward) but are not offered to `--fix` — they are deferred deliberately. `applied`-and-unchanged findings are suppressed from the report (state-schema Rule 6); an applied finding whose source changed re-enters as `open` and is eligible like any other. `rejected`-and-unchanged findings are suppressed from the report entirely. Why: acting on a deferred or rejected finding without explicit re-evaluation bypasses the decision log. (Sentinels never enter the decision log, so they can never satisfy this rule.)
 
@@ -18,13 +18,18 @@ If all three hold, the finding is fix-eligible and joins the ordered gate flow b
 
 **Eligible set scope:** findings consolidated THIS RUN (Section 2) and carried-forward `open` entries (Section 4) are both gated — since bx 2.11.0 every open entry stores its `proposed_edit`, `affected_files`, `source_excerpt` and `citation`, so a Section 4 entry is as applyable as a live one. Section 4 entries go through the **staleness re-grep** below before they enter the gate flow; Section 2 findings were Grep-populated minutes ago and skip it.
 
-**Staleness re-grep (Section 4 entries only).** For each candidate, take the old token from its `proposed_edit` (the left side of its `old → new`, or the quoted token when the edit is prose) and Grep it across the entry's `affected_files` only:
-- **Hit in every file** → gate normally.
-- **Hit in some files** → gate normally with `affected_files` narrowed to the files that still contain the token; say so in the per-finding display ("affected_files narrowed from N to M at re-grep").
-- **Hit in no file** → the edit has already happened or the surface is gone. Do NOT gate. Record in-context `decision: "applied"`, `date`: today, `note`: `"closed at re-grep <today>: token absent in all affected_files"`, and list the entry under **Auto-closed (stale)** in the pre-pass summary so the user sees every verdict the pass took without asking. The decision log keeps the entry, so the user can reopen it by hand. Auto-closed entries are counted on their own line, not in the display-only count.
-- **No token can be identified** (prose-only `proposed_edit`, after rules 1–3 passed) → display-only, badged `[no re-grep token]`; it stays `open`. An entry that already failed rule 3 (new file, external action) is display-only by that rule and gets no re-grep.
+**Staleness re-grep (Section 4 entries only).** The re-grep asks one question per file: *has this edit already happened here?* Which token answers it depends on the edit's shape, so classify the stored `proposed_edit` first:
 
-The token is the text between the backticks on the left of `→` (or the first backticked token in a prose edit), matched literally — escape regex metacharacters when you Grep. For a carried-forward entry the gate display uses the stored `title` as the upstream delta and renders `—` for severity and certainty, which are not stored.
+- **Replacement or deletion** (`old → new`, `old → ∅`, "replace/rename/remove X"): the probe is the **old** token, the text between the backticks on the left of `→` (or the first backticked token in the prose). Present = still pending; absent = done.
+- **Additive** (`∅ → new`, "add/insert/append X", or a left side that is an anchor the edit keeps rather than text it removes): the probe is the **new** token — the text being added. The sense is inverted: **absent = still pending; present = done.** S61 ran the old-token rule on an additive edit, read "no token" in a file the edit had not reached yet, and would have narrowed that file away — the opposite of the truth.
+- **Ambiguous** (prose that names no backticked text, or where the left side cannot be told from an anchor): no probe. Gate on the full `affected_files` list and say so in the per-finding display ("re-grep inconclusive — edit shape unclear; gating on all N files"); it stays `open`. This replaces the old `[no re-grep token]` display-only badge — an ambiguous edit is still an edit the user can approve from its diff, so it is gated, not parked.
+
+Grep the probe across the entry's `affected_files` only, literally — escape regex metacharacters — and apply the shape's sense per file:
+- **Pending in every file** → gate normally.
+- **Pending in some files** → gate normally with `affected_files` narrowed to the files where the edit is still pending; say so in the per-finding display ("affected_files narrowed from N to M at re-grep: done in <files>").
+- **Done in every file** → the edit has already happened or the surface is gone. Do NOT gate. Record in-context `decision: "applied"`, `date`: today, `note`: `"closed at re-grep <today>: <old token absent | new text present> in all affected_files"`, and list the entry under **Auto-closed (stale)** in the pre-pass summary so the user sees every verdict the pass took without asking. The decision log keeps the entry, so the user can reopen it by hand. Auto-closed entries are counted on their own line, not in the display-only count.
+
+An entry that already failed rule 3 (new file, external action) is display-only by that rule and gets no re-grep. For a carried-forward entry the gate display uses the stored `title` as the upstream delta and renders `—` for severity and certainty, which are not stored.
 
 ---
 
@@ -32,15 +37,19 @@ The token is the text between the backticks on the left of `→` (or the first b
 
 After the finding gate flow, walk the run's `allowlist_candidates` (Step 3.1) in order. Each becomes a synthetic fix item: the edit is one new row in `bx/skills/evolve/references/scan-docs.md`'s pinned-allowlist table (URL, capability area from the candidate's reason, note `added <today> (S<N>)`) plus the date clause in the sentence above that table. Show the row as a diff and take `y` / `n` / `skip` exactly like a finding; `n` records nothing in the decision log (candidates are not findings) but the report notes the refusal so the candidate is not re-proposed from the same lane note next run — put the URL and `declined <today>` in the lane's row note instead. `y` appends the row; the docs lane fetches the page from the next run on. Candidates are never auto-applied.
 
+## Inventory drift
+
+When Step 0.2's `--check` reported drift, offer one synthetic item after the allowlist candidates: the edit is the regeneration of `bx/skills/evolve/capabilities.json` by `python -I bx/skills/evolve/scripts/build-capabilities.py --write`. Show the `added_live_only` / `removed_pinned_only` lists as the diff and take `y` / `n` / `skip`. `y` runs the script (the file is the diff the user reviews at commit); `n` and `skip` leave the pinned file as it is and the drift is reported again next run. The regenerated file takes effect on the **next** run — this run's findings were gated against the old vocabulary and are not re-evaluated.
+
 ## Pre-pass summary
 
 Before showing the first finding, print a one-line summary:
 
 ```
---fix pass: N findings eligible (A from this run, B carried forward), M display-only (advisory/deferred/legacy/out-of-scope).
+--fix pass: N findings eligible (A from this run, B carried forward, of which I re-grep-inconclusive), M display-only (advisory/deferred/legacy/out-of-scope).
 Auto-closed (stale): K carried-forward entries whose token is absent from every affected file — <finding_id prefix> <title>, …
 Walking eligible findings in rank order (breakage first, then best-practice, then opportunities).
-Allowlist candidates to offer after the findings: C
+Allowlist candidates to offer after the findings: C · inventory drift: <none | +A −R, regeneration offered>
 ```
 
 Render the `Auto-closed (stale)` line every pass, with `0` and no list when nothing was closed. Singular/plural wording is free; the numbers are fixed.
@@ -144,5 +153,5 @@ The "applied" count shows findings, not files. Surface the file count separately
 - **Run other skills.** Verification (does the edit work?) is out of scope — call `/bx:review` or `/bx:tests` separately if needed.
 - **Edit historical archives.** `docs/key-decisions.md`, `docs/session-history.md`, and the history sections of `CLAUDE.md` are repo records-of-past-state per the S32 convention. They are never touched by `--fix` mode.
 - **Touch files outside the repo.** MCP configs, shell profiles, OS settings — out of scope.
-- **Apply advisory findings.** Community-sourced findings (tier: community) are never fix-eligible; they render in Section 3 of the report only.
+- **Apply advisory findings.** A `tier: community` finding is never fix-eligible. Since 2.12.0 the community lane emits none; its discovery candidates are offered as allowlist rows, which is the only way its output reaches a file.
 - **Advance the watermark.** The orchestrator advances the watermark at the end of every run (Step 6) regardless of whether `--fix` was passed. Fix-mode verdicts are written to the decision log; they do not alter the watermark logic. See `bx/skills/evolve/references/state-schema.md` Rule 4.

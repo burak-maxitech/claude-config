@@ -123,47 +123,9 @@
 
 ### Session 56 - 2026-08-18: Doc schema v2 shipped end-to-end — `feat/doc-schema-v2` Tasks 6–10 driven home and merged as v2.0.0 (38 commits), v2.0.1 closed the three linear archive-read paths (Part 3.0 exclusion, save-writer tail appends, windowed Part 5), Part 7.7 archive rotation designed + built as v2.1.0 (100k trigger, `docs/archive/<name>-K.md`, B≤A≤B+600); this repo migrated (`## Environment Variables` drop consented, 20/20 checker assertions) and compressed 16.2k → 8.3k. Blind rehearsals remained the decisive instrument. (commits: 2b1ef2e, 1d3af59, 3afbbab, b93bfc7, 9f2e328, 53e19ec, b3d607c, 0eedfe2, 3bf748d, 0865cd4, 2f86f36, 91da560, 5ce65d7, 8f4407f, ec2002d, dd5c7fe, 9e47f42, 72c505a)
 
-### Session 57 - 2026-08-18
-**What happened:**
-- Ran built-in `/simplify` over the whole v2.0.0→v2.1.0 range (17 commits): 4 parallel reviewers (reuse / simplification / efficiency / altitude); after dedup, 17 fixes across 13 files; 6 findings deliberately skipped — 7.7-out-of-Part-7 restructure (needs a blind rehearsal), make-fixtures full section-emitter refactor (literal heredocs are a golden-fixture feature), rotation-constants meta-lint (prose variants don't fit the byte-identical model), Part 5.3 content-mode Grep (content genuinely used), migrate dirty-tree blockquote merge (house-style verbatim prompts), 7.7's 7.1-reinforcement (compensating mechanism while rotation stays inside Part 7).
-- Efficiency: save-writer anchor Greps → `-o: true` + `head_limit: 0` (they were re-importing ~120k chars/save — 98% of key-decisions.md came back as match content — and the 250-line default silently drops the final anchor past 250 matches); Part 5.1's full-read deleted; Part 7.7 moves bytes via one byte-exact `bash -c` sed/head/tail split instead of shuttling ~50k chars through context; Part 3.0 excludes dated planning records (`docs/superpowers/**`, ~356KB); 7.7 consent prompts batched.
-- Ownership/altitude: doc-schema.md gains the canonical **Archives** section (archive set + access rule); `--silent` is now a normative default (safe default for every present-and-future consent gate; Part 8 commit sole exception — closes the gap class 5ce65d7 patched per-site); mode-migrate's `bash -c 'cp'` permission dodge replaced by declared `Bash(cp:*)` per the S45 decision; v0-routing rationale deduped to doc-schema.md; doc-migrator's split harness-decline rule flattened into one statement; workflow.md/README restatements now point at their owners.
-- Tests: assert-doc-schema.sh derives presence + order checks from the single `STATE_SECTIONS` constant (was 3 hand-copies in one script); make-fixtures.sh `stub_docs` helper replaces 5 copy-paste stub blocks — regenerated fixtures verified byte-identical, negative order/duplicate tests still FAIL correctly, check-doc-rule-consistency passes.
-- Bumped plugin to **v2.1.1** (PATCH: fixes and doc corrections) + CHANGELOG entry; the first `/bx:save --full` on schema v2 ran this session — Part 5 had nothing left to compress, Parts 6/7 under caps, rotation not triggered (key-decisions ~98k, just under 100k).
+### Session 57 - 2026-08-18: `/simplify` wave over v2.0.0–v2.1.0 (17 fixes, 13 files); save-writer anchor Greps gained `-o`/`head_limit: 0` (were re-importing ~120k chars/save); doc-schema.md gained the canonical Archives section; `--silent` became a normative default; first `/bx:save --full` on schema v2 (nothing to roll up, rotation not triggered); v2.1.1 (commits: 97c6e22, eb48931)
 
-**Files created/modified:**
-- `bx/skills/save/references/mode-update.md` — --silent normative rule; 5.1 / 3.0 / 6.3 / 7.4 / 7.7 fixes
-- `bx/skills/save/references/doc-schema.md` — Archives section; `mode-migrate.md` — declared `cp`
-- `bx/agents/save-writer.md`, `bx/agents/doc-migrator.md` — anchor Grep specs; flattened freshness rule
-- `bx/skills/save/tests/assert-doc-schema.sh`, `make-fixtures.sh` — single-source sections; `stub_docs`
-- `bx/skills/save/SKILL.md`, `bx/skills/resume/SKILL.md`, `bx/scripts/session-start-context.sh`, `README.md`, `workflow.md`, `CHANGELOG.md`, `bx/.claude-plugin/plugin.json` (2.1.1)
-
-**Next session should:**
-- Watch for the first real key-decisions rotation on the next `--full` (file at ~98k now)
-- Run the deferred fixture live `/bx:save` runs; then the `cc` live gate + S55 fix wave
-- Take the 7.7-out-of-Part-7 restructure through a blind rehearsal before shipping
-
-### Session 58 - 2026-08-24
-**What happened:**
-- **Recovered from an outage-truncated session**, then closed the sibling-echo class the prior arch-scoped `/bx:evolve` run left open: v2.1.233 removed `TaskCreate`/`TaskList`/`TodoWrite` from the default toolset and five bx skills promised behaviour that silently could not run. Canonical owner `bx/skills/save/references/task-tools.md` with a degraded path per skill; tracker paths demoted, never deleted. **v2.2.0** (`bf134a8`).
-- **`/bx:arch` review depth v2 — 8 phases through `/bx:plan`, v2.3.0** (`ed708e3`..`7afd51f`). Three rules were actively wrong: `S01` recommended deleting Dependency Inversion, `S06` deleted trust-boundary validation, and the Step 5 gate dropped every `R01`/`R09` finding because the catalog reasons about *cognitive* complexity while the skill measured only *cyclomatic*. Coverage 23 → 54 catalog entries (D/C/E/X), fifth scanner `arch-robustness`, calibrated finding contract (`finding-rubrics.md`), report opens with the top 3 architectural themes. Six blind-rehearsal waves; the S56 ≤2 bar was NOT met (15→12→11, 24→18→12, 12→12) and it shipped on the severity curve, recorded in the spec.
-- **Five skills dogfooded, five defect sets, none findable by review.** `/bx:arch` (v2.4.0): the trust flag was set backwards so Step 5.8's exclusivity removed the run's best findings; no channel existed for a negative result; the ≥3 theme bar rejected real two-member mechanisms. `/bx:evolve` (recorded, unfixed): Step 3.4 defines no `applied` branch, so a re-emitted applied finding matches nothing. `/bx:tests` twice — run 1 halted at Step 0 having resolved the stack from a planted eval fixture's `package.json`; run 2, after the fix, found severity mapped through absolute thresholds the formula cannot reach on a small repo (0.08–0.18 against a 2.0 cutoff) and no `coverage_negatives` channel. `/bx:clean`: `session-start-context.ps1` was never wired — `git log -p` shows the `.ps1` never appeared in `hooks.json`. **Two of the `/bx:arch` defects were structurally invisible to rehearsals**, which feed scanners synthetic findings.
-- **Applied eight code findings across the arch dogfood, and both concurrency fixes were wrong on the first attempt.** `_threshold_status`/`_median_ctr` extracted with equivalence proven over 162 threshold cases and 11 median sizes; the `session-color` registry race and GSC `finding-history` lost update both closed with locks. The first lock's 100ms backoff let 8 racers exceed a 5s cap and fall through unlocked; a "defensive" stale-reap ran `find` every retry where any failure read as stale and `rmdir`'d a **live** lock — strictly worse than no lock. Measured: 5/5 trials 8-way distinct; 12 processes lose 10 of 12 updates unlocked vs 12/12 locked. **Neither control was committed.** (`165a4d6`, `50ceeff`, `d01b203`, `02cc9db`)
-- **`/bx:evolve` full run released the watermark and closed an S37 leftover; two shared owners were created.** 2.1.228 → 2.1.241 (12 releases), docs 11/11, community degraded; `claude plugin validate --strict` became `/bx:save` Part 8 step 2b, closing the install-smoke-test half of the S37 leftovers (**v2.6.0**, `db1f3b5`) — `allowed-tools` needed `Bash(claude:*)` or it would prompt on every save. Then `arch/references/scan-exclusions.md` (**v2.7.0**, `0f8f119`) made the fixture guard a rule both `/bx:arch` and `/bx:tests` read across 14 sites, rather than a line in one dispatch prompt; and `/bx:tests` gained blast-radius severity plus three-state `coverage_negatives` (**v2.8.0**, `586d551`). First real archive rotation also fired (key-decisions 100k → 49k).
-
-**Files created/modified:**
-- `bx/skills/save/references/task-tools.md` + `bx/skills/arch/references/scan-exclusions.md` + `finding-rubrics.md` (new shared owners)
-- `bx/skills/arch/` — 7 new reference files, `refactor-catalog.md` split and deleted, SKILL.md Steps 0–6 rewritten; `bx/agents/arch-robustness.md` new + 4 existing rewired
-- `bx/skills/tests/` — SKILL.md Step 0/4/5, `scan-coverage.md` severity, `report-template.md` footer; 3 `test-*` agents rewired
-- `bx/skills/seo/references/gsc-parse-helper.py` — 2 extractions, 2 comprehensions, `_rmw_lock` + 3 wrapped subcommands
-- `.claude/scripts/session-color.{sh,ps1}` (mutex), `bx/scripts/session-start-context.{sh,ps1}` (one `rev-parse`)
-- `bx/skills/save/` — `mode-update.md` Part 8 step 2b, `doc-structure-rules.md`, SKILL.md allowed-tools
-- `docs/superpowers/specs/2026-08-24-bx-arch-review-depth-design.md`, `docs/upstream/state.json`, `docs/archive/key-decisions-1.md`, `CHANGELOG.md`, `plugin.json` (2.1.1 → 2.8.0)
-
-**Next session should:**
-- Run `/plugin update bx` — main is v2.8.0, the cache 2.5.1, so three versions of skill fixes are not live
-- Commit regression tests for the two concurrency fixes; their evidence is still only in commit messages
-- Dogfood `/bx:health`, the last skill never run
+### Session 58 - 2026-08-24: task-tools sweep across 5 skills after v2.1.233 (v2.2.0); `/bx:arch` review depth v2 in 8 phases (catalog 23→54, `arch-robustness`, calibrated rubrics, thesis-first report; v2.3.0); five skills dogfooded, every first run found defects; two concurrency fixes wrong on first attempt (session-color mutex, GSC `_rmw_lock`; v2.5.x); `claude plugin validate` at Part 8 (v2.6.0); shared owners `task-tools.md`, `scan-exclusions.md`, `finding-rubrics.md`; first archive rotation (commits: bf134a8, 7afd51f, db1f3b5, 748e204)
 
 ### Session 59 - 2026-09-08
 **What happened:**
@@ -241,3 +203,21 @@
 **Next session should:**
 - Push 2.11.1, refresh the plugin, run `/bx:evolve` once more to see the truncation fix and the new allowlist rows work
 - Fix the three 2.11.0 run-found defects; then improvements 7–10
+
+### Session 62 - 2026-10-21
+**What happened:**
+- Fixed the two `/bx:save --full` defects from S61: the Full Path is now a nine-step sequence with the sweep (Parts 0.5/2/3/4/1.10/5/6/7) before the writer dispatch, packet `old` strings sourced post-sweep, a `Full sweep:` session bullet, and pending-entry accounting in Parts 5/6/7.7; the Known Issues open phase qualifies by saving (entry ≥ 500 chars longer than its composed replacement line) with a *looks resolved — confirm* heading. Lint K20 updated, K23 added (watched failing first).
+- Fixed the three `/bx:evolve` 2.11.0 run-found defects: Step 1.5 lane freshness (changelog head via `git ls-remote --tags`, verified equal to the 2.1.306 watermark; docs via the page probe; community same-day), fix-mode re-grep classifies edit shape (replacement → old token absent = done; additive → new text present = done; ambiguous gates on all files), Step 3.4 pain-id match (adopts the stored entry, appends the citation, skips the hash comparison).
+- Shipped improvements 7–10 as bx 2.12.0: `references/lane-contract.md` owns the shared lane text (scan files −300 lines net, drift check clean); `scripts/docs-page-hashes.py` hashes all 22 allowlisted pages via `<url>.md` (text/markdown, stable across fetches) into `watermark.docs_pages` with `inventory_hash` forcing a full re-read when the inventory changes; `scripts/build-capabilities.py` pins `capabilities.json` (434 entries; `--check` reports drift, `--fix` offers regeneration); `scan-community.md` rewritten as a discovery feed (official domains + `anthropics/*` maintainer posts → `allowlist_candidates`, `findings: []`). Interview answers: generated + drift report; discovery feed only.
+- Verified by running: one docs-lane dispatch (one page; conformant footer, counted gate discard) and one community-lane dispatch (3 queries, 2 fetches, 2 reasoned discards, no findings). `check-state.py` + 2 new planted failures, `check-doc-rule-consistency.sh`, `check-known-issues-governance.sh`, `claude plugin validate --strict` all pass.
+- Full sweep (first run of the reordered path): compressed S57–58 (session-history 46.3k → 39.0k), moved 6 Key Decisions rows (CLAUDE.md 13.9k → 12.2k, still ~160 chars over the soft cap with no section over threshold), repaired the blank line that split the Key Decisions table, README/architecture trees list the new evolve files, memory `claude-docs-md-endpoint` added; archives all under 100k, no rotation.
+
+**Files created/modified:**
+- `bx/skills/save/references/mode-update.md`, `verification-checklists.md`, `tests/check-known-issues-governance.sh` — Full Path reorder, open-phase rule, lint pins
+- `bx/skills/evolve/SKILL.md`, `references/{lane-contract.md (new), scan-changelog.md, scan-docs.md, scan-community.md (rewritten), fix-mode-evolve.md, report-template.md, state-schema.md}`, `scripts/{docs-page-hashes.py, build-capabilities.py} (new)`, `capabilities.json (new)`, `tests/{check-state.py, test-check-state.sh}`
+- `bx/agents/upstream-community.md`, `docs/upstream/state.json` (six-key watermark), `README.md`, `workflow.md`, `docs/architecture.md`, `CHANGELOG.md` (2.12.0), `bx/.claude-plugin/plugin.json` (2.11.1 → 2.12.0)
+
+**Next session should:**
+- Push 2.12.0, refresh the plugin cache, run the first `/bx:evolve` on it (seeds the hash map; first execution of Step 1.5, the pain-id match, the drift line, the changelog lane under the contract)
+- Doc tiering Phase 2 and the deferred save minors
+- Dogfood `/bx:health`

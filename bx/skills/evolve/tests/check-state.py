@@ -21,7 +21,7 @@ CAPABILITY = re.compile(r"^bx:[a-z0-9-]+/[a-z0-9/-]+$")
 DECISIONS = {"open", "applied", "rejected", "deferred"}
 CLASSES = {"breakage", "best_practice", "opportunity"}
 
-WATERMARK_KEYS = ["last_changelog_version", "docs_checked_at", "community_checked_at", "changelog_gap"]
+WATERMARK_KEYS = ["last_changelog_version", "docs_checked_at", "community_checked_at", "changelog_gap", "docs_pages", "inventory_hash"]
 LEGACY_KEYS = ["finding_id", "decision", "date", "source_url", "affected_capability",
                "source_content_hash", "class", "title", "note"]
 NEW_KEYS = ["proposed_edit", "affected_files", "source_excerpt", "citation"]
@@ -74,6 +74,8 @@ def check_state(root):
     wm_keys = list(wm.keys())
     if wm_keys == WATERMARK_KEYS[:3]:
         warn("watermark lacks `changelog_gap` (pre-2.11.0 shape; migration owed)")
+    elif wm_keys == WATERMARK_KEYS[:4]:
+        warn("watermark lacks `docs_pages`/`inventory_hash` (pre-2.12.0 shape; the next run adds them)")
     elif wm_keys != WATERMARK_KEYS:
         fail(f"watermark keys out of order or wrong: {wm_keys}")
     v = wm.get("last_changelog_version")
@@ -89,6 +91,24 @@ def check_state(root):
             fail(f"changelog_gap keys must be [after, before, recorded], got {list(gap.keys())}")
         elif not DATE.match(str(gap["recorded"])):
             fail(f"changelog_gap.recorded must be YYYY-MM-DD, got {gap['recorded']!r}")
+
+    pages = wm.get("docs_pages", {})
+    if not isinstance(pages, dict):
+        fail("watermark.docs_pages must be an object keyed by URL")
+    else:
+        for url, entry in pages.items():
+            if not str(url).startswith("https://"):
+                fail(f"docs_pages key {url!r} is not an https URL")
+            if not isinstance(entry, dict) or list(entry.keys()) != ["hash", "scanned"]:
+                fail(f"docs_pages[{url!r}] must be {{hash, scanned}} in that order")
+                continue
+            if not HEX40.match(str(entry["hash"])):
+                fail(f"docs_pages[{url!r}].hash is not 40 lowercase hex chars")
+            if not DATE.match(str(entry["scanned"])):
+                fail(f"docs_pages[{url!r}].scanned must be YYYY-MM-DD")
+    ih = wm.get("inventory_hash")
+    if ih is not None and not HEX40.match(str(ih)):
+        fail("watermark.inventory_hash must be 40 lowercase hex chars or null")
 
     decisions = state.get("decisions")
     if not isinstance(decisions, list):

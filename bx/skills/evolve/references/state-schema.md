@@ -16,7 +16,11 @@ The watermark records the furthest upstream point checked on the most recent com
     "last_changelog_version": "2.1.170",
     "docs_checked_at": "2026-06-09",
     "community_checked_at": "2026-06-09",
-    "changelog_gap": null
+    "changelog_gap": null,
+    "docs_pages": {
+      "https://code.claude.com/docs/en/hooks": { "hash": "f3e50ab36bf5…", "scanned": "2026-10-21" }
+    },
+    "inventory_hash": "9c1d…"
   }
 }
 ```
@@ -29,6 +33,8 @@ The watermark records the furthest upstream point checked on the most recent com
 | `docs_checked_at` | ISO date string or null | The date (YYYY-MM-DD) the Anthropic docs pages were last fetched and scanned. Advances ONLY if the docs lane ran this run (lane_status ok or degraded). A lane that was skipped or unavailable keeps its previous timestamp so the missed range is re-checked next run. Null on first run. |
 | `community_checked_at` | ISO date string or null | The date (YYYY-MM-DD) the community lane (bounded WebSearch over community content) last ran. Advances ONLY if the community lane ran this run (lane_status ok or degraded). Skipped via `--no-community` or unavailable → keeps its previous timestamp. Null on first run. |
 | `changelog_gap` | object or null | Null when the changelog lane's fetched window reached the watermark anchor on the last run. Otherwise `{"after": "<anchor version>", "before": "<oldest version seen>", "recorded": "YYYY-MM-DD"}`: the releases strictly between `after` and `before` were never scanned. Set, cleared and rendered per `scan-changelog.md` Step 1 and `SKILL.md` Step 6; this file owns only the shape. |
+| `docs_pages` | object | One entry per allowlisted docs page the docs lane has fully evaluated, keyed by canonical URL: `{"hash": <40-hex sha1 of the page's whitespace-normalized markdown rendering>, "scanned": "YYYY-MM-DD"}`. Probed before dispatch by `bx/skills/evolve/scripts/docs-page-hashes.py` (read-only); written at Step 6 for pages the lane fetched successfully this run, kept for unchanged pages, left as they were for pages that failed (so they are re-scanned next run). `{}` means no page has been hashed yet — the next run scans every page. Pages removed from the allowlist keep their entry harmlessly; the probe only reports allowlisted URLs. |
+| `inventory_hash` | string or null | sha1 of the sorted, de-duplicated capability inventory (Step 0.2) at the last run whose docs lane was `ok` or `current`. When the live inventory's hash differs, the docs lane re-reads every page regardless of page hashes — the comparison baseline changed, not the pages. Null until the first 2.12.0 run completes. |
 
 ### Why the watermark matters
 
@@ -48,7 +54,9 @@ When `docs/upstream/state.json` is missing (first-ever run or corrupted), Step 0
     "last_changelog_version": null,
     "docs_checked_at": null,
     "community_checked_at": null,
-    "changelog_gap": null
+    "changelog_gap": null,
+    "docs_pages": {},
+    "inventory_hash": null
   },
   "decisions": []
 }
@@ -156,7 +164,7 @@ finding_id = hashlib.sha1(
 ).hexdigest()
 ```
 
-The `affected_capability` string must be normalized before hashing: lowercase, forward-slash separators, no trailing slash, no spaces. Example: `"bx:seo/allowed-tools"` not `"bx:seo / Allowed Tools"`.
+The `affected_capability` string must be normalized before hashing: lowercase, forward-slash separators, no trailing slash, no spaces. Example: `"bx:seo/allowed-tools"` not `"bx:seo / Allowed Tools"`. Since bx 2.12.0 a lane does not compose the string at all: it is one of the pinned `bx/skills/evolve/capabilities.json` entries, copied verbatim (lane-contract.md §1), so this rule describes a form every entry already satisfies and binds only legacy entries written before the pin.
 
 **Pain-point findings — `bx:pain/<id>` convention:** when a finding addresses a known pain point from the `pain_point_list` rather than a specific capability in the `capability_inventory`, set `affected_capability` to `bx:pain/<id>`, where `<id>` is the registry id the orchestrator passed alongside the pain point's text (see **Pain registry** below). Lanes never derive the id from the text and never invent one: a pain point arrives as `{id, text}` and the id is copied verbatim. **Why:** before bx 2.11.0 the id was a kebab-case slug of the pain-point prose, so every rewording of a Known Issue produced a new `finding_id` for the same concern (eight stored slugs covered five concerns). Apply the same normalization (lowercase, no trailing slash, no spaces) before hashing — a valid id already satisfies it.
 
@@ -260,7 +268,7 @@ A `rejected` finding is re-raised ONLY when a current run's lane emits a finding
 
 ### Rule 4: Each watermark timestamp advances only if its lane ran this run
 
-After all findings have been written to state (Rule 1) and any `--fix` verdicts applied (Rule 2), the orchestrator updates the watermark fields at Step 6: `last_changelog_version` to the highest tag processed. `docs_checked_at` advances to today ONLY if the docs lane ran this run (lane_status ok or degraded). `community_checked_at` advances to today ONLY if the community lane ran this run. A lane that was skipped (`--no-community`) or unavailable keeps its previous timestamp, ensuring the missed range is re-checked on the next run.
+After all findings have been written to state (Rule 1) and any `--fix` verdicts applied (Rule 2), the orchestrator updates the watermark fields at Step 6: `last_changelog_version` to the highest tag processed. `docs_checked_at` advances to today ONLY if the docs lane ran this run (lane_status ok or degraded). `community_checked_at` advances to today ONLY if the community lane ran this run. A lane that was skipped (`--no-community`) or unavailable keeps its previous timestamp, ensuring the missed range is re-checked on the next run. A lane marked `current` (SKILL.md Step 1.5: the stored value already equals the lane's head, so it was not dispatched) also keeps its value — there is no missed range, and nothing to advance to. `docs_pages` and `inventory_hash` follow the docs lane's status by the rules in SKILL.md Step 6: page hashes are stored only for pages fetched successfully, and the inventory hash advances only on `ok` or `current`.
 
 **Why:** advancing at the end, not the beginning, means a failed or partial run leaves the watermark at the last fully-completed run's value. Per-lane tracking means a `--no-community` run does not falsely claim community sources were checked.
 
@@ -313,6 +321,8 @@ state.json root:
     docs_checked_at
     community_checked_at
     changelog_gap
+    docs_pages
+    inventory_hash
   decisions: [
     finding_id
     decision

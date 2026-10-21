@@ -40,7 +40,7 @@ From the gathered context:
 After Step 0:
 
 - **Default (no path flag), or `--fast`** → run the **Save Path** below. (`--fast` is a no-op alias kept for muscle memory; it now matches the default.)
-- **`--full`** → run the **Full Path**: the Save Path first, then the heavy sweep (README + `docs/*.md` sync + rollups), all described after the Save Path.
+- **`--full`** → run the **Full Path**: the Save Path with the heavy sweep (README + `docs/*.md` sync + rollups) spliced in **before** the writer dispatch, so the session entry records it. Described after the Save Path.
 
 The old behavior (full sweep by default) is inverted: the daily save is fast; the heavy sweep is opt-in. Drift warnings (emitted at the end of the Save Path) tell the user when a `--full` is due.
 
@@ -113,13 +113,27 @@ If no probe fires, omit the warning entirely.
 
 ## Full Path (`--full`)
 
-Runs the **Save Path** above first (so the fast result is identical), then the heavy sweep below. Because the Save Path deferred the archive reads, do them now:
+The Full Path is the Save Path with the heavy sweep spliced in **before the writer dispatch**, not after it. The order matters: the session entry and the STATUS.md last-session block are composed by the orchestrator and written once by `save-writer`, so a sweep that runs after the dispatch can never be recorded in the session that produced it (observed S61: the first real `--full` rolled up sessions and moved three issues, and the session entry had to be written by hand). Running the sweep first also means every `old` string in the packet is sourced from files the sweep has finished editing, so the writer's exact-string Edits match.
+
+The sweep Parts (0.5, 2, 3, 4, 1.10, 5, 6, 7) run on the **orchestrator**, not the subagent, because Parts 5/6/7 can require an `AskUserQuestion` consent prompt and a subagent cannot prompt the user.
+
+**Sequence:**
+
+1. **Drain the task list** — Save Path step 1, unchanged.
+2. **Step 0.3 full-sweep reads** (below).
+3. **Fix the packet's content, not yet its text.** From the conversation, settle three lists: the decisions this session made (`decision_rows`), the issues it resolved (`known_issue_moves`), and the Known Issues entries it will add or reword. The sweep reads these (Part 6.1 counts the pending rows; Part 7.3 leaves packet-owned entries alone). Nothing else in the packet is needed yet.
+4. **Run the sweep:** Part 0.5, Part 2, Part 3, Part 4, Part 1.10, then Parts 5, 6, 7 (7.7 included). Keep each Part's report line as it completes.
+5. **Compose the update packet** — Save Path step 2, with two additions. (a) Source every `old` string in `claude_md_deltas` and `status_md_deltas` from the files **as the sweep left them**: when any of Parts 1.10, 6 or 7 wrote to CLAUDE.md or docs/STATUS.md, re-read that file first — the Step 0 copy is stale, and a stale `old` string costs a re-dispatch. (b) Fold the sweep's results into `session_history_entry` as one "What happened" bullet (it counts toward the ≤5 cap), e.g. `Full sweep: rolled up 6 sessions, moved 3 resolved issues to docs/known-issues.md, rotated docs/key-decisions.md → docs/archive/key-decisions-1.md`; when the sweep moved or rotated anything, mirror that bullet in `status_md_session_block`. A sweep that triggered nothing gets no bullet.
+6. **Dispatch `save-writer`** — Save Path step 3, unchanged.
+7. **Drift probes** — Save Path step 4, but re-measure first: one `wc -c` over the live files and archives, because the Step 0 figures predate the sweep and the write.
+8. **Commit checkpoint (Part 8)** — once, here. The sweep's edits and the writer's edits land in one commit, as Part 8 specifies.
+9. **Report** — Save Path step 6, plus the `[--full only]` lines of the Change Report.
+
+**What the sweep cannot see.** This session's own additions — the session entry, decision rows, completed items, new Known Issues entries — reach the files only at step 6, after the sweep has measured them. Part 5's window, Part 6's count and 7.7's cut account for the pending entry as each Part notes; whatever remains is a one-session lag that the next `--full` closes. The alternative, sweeping after the write, loses the sweep's record every time.
 
 ### Step 0.3 Full-sweep reads (parallel)
 
 Read `README.md` and all `docs/*.md` **except the auto-managed archives and everything under `docs/archive/`** (Part 3.0's exclusion list, which applies to this read too — rotated volumes are read by no automatic path, ever; via `Glob docs/**/*.md`, then one Read per file in the same turn). These feed Parts 2, 3, 5, 6, 7.
-
-The remaining Parts (0.5, 2, 3, 4, 5, 6, 7) run on the **orchestrator**, not the subagent, because Parts 5/6/7 can require an `AskUserQuestion` consent prompt and a subagent cannot prompt the user. The commit checkpoint (Part 8) already ran as the final Save-Path step — on `--full`, defer the commit to after the rollups instead (so rollup changes land in the same commit), exactly as the current Part 8 note specifies.
 
 ## Step 1: Scan docs/ Folder
 
@@ -247,7 +261,7 @@ behind. Because the repo is on the legacy layout, every link written back into C
 
 ## Part 1: Update CLAUDE.md and docs/STATUS.md
 
-> **Plan-then-batch (applies to Full Path):** Walk through 1.0–1.10 (and Part 6 row removals, if Part 6 fires) and gather every change you intend to make from the evidence cached in Step 0. Then apply all changes to each file in a **single Write** of its full contents, or as non-overlapping parallel Edits in one turn — per the routing table below, some sub-sections target CLAUDE.md and some target docs/STATUS.md; batch each file's edits separately. Do NOT issue one Edit per sub-section — that's the dominant turn-count cost.
+> **Who runs Part 1.** On both paths `save-writer` applies 1.0–1.8 from the packet; only 1.10 runs on the orchestrator, during the `--full` sweep. **Plan-then-batch (orchestrator-side edits on the Full Path — 1.10, Part 6 row removals, Part 7 shrinkers):** gather every change you intend to make from the evidence cached in Step 0 and Step 0.3. Then apply all changes to each file in a **single Write** of its full contents, or as non-overlapping parallel Edits in one turn — per the routing table below, some sub-sections target CLAUDE.md and some target docs/STATUS.md; batch each file's edits separately. Do NOT issue one Edit per sub-section — that's the dominant turn-count cost.
 
 **Target file per sub-section (schema v2):**
 
@@ -585,7 +599,7 @@ Keep `docs/session-history.md` bounded by compressing sessions older than the 5 
 
 1. Count `^### Session` headers with one Grep tool call (`output_mode: count`) on `docs/session-history.md` — do NOT read the file; 5.3 locates and reads only the compressible window
 2. **If count ≤ 5, skip silently** — nothing to compress
-3. The 5 highest-numbered sessions stay in full prose; everything older is a candidate for compression
+3. The 5 highest-numbered sessions stay in full prose; everything older is a candidate for compression. This session's entry is not in the file yet — the writer appends it after Part 5 (Full Path step 6) — so count it as one of the 5: when it carries a new session number, the 4 highest-numbered sessions in the file stay; when it continues the newest session (`cont.`), the window is unchanged
 4. Identify which older entries are still in multi-line "What happened / Files / Next session" format via 5.3's header Grep. Skip any already in one-line format (idempotent — running this part repeatedly is safe)
 
 ### 5.2 First-Run Confirmation (per-project)
@@ -652,7 +666,7 @@ Keep CLAUDE.md's `## Key Decisions` table bounded by moving older rows into `doc
 
 ### 6.1 Detect Overflow
 
-1. Read CLAUDE.md's `## Key Decisions` table; count data rows (exclude the header and separator).
+1. Read CLAUDE.md's `## Key Decisions` table; count data rows (exclude the header and separator), then add the rows the packet will append (`decision_rows`, settled at Full Path step 3) — the writer appends them after Part 6 has run.
 2. **If count ≤ 20, skip silently** — nothing to roll up.
 3. Rows to move: the oldest `(count - 20)` rows.
    - **Oldest = topmost in the table.** By convention, new decisions are appended at the bottom, so FIFO from the top is the mechanical rule. Using "least important" instead invites the same judgment-avoidance that caused the bloat — stick to FIFO unless the user overrides per-session.
@@ -754,9 +768,11 @@ This clause covers project-specific sections only. Every section `claude-md-sect
 
 Part 7 runs on the orchestrator, so this shrinker edits the two files directly: it builds no packet and dispatches no `save-writer`. It borrows only the append procedure and header format of `save-writer.md` step 8a, with `<title>` being the entry's title as Part 1.7 defines it. A resolved entry takes the **last** session its lead names (`The S5 deadlock is resolved (S6)` → `S6`), or this session when it names none; an open entry takes `Open, moved S<N>` for this session. Handle one entry completely — **archive first, remove second** — before starting the next. A title that repeats the status word (`… is RESOLVED (S3) — Resolved S3`) is fine; do not reword it.
 
-One consent in 7.4 covers both phases, and for this section the 7.4 prompt lists the titles it will move, under two headings: *resolved — leaves CLAUDE.md entirely* and *open — replaced by a one-line summary*. The user is approving a classification, so they must see it.
+Entries the packet owns are candidates in neither phase: an entry this session resolved (a `known_issue_moves` item) or one a `claude_md_deltas` pair will reword, both settled at Full Path step 3. The writer moves the first and edits the second after this shrinker has run; moving them here would leave the packet's `entry` text and `old` strings with nothing to match.
 
-The open phase moves only an entry of at least 300 chars: a shorter one would be replaced by a line about as long as itself, and the section would not shrink. Skip shorter entries, keeping topmost-first order among the rest. When the section is still over 4000 and no remaining open entry qualifies, stop and report that the section is over threshold with nothing left worth moving.
+One consent in 7.4 covers both phases, and for this section the 7.4 prompt lists the titles it will move, under two headings: *resolved — leaves CLAUDE.md entirely* and *open — replaced by a one-line summary*. The user is approving a classification, so they must see it. A third heading, *looks resolved — confirm*, is for an open-classified entry the orchestrator has evidence is fixed (this session's conversation, or a commit the entry names that `git log` shows): the status-form test is not overridden — the user is. On confirmation the entry goes into `known_issue_moves` as resolved with that commit, and the writer moves it; declined, it stays an open candidate.
+
+The open phase qualifies an entry by the saving, not by its length. Compose the replacement line (defined below) while planning the move, before the 7.4 prompt, and measure both: the entry qualifies only when it is at least 500 chars longer than its replacement line. The previous rule was a 300-char floor on the entry alone, and S61 showed why that is wrong: the replacement line itself runs 200–280 chars, so a 350-char entry could be moved to save 70 chars and lose its detail for nothing. Skip entries that do not qualify, keeping topmost-first order among the rest; the 7.4 prompt lists only qualifying ones. When the section is still over 4000 and no remaining open entry qualifies, stop and report that the section is over threshold with nothing left worth moving.
 
 A verbatim archive body must not break the archive's own structure, which keys on `### `: write any body line that starts with `#` with a leading backslash (`\###`). That is the only change ever made to an archived body.
 
@@ -849,8 +865,10 @@ Measure the four archives (`wc -c`, omitting any that do not exist). For each fi
    **50k chars** — the minimum number of
    whole entries needed to reach that target (half the threshold, so rotation
    does not re-fire every run). The protected tail never moves: the 5 most recent sessions
-   (session-history, matching Part 5's window), the newest 20 rows (key-decisions, matching
-   Part 6's target), this session's just-appended items (completed-work), and in
+   (session-history, matching Part 5's window, pending entry included), the newest 20 rows
+   (key-decisions, matching Part 6's target), whatever the 50k target leaves at the bottom
+   (completed-work — this session's items are appended by the writer after rotation, so no
+   cut can reach them), and in
    known-issues every entry from the first **live** `Open`-tagged header onward — the cut
    never extends past the first live `Open` entry, even when that leaves the live file over
    50k, because CLAUDE.md links to it and a volume is read by nothing. An `Open` entry is
