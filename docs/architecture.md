@@ -31,7 +31,7 @@ claude-config/                         # marketplace repo
 │   ├── session-history.md
 │   ├── archive/             # Rotated archive volumes (Part 7.7)
 │   ├── superpowers/         # Specs + plans from brainstorm→plan workflows
-│   └── upstream/            # /bx:evolve watermark + decision log
+│   └── upstream/            # /bx:evolve watermark, decision log, pain registry
 ├── .githooks/ .github/workflows/ scripts/   # version-bump guard: hook, CI, script (S60)
 ├── .gitignore
 ├── CLAUDE.md                # Always-loaded AI instructions (schema v2)

@@ -2,6 +2,56 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.11.0 — 2026-10-20
+
+`/bx:evolve` revision, phases 1–7 of `docs/superpowers/plans` S61 (plan file: Revise /bx:evolve). Every
+phase was gated by a blind rehearsal on a committed fixture under `bx/skills/evolve/tests/fixtures/`
+and by the new state validator; the first real run after install is the acceptance test.
+
+### Added
+
+- **Carried-forward findings are actionable.** Every `open` decision-log entry stores
+  `proposed_edit`, `affected_files`, `source_excerpt` and `citation`, so `--fix` gates
+  Section 4 entries too. A staleness re-grep runs first: token absent from every affected
+  file → the entry auto-closes as `applied` with a dated note and is listed in the pre-pass
+  summary; partial hits narrow `affected_files`; prose-only edits are display-only.
+- **Pain registry** `docs/upstream/pain-points.json`: pain points get stable ids that survive
+  rewording (eight pre-2.11.0 slugs covered five concerns). `/bx:evolve` is the only writer;
+  Step 0.3 now reads Known Issues from CLAUDE.md and Next Steps from `docs/STATUS.md`, where
+  schema v2 moved them in S56. Lanes receive `{id, text}` and copy the id into `bx:pain/<id>`.
+- **`applied` branch in Step 3.4** (state-schema Rule 6): unchanged → suppressed with a footer
+  count; changed → `[re-raised — source changed since application]`. A finding with no exact
+  `finding_id` match is matched to a stored entry by `source_url` + overlapping files, so a
+  reworded capability string no longer re-enters the log beside its own applied twin.
+  Same-class, same-URL, overlapping-files findings collapse before hashing.
+- **Changelog pagination with a recorded gap.** The lane paginates (≤10 pages) to the
+  watermark, comparing versions numerically so a yanked tag slices at the next older release;
+  cap before the anchor records `watermark.changelog_gap`, rendered in Section 1 and the
+  headline until a later run or `--full` closes it. End of history before the anchor is not a gap.
+- **`allowlist_candidates`** footer field in all three lanes (replaces the community lane's
+  unactioned `official_source_found:` scan note), rendered in the report and offered in
+  `--fix` as a one-row edit to the docs-lane allowlist. `auto-mode-config` pinned.
+- `bx/skills/evolve/tests/check-state.py` + `test-check-state.sh`: mechanical validator for
+  `state.json` and the registry (schema order, 40-hex hashes, `finding_id` recompute, enum,
+  registry cross-check), wired into the `plugin version bump` CI workflow.
+
+### Changed
+
+- `docs/upstream/state.json` migrated: 13 keys per entry, `changelog_gap: null`, sentinel
+  hash `000…0` replaces five empty hashes, 18 pain-slug entries re-keyed to registry ids
+  (`161ae182 → fe90acdf`, `55ba40ea → 5b91feb3`, `7e849e74 → 727810cc` among them). The 18
+  open findings were hand-triaged: 10 rejected, 1 applied, 5 deferred, 2 kept open with edits.
+  Script kept at `bx/skills/evolve/tests/fixtures/migrate-2-11-0.py`.
+- Default-mode closing line is an honest upper bound (`up to N fix-eligible … K legacy, D deferred`).
+- Report Section 4 gains an `Edit?` column; the footer's decision-log block has six fixed lines.
+- Community lane's slot-3 query uses the first active pain point (pain points carry no severity).
+
+### Fixed
+
+- Step 0.3 read `## Next Steps` from CLAUDE.md, a section schema v2 had moved to STATUS.md.
+- Delta runs lost everything older than the 50-release window and still advanced the watermark.
+- Five stored `source_content_hash` values were empty strings; the validator now rejects that.
+
 ## 2.10.0 — 2026-09-28
 
 ### Added

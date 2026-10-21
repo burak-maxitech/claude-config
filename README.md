@@ -372,7 +372,7 @@ claude-config/                         # marketplace repo
 │   ├── session-history.md
 │   ├── archive/                       # Rotated archive volumes (<name>-<K>.md)
 │   ├── superpowers/                   # Specs + plans (dated planning records)
-│   └── upstream/                      # /bx:evolve watermark + decision log
+│   └── upstream/                      # /bx:evolve watermark, decision log, pain registry
 ├── .githooks/pre-push                 # Opt-in version-bump guard (git config core.hooksPath .githooks)
 ├── .github/workflows/                 # `plugin version bump` CI check
 ├── scripts/check-plugin-version-bump.sh
