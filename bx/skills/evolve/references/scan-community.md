@@ -23,7 +23,7 @@ A community pattern becomes actionable (and `--fix`-eligible) ONLY when a Tier-1
 
 - `community_checked_at` — ISO date string (YYYY-MM-DD) or null. The date the community lane last ran successfully. Null means this is the first run. Used only to frame the report ("community checked as of <date>"); it does NOT gate what you search — you always search with fresh queries.
 - `capability_inventory` — list of bx capability strings (e.g. `"bx:seo/allowed-tools"`, `"bx:save/agent-model"`). Only produce findings that intersect this list or a pain point from the list below.
-- `pain_point_list` — list of short strings describing known friction areas in the bx toolkit (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). Community guidance that addresses a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to the `bx:pain/<kebab-slug>` form (use the `bx:pain/<kebab-slug>` form — see the schema notes below).
+- `pain_point_list` — list of `{id, text}` objects naming known friction areas in the bx toolkit (e.g. `{"id": "permission-prompts-allowed-tools", "text": "permission prompts when allowed-tools misses a command"}`). Community guidance that addresses a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to `bx:pain/<id>` with the `id` copied verbatim from the list — never derived from the text, never invented (see the schema notes below).
 
 ---
 
@@ -35,7 +35,7 @@ Derive at most **3** WebSearch queries per run. Use exactly this allocation — 
 
 1. **Fixed slot 1:** `Claude Code skills best practices <current year>` — scans for general skill-authoring patterns and anti-patterns.
 2. **Fixed slot 2:** `Claude Code plugin <capability> pattern` — replace `<capability>` with the capability from `capability_inventory` that has the most entries/files in the inventory (a proxy for surface area, derivable from the input itself; ties broken by pain-point count). If `capability_inventory` is empty, use the most prominent concept from `pain_point_list`. If both `capability_inventory` and `pain_point_list` are empty, run slot 1 only and record the omission in `scan_note`.
-3. **Variable slot 3:** Derived from the **highest-severity pain point** in `pain_point_list` — formulate a targeted query for that specific friction. If `pain_point_list` is empty, omit this query.
+3. **Variable slot 3:** Derived from the **first pain point** in `pain_point_list` (the orchestrator passes active registry entries in registry order, oldest first — pain points carry no severity) — formulate a targeted query from its `text`. If `pain_point_list` is empty, omit this query.
 
 **Why 3 is the hard cap:** this lane has the worst signal-to-noise ratio of the three lanes. Community posts mix outdated advice, paraphrased official docs, and SEO-shaped listicles. Beyond 3 queries the marginal finding quality drops sharply and the noise-filtering cost (Steps 3–5 below) exceeds the value. The cap is a quality gate, not a time constraint.
 
@@ -144,7 +144,7 @@ The orchestrator advances `community_checked_at` only on `ok` or `degraded`, per
   "proposed_edit": "<consider… phrasing — advisory, never prescriptive>",
   "citation": "<the community page URL — same as source_url for this lane>",
   "source_url": "<canonicalized community page URL — same value used in finding_id>",
-  "affected_capability": "<capability string, e.g. bx:*/allowed-tools, or bx:pain/<kebab-slug>>",
+  "affected_capability": "<capability string, e.g. bx:*/allowed-tools, or bx:pain/<id>>",
   "source_excerpt": "<verbatim heading-bounded section from the fetched page — the exact text the orchestrator will normalize and hash>"
 }
 ```
@@ -153,7 +153,7 @@ The orchestrator advances `community_checked_at` only on `ok` or `degraded`, per
 
 **`source_excerpt`:** the verbatim heading-bounded section extract (per the verbatim-extract requirement in Step 3) — never WebFetch's summary prose (see Step 3 for why). The orchestrator normalizes and hashes your `source_excerpt` per `bx/skills/evolve/references/state-schema.md` to produce `source_content_hash`. Return the raw extract; do not attempt to hash.
 
-**`affected_capability` normalization:** normalize per `bx/skills/evolve/references/state-schema.md`. For pain-point-only findings, use the `bx:pain/<kebab-slug>` form — the slug convention is defined in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
+**`affected_capability` normalization:** normalize per `bx/skills/evolve/references/state-schema.md`. For pain-point-only findings, use `bx:pain/<id>` with the id from `pain_point_list` — the convention is defined in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
 
 **`source_url`:** the canonicalized URL of the community page. Apply canonicalization per `bx/skills/evolve/references/state-schema.md` before hashing and storing. For this lane, `citation` and `source_url` always have the same value.
 

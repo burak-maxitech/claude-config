@@ -37,15 +37,17 @@ Render inventory entries as capability strings in `bx:<skill>/<area>` form (e.g.
 
 **Historical archives out of scope:** `docs/key-decisions.md`, `docs/session-history.md`, and CLAUDE.md history sections are records of past state per repo convention. Do not include them in the inventory.
 
-### 0.3 — Pain points
+### 0.3 — Pain points (registry-backed)
 
-Read CLAUDE.md `## Known Issues / Blockers` and `## Next Steps`. Extract each item as a short pain-point string (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). These feed the relevance gate — a finding that addresses a pain point is surfaced even without a direct capability-inventory match.
+Read CLAUDE.md `## Known Issues / Blockers` and `docs/STATUS.md` `## Next Steps` (doc schema v2 moved Next Steps there in S56; on a repo without `docs/STATUS.md`, read CLAUDE.md's `## Next Steps` instead). Read `docs/upstream/pain-points.json` if it exists (missing → start from an empty registry). Derive each item's lead and match it to the registry exactly as `bx/skills/evolve/references/state-schema.md`'s **Pain registry** section prescribes — that section owns the lead rule, the significant-word rule, the three-step match and the retire rule; do not improvise a slug. Keep the updated registry in context: it is written at Checkpoint 1 (Step 4), never here.
+
+The `pain_point_list` for Step 2 is the list of active registry entries as `{id, text}`. A finding that addresses a pain point is surfaced even without a direct capability-inventory match, and its `affected_capability` is `bx:pain/<id>` with the id copied verbatim.
 
 ### 0.4 — Detection summary
 
 End Step 0 with a one-line summary to the user, e.g.:
 
-> Loaded state: changelog watermark 2.1.170 · docs 2026-06-09 · community 2026-06-09. Inventory: 47 capability entries, 6 pain points. 3 open findings in decision log.
+> Loaded state: changelog watermark 2.1.170 · docs 2026-06-09 · community 2026-06-09. Inventory: 47 capability entries; pain registry 6 active / 2 retired (1 new this run). 3 open findings in decision log.
 
 ---
 
@@ -77,12 +79,12 @@ For each Agent call, include the following shared context block verbatim, then i
 ```
 Watermark: last_changelog_version=<value|null> · docs_checked_at=<value|null> · community_checked_at=<value|null>
 capability_inventory: <the list from Step 0.2>
-pain_point_list: <the list from Step 0.3>
+pain_point_list: <the active {id, text} entries from Step 0.3 — findings that address one set affected_capability to bx:pain/<id>, id verbatim>
 Repo root: the working directory. Grep scope for affected_files: bx/, README.md, workflow.md.
 Output: structured JSON-shaped findings per the schema in your scan instructions. finding_id: null and source_excerpt as specified — the orchestrator computes all hashes. Do NOT format a report.
 ```
 
-Instruct each agent to **first Read** its own scan reference file (`upstream-changelog` → `bx/skills/evolve/references/scan-changelog.md`; `upstream-docs` → `bx/skills/evolve/references/scan-docs.md`; `upstream-community` → `bx/skills/evolve/references/scan-community.md`) and then Read the following named sections of `bx/skills/evolve/references/state-schema.md`: "source_url canonicalization (normative)", "affected_capability normalization" (within the finding_id computation section), and the "`bx:pain/<kebab-slug>` convention" paragraph. These files live at repo-root-relative paths; the run-in-repo precondition guarantees CWD = repo root. The agent follows the scan file exactly — it is canonical. Do NOT inline the content of these files in the task prompt.
+Instruct each agent to **first Read** its own scan reference file (`upstream-changelog` → `bx/skills/evolve/references/scan-changelog.md`; `upstream-docs` → `bx/skills/evolve/references/scan-docs.md`; `upstream-community` → `bx/skills/evolve/references/scan-community.md`) and then Read the following named sections of `bx/skills/evolve/references/state-schema.md`: "source_url canonicalization (normative)", "affected_capability normalization" (within the finding_id computation section), and the "`bx:pain/<id>` convention" paragraph (lanes copy the id they were given; the **Pain registry** section itself is orchestrator-only and need not be read by lanes). These files live at repo-root-relative paths; the run-in-repo precondition guarantees CWD = repo root. The agent follows the scan file exactly — it is canonical. Do NOT inline the content of these files in the task prompt.
 
 **`--no-community`:** omit the Agent call for `upstream-community` entirely. Record `lane_status: skipped` for that lane in the report footer.
 
@@ -135,7 +137,7 @@ Cross-lane corroboration matches on `affected_capability`: when two lanes emit f
 
 Read `bx/skills/evolve/references/report-template.md` and render exactly as specified there. Do not improvise the report structure; report-template.md owns every section, the headline format, the empty-state rows, and the footer shape.
 
-**New actionable findings → decision log.** Before rendering the report, write new and re-raised findings to `docs/upstream/state.json`. A new entry's `title` is the lane finding's `upstream_delta` reduced to one line of at most 120 characters (lanes do not emit a separate title); the four edit fields come from the finding verbatim. "Open entries written this run" in the footer counts new `open` entries plus every entry that transitioned to `open` this run (re-raised rejected or applied). **Checkpoint 1** — write state per `bx/skills/evolve/references/state-schema.md`'s Update Mechanics (it owns the contents and procedure).
+**New actionable findings → decision log.** Before rendering the report, write new and re-raised findings to `docs/upstream/state.json`. A new entry's `title` is the lane finding's `upstream_delta` reduced to one line of at most 120 characters (lanes do not emit a separate title); the four edit fields come from the finding verbatim. "Open entries written this run" in the footer counts new `open` entries plus every entry that transitioned to `open` this run (re-raised rejected or applied). **Checkpoint 1** — write state per `bx/skills/evolve/references/state-schema.md`'s Update Mechanics (it owns the contents and procedure), and write the updated pain registry to `docs/upstream/pain-points.json` in the same turn (its shape and key order are in the schema's **Pain registry** section). Run `python -I bx/skills/evolve/tests/check-state.py .` afterwards; a non-zero exit is reported as a validation failure.
 
 **Advisory findings** (`tier: community`) are not written to the decision log — they appear in Section 3 and are gone when the run ends.
 

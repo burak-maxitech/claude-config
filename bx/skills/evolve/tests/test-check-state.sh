@@ -51,6 +51,34 @@ plant bad-key-order  "e=d['decisions'][0]; n=e.pop('note'); d['decisions'][0]=di
 plant bad-decision   "d['decisions'][0]['decision']='maybe'"                                     "not in"
 plant id-mismatch    "d['decisions'][0]['affected_capability']='bx:other/thing'"                 "does not equal sha1"
 
+# pain registry: a state whose bx:pain/<x> points at an alias or an unknown id must fail
+plant_reg() {  # <name> <python-expression mutating `d` (state) and `r` (registry)> <expected-substring>
+    local root="$TMP/$1"
+    mkdir -p "$root/docs/upstream"
+    cp "$REPO/docs/upstream/state.json" "$root/docs/upstream/state.json"
+    PYTHONUTF8=1 "$PY" -I - "$root/docs/upstream" "$2" <<'PY'
+import hashlib, json, sys
+d_dir, expr = sys.argv[1], sys.argv[2]
+d = json.load(open(d_dir + "/state.json", encoding="utf-8"))
+r = {"pain_points": [{"id": "sample-pain", "text": "Sample pain point", "source": "claude-md", "status": "active",
+                      "aliases": ["sample-pain-old-slug"], "first_seen": "2026-10-20", "last_seen": "2026-10-20"}]}
+url = d["decisions"][0]["source_url"]
+def point(cap):
+    e = d["decisions"][0]; e["affected_capability"] = cap
+    e["finding_id"] = hashlib.sha1((url + "|" + cap).encode()).hexdigest()
+exec(expr)
+json.dump(d, open(d_dir + "/state.json", "w", encoding="utf-8"), indent=2, ensure_ascii=False)
+json.dump(r, open(d_dir + "/pain-points.json", "w", encoding="utf-8"), indent=2)
+PY
+    if run_check "$root"; then fail "$1 is rejected -- validator passed"
+    elif printf '%s' "$OUT" | grep -qF -- "$3"; then pass "$1 is rejected"
+    else fail "$1 is rejected -- wrong reason: $OUT"; fi
+}
+plant_reg pain-alias-used   "point('bx:pain/sample-pain-old-slug')"                                  "is an alias"
+plant_reg pain-unknown-id   "point('bx:pain/nobody-knows')"                                          "no registry entry"
+plant_reg registry-dup-id   "point('bx:pain/sample-pain'); r['pain_points'].append(dict(r['pain_points'][0]))" "duplicate id"
+plant_reg registry-bad-keys "point('bx:pain/sample-pain'); r['pain_points'][0].pop('last_seen')"    "keys must be"
+
 echo ""
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES check-state test(s) failed."; exit 1; fi
 echo "All check-state tests passed."

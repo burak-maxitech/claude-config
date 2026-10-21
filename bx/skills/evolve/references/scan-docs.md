@@ -10,7 +10,7 @@ You have these tools available: Read, Grep, Glob, WebFetch. Use WebFetch for all
 
 - `docs_checked_at` — ISO date string (YYYY-MM-DD) or null. The date the docs pages were last fetched and compared against the capability inventory. Null means this is the first run. This field frames the report ("docs checked as of <date>") but does NOT gate what you fetch — you always re-read all allowlisted pages on every run and compare against the live capability inventory (see Delta detection below).
 - `capability_inventory` — list of bx capability strings (e.g. `"bx:seo/allowed-tools"`, `"bx:save/agent-model"`). Only produce findings that intersect this list or a pain point from the list below.
-- `pain_point_list` — list of short strings describing known friction areas in the bx toolkit (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). Official guidance that addresses a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to the `bx:pain/<kebab-slug>` form (use the `bx:pain/<kebab-slug>` form — see the schema notes below).
+- `pain_point_list` — list of `{id, text}` objects naming known friction areas in the bx toolkit (e.g. `{"id": "permission-prompts-allowed-tools", "text": "permission prompts when allowed-tools misses a command"}`). Official guidance that addresses a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to `bx:pain/<id>` with the `id` copied verbatim from the list — never derived from the text, never invented (see the schema notes below).
 
 ---
 
@@ -148,7 +148,7 @@ The orchestrator advances `docs_checked_at` only on `ok` or `degraded`, per `bx/
 
 **`source_excerpt`:** the verbatim heading-bounded section extract (per the verbatim-extract requirement in Step 1) — never WebFetch's summary prose (summaries are unstable across calls; see Step 1 for why). The orchestrator normalizes and hashes your `source_excerpt` per `bx/skills/evolve/references/state-schema.md` to produce `source_content_hash`. Return the raw extract; do not attempt to hash.
 
-**`affected_capability` normalization:** normalize per `bx/skills/evolve/references/state-schema.md`. For pain-point-only findings (no inventory capability matched), use the `bx:pain/<kebab-slug>` form — the slug convention is defined in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
+**`affected_capability` normalization:** normalize per `bx/skills/evolve/references/state-schema.md`. For pain-point-only findings (no inventory capability matched), use `bx:pain/<id>` with the id from `pain_point_list` — the convention is defined in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
 
 **`source_url`:** the canonicalized allowlisted URL for the page the finding comes from (e.g. `https://code.claude.com/docs/en/hooks`). Apply canonicalization per `bx/skills/evolve/references/state-schema.md` before hashing and storing. For this lane, `citation` and `source_url` always have the same value.
 

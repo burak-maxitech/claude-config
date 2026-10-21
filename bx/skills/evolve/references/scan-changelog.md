@@ -10,7 +10,7 @@ You have these tools available: Read, Grep, Glob, Bash (gh commands only — pat
 
 - `last_changelog_version` — string (e.g. `"2.1.170"`) or null. The highest claude-code release processed on the last run, stored as an **unprefixed version string** (no leading `v`). Null means this is the first run — scan ALL releases in the window.
 - `capability_inventory` — list of bx capability strings (e.g. `"bx:seo/allowed-tools"`, `"bx:save/agent-model"`). Only produce findings that intersect this list or a pain-point from the list below.
-- `pain_point_list` — list of short strings describing known friction areas in the bx toolkit (e.g. `"permission prompts on every run"`, `"watermark drift on partial failures"`). A release note addressing a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to the `bx:pain/<kebab-slug>` form (use the `bx:pain/<kebab-slug>` form — see the schema notes below).
+- `pain_point_list` — list of `{id, text}` objects naming known friction areas in the bx toolkit (e.g. `{"id": "permission-prompts-allowed-tools", "text": "permission prompts when allowed-tools misses a command"}`). A release note that addresses a pain point qualifies as a finding even without an exact capability match. For such findings, set `affected_capability` to `bx:pain/<id>` with the `id` copied verbatim from the list — never derived from the text, never invented (see the schema notes below).
 
 ---
 
@@ -70,7 +70,7 @@ For each in-scope release body, extract these categories of change. Each is a ca
 
 ### Step 6 — Filter against capability inventory and pain points
 
-For each candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point matches with no inventory capability produce a finding with `affected_capability` set to the `bx:pain/<kebab-slug>` form (use the `bx:pain/<kebab-slug>` form — see the schema notes below).
+For each candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point matches with no inventory capability produce a finding with `affected_capability` set to `bx:pain/<id>` (id copied from `pain_point_list` — see the schema notes below).
 
 ### Step 7 — Populate affected_files via Grep
 
@@ -125,7 +125,7 @@ If two releases in a degraded run produce the same `(source_url, affected_capabi
 
 **`source_excerpt`:** the verbatim heading-bounded extract (or release-body section) that is the hash input — not your own summary prose. The orchestrator normalizes and hashes your `source_excerpt` per `bx/skills/evolve/references/state-schema.md` to produce `source_content_hash`. Return the raw extract; do not attempt to hash.
 
-**`affected_capability` normalization:** normalize per `bx/skills/evolve/references/state-schema.md`. Example: `"bx:seo/allowed-tools"`. For pain-point-only findings (no inventory capability matched), use the `bx:pain/<kebab-slug>` form — the slug derivation convention (form, example, stability requirement) is defined in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
+**`affected_capability` normalization:** normalize per `bx/skills/evolve/references/state-schema.md`. Example: `"bx:seo/allowed-tools"`. For pain-point-only findings (no inventory capability matched), use `bx:pain/<id>` with the id from `pain_point_list` — the convention and its reason are in `bx/skills/evolve/references/state-schema.md`'s finding_id computation section.
 
 **`source_url` for the `ok` path:** the GitHub release URL for the specific tag, e.g. `https://github.com/anthropics/claude-code/releases/tag/v2.1.170`. Apply canonicalization per `bx/skills/evolve/references/state-schema.md` before hashing and storing.
 

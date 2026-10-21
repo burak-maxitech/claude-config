@@ -158,7 +158,49 @@ finding_id = hashlib.sha1(
 
 The `affected_capability` string must be normalized before hashing: lowercase, forward-slash separators, no trailing slash, no spaces. Example: `"bx:seo/allowed-tools"` not `"bx:seo / Allowed Tools"`.
 
-**Pain-point findings — `bx:pain/<kebab-slug>` convention:** when a finding addresses a known pain point from the `pain_point_list` rather than a specific capability in the `capability_inventory`, set `affected_capability` to `bx:pain/<kebab-slug>`. The slug form is `bx:pain/` followed by the pain-point text converted to lowercase kebab-case (spaces → hyphens, punctuation stripped). Example: pain point `"permission prompts on every run"` → `bx:pain/permission-prompts-on-every-run`. The slug MUST be derived deterministically from the canonical pain-point text — never from the upstream release content — so that `finding_id` is stable across runs and re-raise checks work correctly. Apply the same normalization (lowercase, no trailing slash, no spaces) before hashing.
+**Pain-point findings — `bx:pain/<id>` convention:** when a finding addresses a known pain point from the `pain_point_list` rather than a specific capability in the `capability_inventory`, set `affected_capability` to `bx:pain/<id>`, where `<id>` is the registry id the orchestrator passed alongside the pain point's text (see **Pain registry** below). Lanes never derive the id from the text and never invent one: a pain point arrives as `{id, text}` and the id is copied verbatim. **Why:** before bx 2.11.0 the id was a kebab-case slug of the pain-point prose, so every rewording of a Known Issue produced a new `finding_id` for the same concern (eight stored slugs covered five concerns). Apply the same normalization (lowercase, no trailing slash, no spaces) before hashing — a valid id already satisfies it.
+
+### Pain registry — `docs/upstream/pain-points.json` (normative)
+
+The registry gives every pain point a stable id that survives rewording. `/bx:evolve` is its only writer (Step 0.3 rebuilds it in-context, Checkpoint 1 writes it); `/bx:save` and every other skill leave it alone. It is created on the first 2.11.0 run and committed with `state.json`.
+
+```json
+{
+  "pain_points": [
+    {
+      "id": "plugin-cache-staleness",
+      "text": "Plugin-versioning sharp edge (S54)",
+      "source": "claude-md",
+      "status": "active",
+      "aliases": ["plugin-cache-staleness-after-every-push-activation-gap"],
+      "first_seen": "2026-06-10",
+      "last_seen": "2026-10-20"
+    }
+  ]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `id` | Stable kebab-case identifier (`[a-z0-9-]+`, ≤40 chars). Never changed, never reused, never deleted. |
+| `text` | The pain point's current lead text as read this run (≤160 chars, markers stripped). Updated whenever the lead changes; the id does not. |
+| `source` | `claude-md` (CLAUDE.md `## Known Issues / Blockers`) or `status-md` (`docs/STATUS.md` `## Next Steps`). Updated if the item moves. |
+| `status` | `active` — the lead was found this run; `retired` — it was not (the issue was resolved, archived or dropped). A retired id reactivates if its lead reappears. |
+| `aliases` | Earlier ids or pre-2.11.0 slugs that denote the same concern. Unique across the whole registry; an alias is never also an id. Used only by matching and by the validator's rewrite check. |
+| `first_seen` / `last_seen` | ISO dates of the first and most recent run that found the lead. |
+
+**Sources and leads.** A pain point is an entry of CLAUDE.md's `## Known Issues / Blockers` (entry and lead exactly as `save/references/mode-update.md` Part 1.7 defines them — a bold phrase or a top-level bullet; the `> Archived issues:` and `> Session state:` blocks are not entries) or a numbered item of `docs/STATUS.md`'s `## Next Steps`. The **lead** is the bold phrase when the item opens with one, otherwise the text before the first ` — ` or `. `. `text` is the lead with `**`, list markers and the trailing `:`/`.` removed.
+
+**Significant words** are the lead's lowercase alphanumeric tokens of four or more characters, excluding `this that with from into when then than they have been will skill skills still after before`. Code spans count as words (`start-claude.ps1` → `start-claude.ps1`).
+
+**Matching, in order, for each lead read this run:**
+1. An active or retired entry whose `text`'s significant words share at least three with the lead's first six significant words → that entry (update `text`, `source`, `last_seen`; set `active`).
+2. Else an entry one of whose `aliases`, read as words split on `-`, shares at least three with those six → that entry, same updates.
+3. Else a new entry: `id` = the first four significant words joined by `-` (truncate to 40 chars; on collision append `-2`, `-3`, …), `aliases: []`, `first_seen = last_seen = today`, `active`.
+
+Two leads may not match the same entry in one run: if they do, the second lead gets a new entry and the orchestrator notes the near-duplicate in the report footer. After all leads are processed, every entry not matched this run becomes `retired` (its `last_seen` unchanged). Nothing is ever removed.
+
+**Hand-off to the lanes.** `pain_point_list` in the Step 2 context block is the list of **active** entries as `{id, text}` objects in registry order. A lane's pain-point finding sets `affected_capability: bx:pain/<id>` with the id copied verbatim. The validator rejects a `bx:pain/<x>` whose `<x>` is an alias or unknown, so a stored entry must always point at an id — the one-time 2.11.0 migration rewrote the pre-registry slugs to ids and recomputed their `finding_id`s.
 
 ### source_url canonicalization (normative)
 
