@@ -272,3 +272,6 @@
 - [x] S62: `/bx:save --full` sweep-before-writer ordering + saving-based open-phase rule (bx 2.12.0)
 - [x] S62: `/bx:evolve` lane-freshness skip, edit-shape re-grep, pain-id match (2.12.0)
 - [x] S62: `lane-contract.md`, docs page-hash probe + `watermark.docs_pages`, pinned `capabilities.json`, community discovery feed (2.12.0)
+- [x] S62: bx 2.12.1 — three evolve findings applied; registry threshold + validator pattern fixed by running
+- [x] S62: bx 2.12.2 — task-tools.md states the v2.1.268 allowlist rule; env-vars pinned
+- [x] S62: four real `/bx:evolve` runs on 2.12.x (freshness skip, hash map, pinned inventory, discovery lane exercised)

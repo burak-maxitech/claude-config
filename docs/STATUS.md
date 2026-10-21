@@ -2,19 +2,19 @@
 
 > Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
 
-Last Updated: 2026-10-21 (Session 62)
+Last Updated: 2026-10-21 (Session 62, cont.)
 
 ## Current Status
 
 | Area | Status |
 |------|--------|
-| Skills (11) | Complete — `/bx:save --full` reordered sweep first-run S62 (2.12.0); `/bx:evolve` 2.12.0 lanes dispatched once each (docs, community); only `/bx:health` never run |
+| Skills (11) | Complete — `/bx:save --full` run twice on the reordered sweep S62 (incl. a real Part 7.3 size rollup); `/bx:evolve` 2.12.x run four times S62 (freshness skip, hash map, pinned inventory, discovery lane all exercised); only `/bx:health` never run |
 | Subagents (20) | Complete — `arch-robustness` added S58 |
-| Plugin packaging (`bx`) | **v2.11.1** pushed (S61); **2.12.0 committed S62, push + cache refresh owed** (cache still 2.11.1). Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
+| Plugin packaging (`bx`) | **v2.12.2** pushed and installed S62 (cache 2.12.2; 2.12.0 → 2.12.1 → 2.12.2 in one day). Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate passed and fix wave shipped in `7ed079a` (2026-08-17), recorded S61 |
 | Cross-platform setup | Complete |
-| GitHub sync | Complete — main pushed through v2.11.1 (S61); 2.12.0 push owed |
+| GitHub sync | Complete — main pushed through v2.12.2 (S62, `c2388c9`) |
 | Documentation | Complete — schema v2 |
 
 ## Completed
@@ -27,9 +27,9 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## In Progress
 
-**`/bx:evolve` 2.12.0 — all S61 follow-ups shipped, first real run owed (S62).** The three 2.11.0 run-found defects (lane-freshness skip via `git ls-remote`, edit-shape re-grep, pain-id match) and improvements 7–10: `lane-contract.md` (named owner of the shared lane text; scan files cite it), `scripts/docs-page-hashes.py` + `watermark.docs_pages`/`inventory_hash` (docs lane reads only changed pages — the `.md` endpoint hashes with zero tokens), `scripts/build-capabilities.py` → pinned `capabilities.json` (434 entries, the only legal `affected_capability` vocabulary), community lane rewritten as an official-source discovery feed (`findings: []`). Docs and community lanes each verified by one live dispatch. **Owed:** push + cache refresh, then the first `/bx:evolve` run (seeds the hash map; exercises Step 1.5, 3.4 pain-id, `--check` drift, the changelog lane under the contract); the plugin-eval design item `69ef485d`.
+**`/bx:evolve` 2.12.x — shipped, run four times, three run-found defects fixed (S62).** 2.12.0 delivered the three 2.11.0 defects and improvements 7–10 (`lane-contract.md`, `scripts/docs-page-hashes.py` + `watermark.docs_pages`/`inventory_hash`, pinned `capabilities.json` via `scripts/build-capabilities.py`, community lane as a discovery feed). Four real runs: delta 22/22 pages (5 findings), `--fix` with all lanes current (3 applied + `env-vars` pinned), delta 5/23 (1 finding), `--fix` all-current (1 applied). Fixed in 2.12.1: registry threshold `min(3, n)`, validator pattern for the pinned vocabulary. **Open:** the probe's delta-aware scan (narrowed by hand once), candidates persisting into `--fix`, a `source_url` tie-break rule, the plugin-eval design `69ef485d` (needs `bx/evals/` + `claude plugin eval init`).
 
-**Doc tiering phase 1 — the two S61 run-found defects fixed in 2.12.0; this save was the first run of the fix.** The `--full` sweep (Parts 2–7) now runs before the writer dispatch and the session entry carries a `Full sweep:` bullet; the open-phase 300-char floor became "entry at least 500 chars longer than its composed replacement line", with a *looks resolved — confirm* heading in the 7.4 prompt. Lint K20/K23 pin both. Still open: deferred minors (guard checks inequality not increase; guard tests not hermetic against `commit.gpgsign`; lint and fixture tests not in CI; `save-writer`'s unreachable `status: open` path); CLAUDE.md sits just over the 12k soft cap with no section over its shrinker threshold; Phase 2 (`.claude/rules/` tier) gated on re-verifying `paths:`. Plan: `docs/superpowers/plans/2026-09-28-bx-doc-tiering-phase1.md`.
+**Doc tiering phase 1 — the two S61 defects fixed in 2.12.0 and run twice (S62).** The `--full` sweep (Parts 2–7) runs before the writer dispatch; the second run exercised the Part 7.3 size-based Key Decisions rollup for real (8 rows moved, CLAUDE.md 12.7k → 9.3k). The open-phase floor is saving-based with a *looks resolved — confirm* heading; lint K20/K23 pin both. Still open: deferred minors (guard checks inequality not increase; guard tests not hermetic against `commit.gpgsign`; lint and fixture tests not in CI; `save-writer`'s unreachable `status: open` path); Phase 2 (`.claude/rules/` tier) is now unblocked — the memory docs confirm `paths:` is the only rule frontmatter field (deferred finding `5b91feb3` carries the edit). Plan: `docs/superpowers/plans/2026-09-28-bx-doc-tiering-phase1.md`.
 
 **Doc schema v2 post-merge verification (S56–57).** The first `/bx:save --full` on schema v2 ran S57: Part 5 found all older sessions already compressed, Parts 6/7 under caps, and rotation did not fire then. It has since fired: `docs/archive/key-decisions-1.md` exists and the live `docs/key-decisions.md` measured 53k on 2026-09-28 (S60). Still owed from the deferred Task 10 skill-steps: live `/bx:save` runs against the fixtures (fx-v2 no-op, fx-partial resume, fx-dirty skip, fx-v1-envvars keep path, fx-v1-sparse scaffold, fx-v1-ineligible decline). Post-merge minors parked in both plans: backlog symptom measurement (7.7's clause is unreachable), checker fence-strip/CR robustness, mode-migrate declines-bullet v1-only phrasing, resume Quick Reference partial row, structure-rules cell wording.
 
@@ -41,8 +41,8 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## Next Steps
 
-1. **Push 2.12.0, refresh the cache, run the first `/bx:evolve` on it** — push main, `claude plugin update bx` + `/reload-plugins`; the run seeds `watermark.docs_pages` (all 22 pages once), and is the first execution of Step 1.5's freshness skip, the 3.4 pain-id match, the `--check` drift line and the changelog lane under `lane-contract.md`. Then a same-day `--fix` should show the changelog and docs lanes `current`.
-2. **Doc tiering Phase 2** (`.claude/rules/` tier, spec D4–D6), gated on re-verifying `paths:` against the memory docs; plus the deferred minors listed in `## In Progress`.
+1. **`/bx:evolve` 2.12.x follow-ups** — make `docs-page-hashes.py` delta-aware (diff the live inventory against the last committed `capabilities.json`; scan only pages whose markdown contains an added or removed token, instead of all 23 on any change), persist `allowlist_candidates` from a delta run into its `--fix`, add a `source_url` tie-break rule (larger file overlap) to Step 3.4; PATCH bump.
+2. **Doc tiering Phase 2** (`.claude/rules/` tier, spec D4–D6) — unblocked S62: the memory docs confirm `paths:` is the only rule frontmatter field (YAML list or comma string; unparseable YAML loads the rule unconditionally); the edit is stored on deferred finding `5b91feb3`. Plus the deferred minors listed in `## In Progress`.
 3. **Doc-schema v2 fixture verification** — the deferred live `/bx:save` runs against the six fixture cases (fx-v2 no-op, fx-partial resume, fx-dirty skip, fx-v1-envvars keep path, fx-v1-sparse scaffold, fx-v1-ineligible decline), plus the post-merge minors batch from both plans.
 4. **/simplify follow-up: move Part 7.7 rotation out of Part 7** into its own sibling Part — deletes the five "except 7.7" carve-outs; requires a blind rehearsal before shipping. The S59 spec's D4 proposes a Part 7.9 sibling on the same reasoning — do these together.
 5. **Resume the `/bx:webdesign` kaanarik run past review** — push through Phase 3 inject+verify; verify finding `dadac845` live (Phase 3e asks before the destructive-git rollback).
@@ -56,9 +56,9 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 > Full history: [session-history.md](session-history.md)
 
-### Last Session (Session 62) - 2026-10-21
-- **bx 2.12.0 (uncommitted → committed this save):** `/bx:save --full` fixed — the sweep (Parts 2–7) runs before the writer dispatch and the open-phase floor is saving-based; this save was the fix's first run (compressed S57–58, rolled up 6 Key Decisions rows, repaired a table gap).
-- **`/bx:evolve` three run-found defects fixed:** lane-freshness skip (`git ls-remote` for the changelog head; probe for docs; same-day for community), edit-shape re-grep (additive edits probe the new text), pain-id match as a third 3.4 lookup.
-- **Improvements 7–10 shipped:** `lane-contract.md` (scan files cite, never restate), docs lane reads only changed pages via a zero-token `.md` hash probe (`watermark.docs_pages`, `inventory_hash`), pinned `capabilities.json` (434 entries, generated), community lane re-scoped to an official-source discovery feed.
-- Live dispatches of the rewritten docs and community lanes returned contract-conformant output; validator + planted-failure tests, both lints and `claude plugin validate --strict` pass.
-- Full sweep: compressed sessions 57–58, moved 6 Key Decisions rows to `docs/key-decisions.md`, README/architecture trees updated, one memory added; CLAUDE.md 13.9k → ~12.2k, no shrinker threshold reached.
+### Last Session (Session 62, cont.) - 2026-10-21
+- **bx 2.12.0 → 2.12.2 shipped and installed in one day.** 2.12.0 (save sweep reorder, evolve lane contract, page-hash probe, pinned inventory, discovery lane), 2.12.1 (three findings applied; registry threshold + validator pattern fixed by running), 2.12.2 (`task-tools.md` states the v2.1.268 allowlist rule).
+- **Four real `/bx:evolve` runs:** delta 22/22 pages → 5 findings; `--fix` with every lane current → 3 applied (`/bx:clean` rewind caveat, `KillShell` → `TaskStop`, ultrareview wording) + `env-vars` pinned; delta 5/23 (scan narrowed by hand after a one-token inventory change) → 1 finding; `--fix` all-current → applied. Decision log 41 applied / 14 rejected / 5 deferred / 1 open.
+- **Three run-found defects fixed in place:** pain-registry threshold `min(3, n)`, validator capability pattern, `source_url` tie-break by file overlap (text-only).
+- **Second `/bx:save --full` on the reordered sweep:** Part 7.3's size-based Key Decisions rollup ran for real (8 rows → archive, CLAUDE.md 12.7k → 9.3k); Parts 5/6 silent; no rotation.
+- Full sweep: 8 Key Decisions rows moved by size pressure; README/architecture already current; no memory change.

@@ -221,3 +221,22 @@
 - Push 2.12.0, refresh the plugin cache, run the first `/bx:evolve` on it (seeds the hash map; first execution of Step 1.5, the pain-id match, the drift line, the changelog lane under the contract)
 - Doc tiering Phase 2 and the deferred save minors
 - Dogfood `/bx:health`
+
+### Session 62 (cont.) - 2026-10-21
+**What happened:**
+- Released and installed bx 2.12.0 (`78fdc68`), 2.12.1 (`fd04dc1`) and 2.12.2 (`c2388c9`); cache refreshed each time via `claude plugin update bx` + `/reload-plugins`.
+- First `/bx:evolve` on 2.12.0: changelog current (`git ls-remote` head = 2.1.306), docs 22/22 pages (hash map seeded), community discovery clean. 5 findings: clean's `/rewind` promise wrong for `git rm` deletions (re-raised applied `4ed0fc0c` by source_url), `KillShell` → `TaskStop` in webdesign, ultrareview numbers unsourced, `.claude/rules/` contract confirmed (deferred `5b91feb3`, edit filled), plugin-eval overlap joined to `69ef485d` by judgment. Pain registry: 14 active / 10 retired; `tiering-phase` merged into `claude-md-over-size-target`.
+- Defects found by running, fixed before the state write: the registry's fixed three-word threshold spawned duplicate ids for two-word leads (`min(3, n)`); the validator's capability pattern rejected `tool:KillShell` / `builtin:code-review-ultra` (widened to `^bx:[a-z0-9-]+/[A-Za-z0-9:/_.-]+$`).
+- `--fix` minutes later: all three lanes current, pure fix pass; 3 applied across 9 files, `env-vars` pinned (candidate carried by hand — not persisted between runs), inventory regenerated.
+- Second delta: inventory hash changed by one rename, rule prescribed a 23-page re-read; narrowed by orchestrator judgment to the new page + 4 pages mentioning `TaskStop`/`KillShell` (delta from git). One finding: `task-tools.md` stated a v2.1.233 denylist; docs define a v2.1.268 allowlist. Second `--fix`: all-current, applied (2.12.2).
+- `/bx:save --full` twice on the reordered sweep; the second ran Part 7.3's size rollup for real.
+
+**Files created/modified:**
+- `bx/skills/evolve/references/state-schema.md` (registry threshold, capability pattern text), `bx/skills/evolve/tests/check-state.py` (pattern), `references/scan-docs.md` (env-vars row), `capabilities.json` (regenerated)
+- `bx/skills/clean/SKILL.md`, `bx/skills/webdesign/{SKILL.md, references/phase1-extract.md, references/phase3-inject.md}`, `bx/skills/health/references/state-buckets.md`, `bx/skills/review/SKILL.md`, `bx/skills/save/references/task-tools.md`, `README.md`, `workflow.md`
+- `docs/upstream/state.json` (61 entries; six-key watermark with 23 page hashes), `docs/upstream/pain-points.json`, `CHANGELOG.md` (2.12.1, 2.12.2), `bx/.claude-plugin/plugin.json`
+
+**Next session should:**
+- Make the page probe delta-aware; persist candidates into `--fix`; add the `source_url` tie-break rule
+- Doc tiering Phase 2 (`.claude/rules/` tier) — unblocked, edit on `5b91feb3`
+- Dogfood `/bx:health`
