@@ -118,8 +118,9 @@ Skipped:          1 (including 0 could-not-apply-mechanically)
 Aborted-remaining: 0
 
 Next steps:
-- Run `/plugin update bx` then `/reload-plugins` (or relaunch `cc`) — the plugin cache does not
-  pick up edits until refreshed. Since Claude Code 2.1.260 `/reload-plugins` is also available in
+- Run `claude plugin update bx` from a shell (`update` has no `/plugin` session form) then `/reload-plugins`
+  in the session (or `/reload-skills` when only SKILL.md files changed; hooks, agents and `.mcp.json`
+  need the full reload), or relaunch `cc` — the plugin cache does not pick up edits until refreshed. Since Claude Code 2.1.260 `/reload-plugins` is also available in
   headless (`-p` / SDK) sessions, so a scripted pass can refresh without an interactive relaunch. (Claude Code 2.1.216 fixed mid-session skill/command edits not
   appearing in the slash menu until restart, and v2.1.221 made plugins installed from `/plugin`
   activate immediately "when safe", and v2.1.268 made a plugin installed, enabled or disabled

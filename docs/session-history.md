@@ -222,3 +222,22 @@
 **Next session should:**
 - Fix the two `--full` defects in `mode-update.md` / `save-writer.md` (PATCH bump)
 - Turn the `/bx:evolve` examination into a prioritized revision plan
+
+### Session 61 (cont.) - 2026-10-20
+**What happened:**
+- Examined `/bx:evolve` (agent report: purpose, lanes, state model; 14 defects; 10 prioritized improvements) and planned improvements 1–6 via `/bx:plan` (12 interview answers locked: store edits on open entries, applied branch mirroring the rejected rule, pain registry owned by evolve, paginate to the anchor with a recorded gap, hand-triage the 18, validator + rehearsal + real run, one MINOR release).
+- Built it on `feat/evolve-v2`, one commit per phase (`e66d790`..`8da760e`): Phase 1 schema + `tests/check-state.py` (6 planted-defect cases) + CI step + sentinel hash backfill; Phase 2 Step 3.2/3.4 (same-source dedup before hashing, `applied` branch, source_url match, relevance check after the lookup); Phase 3 pain registry (`docs/upstream/pain-points.json`, lead/significant-word/three-step match, aliases); Phase 4 numeric anchor compare + pagination ≤10 pages + `changelog_gap`; Phase 5 Section 4 fix eligibility + stale auto-close + honest closing line; Phase 6 `allowlist_candidates` + `auto-mode-config` pinned; Phase 7 migration script + triage; Phase 8 CHANGELOG 2.11.0, validate, merge, push (CI green).
+- Six blind rehearsals (phases 2 ×2, 4 ×2, 5 ×1 plus the fixture rebuild) reproduced every expected outcome and caught: relevance check ordered before the lookup it feeds; same-source collapse ignoring `class`; equality-only anchor unable to tell "yanked" from "predates history"; closing line over-promising; a fixture that underflowed into negative versions.
+- Real runs on the installed 2.11.0: delta 2.1.284 → 2.1.306 (20 releases, 15 pages; 7 findings, 1 cross-lane collapse); `--fix` applied 8 (`/plugin update bx` → shell `claude plugin update bx`; `/reload-skills`; convention-aware `/code-review` wording; webdesign Phase 3e confirmation; WebFetch truncation rule; hook comment; agent-tools truth), pinned 7 allowlist pages, rejected `4519c508`. Live probe: `upstream-changelog` with `Bash(gh:*)` ran `echo`/`git` — specifiers unenforced.
+- Cache gotcha: `/plugin update bx` has no session form; `/plugin marketplace update burak-tools` + `/reload-plugins` installed 2.11.0.
+
+**Files created/modified:**
+- `bx/skills/evolve/SKILL.md`, `references/{state-schema,fix-mode-evolve,scan-changelog,scan-docs,scan-community,report-template}.md` — the revision
+- `bx/skills/evolve/tests/check-state.py`, `test-check-state.sh`, `fixtures/{phase2,phase4,phase5}/`, `fixtures/migrate-2-11-0.py` — NEW
+- `docs/upstream/state.json` (58 entries, 13 keys), `docs/upstream/pain-points.json` — NEW registry
+- `--fix` edits: `README.md`, `workflow.md`, `bx/skills/webdesign/references/phase{1-extract,3-inject}.md`, `bx/skills/save/references/mode-update.md`, `bx/scripts/session-start-context.sh`, `docs/architecture.md`
+- `.github/workflows/plugin-version.yml`, `CHANGELOG.md`, `bx/.claude-plugin/plugin.json` (2.10.0 → 2.11.0 → 2.11.1)
+
+**Next session should:**
+- Push 2.11.1, refresh the plugin, run `/bx:evolve` once more to see the truncation fix and the new allowlist rows work
+- Fix the three 2.11.0 run-found defects; then improvements 7–10

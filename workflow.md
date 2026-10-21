@@ -34,7 +34,7 @@ cc               # interactive project picker
 
 **What the script does (5 steps):**
 1. Pulls latest claude-config (syncs the `bx` plugin source across machines)
-2. (Legacy symlink check — superseded by `/plugin update bx` once the plugin is installed)
+2. (Legacy symlink check — superseded by `claude plugin update bx` once the plugin is installed)
 3. Navigates to project and pulls latest changes
 4. Checks for Claude Code updates
 5. Launches Claude Code (tip: run `/bx:resume` to get up to speed)
@@ -56,7 +56,7 @@ cc               # interactive project picker
 cd ~/Development/projects/claude-config && git pull && cd -
 
 # 2. Ensure the bx plugin is current (after first-time /plugin install bx@burak-tools)
-#    /plugin marketplace update burak-tools && /plugin update bx   (run inside Claude Code)
+#    /plugin marketplace update burak-tools   (inside Claude Code), then from a shell: claude plugin update bx, then /reload-plugins
 
 # 3. Navigate to project
 cd ~/projects/[project-name]
@@ -84,7 +84,7 @@ claude
 cd C:\Development\projects\claude-config; git pull; cd -
 
 # 2. Ensure the bx plugin is current (after first-time /plugin install bx@burak-tools)
-#    /plugin marketplace update burak-tools; /plugin update bx   (run inside Claude Code)
+#    /plugin marketplace update burak-tools   (inside Claude Code), then from a shell: claude plugin update bx, then /reload-plugins
 
 # 3. Navigate to project
 cd C:\Development\projects\[project-name]
@@ -275,7 +275,7 @@ on pre-v2 repos. The full breakdown — including what `--full` adds — lives i
 
 ### /bx:review
 
-**When:** Before committing, or to check specific code, when you want more rigor than the built-in `/code-review` (which is fine for routine diffs but doesn't scan codebase conventions or run `--security`/`--verify`/`--fix`).
+**When:** Before committing, or to check specific code, when you want more rigor than the built-in `/code-review` (which is fine for routine diffs but does not run a pre-review codebase-convention scan — since v2.1.290 it reports CLAUDE.md-rule and cleanup findings at medium effort on Opus/Sonnet 5.5, while `/bx:review` samples the codebase's actual patterns — and cannot run `--security`/`--verify`/`--fix`).
 
 **Usage:**
 ```bash

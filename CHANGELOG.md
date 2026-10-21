@@ -2,6 +2,37 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.11.1 — 2026-10-20
+
+The first two real `/bx:evolve` runs on 2.11.0 (delta 2.1.284 → 2.1.306, then `--fix`), applied
+through the new carry-forward gate. Doc and instruction fixes only; no behaviour change in any skill.
+
+### Fixed
+
+- **`/plugin update bx` has no session form.** `update` is a shell-only subcommand; typing it after
+  `/plugin` just opens the Discover tab (observed: the cache stayed at 2.10.0). README, workflow.md,
+  fix-mode-evolve.md and mode-update.md now say `/plugin marketplace update burak-tools` (session),
+  `claude plugin update bx` (shell), `/reload-plugins` (session). `/reload-skills` is named for
+  SKILL.md-only refreshes.
+- **Agent `tools:` specifiers are not enforced.** Verified live: an agent declared `Bash(gh:*)` ran
+  `echo` and `git`. The 17 scoped lists stay as declared intent; the S43 rule in evolve SKILL.md,
+  README's agents paragraph and docs/architecture.md now say the in-Bash discipline is prompt-enforced.
+- `/bx:webdesign` Phase 3e asks the user before its destructive-git rollback and stops on an auto-mode
+  denial (closes findings `dadac845` + `6712a71e`; live verification on the kaanarik run still owed).
+- `/bx:evolve` docs and community lanes handle WebFetch truncation (re-fetch with `offset`, else
+  `pages_failed: truncated`) — this run's docs lane had read the hooks page to ~100k of 270k chars.
+- workflow.md's `/bx:review` rationale reflects v2.1.290 (`/code-review` at medium effort reports
+  CLAUDE.md-convention findings).
+- Seven doc pages pinned in the docs-lane allowlist (`code-review-local`, `ultrareview`,
+  `plugins/manifest-reference`, `plugins/marketplace-reference`, `plugins/components`,
+  `permission-modes`, `tools-reference`); `install`, `scheduled-tasks`, `settings-reference` declined.
+- `session-start-context.sh` comment on CLAUDE_ENV_FILE plain assignments (CC 2.1.296).
+
+### Known (recorded in CLAUDE.md Known Issues)
+
+- `--fix` re-runs all three lanes even when the watermark is current; the re-grep misreads additive
+  edits; same-concern findings from different release URLs are not joined.
+
 ## 2.11.0 — 2026-10-20
 
 `/bx:evolve` revision, phases 1–7 of `docs/superpowers/plans` S61 (plan file: Revise /bx:evolve). Every

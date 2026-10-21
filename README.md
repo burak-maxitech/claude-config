@@ -73,13 +73,18 @@ Each session is launched **named after the project and color-coded**, so paralle
 **Everyone** — to pull the latest skills after they change, run inside Claude Code:
 
 ```
-/plugin marketplace update burak-tools
-/plugin update bx
+/plugin marketplace update burak-tools    # inside Claude Code — refreshes the marketplace clone
 ```
 
-Updates are on-demand; the plugin is explicitly versioned (semver in `bx/.claude-plugin/plugin.json`, history in [`CHANGELOG.md`](CHANGELOG.md)), and the `version` field is the update cache key — `/plugin update bx` installs a new version whenever it has been bumped, and a pushed commit that doesn't bump it is not offered as an update. (If you use the `cc` launcher, it runs this refresh automatically on every launch — so you can skip these two commands.) Claude Code 2.1.216 made skills and commands edited *during* a session appear in the slash menu without a restart — but that covers in-place edits to files already loaded, not pulling a new commit from the marketplace, so the two commands above are still how you pick up someone else's changes.
+```bash
+claude plugin update bx                   # from a shell — `update` has no /plugin session form
+```
 
-**Contributors only** — if you edited skills in a local clone: bump `version` in `bx/.claude-plugin/plugin.json` and add a [`CHANGELOG.md`](CHANGELOG.md) entry (the version is the update cache key — pushing without a bump means `/plugin update` reports "already at the latest version" and nobody receives the change; `/bx:save`'s commit step does the bump for you, and since v2.6.0 also runs `claude plugin validate ./bx --strict --json` at the same checkpoint so a manifest or frontmatter problem surfaces before the push rather than at install time), then `git commit` → `git push` and run the two commands above to pick up your own change.
+then `/reload-plugins` inside Claude Code (or `/reload-skills` when only SKILL.md files changed; hooks, agents and `.mcp.json` need the full reload).
+
+Updates are on-demand; the plugin is explicitly versioned (semver in `bx/.claude-plugin/plugin.json`, history in [`CHANGELOG.md`](CHANGELOG.md)), and the `version` field is the update cache key — `claude plugin update bx` installs a new version whenever it has been bumped, and a pushed commit that doesn't bump it is not offered as an update. Typing `/plugin update bx` inside a session does nothing useful: an unrecognized word after `/plugin` just opens the Discover tab. (If you use the `cc` launcher, it runs this refresh automatically on every launch — so you can skip these commands.) Claude Code 2.1.216 made skills and commands edited *during* a session appear in the slash menu without a restart — but that covers in-place edits to files already loaded, not pulling a new commit from the marketplace, so the commands above are still how you pick up someone else's changes.
+
+**Contributors only** — if you edited skills in a local clone: bump `version` in `bx/.claude-plugin/plugin.json` and add a [`CHANGELOG.md`](CHANGELOG.md) entry (the version is the update cache key — pushing without a bump means `claude plugin update` reports "already at the latest version" and nobody receives the change; `/bx:save`'s commit step does the bump for you, and since v2.6.0 also runs `claude plugin validate ./bx --strict --json` at the same checkpoint so a manifest or frontmatter problem surfaces before the push rather than at install time), then `git commit` → `git push` and run the commands above to pick up your own change.
 
 <details>
 <summary><strong>Migrating an existing machine from the old symlink setup</strong> — click to expand. <em>Only relevant if you used this repo before it became a plugin (you have <code>~/.claude/skills</code> symlinked into a clone). New teammates: skip this entirely.</em></summary>
@@ -222,7 +227,7 @@ Then refresh your install with the two `/plugin …` commands from [Updating](#u
 
 ## Subagents
 
-The `bx/agents/` folder contains 20 subagent definitions used by skills (namespaced `bx:<agent>` once installed). These run on Sonnet for cost efficiency and have scoped tool permissions. Skills dispatch them automatically via the Agent tool (renamed from Task in 2.1.63), and you can also reference them by name in `@`-mention typeahead inside the REPL (added in Claude Code 2.1.89).
+The `bx/agents/` folder contains 20 subagent definitions used by skills (namespaced `bx:<agent>` once installed). These run on Sonnet for cost efficiency and declare scoped tool lists. The lists restrict *which tools* an agent has; Claude Code does not enforce command specifiers such as `Bash(find:*)` on agents (verified 2026-10-20 — an agent declared with `Bash(gh:*)` ran other commands), so the read-only discipline inside Bash is prompt-enforced by each agent's scan instructions. Skills dispatch them automatically via the Agent tool (renamed from Task in 2.1.63), and you can also reference them by name in `@`-mention typeahead inside the REPL (added in Claude Code 2.1.89).
 
 | Agent | Used By | Purpose |
 |-------|---------|---------|
@@ -432,5 +437,5 @@ again next time; `--skip-migrate` skips it for that run (the next save offers ag
 another whose `bx` plugin is still on 1.x, the old skill will not find the sections it
 expects. It degrades safely — `save-writer` refuses to guess at a missing anchor and reports
 a warning instead of writing to the wrong place — but that session's save will be
-incomplete. Update the plugin (`/plugin update bx`) on the second machine. The `cc` launcher
+incomplete. Update the plugin (`claude plugin update bx` from a shell, then `/reload-plugins`) on the second machine. The `cc` launcher
 does this automatically on every launch.

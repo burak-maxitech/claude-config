@@ -16,7 +16,7 @@ You have these tools available: Read, Grep, Glob, WebFetch. Use WebFetch for all
 
 ## Pinned URL allowlist
 
-Verified 2026-06-09; `permissions` added 2026-07-22 (S50); `checkpointing` + `code-review` added 2026-08-11 (S54); `auto-mode-config` added 2026-10-20 (S61, a candidate since 2026-08-11). For each URL: the working form confirmed by WebFetch, the capability area it covers, and any redirect note.
+Verified 2026-06-09; `permissions` added 2026-07-22 (S50); `checkpointing` + `code-review` added 2026-08-11 (S54); `auto-mode-config` added 2026-10-20 (S61, a candidate since 2026-08-11); `code-review-local`, `ultrareview`, `plugins/manifest-reference`, `plugins/marketplace-reference`, `plugins/components`, `permission-modes`, `tools-reference` added 2026-10-20 (S61 `--fix`, from the first run's `allowlist_candidates`; `plugins/install`, `scheduled-tasks` and `settings-reference` declined 2026-10-20 — re-offer only with a new reason). For each URL: the working form confirmed by WebFetch, the capability area it covers, and any redirect note.
 
 | URL | Capability area | Notes |
 |-----|----------------|-------|
@@ -35,6 +35,13 @@ Verified 2026-06-09; `permissions` added 2026-07-22 (S50); `checkpointing` + `co
 | `https://code.claude.com/docs/en/checkpointing` | checkpointing — per-user-prompt checkpoint capture, `/rewind` restore semantics, `Esc Esc` behavior, subagent/background-fork edits not restored, bash-command changes untracked | loads directly |
 | `https://code.claude.com/docs/en/code-review` | code review — `/code-review` effort levels + remembered level, background/foreground runs, `--fix` edits outside checkpoints, `disable-model-invocation` scheduled-task caveat, `REVIEW.md`, ultra escalation | loads directly |
 | `https://code.claude.com/docs/en/auto-mode-config` | auto mode — classifier-approved actions, which `allow` rules are dropped on entry (broad `Bash(*)`) and which carry over, destructive-git blocking, `PermissionDenied` retry hook | loads directly (verified 2026-10-20); owns the premise of webdesign finding `dadac845` |
+| `https://code.claude.com/docs/en/code-review-local` | local `/code-review` — effort levels + remembered level, background runs, `--fix`, `REVIEW.md`, ultra escalation (the contract bx:review's ladder cites) | added 2026-10-20 (S61); the `code-review` row above now describes only the GitHub-hosted service |
+| `https://code.claude.com/docs/en/ultrareview` | `/code-review ultra` — the cloud multi-agent pass bx:health and bx:review route to; `/ultrareview` alias | added 2026-10-20 (S61) |
+| `https://code.claude.com/docs/en/plugins/manifest-reference` | plugin.json schema — fields, `version`, `displayName`, `userConfig`, path rules, validate | added 2026-10-20 (S61); `plugins-reference` now returns this content under another title |
+| `https://code.claude.com/docs/en/plugins/marketplace-reference` | marketplace.json schema — entry fields, plugin source types, per-entry `version` and `strict` precedence, copy vs link mode | added 2026-10-20 (S61); `plugins/loading` links here for the version rule |
+| `https://code.claude.com/docs/en/plugins/components` | per-component runtime — where hooks.json, `bin/`, agents and skills load from and what runs at session start | added 2026-10-20 (S61); the `plugins` row is now only an overview |
+| `https://code.claude.com/docs/en/permission-modes` | permission modes, auto mode defaults, protected paths — what the classifier blocks before any rule | added 2026-10-20 (S61) |
+| `https://code.claude.com/docs/en/tools-reference` | built-in tool names and behaviour (Agent, AskUserQuestion, Bash, PowerShell, WebFetch) — the vocabulary of `allowed-tools`, agent `tools` and `disallowed-tools` | added 2026-10-20 (S61) |
 
 This lane fetches ONLY these allowlisted URLs. Following a link is allowed only to an anchor on the **same page** (one hop to a `#fragment`). Never follow links to other pages or domains. Why: unbounded link-chasing turns this pinned lane into an open-research lane and destroys the authority guarantee — findings must be traceable to a specific canonical page.
 
@@ -61,6 +68,8 @@ For each URL in the pinned allowlist above, call `WebFetch` using that URL's "Ca
 **Failure definition:** A fetch fails if WebFetch returns an error, a redirect to an unrelated page, or empty content where content is expected. On any failure: record the URL and error in `pages_failed` for the footer addendum and continue with the remaining URLs. Never silently skip a failed fetch — the footer must name every failure explicitly.
 
 **One-hop rule:** you may follow a `#fragment` anchor on the same page to read a specific section. Never follow links to other pages or domains.
+
+**Truncation rule (Claude Code 2.1.290+):** WebFetch stops at about 100,000 characters and reports how much of the page was left unread. If a fetch reports unread text, call the same URL again with `offset` set to the reported position, and repeat until the page is complete; treat the parts as one page. If the page is still incomplete when you stop, record the URL in `pages_failed` with the reason `truncated at <position> of <total>` — a half-read page is partial coverage, not a clean fetch. (The hooks and sub-agents pages exceed the limit.)
 
 **Verbatim-extract requirement (hash stability):** for each guidance item that becomes a candidate delta, capture the **verbatim page text** of the smallest heading-bounded section containing that guidance — from its own heading to the next same-or-higher-level heading. That verbatim extract (not WebFetch's summary prose) is what gets returned as `source_excerpt`. Hashing a summary hashes noise: WebFetch's model-processed output varies between calls, causing the hash to change even when the underlying guidance is unchanged — which re-raises every rejected finding on every run (state-schema Rule 3). The verbatim extract is the only stable hash input; the orchestrator normalizes and hashes it.
 

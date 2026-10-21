@@ -217,7 +217,9 @@ If all checks pass: go to Step 3d. If any check fails: go to Step 3e.
 
 ### 3e — On failure: rollback and continue
 
-1. Clean ALL uncommitted changes since the last commit (a restyle may have touched shared components, CSS modules, or created new files; restoring only `pages[].file` leaks dirty files into the next page's iteration):
+1. **Confirm the discard with the user first.** `git restore .` + `git clean -fd` are destructive-git forms that auto mode's classifier may deny unless the user's own message describes the exact action (auto-mode-config: "a one-off action you did intend: state that intent in your next message and let Claude retry"). Before the first rollback of the run, ask via `AskUserQuestion` — "Discard this failed restyle of `<page>`? Runs `git restore .` and `git clean -fd` (untracked, non-ignored files only) in `<project-root>`." — and print the exact commands in the turn that runs them. A `yes` covers the rest of the run's rollbacks; print the commands each time anyway. If auto mode still denies them, stop and ask the user to approve or to run them; never leave the tree dirty and never continue to the next page on a dirty tree. (Optional, user-side: `/auto-mode-setup` (2.1.304+) or `claude auto-mode defaults --label 'Git Destructive'` to see whether these commands are soft-denied by default. A plugin cannot ship `autoMode.allow` rules.)
+
+2. Clean ALL uncommitted changes since the last commit (a restyle may have touched shared components, CSS modules, or created new files; restoring only `pages[].file` leaks dirty files into the next page's iteration):
    ```bash
    git -C <project-root> restore .
    git -C <project-root> clean -fd
@@ -227,7 +229,7 @@ If all checks pass: go to Step 3d. If any check fails: go to Step 3e.
 
 After rollback, assert the tree is clean (`git status --porcelain` is empty) before continuing to the next page.
 
-2. Set page-level `status = failed` in `state.json`. Record the failure reason in `state.json` under `pages[].failure_reason`.
+3. Set page-level `status = failed` in `state.json`. Record the failure reason in `state.json` under `pages[].failure_reason`.
 
 3. **Continue to the next page.** Do not abort the run. Failed pages can be retried later via `/bx:webdesign page <name>`.
 

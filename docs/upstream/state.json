@@ -1,8 +1,8 @@
 {
   "watermark": {
-    "last_changelog_version": "2.1.284",
-    "docs_checked_at": "2026-09-28",
-    "community_checked_at": "2026-09-28",
+    "last_changelog_version": "2.1.306",
+    "docs_checked_at": "2026-10-20",
+    "community_checked_at": "2026-10-20",
     "changelog_gap": null
   },
   "decisions": [
@@ -23,14 +23,14 @@
     },
     {
       "finding_id": "793f1bccfa734d279a821e5c51512e679e0fe602",
-      "decision": "open",
-      "date": "2026-06-10",
+      "decision": "applied",
+      "date": "2026-10-20",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.152",
       "affected_capability": "bx:pain/plugin-versioning-sharp-edge",
       "source_content_hash": "abba11c823427c5701e96bd1c442233dd5152cfb",
       "class": "opportunity",
       "title": "`/reload-skills` — lighter alternative to `/reload-plugins` for skills-only updates",
-      "note": null,
+      "note": "applied S61: `/reload-skills` named in fix-mode-evolve.md post-pass and README Updating section",
       "proposed_edit": "Name `/reload-skills` as the lighter refresh when only SKILL.md files changed (hooks, agents and .mcp.json still need `/reload-plugins`): in fix-mode-evolve.md's post-pass 'Next steps' block (`/reload-plugins` → `/reload-plugins` (or `/reload-skills` for SKILL.md-only edits)) and in README's 'Updating to the latest version' paragraph.",
       "affected_files": [
         "bx/skills/evolve/references/fix-mode-evolve.md",
@@ -161,14 +161,14 @@
     },
     {
       "finding_id": "dadac84562356de2f5e790d40e486378fb5d8e9d",
-      "decision": "open",
-      "date": "2026-07-05",
+      "decision": "applied",
+      "date": "2026-10-20",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.183",
       "affected_capability": "bx:webdesign/git-safety-invariant",
       "source_content_hash": "8c4286f68f39951fe5da76f1e38e895c145d7bb3",
       "class": "breakage",
       "title": "Auto-mode now blocks destructive git (`git clean -fd`, `restore`, `reset --hard`) — /bx:webdesign Phase-3 rollback may be intercepted (v2.1.183)",
-      "note": "Lane finding, certainty 0.55 — NOT yet verified against a live run. /bx:webdesign Phase 3's documented per-page-failure rollback (`git restore .` + `git clean -fd`) and the git-safety invariant may be auto-blocked by the new classifier unless the session reads as an explicit request to discard local work. VERIFY during the pending webdesign dogfood before treating as confirmed breakage; if intercepted, make the cleanup legible as agent-initiated or add a user-confirmation step before Phase 3 first runs. Also relevant: new `autoMode.classifyAllShell` setting (v2.1.193). ADDENDUM 2026-08-11: community lane surfaced Anthropic's OFFICIAL auto-mode engineering post (anthropic.com/engineering/claude-code-auto-mode) + docs page (code.claude.com/docs/en/auto-mode-config) confirming the classifier 'blocks anything irreversible' incl. destructive git on the working branch unless explicitly requested — authority upgrade for this finding's premise; the auto-mode-config page is a scan-docs allowlist candidate (owns the autoMode classifier contract). Verification during the kaanarik Phase-3 dogfood still required.",
+      "note": "applied S61 together with 6712a71e (same edit); live verification on the kaanarik run still owed",
       "proposed_edit": "Before Phase 3's first per-page rollback (`git restore .` + `git clean -fd`, phase3-inject.md), add an explicit user-confirmation step and phrase the cleanup as a user-requested discard of the failed injection, so auto mode's destructive-git classifier reads it as requested; keep the Phase 1 invariant text in step. Verify live on the kaanarik Phase-3 run before treating as confirmed breakage.",
       "affected_files": [
         "bx/skills/webdesign/references/phase3-inject.md",
@@ -761,6 +761,168 @@
       "affected_files": [],
       "source_excerpt": null,
       "citation": null
+    },
+    {
+      "finding_id": "6712a71e1ea1d7053c8669cba59f7319572ec5eb",
+      "decision": "applied",
+      "date": "2026-10-20",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.304",
+      "affected_capability": "bx:pain/resume-bx-webdesign-kaanarik-past",
+      "source_content_hash": "73c3acd73902d97eaae2f38fa9a023908f1377f9",
+      "class": "opportunity",
+      "title": "2.1.304: new /auto-mode-setup teaches auto mode about the project; auto-mode docs say explicit user intent overrides a s",
+      "note": "applied S61 together with dadac845: Phase 3e gains a user confirmation before the destructive-git rollback and a denial rule; phase1 invariant cross-references it",
+      "proposed_edit": "Before the kaanarik Phase-3 resume: run `claude auto-mode defaults --label 'Git Destructive'` to see whether `git restore .` / `git clean -fd` are default soft_deny rules, and run /auto-mode-setup (2.1.304+) in that project. In phase3-inject.md step 3e, before the rollback print the exact command and scope ('Discarding this failed restyle: git restore . and git clean -fd (untracked, non-ignored files only)') and make it an AskUserQuestion confirmation so the classifier reads the action as user-described; add 'If auto mode still denies the rollback, ask the user to approve; never leave the tree dirty or continue to the next page.' Mirror the invariant text in phase1-extract.md (line 71). A plugin cannot ship autoMode.allow (classifier ignores project settings).",
+      "affected_files": [
+        "bx/skills/webdesign/references/phase3-inject.md",
+        "bx/skills/webdesign/references/phase1-extract.md"
+      ],
+      "source_excerpt": "- Added `/auto-mode-setup`: a guided setup that reads your project and recent sessions to teach auto mode about your environment, now also available on Bedrock, Vertex, Foundry, Claude apps gateway and telemetry-disabled sessions",
+      "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.304 (published 2026-10-19) · https://code.claude.com/docs/en/auto-mode-config#fix-a-denial-with-an-allow-rule-an-environment-entry-or-a-retry"
+    },
+    {
+      "finding_id": "c3ced8e7ac1cb0ec55649293b5757b64ce4f0e81",
+      "decision": "applied",
+      "date": "2026-10-20",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.290",
+      "affected_capability": "bx:review/builtin-code-review-ladder",
+      "source_content_hash": "7891dbc36535fe2d2580e1485650f3bce57eaa69",
+      "class": "best_practice",
+      "title": "2.1.290: built-in /code-review at medium effort now also reports cleanup and CLAUDE.md-conventions findings on models wi",
+      "note": "applied S61: workflow.md:278 reworded (medium-effort /code-review reports CLAUDE.md-rule + cleanup findings since v2.1.290)",
+      "proposed_edit": "workflow.md:278 says the built-in /code-review 'doesn't scan codebase conventions'. Reword to: 'does not run a pre-review codebase-convention scan (it reports CLAUDE.md-rule and cleanup findings at medium effort on Opus/Sonnet 5.5; /bx:review samples the codebase's actual patterns and adds --security/--verify/--fix)'. Check README.md:175-180 for the same wording.",
+      "affected_files": [
+        "workflow.md",
+        "README.md"
+      ],
+      "source_excerpt": "- Changed `/code-review` at medium effort to also report cleanup and CLAUDE.md conventions findings on models without tuned review settings, including Opus 5.5 and Sonnet 5.5",
+      "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.290 (published 2026-10-05)"
+    },
+    {
+      "finding_id": "6db3ed619a28a555d470d8e017056a111e9a97c7",
+      "decision": "applied",
+      "date": "2026-10-20",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.290",
+      "affected_capability": "bx:evolve/webfetch-lanes",
+      "source_content_hash": "6439fdb99ea04e2e4d29527597020e5cce11628c",
+      "class": "opportunity",
+      "title": "2.1.290: WebFetch no longer silently drops page text past 100,000 characters; it reports how much was unread and takes a",
+      "note": "applied S61: truncation/offset rule added to scan-docs.md Step 1 and scan-community.md fetch step",
+      "proposed_edit": "Add to both lanes' fetch step: 'If WebFetch reports unread text, re-call the same URL with `offset` set to the reported position until the page is complete; if still incomplete, record the URL in pages_failed with reason \"truncated\".' (This run's docs lane read hooks to ~100k of 270k chars and sub-agents to ~100k of 109k.)",
+      "affected_files": [
+        "bx/skills/evolve/references/scan-docs.md",
+        "bx/skills/evolve/references/scan-community.md"
+      ],
+      "source_excerpt": "- Fixed WebFetch silently dropping page text past 100,000 characters; it now says how much was unread and takes an `offset` to read on",
+      "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.290 (published 2026-10-05)"
+    },
+    {
+      "finding_id": "e3dd5f5b717baecbd710b8fe9d1acdb00507cf01",
+      "decision": "applied",
+      "date": "2026-10-20",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.296",
+      "affected_capability": "bx:save/session-start-hook",
+      "source_content_hash": "3afe197fa0d4a8b13aa74b980b7047c9e4df9ae3",
+      "class": "best_practice",
+      "title": "2.1.296: PowerShell commands now see variables that hooks write to CLAUDE_ENV_FILE, but only when the file holds plain a",
+      "note": "applied S61, variant (b) of the stored edit: comment added; `export` kept because a plain assignment would not reach python children of the Bash tool — PowerShell parity unverified",
+      "proposed_edit": "session-start-context.sh lines 20-25 append `export PYTHONIOENCODING=utf-8` and `export PYTHONUTF8=1`. Verify against the hooks docs' CLAUDE_ENV_FILE section whether plain `NAME=value` lines are honoured by both shells; if so change the two lines to plain assignments, else add a one-line comment that the PowerShell tool does not receive them.",
+      "affected_files": [
+        "bx/scripts/session-start-context.sh"
+      ],
+      "source_excerpt": "- Fixed PowerShell commands not seeing variables that hooks write to CLAUDE_ENV_FILE (when the file holds only plain assignments)",
+      "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.296 (published 2026-10-09)"
+    },
+    {
+      "finding_id": "75741975e83a7cee13c0dc9e32fb80bb20b38002",
+      "decision": "applied",
+      "date": "2026-10-20",
+      "source_url": "https://code.claude.com/docs/en/plugins/cli-reference",
+      "affected_capability": "bx:save/plugin-update",
+      "source_content_hash": "3072fcc3f69339d5947d513960b1a1b22b4d2138",
+      "class": "breakage",
+      "title": "Plugin CLI reference: `update` is a shell-only subcommand with no session form (an unrecognized word after `/plugin` jus",
+      "note": "applied S61: README/workflow/fix-mode/mode-update now say `claude plugin update bx` (shell) + `/reload-plugins`; observed live this session",
+      "proposed_edit": "Replace in-session `/plugin update bx` with `claude plugin update bx` run from a shell, followed by `/reload-plugins` in the session. Keep `/plugin marketplace update burak-tools` (documented session form). Fix README.md lines 77, 80, 82, 435; workflow.md 'run inside Claude Code' comments at lines 37, 59, 87; fix-mode-evolve.md line 121; mode-update.md Part 8 line 934. (Observed this session: `/plugin update bx` left the cache at 2.10.0; `/plugin marketplace update` + `/reload-plugins` installed 2.11.0.)",
+      "affected_files": [
+        "README.md",
+        "workflow.md",
+        "bx/skills/evolve/references/fix-mode-evolve.md",
+        "bx/skills/save/references/mode-update.md"
+      ],
+      "source_excerpt": "## /plugin in a session\n\nInside an interactive session, `/plugin` opens the plugin panel. Each subcommand opens the panel on a tab, runs an action there, or prints a result inline. `/plugins` and `/marketplace` are aliases for `/plugin`.\n\nYou can run these commands only in an interactive terminal session. In a non-interactive run such as `claude -p`, Claude Code replies that `/plugin` isn't available in this environment.\n\nFor which surfaces have `/plugin`, how to install without it, and what each panel tab shows, see [Install and manage plugins](/docs/en/plugins/install).\n\nA `<plugin>` is a plugin `name` or `name@marketplace`.\n\nThe table below lists every session form. The shell subcommands `init`, `update`, `details`, `prune`, `eval`, `eval init`, and `test` have no session form.\n\n| Command | Aliases | What it does |\n| :- | :- | :- |\n| `/plugin` | | Opens the panel on the **Discover** tab. Any unrecognized first word after `/plugin` does the same |\n| `/plugin help` | `/plugin --help`, `/plugin -h` | Shows the usage list of `/plugin` subcommands |\n| `/plugin list [--enabled\\|--disabled]` | `ls` | Prints your marketplace-installed plugins inline, with version, scope, and status. A filter flag shows only that state. A plugin whose enable state hasn't been applied yet is marked `— run /reload-plugins to apply` |\n| `/plugin install` | `i` | Opens the **Discover** tab |\n| `/plugin install <plugin>` | `i` | Opens the plugin's details in the **Discover** tab. With `name@marketplace`, opens them in that marketplace's list |\n| `/plugin install <source>` | `i` | Reports a [marketplace not found](/docs/en/plugins/troubleshooting#marketplace-not-found) error and installs nothing when the target is a path, URL, or `owner/repo`, even a source you've already added. To install from a source, see [Add a marketplace and install in one command](/docs/en/plugins/install#add-a-marketplace-and-install-in-one-command) |\n| `/plugin install <plugin> --marketplace <source>` | `i` | Adds the marketplace at `<source>` when you haven't added it yet, asking you to confirm first, then opens the plugin's details. See [Add a marketplace and install in one command](/docs/en/plugins/install#add-a-marketplace-and-install-in-one-command). Requires Claude Code v2.1.275 or later |\n| `/plugin manage` | | Opens the **Installed** tab |\n| `/plugin stats` | | Opens the **Stats** tab, in sessions where [`/skill-doctor`](/docs/en/skills#find-unused-skills) is available. Anywhere else it opens the panel on the **Discover** tab |\n| `/plugin enable <plugin>` | | Opens the **Installed** tab at the plugin and enables it |\n| `/plugin disable <plugin>` | | Opens the **Installed** tab at the plugin and disables it |\n| `/plugin uninstall <plugin>` | | Opens the **Installed** tab at the plugin and uninstalls it |\n| `/plugin configure <plugin>` | `config` | Opens the plugin's [`userConfig`](/docs/en/plugins/manifest-reference) dialog, or reports that the plugin declares none |\n| `/plugin validate <path>` | | Prints the same report as `claude plugin validate`, inline |\n| `/plugin tag [path] [--push] [--dry-run] [--force]` | | Creates the release tag as `claude plugin tag` does. Accepts `--push`, `--dry-run`, and `--force` or `-f`; with any other flag or an extra argument, Claude Code prints usage instead |\n| `/plugin marketplace` | `market` | Does nothing visible. Pass `add`, `list`, `update`, or `remove` |\n| `/plugin marketplace add [source]` | `market add` | With a source, adds it and reports the result. Without one, opens the **Add marketplace** input |\n| `/plugin marketplace list` | `market list` | Prints your marketplace names inline |\n| `/plugin marketplace update [name]` | `market update` | Opens the **Marketplaces** tab. With a name, refreshes that marketplace there |\n| `/plugin marketplace remove [name]` | `market remove`, `market rm`, `marketplace rm` | Opens the **Marketplaces** tab. With a name, removes that marketplace there |\n\nIf you name a plugin that isn't installed in the current project in `/plugin enable`, `disable`, `uninstall`, or `configure`, Claude Code prints `Plugin \"<plugin>\" is not installed in this project` instead of acting.",
+      "citation": "https://code.claude.com/docs/en/plugins/cli-reference#plugin-in-a-session"
+    },
+    {
+      "finding_id": "4519c50883209e2485e9afff9c5e069edf96d9f1",
+      "decision": "rejected",
+      "date": "2026-10-20",
+      "source_url": "https://code.claude.com/docs/en/plugins/loading",
+      "affected_capability": "bx:skills/plugin-version-cache-key",
+      "source_content_hash": "cd109ac57da48a14448d1c2ce67a7ca7f488014d",
+      "class": "opportunity",
+      "title": "Docs: when neither the manifest nor the marketplace entry sets `version`, a relative-path plugin in a Git-hosted marketp",
+      "note": "rejected S61 (user verdict): dropping `version` reverses the S54 decision; semver + CHANGELOG + bump guard kept. Re-raise only if the loading docs section changes",
+      "proposed_edit": "Evaluate dropping `version` from bx/.claude-plugin/plugin.json (marketplace.json already omits it; source is relative `./bx`), making every push an update and retiring the bump-or-nobody-gets-it failure mode. Tradeoffs: semver label and CHANGELOG-keyed versions go away. Would retire or relax scripts/check-plugin-version-bump.sh, .github/workflows/plugin-version.yml, CLAUDE.md Known Issues, README 'cache key' paragraphs (lines 80, 82, 152), workflow.md:848, mode-update.md Part 8. Half-measure for the author's machine: add the marketplace from a local path so edits load in place after /reload-plugins.",
+      "affected_files": [
+        "bx/.claude-plugin/plugin.json",
+        "README.md",
+        "workflow.md",
+        "bx/skills/save/references/mode-update.md"
+      ],
+      "source_excerpt": "### How Claude Code computes the version\n\nFor a marketplace you added by source, Claude Code picks the rule by the `source` type of the plugin's marketplace entry. The [marketplace reference](/docs/en/plugins/marketplace-reference#plugin-sources) lists the source types. For every source type in that list except `command`:\n\n1. The `version` field in the plugin's manifest comes first\n2. Then the `version` field in the plugin's marketplace entry\n3. When neither is set, the version comes from the source type:\n\n| Source type | Version when no `version` field is set |\n| :- | :- |\n| `github`, `url`, or `git-subdir` | The commit SHA of the source, shortened to 12 characters. A `git-subdir` version also carries a hash of the subdirectory path |\n| `archive` | The SHA-256 digest, shortened to 12 characters: the `sha256` pin in the marketplace entry, or the digest of the downloaded file when there is no pin |\n| Relative path inside a Git-hosted marketplace | The commit SHA of the installed directory |\n| Local directory, when neither the plugin directory nor its marketplace is a git repository | `unknown` |\n| `npm` | `unknown` |\n\nClaude Code doesn't take the version from a repository that encloses the install path, such as a git-managed `~/.claude`.\n\nFor a `command` source, Claude Code always derives the version from what the command produced: a 12-character hash on its own, or `<manifest version>-<hash>` when the manifest sets one. The marketplace entry's `version` is ignored for command sources. For what the hash covers, see [Copy mode and link mode](/docs/en/plugins/marketplace-reference#copy-mode-and-link-mode).\n\nBecause the manifest comes first, a manifest that pins `\"version\": \"1.0.0\"` keeps every user on the cached copy until its author changes the string, however many commits they push. To let users track commits instead, leave `version` out of both the manifest and the entry. [Host a marketplace](/docs/en/plugins/host-marketplace) covers which choice fits which release setup.",
+      "citation": "https://code.claude.com/docs/en/plugins/loading#how-claude-code-computes-the-version"
+    },
+    {
+      "finding_id": "69ef485d9eb97611b2e88036ac71de96ca0327cf",
+      "decision": "open",
+      "date": "2026-10-20",
+      "source_url": "https://code.claude.com/docs/en/plugin-evals",
+      "affected_capability": "bx:pain/doc-schema-fixture-verification",
+      "source_content_hash": "ec9cc532ece8363f59c0cda1cca22c9a398e82ba",
+      "class": "opportunity",
+      "title": "`claude plugin eval` runs a plugin's prompts in fresh isolated non-interactive sessions with seeded workspaces and grade",
+      "note": null,
+      "proposed_edit": "Prototype the six doc-schema v2 fixture cases as plugin eval cases under bx/evals/<case>/ (prompt.md + case.yaml workspace seeding + regex/file_exists graders; `--ablation none` halves cost). Document the command in verification-checklists.md as the repeatable check; keep the manual run as fallback. Caveats: requires Claude Code 2.1.269+, every run is a billed model call (3 runs per case by default), 'early access' state unverified for this account, confirm the eval prompt can invoke /bx:save.",
+      "affected_files": [
+        "bx/skills/save/references/verification-checklists.md",
+        "bx/skills/save/SKILL.md"
+      ],
+      "source_excerpt": "### What happens in a run\n\nFor each run of a case, Claude Code starts a fresh, [isolated](#how-runs-are-isolated) [non-interactive session](/docs/en/headless) with only your plugin loaded, sends the prompt, and lets Claude work until it finishes or hits the case's turn or time limit. Each grader then checks the final reply, the transcript, or a file Claude created, and passes or fails.",
+      "citation": "https://code.claude.com/docs/en/plugin-evals#what-happens-in-a-run"
+    },
+    {
+      "finding_id": "34bf4118fac6276fe7040a00b42da32913123e20",
+      "decision": "applied",
+      "date": "2026-10-20",
+      "source_url": "https://code.claude.com/docs/en/sub-agents",
+      "affected_capability": "bx:agents/tools",
+      "source_content_hash": "b00bb068ee95acc63cd3d725c6e6587fe42eec62",
+      "class": "best_practice",
+      "title": "Sub-agents docs document only bare tool names in agent `tools:`; a specifier on disallowedTools removes the whole tool — bx scopes 17 agents with `Bash(cmd:*)` entries",
+      "note": "applied S61 (user verdict: document the truth, keep the lists). Verified live: upstream-changelog (tools Bash(gh:*)) ran `echo` and `git` unblocked. S43 rule in evolve SKILL.md, README agents paragraph and docs/architecture.md now say specifiers are not enforced on agents and the discipline is prompt-enforced; the 17 tools lists are kept as declared intent.",
+      "proposed_edit": "Verify once: dispatch an agent whose tools list is e.g. `Bash(gh:*)` and have it run a Bash command outside the specifier. Not enforced -> list bare `Bash` and state in the agent bodies that the read-only discipline is prompt-enforced (or add permissions.deny rules). Enforced -> record it so the next scan stops flagging. Old -> new if bare: `tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*)` -> `tools: Read, Grep, Glob, Bash`.",
+      "affected_files": [
+        "bx/agents/save-writer.md",
+        "bx/agents/upstream-changelog.md",
+        "bx/agents/seo-gsc-insights.md",
+        "bx/agents/seo-technical.md",
+        "bx/agents/seo-content.md",
+        "bx/agents/arch-robustness.md",
+        "bx/agents/arch-structure.md",
+        "bx/agents/test-coverage.md",
+        "bx/agents/test-economics.md",
+        "bx/agents/test-quality.md",
+        "bx/agents/arch-performance.md",
+        "bx/agents/arch-refactors.md",
+        "bx/agents/arch-simplification.md",
+        "bx/agents/cleanup-styles-tests.md",
+        "bx/agents/geo-generative.md",
+        "bx/agents/cleanup-deps-config.md",
+        "bx/agents/cleanup-files-code.md"
+      ],
+      "source_excerpt": "#### Restrict which tools a subagent can use\n\nTo restrict tools, use the `tools` field as an allowlist or the `disallowedTools` field as a denylist. If both are set, `disallowedTools` is applied first, then `tools` is resolved against the remaining pool. A tool listed in both is removed.\n\nThis example uses `tools` to allow only Read, Grep, Glob, and Bash. The subagent can't edit files, write files, or use any MCP tools:\n\n```yaml theme={null}\n---\nname: safe-researcher\ndescription: Research agent with restricted capabilities\ntools: Read, Grep, Glob, Bash\n---\n```\n\nA `disallowedTools` entry with a specifier, such as `Bash(git push *)`, still removes the whole tool from the subagent, not only the matching commands. To keep Bash and block specific commands, add a [Bash deny rule](/docs/en/permissions#bash) such as `Bash(git push *)` to `permissions.deny` in your settings. The rule applies to the main conversation and to subagents.\n",
+      "citation": "https://code.claude.com/docs/en/sub-agents#restrict-which-tools-a-subagent-can-use"
     }
   ]
 }

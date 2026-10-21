@@ -68,7 +68,7 @@ Interpret `$ARGUMENTS`:
 
 ## Step 2 — Parallel Lane Dispatch
 
-Launch all three lane agents in a single turn (three Agent calls in one message). Set `subagent_type` to the dedicated agent name for each — **never generic subagents** (the S43 rule: skill-specific agents carry the least-privilege tool lists and baked-in scanning instructions; a generic subagent runs on the orchestrator's model and bypasses tool scoping):
+Launch all three lane agents in a single turn (three Agent calls in one message). Set `subagent_type` to the dedicated agent name for each — **never generic subagents** (the S43 rule: skill-specific agents carry the baked-in scanning instructions and the declared tool lists; a generic subagent runs on the orchestrator's model and skips both. Note that Claude Code does not enforce command specifiers such as `Bash(gh:*)` on agent `tools:` lists — verified 2026-10-20, an agent declared with `Bash(gh:*)` ran `echo` and `git` — so the lists document intent and the read-only discipline is enforced by the scan instructions, not by the harness):
 
 - Agent call 1: `subagent_type: upstream-changelog`
 - Agent call 2: `subagent_type: upstream-docs`
@@ -91,7 +91,7 @@ Instruct each agent to **first Read** its own scan reference file (`upstream-cha
 
 **`--full`:** pass `last_changelog_version=null`, `docs_checked_at=null`, `community_checked_at=null` in the shared context block, overriding the stored values. The stored `state.json` is untouched at this point.
 
-**Agent tool lists are least-privilege.** Do not ask agents to run anything beyond their scan instructions. The orchestrator owns all state reads and writes; agents return raw findings only.
+**Agent tool lists declare intent; they are not enforced below the tool level.** A `Bash(gh:*)` entry gives the agent all of Bash (verified 2026-10-20), so the scan instructions are the real boundary: do not ask agents to run anything beyond them. The orchestrator owns all state reads and writes; agents return raw findings only.
 
 ---
 

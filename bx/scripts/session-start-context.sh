@@ -17,6 +17,9 @@ set -e
 # Persist session-wide env vars (CC 2.1.152+): UTF-8 Python defaults retire the
 # per-call PYTHONIOENCODING/PYTHONUTF8 prefixes (the S31 Windows-charmap lesson).
 # No-op on older Claude Code versions where CLAUDE_ENV_FILE is unset.
+# CC 2.1.296: the PowerShell tool also reads CLAUDE_ENV_FILE when it holds only
+# plain assignments; the hooks docs count `export NAME=value` lines as plain, so
+# keep this file to such lines (no functions, no command substitution).
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   {
     echo 'export PYTHONIOENCODING=utf-8'
