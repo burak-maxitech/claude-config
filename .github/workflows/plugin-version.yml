@@ -18,6 +18,8 @@ jobs:
           fetch-depth: 0
       - name: Guard tests
         run: bash scripts/test-check-plugin-version-bump.sh
+      - name: Upstream state validator (/bx:evolve)
+        run: bash bx/skills/evolve/tests/test-check-state.sh
       - name: Plugin changed without a version bump?
         env:
           EVENT: ${{ github.event_name }}

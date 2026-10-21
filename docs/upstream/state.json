@@ -385,7 +385,7 @@
       "date": "2026-08-24",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.232",
       "affected_capability": "bx:skills/agent-dispatch-background-default",
-      "source_content_hash": "",
+      "source_content_hash": "0000000000000000000000000000000000000000",
       "class": "breakage",
       "title": "v2.1.232 makes non-teammate Agent spawns background-by-default in interactive sessions; verify bx's synchronous fan-outs still block",
       "note": "Changelog lane, severity high, certainty 0.65. v2.1.232: subagent forking on by default and non-teammate agent spawns in interactive sessions now run in the background by default. bx dispatches synchronous fan-outs that then consolidate results: /bx:evolve Step 2 (3 lanes), /bx:clean Step 1 (3 cleanup-* agents), /bx:arch Step 4 (5 arch-* agents), /bx:save (save-writer), /bx:tests (3 agents). ORCHESTRATOR-CORROBORATED: this very run dispatched 3 lanes and did receive all 3 results before consolidating, so the wait behavior is intact in practice for Agent-tool dispatch with an explicit subagent_type. Proposed: audit the 4 files matching subagent_type plus the arch/tests/clean fan-outs and state explicitly that the orchestrator awaits all dispatched agents, so the assumption is documented rather than incidental."
@@ -396,7 +396,7 @@
       "date": "2026-08-24",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.232",
       "affected_capability": "bx:pain/plugin-cache-staleness-skills-run-from-cache-a-bx-push-without-a-version-bump-reaches-no-user",
-      "source_content_hash": "",
+      "source_content_hash": "0000000000000000000000000000000000000000",
       "class": "opportunity",
       "title": "/plugin install now refreshes the marketplace first — README/workflow install instructions may be able to drop the manual marketplace-update step",
       "note": "Changelog lane, severity high, certainty 0.6. Covers /plugin install only, NOT /plugin update. The version-bump-as-cache-key mechanism may still be required for updates. Verify the update path before touching update-side instructions."
@@ -407,7 +407,7 @@
       "date": "2026-08-24",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.229",
       "affected_capability": "bx:pain/plugin-cache-staleness-skills-run-from-cache-a-bx-push-without-a-version-bump-reaches-no-user",
-      "source_content_hash": "",
+      "source_content_hash": "0000000000000000000000000000000000000000",
       "class": "opportunity",
       "title": "Plugin marketplace `command` sources with mode:link re-resolve per session without a restart",
       "note": "Changelog lane, severity high, certainty 0.45. Described for a local command printing a plugin directory (e.g. an IDE); may not map onto a git-hosted marketplace like burak-tools. Needs verification before any doc change."
@@ -418,7 +418,7 @@
       "date": "2026-08-24",
       "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.232",
       "affected_capability": "bx:review/builtin-code-review-ladder",
-      "source_content_hash": "",
+      "source_content_hash": "0000000000000000000000000000000000000000",
       "class": "best_practice",
       "title": "/code-review at high/xhigh/max now also runs as a background agent",
       "note": "Changelog lane, severity low, certainty 0.4. Likely a no-op: the ladder prose was generalized to 'background' when v2.1.218 shipped (finding d1219059..., applied). A near-identical v2.1.218 signal was REJECTED as already-covered (finding 282556d0...); expect the same outcome. Confirm no effort-level-specific synchronous claim survives in the 15 files referencing /code-review."
@@ -429,7 +429,7 @@
       "date": "2026-08-24",
       "source_url": "https://code.claude.com/docs/en/plugins",
       "affected_capability": "bx:pain/s37-plugin-packaging-leftovers-install-smoke-test-symlink-retirement",
-      "source_content_hash": "",
+      "source_content_hash": "0000000000000000000000000000000000000000",
       "class": "opportunity",
       "title": "`claude plugin validate` is the documented local smoke-test — wire it into /bx:save Part 8 to close the S37 install-smoke-test leftover",
       "note": "Docs lane, severity medium, certainty 0.6. ORCHESTRATOR-VERIFIED THIS RUN: the command exists (claude plugin validate [--strict] <path>), and bx passes both plain and --strict, as does the marketplace manifest at repo root. Proposed: add a validate step to mode-update.md Part 8 alongside the version bump, surfacing errors/warnings at the commit checkpoint. Closes the install-smoke-test half of the S37 plugin-packaging leftovers open since Session 37. APPLIED 2026-08-24 (same-run --fix): mode-update.md Part 8 gains step 2b — run `claude plugin validate ./bx --strict` after the version bump and before the commit, plus `claude plugin validate .` for the root marketplace manifest. Pass reports one line; fail/warn surfaces output verbatim and asks fix-now-or-commit-anyway (never a veto — a warning is information, not a block); --silent reports and commits anyway since its contract is zero prompts; command-not-found skips silently so an older harness never fails a save. bx/skills/save/SKILL.md allowed-tools gained Bash(claude:*) per the S45 enumeration rule — without it the new step would prompt on every save. Dogfooded on itself: bx and the root marketplace manifest both pass plain and --strict. Shipped in plugin v2.6.0."

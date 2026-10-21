@@ -15,7 +15,8 @@ The watermark records the furthest upstream point checked on the most recent com
   "watermark": {
     "last_changelog_version": "2.1.170",
     "docs_checked_at": "2026-06-09",
-    "community_checked_at": "2026-06-09"
+    "community_checked_at": "2026-06-09",
+    "changelog_gap": null
   }
 }
 ```
@@ -27,6 +28,7 @@ The watermark records the furthest upstream point checked on the most recent com
 | `last_changelog_version` | string or null | The **unprefixed** claude-code version string (e.g. `"2.1.170"`) of the highest changelog entry processed in the last run. Release tags carry a leading `v` (e.g. `v2.1.170`) which is stripped before storing or comparing — the normalization rule is defined in `bx/skills/evolve/references/scan-changelog.md`. On the next run, only entries tagged AFTER this version are fetched. "After" is defined as release order returned by `gh release list` (newest-first tag order); CHANGELOG.md document order is the fallback when `gh` is unavailable. Null on first run → fetch the full changelog. |
 | `docs_checked_at` | ISO date string or null | The date (YYYY-MM-DD) the Anthropic docs pages were last fetched and scanned. Advances ONLY if the docs lane ran this run (lane_status ok or degraded). A lane that was skipped or unavailable keeps its previous timestamp so the missed range is re-checked next run. Null on first run. |
 | `community_checked_at` | ISO date string or null | The date (YYYY-MM-DD) the community lane (bounded WebSearch over community content) last ran. Advances ONLY if the community lane ran this run (lane_status ok or degraded). Skipped via `--no-community` or unavailable → keeps its previous timestamp. Null on first run. |
+| `changelog_gap` | object or null | Null when the changelog lane's fetched window reached the watermark anchor on the last run. Otherwise `{"after": "<anchor version>", "before": "<oldest version seen>", "recorded": "YYYY-MM-DD"}`: the releases strictly between `after` and `before` were never scanned. Set, cleared and rendered per `scan-changelog.md` Step 1 and `SKILL.md` Step 6; this file owns only the shape. |
 
 ### Why the watermark matters
 
@@ -45,7 +47,8 @@ When `docs/upstream/state.json` is missing (first-ever run or corrupted), Step 0
   "watermark": {
     "last_changelog_version": null,
     "docs_checked_at": null,
-    "community_checked_at": null
+    "community_checked_at": null,
+    "changelog_gap": null
   },
   "decisions": []
 }
@@ -71,7 +74,12 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "source_content_hash": "7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1d",
       "class": "breakage",
       "title": "`allowed-tools` entry missing for Bash helper",
-      "note": "Added allowed-tools entry for new Bash helper per claude-code 1.7.0 release notes."
+      "note": "Added allowed-tools entry for new Bash helper per claude-code 1.7.0 release notes.",
+      "proposed_edit": "bx/skills/seo/SKILL.md allowed-tools: add `Bash(gsc-parse-helper.py *)`",
+      "affected_files": ["bx/skills/seo/SKILL.md"],
+      "source_excerpt": "### Permissions
+Skills may now grant Bash helpers by exact command prefix …",
+      "citation": "https://code.claude.com/docs/en/skills#permissions · v1.7.0 release notes"
     },
     {
       "finding_id": "b9c4e2f1a0d5b7c3e6f8a2d4b6c8e0f2a4b6c8e0",
@@ -93,7 +101,12 @@ Each entry in the `decisions` array represents one actionable finding that has b
       "source_content_hash": "9e107d9d372bb6826bd81d3542a419d6a3b1c5d2",
       "class": "best_practice",
       "title": "allowed-tools pattern syntax update for /bx:clean",
-      "note": null
+      "note": null,
+      "proposed_edit": "`Bash(find:*)` → `Bash(find *)` in bx/skills/clean/SKILL.md and the three cleanup agents",
+      "affected_files": ["bx/skills/clean/SKILL.md", "bx/agents/cleanup-files-code.md", "bx/agents/cleanup-deps-config.md", "bx/agents/cleanup-styles-tests.md"],
+      "source_excerpt": "### Tool permission patterns
+Use a space before the wildcard …",
+      "citation": "https://code.claude.com/docs/en/settings#permissions"
     },
     {
       "finding_id": "d2e6f0a4b8c2e6f0a4b8c2e6f0a4b8c2e6f0a4b8",
@@ -123,6 +136,14 @@ Each entry in the `decisions` array represents one actionable finding that has b
 | `class` | enum string | yes | The finding's class at its last surfacing: `breakage`, `best_practice`, or `opportunity`. Always non-null for stored entries — `lane-unavailable-*` sentinels are never written to the `decisions` array (they are lane-health reports, not actionable findings), so every stored entry has a non-null class. **Why stored:** carried-forward findings must be renderable in the report's Section 4 from state alone — without a stored class the orchestrator cannot label entries no lane re-emitted this run. |
 | `title` | string | yes | The finding's one-line title at its last surfacing (e.g. `` "`allowed-tools` glob syntax changed" ``). Always non-null for stored entries — same reason as `class`: sentinels never enter the `decisions` array. **Why stored:** same reason as `class` — Section 4 rendering requires it without a live lane re-emit. |
 | `note` | string or null | yes (nullable) | Human-readable explanation of the verdict — a one-liner covering what was done or why it was skipped. The key must always be present; the value may be null (use null, not absent key). |
+| `proposed_edit` | string or null | yes (nullable) | The lane finding's `proposed_edit` at the entry's last surfacing — prose plus concrete `old → new` where the lane gave one. **Why stored:** a Section 4 carried-forward entry is fix-eligible only from state (no lane re-emitted it), so the edit must live here. Kept verbatim on transition to `applied`/`rejected` as history. |
+| `affected_files` | array of strings | yes (may be empty) | Repo-relative paths from the lane finding's `affected_files` (Grep-populated, sibling echoes included). Empty only on non-`open` entries or legacy entries. `--fix` re-greps these before offering a carried-forward entry (`fix-mode-evolve.md`). |
+| `source_excerpt` | string or null | yes (nullable) | The lane's verbatim heading-bounded extract — the hash input. Stored so a carried-forward entry's `source_content_hash` is explainable and re-computable without a fetch. |
+| `citation` | string or null | yes (nullable) | The lane finding's `citation` string (release URL and/or doc URL with anchor). Rendered in Section 4 and the fix gate. |
+
+**Legacy entries (written before bx 2.11.0)** carry only the first nine keys. The validator warns on them and never fails; they are display-only in `--fix` until a lane re-emits them or the one-time triage fills the four fields. New or updated entries always carry all thirteen keys, in schema order.
+
+**The sentinel hash `0000000000000000000000000000000000000000`** stands for "no comparable source text stored". It is written when a lane returned no usable `source_excerpt` (the five pre-2.11.0 entries were backfilled with it). Rules 3, 5 and 6 treat the sentinel as *never compared*: a live re-emit stores the live hash and proceeds as if the stored and live hashes were equal — never as "source changed". An empty string is not a valid hash and the validator rejects it.
 
 ### finding_id computation (normative)
 
@@ -225,7 +246,7 @@ The orchestrator rewrites the entire file at exactly three sanctioned checkpoint
 
 1. **Read** `docs/upstream/state.json` via the Read tool at the start of the run (Step 0). Deserialize into an in-context object.
 2. **Modify** the in-context object as findings are evaluated and verdicts recorded throughout the run. Do not write between checkpoints.
-3. **Validate** the modified object before writing: confirm the `decisions` array has no duplicate `finding_id` values; confirm all required fields are present on every entry; confirm `decision` values are in the allowed enum set. **On ANY validation failure, do NOT write the file.** Report the validation failure in the run output and leave `state.json` untouched so the previous valid state is preserved.
+3. **Validate** the modified object before writing: confirm the `decisions` array has no duplicate `finding_id` values; confirm all required fields are present on every entry in schema order; confirm `decision` values are in the allowed enum set; confirm `finding_id` and `source_content_hash` are 40 lowercase hex characters (the sentinel counts; `""` does not); confirm each `finding_id` equals `sha1(source_url|affected_capability)`; confirm every `bx:pain/<id>` capability names an `id` (not an alias) in `docs/upstream/pain-points.json`. These checks are mechanical: run `python -I bx/skills/evolve/tests/check-state.py .` after the Write and treat a non-zero exit as a validation failure to report (the pre-write in-context check and the post-write script must agree). **On ANY validation failure, do NOT write the file.** Report the validation failure in the run output and leave `state.json` untouched so the previous valid state is preserved.
 4. **Write** the validated object back to `docs/upstream/state.json` via the Write tool, serialized as pretty-printed JSON (2-space indent, keys in schema order). The Write tool is an atomic overwrite — no temp file needed.
 
 **Why no shell-based writes:** shell state does not persist across Bash tool calls in Claude Code. A `jq` command that reads from a file in one Bash call and writes in another has no guaranteed consistency if the run interleaves tool calls. The Read-modify-in-context-Write pattern keeps the entire state transition inside a single logical unit the orchestrator controls, with no shell state assumptions.
@@ -240,6 +261,7 @@ state.json root:
     last_changelog_version
     docs_checked_at
     community_checked_at
+    changelog_gap
   decisions: [
     finding_id
     decision
@@ -250,5 +272,9 @@ state.json root:
     class
     title
     note
+    proposed_edit
+    affected_files
+    source_excerpt
+    citation
   ]
 ```
