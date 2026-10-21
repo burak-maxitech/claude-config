@@ -15,7 +15,7 @@ You have these tools available: Read, Grep, Glob, WebSearch, WebFetch. Use WebSe
 - **Severity caps at `medium` for all community findings** — community claims are uncorroborated by an official source; high severity is reserved for Tier-1 lanes where provenance is verified.
 - **Certainty band: 0.3–0.6** — never above 0.6 for any community finding, regardless of how confident the source sounds. Exception: the `lane-unavailable-community` sentinel is exempt (certainty 1.0, empty affected_files) — it reports lane health, not a community claim.
 
-A community pattern becomes actionable (and `--fix`-eligible) ONLY when a Tier-1 source (Anthropic docs or the claude-code changelog) independently corroborates it. In that case, the docs/changelog lane **owns** the finding — not this one. If you encounter an official Anthropic source while fetching community content, do NOT emit a `tier: community` finding for it — record it in `scan_note` so the orchestrator knows the docs or changelog lane should own it.
+A community pattern becomes actionable (and `--fix`-eligible) ONLY when a Tier-1 source (Anthropic docs or the claude-code changelog) independently corroborates it. In that case, the docs/changelog lane **owns** the finding — not this one. If you encounter an official Anthropic source while fetching community content, do NOT emit a `tier: community` finding for it — record it in the footer's `allowlist_candidates` so the orchestrator knows the docs or changelog lane should own it.
 
 ---
 
@@ -53,7 +53,7 @@ For each query from Step 1, call WebSearch. Collect all returned URLs and their 
 - High-engagement community posts (significant upvotes/stars/reactions visible in the snippet)
 - GitHub Discussions, Issues, or Pull Requests on `anthropics/claude-code`
 
-**GitHub boundary rule:** posts by Anthropic maintainers in `anthropics/*` repos (Issues, PRs, Discussions, release notes) count as OFFICIAL sources — never emit them as `tier: community` findings. Hand them off via `scan_note` using the `official_source_found:` format, exactly as you would for any other Tier-1 source encountered during community fetching. Apply shortlist ranking in order: named engineering blog > maintainer/conference content > high-engagement community post; use recency as the tiebreaker. The 5-fetch budget is spent on the global top 5 across all queries.
+**GitHub boundary rule:** posts by Anthropic maintainers in `anthropics/*` repos (Issues, PRs, Discussions, release notes) count as OFFICIAL sources — never emit them as `tier: community` findings. Hand them off through the footer's `allowlist_candidates` list, exactly as you would for any other Tier-1 source encountered during community fetching. Apply shortlist ranking in order: named engineering blog > maintainer/conference content > high-engagement community post; use recency as the tiebreaker. The 5-fetch budget is spent on the global top 5 across all queries.
 
 **Discard before fetching:**
 - SEO-shaped listicles ("10 best practices for…", "top X tips…") with no identifiable author
@@ -157,7 +157,7 @@ The orchestrator advances `community_checked_at` only on `ok` or `degraded`, per
 
 **`source_url`:** the canonicalized URL of the community page. Apply canonicalization per `bx/skills/evolve/references/state-schema.md` before hashing and storing. For this lane, `citation` and `source_url` always have the same value.
 
-**`tier`:** always `community`. Never `official`. If you find an official Anthropic source, do not emit it here — record it in `scan_note`.
+**`tier`:** always `community`. Never `official`. If you find an official Anthropic source, do not emit it here — record it in `allowlist_candidates`.
 
 **`severity`:** never `high`. Maximum is `medium`. See Step 7 guidance.
 
@@ -197,7 +197,7 @@ Note: `severity: low` — a missing advisory lane is not urgent. This differs fr
 - **Advisory-only, always.** `tier: community` findings are NEVER `--fix`-eligible. `proposed_edit` must use "consider…" phrasing. The orchestrator must not offer automatic application.
 - **Severity hard cap: medium.** Never assign `high` severity to a community finding. The reason is stated in the TIER RULE section: community claims are uncorroborated. Exception: the `lane-unavailable-community` sentinel is exempt (severity `low` by design — a missing advisory lane is not urgent).
 - **Certainty hard band: 0.3–0.6.** Never above 0.6. Never below 0.3 in an emitted finding (below 0.3 means the evidence is too weak to surface at all — discard instead). Exception: the `lane-unavailable-community` sentinel is exempt (certainty 1.0, empty affected_files) — it reports lane health, not a community claim.
-- **Official sources encountered during fetching are NOT emitted here.** If you reach an Anthropic docs page, a GitHub release note, any first-party source, or a post by an Anthropic maintainer in an `anthropics/*` repo while fetching community content, record the URL and the relevant claim in `scan_note` (format: `official_source_found: <url> — <one-line description>`). The docs or changelog lane owns that finding. See the GitHub boundary rule in Step 2.
+- **Official sources encountered during fetching are NOT emitted here.** If you reach an Anthropic docs page, a GitHub release note, any first-party source, or a post by an Anthropic maintainer in an `anthropics/*` repo while fetching community content, record the URL and the relevant claim in the footer's `allowlist_candidates` list (`<url> — <one-line description>`); until bx 2.11.0 this was a `scan_note: official_source_found:` entry, which nothing acted on. The docs or changelog lane owns that finding once the page is pinned. See the GitHub boundary rule in Step 2.
 - **Unconfirmable claims are discarded, not capped.** Unlike the docs lane (which caps at certainty 0.5), this lane discards without emitting. The noise floor is higher.
 - **Never report zero findings silently.** If all searches and fetches ran without error but no candidates survived the filters, append a note: `scan_note: <N> pages evaluated; no capability or pain-point matches survived verification`. This is distinct from `unavailable`.
 - **Include sibling-file echoes in `affected_files`.** Always populate via Step 6 Grep. Never infer from the capability string alone.
@@ -216,7 +216,8 @@ pages_fetched: <n>/5
 pages_failed: [<url>: <error>, ...]         # empty list [] if all fetches succeeded
 searches_failed: [<query>: <error>, ...]    # empty list [] if no query failed with an error
 lane_status: ok | degraded | unavailable
-scan_note: <optional — used for: zero findings despite clean run; stale_source flags; cap_reached note; official_source_found notices; other non-error observations>
+allowlist_candidates: [<url> — <one-line reason>, ...]   # official pages you reached or needed that are NOT on scan-docs.md's pinned allowlist; empty list [] when none
+scan_note: <optional — used for: zero findings despite clean run; stale_source flags; cap_reached note; other non-error observations>
 discarded_findings: <count of findings dropped by the 10-finding cap PLUS zero-hit affected_files discards from Step 6 PLUS unconfirmable discards from Step 4, or 0>
 ```
 

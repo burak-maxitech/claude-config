@@ -207,6 +207,7 @@ gap_after: <the anchor version when the cap was reached before it, else null>
 gap_before: <oldest_version_seen when the cap was reached before the anchor, else null>
 gap_closed: <true when a recorded changelog_gap was closed this run (anchor reached or passed, end of history, or --full), else false>
 lane_status: ok | degraded | unavailable
+allowlist_candidates: [<url> — <one-line reason>, ...]   # official pages you reached or needed that are NOT on scan-docs.md's pinned allowlist; empty list [] when none
 scan_note: <optional; several notes may apply in one run — join them with ` | ` in the order they arose (a single note may itself contain `; `). Used when the scan ran cleanly but found zero capability matches, when the 50-release window was exhausted on a null watermark, when the anchor tag was not present and the slice fell to the next older release, when the cap was reached before the anchor (gap recorded), or when the anchor predates the release history>
 discarded_findings: <count of findings dropped by the 20-finding cap PLUS zero-hit affected_files discards from Step 7, or 0>
 releases_digest: [<unprefixed version> — <publishedAt date> — <one-line summary>, ...]   # one entry per in-scope release processed; the summary is the body's first bullet (else its first non-heading line), trimmed to one line; on the degraded path (CHANGELOG.md fallback) the date field is omitted since publishedAt is unavailable
@@ -215,5 +216,7 @@ releases_digest: [<unprefixed version> — <publishedAt date> — <one-line summ
 `releases_digest` feeds the report's Section 1 per-release lines. Include one entry for every release that was in scope (i.e., every release fetched and evaluated, regardless of whether it produced a finding). If `lane_status` is `unavailable`, emit an empty list `[]`.
 
 **Zero-new-releases case:** when `last_changelog_version` equals the newest release tag in the window (i.e., no in-scope releases exist since the watermark), set `releases_scanned: 0`, `lane_status: ok`, and `newest_version_seen` to the incoming `last_changelog_version` value (a no-op advance). Never emit `null` for `newest_version_seen` on an `ok` run — the orchestrator advances the watermark to this value, and `null` would clobber the stored watermark and force a full rescan on the next run.
+
+`allowlist_candidates` is required (an empty list is valid): when a release note points at a docs page for the detail of a change that intersects the inventory, and that page is not on `scan-docs.md`'s pinned allowlist, list it with the reason — the docs lane cannot see a page nobody pinned.
 
 These power the report footer and the orchestrator's watermark-advance decision.

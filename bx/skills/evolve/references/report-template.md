@@ -245,6 +245,10 @@ Discarded findings (per lane — each lane reports its own composition):
   changelog lane: 3 discarded
   docs lane:      1 discarded
   community lane: 0 discarded
+
+Allowlist candidates (official pages not on scan-docs.md's pinned list — offered as edits in --fix):
+  https://code.claude.com/docs/en/plugin-evals — owns the `claude plugin eval` suite format (changelog lane, v2.1.269)
+  (none)                                            # render this line when the list is empty
 ```
 
 The "Decision-log filters" block makes every suppression and merge count explicit; render each of its six lines every run, with `0` where nothing happened (the sentinel clause then reads "includes 0 sentinel entries"), so the headline math is auditable against the lanes' raw finding counts. Singular/plural wording is free; the numbers and the line order are fixed. "Open entries written this run" counts new `open` entries plus entries that transitioned to `open` this run. If a community lane was skipped, its watermark line shows the old value with a note: `community 2026-05-10 → (skipped — no advance)`.

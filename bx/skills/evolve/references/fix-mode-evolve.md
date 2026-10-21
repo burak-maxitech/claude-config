@@ -28,6 +28,10 @@ The token is the text between the backticks on the left of `→` (or the first b
 
 ---
 
+## Allowlist candidates
+
+After the finding gate flow, walk the run's `allowlist_candidates` (Step 3.1) in order. Each becomes a synthetic fix item: the edit is one new row in `bx/skills/evolve/references/scan-docs.md`'s pinned-allowlist table (URL, capability area from the candidate's reason, note `added <today> (S<N>)`) plus the date clause in the sentence above that table. Show the row as a diff and take `y` / `n` / `skip` exactly like a finding; `n` records nothing in the decision log (candidates are not findings) but the report notes the refusal so the candidate is not re-proposed from the same lane note next run — put the URL and `declined <today>` in the lane's row note instead. `y` appends the row; the docs lane fetches the page from the next run on. Candidates are never auto-applied.
+
 ## Pre-pass summary
 
 Before showing the first finding, print a one-line summary:
@@ -36,6 +40,7 @@ Before showing the first finding, print a one-line summary:
 --fix pass: N findings eligible (A from this run, B carried forward), M display-only (advisory/deferred/legacy/out-of-scope).
 Auto-closed (stale): K carried-forward entries whose token is absent from every affected file — <finding_id prefix> <title>, …
 Walking eligible findings in rank order (breakage first, then best-practice, then opportunities).
+Allowlist candidates to offer after the findings: C
 ```
 
 Render the `Auto-closed (stale)` line every pass, with `0` and no list when nothing was closed. Singular/plural wording is free; the numbers are fixed.

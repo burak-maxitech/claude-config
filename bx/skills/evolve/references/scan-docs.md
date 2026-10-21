@@ -16,7 +16,7 @@ You have these tools available: Read, Grep, Glob, WebFetch. Use WebFetch for all
 
 ## Pinned URL allowlist
 
-Verified 2026-06-09; `permissions` added 2026-07-22 (S50); `checkpointing` + `code-review` added 2026-08-11 (S54). For each URL: the working form confirmed by WebFetch, the capability area it covers, and any redirect note.
+Verified 2026-06-09; `permissions` added 2026-07-22 (S50); `checkpointing` + `code-review` added 2026-08-11 (S54); `auto-mode-config` added 2026-10-20 (S61, a candidate since 2026-08-11). For each URL: the working form confirmed by WebFetch, the capability area it covers, and any redirect note.
 
 | URL | Capability area | Notes |
 |-----|----------------|-------|
@@ -34,10 +34,11 @@ Verified 2026-06-09; `permissions` added 2026-07-22 (S50); `checkpointing` + `co
 | `https://code.claude.com/docs/en/commands` | commands/slash-commands reference — built-in commands, bundled skills, workflow commands | candidate `/slash-commands` redirects to skills page; successor is this URL |
 | `https://code.claude.com/docs/en/checkpointing` | checkpointing — per-user-prompt checkpoint capture, `/rewind` restore semantics, `Esc Esc` behavior, subagent/background-fork edits not restored, bash-command changes untracked | loads directly |
 | `https://code.claude.com/docs/en/code-review` | code review — `/code-review` effort levels + remembered level, background/foreground runs, `--fix` edits outside checkpoints, `disable-model-invocation` scheduled-task caveat, `REVIEW.md`, ultra escalation | loads directly |
+| `https://code.claude.com/docs/en/auto-mode-config` | auto mode — classifier-approved actions, which `allow` rules are dropped on entry (broad `Bash(*)`) and which carry over, destructive-git blocking, `PermissionDenied` retry hook | loads directly (verified 2026-10-20); owns the premise of webdesign finding `dadac845` |
 
 This lane fetches ONLY these allowlisted URLs. Following a link is allowed only to an anchor on the **same page** (one hop to a `#fragment`). Never follow links to other pages or domains. Why: unbounded link-chasing turns this pinned lane into an open-research lane and destroys the authority guarantee — findings must be traceable to a specific canonical page.
 
-**Allowlist completeness rule (S50).** A page belongs on this list when it is the *canonical owner* of a syntax or contract the bx plugin depends on — not merely when it mentions that syntax in passing. `permissions` was absent while `settings` and `sub-agents` were present; both show only name-based `Agent(<name>)` rules, so the lane concluded `Tool(param:value)` was undocumented and proposed reverting a correct fix. **Before emitting any finding whose claim is "the docs don't document X," check whether the page that owns X is on this list at all** — if it isn't, that is an allowlist gap to report in `scan_note`, not a finding about the plugin.
+**Allowlist completeness rule (S50).** A page belongs on this list when it is the *canonical owner* of a syntax or contract the bx plugin depends on — not merely when it mentions that syntax in passing. `permissions` was absent while `settings` and `sub-agents` were present; both show only name-based `Agent(<name>)` rules, so the lane concluded `Tool(param:value)` was undocumented and proposed reverting a correct fix. **Before emitting any finding whose claim is "the docs don't document X," check whether the page that owns X is on this list at all** — if it isn't, that is an allowlist gap: put the page in `allowlist_candidates` (footer), not in a finding about the plugin. The same goes for any official page you were tempted to follow a link to: record it as a candidate instead of fetching it.
 
 ---
 
@@ -207,8 +208,11 @@ pages_fetched: <n — count of allowlisted URLs that returned content successful
 pages_failed: [<url>: <error>, ...]   # empty list [] if all succeeded
 lane_status: ok | degraded | unavailable
 scan_note: <optional — used when scan ran cleanly but zero capability matches found, or other non-error observations>
+allowlist_candidates: [<url> — <one-line reason>, ...]   # official pages you reached or needed that are NOT on scan-docs.md's pinned allowlist; empty list [] when none
 discarded_findings: <count of findings dropped by the 15-finding cap PLUS zero-hit affected_files discards from Step 5 PLUS verification-gate discards from Step 3, or 0>
 ```
+
+`allowlist_candidates` is required (an empty list is a valid value). A candidate is an official `code.claude.com` or `anthropic.com` page that is the canonical owner of a contract bx depends on and is not in the table above — typically one an allowlisted page links to for the detail you needed, or one the completeness rule (above) told you was missing. Name the capability area the page would cover. The orchestrator renders candidates in the report footer and, in `--fix`, offers each as an edit adding a row to this table.
 
 **Zero-findings-but-all-pages-checked case:** set `pages_fetched` to the count of allowlist rows successfully fetched, `pages_failed` to its real contents (empty list only if truly no fetches failed), `lane_status` to what actually happened (`ok` only if every allowlisted page fetched successfully; `degraded` if any page failed even though zero findings emerged from the pages that did succeed), and use `scan_note` to explain that no gaps were found. Never return an empty finding list without a `scan_note` — that is indistinguishable from a partial run.
 

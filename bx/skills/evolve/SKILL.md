@@ -101,7 +101,7 @@ After all lane agents return (wait for all three Agent calls to complete):
 
 ### 3.1 — Collect lane outputs
 
-Record each lane's `lane_status` (ok / degraded / unavailable / skipped). These govern watermark advancement (Step 6) and the report footer (Step 4).
+Record each lane's `lane_status` (ok / degraded / unavailable / skipped). These govern watermark advancement (Step 6) and the report footer (Step 4). Also collect every lane's `allowlist_candidates` into one de-duplicated list (by canonical URL), and add any official page the orchestrator itself fetched outside the pinned allowlist during this run — the S53 lesson was that most Tier-1 value came from exactly such pages, and a candidate that lives only in a scan note is never acted on. The list renders in the footer and feeds `--fix` (`fix-mode-evolve.md`, *Allowlist candidates*).
 
 **Sentinels exit the pipeline here.** A `lane-unavailable-*` finding is a lane-health report, not a finding: record the lane's `lane_status: unavailable`, stash its `upstream_delta` (the verbatim errors) for the report's Section 1 lane row, and REMOVE it from the finding set. Nothing downstream of 3.1 — hashing, gating, decision log, fix mode — ever sees a sentinel; every downstream sentinel rule is entailed by this one.
 
