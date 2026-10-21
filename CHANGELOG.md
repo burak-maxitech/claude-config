@@ -2,6 +2,25 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.12.2 — 2026-10-21
+
+The third and fourth `/bx:evolve` runs of the day (delta on 5 of 23 pages, then `--fix` with every
+lane current). One doc fix.
+
+### Fixed
+
+- **`task-tools.md` states the documented allowlist rule** (tools reference, v2.1.268+): task
+  tools are on by default only on Opus 4.7 / Sonnet 4.6 / Haiku 4.5 and earlier; every other
+  model opts in via `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`, `--allowedTools` or `--tools`; background and
+  cloud sessions always have them; subagents follow the session; `CLAUDE_CODE_ENABLE_TASKS=0` swaps
+  in `TodoWrite`. The presence check is unchanged. (Was a v2.1.233 denylist.)
+
+### Known
+
+- A changed inventory hash forces a full page re-read even when the delta is one renamed token;
+  this run narrowed the scan by hand (new page + pages mentioning the token). The probe should
+  compute the delta from the last committed `capabilities.json` and do this itself.
+
 ## 2.12.1 — 2026-10-21
 
 The first two `/bx:evolve` runs on 2.12.0 (delta with all 22 pages, then `--fix` with every lane

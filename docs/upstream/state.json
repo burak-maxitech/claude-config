@@ -92,9 +92,13 @@
       "https://code.claude.com/docs/en/tools-reference": {
         "hash": "a16431c435ad4d4e01fd9a0b705c0e7e61a623ed",
         "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/env-vars": {
+        "hash": "04c4ed4a713392d5fa837dbb80da3d4d680587b1",
+        "scanned": "2026-10-21"
       }
     },
-    "inventory_hash": "e58fe4630c952775b9cfcb46aef46710d41a8e85"
+    "inventory_hash": "45a4793c2c4bd0eb06c1415815108d52830da512"
   },
   "decisions": [
     {
@@ -1060,6 +1064,23 @@
       ],
       "source_excerpt": "## How ultrareview compares to /code-review\n\nBoth reviews examine code, but you use them at different stages of your workflow.\n\n| | `/code-review` | `/code-review ultra` |\n| - | - | - |\n| Target | your working diff, a pull request, a branch, or a path | your working diff or a pull request |\n| Runs | locally in your session | in a cloud sandbox |\n| Depth | scales with the effort argument | multi-agent fleet with independent verification |\n| Duration | seconds to a few minutes | roughly 15 to 25 minutes |\n| Cost | counts toward normal usage | free runs, then roughly \\$5 to \\$25 per review as usage credits |\n| Best for | quick feedback while iterating | pre-merge confidence on substantial changes |\n\nUse `/code-review` for fast feedback as you work, or pass a PR number to review a teammate's pull request before approving it. Use `/code-review ultra` before merging a substantial change when you want a deeper pass that catches issues a local review might miss.",
       "citation": "https://code.claude.com/docs/en/ultrareview"
+    },
+    {
+      "finding_id": "260a171ccd9225a932ed40a02ef3ee83a0dcc488",
+      "decision": "applied",
+      "date": "2026-10-21",
+      "source_url": "https://code.claude.com/docs/en/tools-reference",
+      "affected_capability": "bx:save/idiom:task-tracker",
+      "source_content_hash": "dff2021bffd64671f762f978c68588096b76fecd",
+      "class": "best_practice",
+      "title": "Task-tool availability is an allowlist (default only on Opus 4.7 / Sonnet 4.6 / Haiku 4.5 and earlier, v2.1.268+); task-tools.md states a denylist",
+      "note": "APPLIED 2026-10-21 (S62 --fix): task-tools.md 'The fact' rewritten to the v2.1.268 allowlist rule (default only on Opus 4.7 / Sonnet 4.6 / Haiku 4.5 and earlier; three opt-ins; background/cloud carve-outs; subagent follows session; CLAUDE_CODE_ENABLE_TASKS=0 swaps in TodoWrite). Presence check unchanged.",
+      "proposed_edit": "In bx/skills/save/references/task-tools.md 'The fact': change 'As of claude-code **v2.1.233**, the task-tracker tools ... are **not in the default toolset** on Opus 4.8, Sonnet 5, Fable 5, Mythos 5 and newer models' to 'As of claude-code **v2.1.268**, the task-tracker tools are in the default toolset only on Opus 4.7, Sonnet 4.6, Haiku 4.5 and earlier models; on every other model, including unrecognized/gateway model IDs, they are left out unless opted in via CLAUDE_CODE_ENABLE_TODO_TOOLS=1, naming a Task tool in --allowedTools, or listing it in --tools. Background and cloud sessions always have them; a subagent has them only when the parent session does. CLAUDE_CODE_ENABLE_TASKS=0 swaps the four Task tools for TodoWrite (so a present TodoWrite with no TaskCreate is a valid session shape - the presence check already handles it).' Keep the single-owner rule (satellites still cite, do not restate). The presence-check procedure itself is correct and unchanged; this is a drift fix to the stated fact. (Note: v2.1.233 is still the version that introduced CLAUDE_CODE_ENABLE_TODO_TOOLS per the env-vars row.)",
+      "affected_files": [
+        "bx/skills/save/references/task-tools.md"
+      ],
+      "source_excerpt": "## Task tool availability\n\nThe task-tracking tools, `TaskCreate`, `TaskGet`, `TaskUpdate`, `TaskList`, and `TodoWrite`, are available by default only on Opus 4.7, Sonnet 4.6, Haiku 4.5, and earlier models. Wherever the tools are available, you get the four Task tools, or `TodoWrite` instead when you set [`CLAUDE_CODE_ENABLE_TASKS=0`](/docs/en/env-vars).\n\nOn every other model, Claude Code leaves the tools out unless you opt in. The same applies to a model ID Claude Code doesn't recognize, such as a custom model name served through an [LLM gateway](/docs/en/llm-gateway). On newer models, Claude keeps track of multi-step work without a written checklist, and the tools' definitions and reminders take up context. Without the tools, Claude adds nothing to the [task list](/docs/en/interactive-mode#task-list) while it works.\n\nIf you'd like to use these tools on a model that doesn't have them by default, do one of the following:\n\n* Export [`CLAUDE_CODE_ENABLE_TODO_TOOLS=1`](/docs/en/env-vars) before you start Claude Code, for example `CLAUDE_CODE_ENABLE_TODO_TOOLS=1 claude`. Claude Code then provides the same tools on every model and every provider\n* Name one of the tools in [`--allowedTools`](/docs/en/cli-reference#cli-flags), for example `claude --allowedTools TaskCreate`\n* List the tools in [`--tools`](/docs/en/cli-reference#cli-flags), which restricts the session's built-in tools to the ones it names. Include the tools you want alongside the other built-in tools you use\n* In the Agent SDK, the [`allowedTools` and `tools` options](/docs/en/agent-sdk/todo-tracking#model-availability) work the same way as the two flags\n\nIn [background sessions](/docs/en/agent-view) and in [cloud sessions](/docs/en/claude-code-on-the-web), Claude Code provides the same tools on every model, listed or not.\n\nClaude Code gives a subagent the tools only when your session has them, even when the subagent runs a different model. An in-process [agent team](/docs/en/agent-teams) teammate follows your session the same way, while a teammate in its own [split pane](/docs/en/agent-teams#choose-a-display-mode) runs as a separate Claude Code process, so its own model decides. Without the Task tools, an agent coordinates with its team through messages instead of the [shared task list](/docs/en/agent-teams#assign-and-claim-tasks).\n\nThe default set described here applies in Claude Code v2.1.268 and later.",
+      "citation": "https://code.claude.com/docs/en/tools-reference"
     }
   ]
 }

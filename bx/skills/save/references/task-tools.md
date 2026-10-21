@@ -11,10 +11,15 @@ Cited by: `/bx:resume` (Step 5), `/bx:save` (Part 0 drain), `/bx:plan` (Step 6),
 
 ## The fact
 
-As of claude-code **v2.1.233**, the task-tracker tools — `TaskCreate`, `TaskGet`,
-`TaskUpdate`, `TaskList`, `TodoWrite` — are **not in the default toolset** on Opus 4.8,
-Sonnet 5, Fable 5, Mythos 5 and newer models. `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` restores them.
-Older models still carry them by default.
+As of claude-code **v2.1.268**, the task-tracker tools — `TaskCreate`, `TaskGet`,
+`TaskUpdate`, `TaskList`, `TodoWrite` — are in the default toolset **only on Opus 4.7,
+Sonnet 4.6, Haiku 4.5 and earlier models**. On every other model, including an
+unrecognized or gateway model ID, Claude Code leaves them out unless the session opts in:
+`CLAUDE_CODE_ENABLE_TODO_TOOLS=1` (introduced v2.1.233), a Task tool named in
+`--allowedTools`, or the tools listed in `--tools`. Background and cloud sessions always
+have them; a subagent has them only when the parent session does.
+`CLAUDE_CODE_ENABLE_TASKS=0` swaps the four Task tools for `TodoWrite`, so a session with
+`TodoWrite` and no `TaskCreate` is a valid shape (the check below already handles it).
 
 Listing these tools in a skill's `allowed-tools` does **not** make them appear —
 `allowed-tools` grants permission, not existence. The frontmatter entries stay: they are what
