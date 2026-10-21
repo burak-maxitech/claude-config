@@ -30,7 +30,7 @@ If Section 4 is non-empty (there are carried-forward open or deferred entries), 
 **Toolkit is current** — no NEW upstream deltas intersect the plugin since changelog 2.1.170 · docs 2026-06-09. (3 open findings carried forward — see Section 4)
 ```
 
-The watermark fields rendered in the special case are `last_changelog_version` and `docs_checked_at` from `docs/upstream/state.json`. Render as `changelog <version> · docs <date>`. If a field is null (first run), render "never" in its place.
+The watermark fields rendered in the special case are `last_changelog_version` and `docs_checked_at` from `docs/upstream/state.json`. Render as `changelog <version> · docs <date>`. If a field is null (first run), render "never" in its place. If `watermark.changelog_gap` will be non-null after Step 6 (its value is known at render time — the lanes have returned), append ` — changelog gap <after> → <before> unscanned` to the headline in both the normal and the special case; "Toolkit is current" is never rendered without that qualifier while a gap exists.
 
 The four counts in the normal headline are FINAL counts after decision-log suppression (rejected-unchanged findings do not appear in the headline). The footer discloses the suppression count so the math is auditable.
 
@@ -52,7 +52,7 @@ One line per lane. Render even if a lane was skipped or unavailable.
 
 **Lane statuses:** `ok` (ran fully), `degraded` (ran partially — network errors, partial results), `skipped` (user passed `--no-community`), `unavailable` (tool or auth failure prevented the lane from running).
 
-For the changelog lane, the "Range covered" shows `<old watermark version> → <new version>` and the count of releases processed this run. If `last_changelog_version` was null (first run), render the old end as "beginning". For a skipped or unavailable lane, render `—`.
+For the changelog lane, the "Range covered" shows `<old watermark version> → <new version>` and the count of releases processed this run, then ` · <pages_fetched> page(s)`. If `last_changelog_version` was null (first run), render the old end as "beginning". When the lane filled part of a recorded gap this run, render the count as `(<total> releases: <delta> new + <gap_fill_scanned> gap fill)`. When the lane reported a gap this run (new or still open), append ` (gap: <after> → <before> unscanned)` to the cell; when the lane closed a gap this run, append ` (gap <after> → <before> closed)`; when the lane's scan_note says the anchor tag was not present, append ` (anchor tag absent; sliced at <version>)` so the old end of the range is not mistaken for a live tag. For a skipped or unavailable lane, render `—`.
 
 For docs and community lanes, the "Range covered" shows `<old *_checked_at> → today`. If the old timestamp was null (first run), render the old end as "first run". For a skipped or unavailable lane, render `—`.
 
@@ -62,8 +62,8 @@ Below the table, one line per release processed by the changelog lane. These lin
 
 ```
 **Changelog entries scanned this run:**
-- v2.1.170 — 2026-06-09 — Hooks: new `PostToolUse` event added
-- v2.1.169 — 2026-06-08 — MCP: `allowed-tools` now accepts glob patterns
+- 2.1.170 — 2026-06-09 — Hooks: new `PostToolUse` event added
+- 2.1.169 — 2026-06-08 — MCP: `allowed-tools` now accepts glob patterns
 - ...
 ```
 

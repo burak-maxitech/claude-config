@@ -95,7 +95,7 @@ Only candidates that survive the verification gate proceed to Step 4.
 
 ### Step 4 — Filter against capability inventory and pain points
 
-For each verified candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point-only findings use `affected_capability: bx:pain/<kebab-slug>` (use the `bx:pain/<kebab-slug>` form — see the schema notes below).
+For each verified candidate delta: check whether it intersects the `capability_inventory` or addresses an item in the `pain_point_list`. If neither — discard silently. Only emit findings for candidates that match. Pain-point-only findings use `affected_capability: bx:pain/<id>` with the id copied from `pain_point_list` (see the schema notes below).
 
 ### Step 5 — Populate affected_files via Grep
 

@@ -22,21 +22,31 @@ claude-code release tags use a leading `v` (e.g. `v2.1.170`); CHANGELOG.md headi
 
 ## Method
 
-### Step 1 — Fetch releases (primary: gh)
+### Step 1 — Fetch releases (primary: gh), paginating to the watermark anchor
 
-Run ONE call:
+Fetch page 1:
 
 ```
-gh api "repos/anthropics/claude-code/releases?per_page=50"
+gh api "repos/anthropics/claude-code/releases?per_page=50&page=1"
 ```
 
 This returns a JSON array of release objects, newest-first. Each object contains `tag_name`, `body`, and `published_at`. Parse the array in-context — no per-release follow-up calls needed.
 
-**Failure definition:** A call fails if it exits non-zero OR returns empty/invalid JSON. On failure, fall back to the WebFetch CHANGELOG path (Step 3) and set `lane_status: degraded`.
+**Failure definition:** A call fails if it exits non-zero OR returns empty/invalid JSON. A failure on page 1 falls back to the WebFetch CHANGELOG path (Step 3) with `lane_status: degraded`. A failure on a later page ends pagination: treat the pages already fetched as the window and continue with the anchor-not-found rule below (`degraded`).
 
-**Watermark stop rule:** Normalize each `tag_name` (strip leading `v`) before comparing. Slice the returned array from newest to oldest; stop (exclude) the release whose normalized version **exactly equals** `last_changelog_version` and all older ones. If no exact match is found within the 50-release window (the watermark tag was yanked, or more than 50 releases have shipped since the last run — claude-code ships near-daily so this is realistic), process the entire window AND emit a `scan_note: watermark anchor <last_changelog_version> not found in the 50-release window; window may be incomplete`.
+**The target version.** The version you paginate toward is the **anchor**: normally `last_changelog_version`; when the context block carries a non-null `changelog_gap`, it is the gap's `after` instead (see *Closing a recorded gap*). Versions compare numerically, component by component (`2.1.420` > `2.1.99`), never as strings; a tag that does not parse as three non-negative integers is skipped with a `scan_note` naming it.
 
-If `last_changelog_version` is null, process ALL releases in the returned array and emit a `scan_note` if the window appears exhausted (50 entries returned with no null stopping point).
+**Watermark stop rule:** Normalize each `tag_name` (strip leading `v`) before comparing. Walk the fetched releases from newest to oldest and stop at the first release whose version is **less than or equal to** the anchor; that release and everything older are excluded. Equal means the anchor tag is present. Less-than means the anchor tag itself is gone (yanked or renamed) but every release newer than it has been seen — treat the anchor as found, exclude from that release on, and emit `scan_note: watermark anchor <anchor> not present; sliced at <first older version>`. No gap exists in either case.
+
+**Pagination rule:** if page 1 does not reach the anchor (its oldest release is still newer than the anchor), fetch `page=2`, then `page=3`, … up to **`page=10`** (500 releases), stopping as soon as a page reaches the anchor or a page returns an empty array (`[]`, the end of the release history). Concatenate pages newest-first. The anchor is almost always on page 1; every further page is one more `gh` call and nothing else. If `last_changelog_version` is null, fetch page 1 only — a null watermark is the first-run / `--full` re-audit of the recent window, not a request to read the whole history.
+
+**Cap reached before the anchor** (10 pages fetched, the tenth non-empty, oldest release still newer than the anchor — whether history continues past page 10 is unknown and irrelevant: the cap is the cap): set `lane_status: degraded`, process every release fetched, and report the gap in the footer: `gap_after: <anchor>` and `gap_before: <normalized version of the oldest release fetched>` — the releases strictly between those two versions were never scanned. The orchestrator records this as `watermark.changelog_gap` (Step 6) and the report shows it every run until it is closed. Also emit `scan_note: watermark anchor <anchor> not reached in 10 pages (<M> releases); gap recorded`.
+
+**End of history before the anchor** (a page returned `[]` and the oldest release fetched is still newer than the anchor): the anchor predates the whole release history, so nothing is unscanned — process everything fetched, `lane_status: ok`, no gap, `scan_note: watermark anchor <anchor> predates the release history; all <M> releases scanned`. If a gap was recorded, this closes it (`gap_closed: true`).
+
+A null-watermark run that fills page 1 completely (50 entries) emits `scan_note: 50-release window exhausted (first run / --full)` and no gap.
+
+**Closing a recorded gap.** When the context block carries `changelog_gap: {after, before}`, the anchor is `after` (above). Reaching it — by equality, by passing it, or by hitting the end of history — closes the gap: set `gap_closed: true`, `gap_after: null`, `gap_before: null`. Hitting the cap first leaves the gap open: `lane_status: degraded`, `gap_closed: false`, `gap_after: <after>` unchanged, `gap_before: <new oldest release fetched>`. **Input this run** is the union of two ranges: releases newer than `last_changelog_version` (the normal delta) AND releases strictly between `after` and `before` (the gap fill); releases from `before` up to and including the watermark were processed on earlier runs and are not re-processed. Report `releases_scanned` as the total and `gap_fill_scanned` as the second range's count. A `--full` run closes any gap unconditionally (`gap_closed: true`) because it re-audits the recent window by design and the user has asked for a fresh baseline.
 
 ### Step 2 — Extract release content (primary: gh)
 
@@ -95,7 +105,7 @@ If two releases in a degraded run produce the same `(source_url, affected_capabi
 | Value | Meaning | Watermark advance? |
 |---|---|---|
 | `ok` | Primary method (`gh`) succeeded. Release bodies were fetched directly; `publishedAt` dates and release URLs are precise. | Yes — `last_changelog_version` advances to `newest_version_seen`. |
-| `degraded` | Primary (`gh`) failed; fallback (raw CHANGELOG.md fetch) succeeded. Findings are still trustworthy but `citation` URLs and dates are coarser (raw file URL instead of per-release URL; no `publishedAt`). | Yes — `last_changelog_version` still advances because the changelog content was successfully evaluated; the user is informed of the coarser citation quality via the `lane_status: degraded` disclosure. |
+| `degraded` | Primary (`gh`) failed and the fallback (raw CHANGELOG.md fetch) succeeded — findings are trustworthy but `citation` URLs and dates are coarser (raw file URL, no `publishedAt`); OR `gh` succeeded but the watermark anchor was not found within the paginated window, so a gap exists (`gap_after`/`gap_before` set). | Yes — `last_changelog_version` still advances to `newest_version_seen` because everything fetched was evaluated; the gap, if any, is recorded in `watermark.changelog_gap` so the unscanned range is never silently forgotten. |
 | `unavailable` | Both primary and fallback failed. Only the `lane_unavailable` degenerate finding was emitted. | No — the orchestrator MUST NOT advance `last_changelog_version` when `lane_status` is `unavailable`. The missed range will be re-checked on the next run because the watermark is unchanged. |
 
 **Why this matters:** the orchestrator advances the watermark only on `ok` or `degraded`. Silent degradation is impossible — the report footer always discloses `lane_status`, so the user knows whether citations are precise or coarse, and knows when no advance occurred.
@@ -190,10 +200,16 @@ After all findings (or after the single `lane_unavailable` finding), append:
 ```
 releases_scanned: <n — 0 if lane_status is unavailable, since nothing was successfully evaluated>
 newest_version_seen: <unprefixed version string, or null if unavailable>
+pages_fetched: <number of gh page calls made this run, 1–10 (the cap is never exceeded, so page 11 is never requested; an empty page reached within the cap counts); 0 on the CHANGELOG.md fallback>
+oldest_version_seen: <unprefixed version string of the oldest release fetched — fetched, not processed — or null if unavailable>
+gap_fill_scanned: <releases processed from inside a recorded gap this run, else 0>
+gap_after: <the anchor version when the cap was reached before it, else null>
+gap_before: <oldest_version_seen when the cap was reached before the anchor, else null>
+gap_closed: <true when a recorded changelog_gap was closed this run (anchor reached or passed, end of history, or --full), else false>
 lane_status: ok | degraded | unavailable
-scan_note: <optional — used when scan ran cleanly but zero capability matches found, when the --limit 50 window was exhausted, or when the watermark anchor was not found>
+scan_note: <optional; several notes may apply in one run — join them with ` | ` in the order they arose (a single note may itself contain `; `). Used when the scan ran cleanly but found zero capability matches, when the 50-release window was exhausted on a null watermark, when the anchor tag was not present and the slice fell to the next older release, when the cap was reached before the anchor (gap recorded), or when the anchor predates the release history>
 discarded_findings: <count of findings dropped by the 20-finding cap PLUS zero-hit affected_files discards from Step 7, or 0>
-releases_digest: [<unprefixed version> — <publishedAt date> — <one-line summary>, ...]   # one entry per in-scope release processed; on the degraded path (CHANGELOG.md fallback) the date field is omitted since publishedAt is unavailable
+releases_digest: [<unprefixed version> — <publishedAt date> — <one-line summary>, ...]   # one entry per in-scope release processed; the summary is the body's first bullet (else its first non-heading line), trimmed to one line; on the degraded path (CHANGELOG.md fallback) the date field is omitted since publishedAt is unavailable
 ```
 
 `releases_digest` feeds the report's Section 1 per-release lines. Include one entry for every release that was in scope (i.e., every release fetched and evaluated, regardless of whether it produced a finding). If `lane_status` is `unavailable`, emit an empty list `[]`.

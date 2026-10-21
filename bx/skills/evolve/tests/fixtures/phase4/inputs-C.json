@@ -1,0 +1,15 @@
+{
+  "scenario": "C",
+  "last_changelog_version": "2.1.989",
+  "changelog_gap": {
+    "after": "2.1.878",
+    "before": "2.1.899",
+    "recorded": "2026-10-01"
+  },
+  "note": "a gap recorded on an earlier run; its `after` version sits on page 3",
+  "capability_inventory": [
+    "bx:evolve/changelog-window"
+  ],
+  "pain_point_list": [],
+  "how_to_fetch": "`gh api \"repos/anthropics/claude-code/releases?per_page=50&page=N\"` returns the contents of page-N.json in this directory; page-11.json is the empty array (end of history)."
+}

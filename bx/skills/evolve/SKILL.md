@@ -58,7 +58,7 @@ Interpret `$ARGUMENTS`:
 | Flag | Effect |
 |---|---|
 | *(none)* | Default delta run: research changes since the watermark, emit report, stop. |
-| `--full` | Treat all watermark fields as null FOR THIS RUN only — the stored `state.json` is untouched until the end-of-run watermark advance (Step 6). Triggers a full re-audit as if running for the first time. |
+| `--full` | Treat all watermark fields as null FOR THIS RUN only — the stored `state.json` is untouched until the end-of-run watermark advance (Step 6). Triggers a full re-audit as if running for the first time, and closes any recorded `changelog_gap` (the user asked for a fresh baseline). |
 | `--fix` | Run the full report (Steps 2–4), then execute the per-finding diff gate (Step 5). |
 | `--no-community` | Skip lane 3 (`upstream-community`). Lane 3's `community_checked_at` watermark field keeps its previous value per state-schema Rule 4 — the missed range re-checks on the next run. |
 
@@ -78,6 +78,7 @@ For each Agent call, include the following shared context block verbatim, then i
 
 ```
 Watermark: last_changelog_version=<value|null> · docs_checked_at=<value|null> · community_checked_at=<value|null>
+changelog_gap: <null, or {after, before} copied from state — the changelog lane paginates to `after` to close it>
 capability_inventory: <the list from Step 0.2>
 pain_point_list: <the active {id, text} entries from Step 0.3 — findings that address one set affected_capability to bx:pain/<id>, id verbatim>
 Repo root: the working directory. Grep scope for affected_files: bx/, README.md, workflow.md.
@@ -166,6 +167,7 @@ Where M = total `open` + `deferred` entries in the decision log after this run.
 At the end of EVERY run (default or `--fix`), advance the watermark per state-schema Rule 4:
 
 - `last_changelog_version` ← changelog lane's `newest_version_seen` (only if changelog `lane_status` is `ok` or `degraded`).
+- `changelog_gap` ← set to `{"after": <gap_after>, "before": <gap_before>, "recorded": <today>}` when the lane reports `gap_after` non-null (a fresh gap, or a recorded one that is still open — `recorded` keeps the original date in that case); set to `null` when the lane reports `gap_closed: true`; otherwise unchanged — in particular an `unavailable` or `skipped` changelog lane leaves a recorded gap exactly as it was, and the report keeps showing it. These values, like the watermark fields, are known once the lanes return (Step 3), so Step 4's report renders the values Step 6 will write. The watermark still advances past a gap — that is deliberate: the gap object, not a frozen watermark, is what keeps the unscanned range visible (a frozen watermark would re-scan the same 50 releases forever after a yanked tag). Section 1 renders the gap on every run until it is `null`.
 - `docs_checked_at` ← today's date (only if docs `lane_status` is `ok` or `degraded`).
 - `community_checked_at` ← today's date (only if community `lane_status` is `ok` or `degraded`). A `--no-community` run leaves this field unchanged.
 
