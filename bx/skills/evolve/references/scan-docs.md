@@ -16,7 +16,7 @@ You have these tools available: Read, Grep, Glob, WebFetch. Use WebFetch for all
 
 ## Pinned URL allowlist
 
-Verified 2026-06-09; `permissions` added 2026-07-22 (S50); `checkpointing` + `code-review` added 2026-08-11 (S54); `auto-mode-config` added 2026-10-20 (S61, a candidate since 2026-08-11); `code-review-local`, `ultrareview`, `plugins/manifest-reference`, `plugins/marketplace-reference`, `plugins/components`, `permission-modes`, `tools-reference` added 2026-10-20 (S61 `--fix`, from the first run's `allowlist_candidates`; `plugins/install`, `scheduled-tasks` and `settings-reference` declined 2026-10-20 — re-offer only with a new reason). For each URL: the working form confirmed by WebFetch, the capability area it covers, and any redirect note.
+Verified 2026-06-09; `permissions` added 2026-07-22 (S50); `checkpointing` + `code-review` added 2026-08-11 (S54); `auto-mode-config` added 2026-10-20 (S61, a candidate since 2026-08-11); `code-review-local`, `ultrareview`, `plugins/manifest-reference`, `plugins/marketplace-reference`, `plugins/components`, `permission-modes`, `tools-reference` added 2026-10-20 (S61 `--fix`, from the first run's `allowlist_candidates`; `plugins/install`, `scheduled-tasks` and `settings-reference` declined 2026-10-20 — re-offer only with a new reason); `env-vars` added 2026-10-21 (S62 `--fix`, docs-lane candidate). For each URL: the working form confirmed by WebFetch, the capability area it covers, and any redirect note.
 
 | URL | Capability area | Notes |
 |-----|----------------|-------|
@@ -42,6 +42,7 @@ Verified 2026-06-09; `permissions` added 2026-07-22 (S50); `checkpointing` + `co
 | `https://code.claude.com/docs/en/plugins/components` | per-component runtime — where hooks.json, `bin/`, agents and skills load from and what runs at session start | added 2026-10-20 (S61); the `plugins` row is now only an overview |
 | `https://code.claude.com/docs/en/permission-modes` | permission modes, auto mode defaults, protected paths — what the classifier blocks before any rule | added 2026-10-20 (S61) |
 | `https://code.claude.com/docs/en/tools-reference` | built-in tool names and behaviour (Agent, AskUserQuestion, Bash, PowerShell, WebFetch) — the vocabulary of `allowed-tools`, agent `tools` and `disallowed-tools` | added 2026-10-20 (S61) |
+| `https://code.claude.com/docs/en/env-vars` | environment variables — `CLAUDE_CODE_ENABLE_TODO_TOOLS`, `CLAUDE_CODE_ENABLE_TASKS`, `CLAUDE_CODE_SUBAGENT_MODEL`, `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS`, `CLAUDE_ENV_FILE` — the names `save/references/task-tools.md` and `session-start-context.sh` depend on | added 2026-10-21 (S62 `--fix`, docs-lane candidate) |
 
 This lane fetches ONLY these allowlisted URLs. Following a link is allowed only to an anchor on the **same page** (one hop to a `#fragment`). Never follow links to other pages or domains. Why: unbounded link-chasing turns this pinned lane into an open-research lane and destroys the authority guarantee — findings must be traceable to a specific canonical page.
 

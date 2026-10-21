@@ -1,11 +1,100 @@
 {
   "watermark": {
     "last_changelog_version": "2.1.306",
-    "docs_checked_at": "2026-10-20",
-    "community_checked_at": "2026-10-20",
+    "docs_checked_at": "2026-10-21",
+    "community_checked_at": "2026-10-21",
     "changelog_gap": null,
-    "docs_pages": {},
-    "inventory_hash": null
+    "docs_pages": {
+      "https://code.claude.com/docs/en/skills": {
+        "hash": "72ed85eb9ed83dda1ccdb07e52a0f0c3ed7f9372",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/plugins": {
+        "hash": "b0ffa2642d392b4c3d38ec35351b556088ea4170",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/plugins-reference": {
+        "hash": "43b2ee02b97697080f1b16019abf8b4c3d59ae42",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/plugins/loading": {
+        "hash": "601eab5cc8456e6d01d0cf2579560f135a899f21",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/plugins/cli-reference": {
+        "hash": "4505b0e4de9bbcf0a34ff6a4381bfa4d83e57839",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/plugin-evals": {
+        "hash": "1cb6b6a8e3d100df9bdf11bff143356b9849259f",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/hooks": {
+        "hash": "f3e50ab36bf547ca1d6886b405626d8490012e25",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/settings": {
+        "hash": "84d7181b94b382760c8c691c4e7c68ded7911bfb",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/permissions": {
+        "hash": "8344b43d1161a236d05129740f65ef5cd774ced2",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/sub-agents": {
+        "hash": "b9e92e6158019fcbc65eba521df82860a2398b34",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/memory": {
+        "hash": "0bec33eaf52f64da3608a71e8a121e6135154398",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/commands": {
+        "hash": "2b54d1df0004924432a52595c805beef4f7b1f90",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/checkpointing": {
+        "hash": "4143b0886c0c1853c683c66034bb6050bab22c27",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/code-review": {
+        "hash": "c3ca71068ef9e313aae729d21d7f2e7e65366c9f",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/auto-mode-config": {
+        "hash": "c4d8163098a6715cae85d4052e0ce8d9492eee43",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/code-review-local": {
+        "hash": "9de30f8b111f7b6043f7f1c18ed5549d2ac63691",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/ultrareview": {
+        "hash": "f65bf9bf4d69efd22ac9f766554cd119b758f3bc",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/plugins/manifest-reference": {
+        "hash": "43b2ee02b97697080f1b16019abf8b4c3d59ae42",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/plugins/marketplace-reference": {
+        "hash": "43f82f7207d6a05b8b4505ce26c6bb551291320c",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/plugins/components": {
+        "hash": "63d5a566e3fe8dda11c763b28fe79522d23c4f19",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/permission-modes": {
+        "hash": "f9741c8f25bd12e757b849290517c4cc042d8b54",
+        "scanned": "2026-10-21"
+      },
+      "https://code.claude.com/docs/en/tools-reference": {
+        "hash": "a16431c435ad4d4e01fd9a0b705c0e7e61a623ed",
+        "scanned": "2026-10-21"
+      }
+    },
+    "inventory_hash": "e58fe4630c952775b9cfcb46aef46710d41a8e85"
   },
   "decisions": [
     {
@@ -437,17 +526,19 @@
     {
       "finding_id": "4ed0fc0c1903e2177418b06512d3127e2efe85ed",
       "decision": "applied",
-      "date": "2026-07-30",
+      "date": "2026-10-21",
       "source_url": "https://code.claude.com/docs/en/checkpointing",
       "affected_capability": "bx:review/rewind-checkpoint-note",
-      "source_content_hash": "eec0ef3de8b9dabbf9004a8a274a5d0ae8f78e8b",
+      "source_content_hash": "25656cc3ca6f8a44f9e26534b38ec92026058776",
       "class": "breakage",
-      "title": "Checkpoint claim is factually wrong: checkpoints are created before each USER PROMPT, not before each edit",
-      "note": "APPLIED 2026-07-30 (scoped review-only run). bx/skills/review/SKILL.md: rewrote the post---fix closing line. Corrected 'Checkpoints are created automatically before each edit' -> checkpoints are captured before each USER PROMPT, so one /rewind reverts the whole Step-6 batch rather than a single edit. Also fixed two rider errors in the same sentence: Esc Esc opens the rewind menu only on an EMPTY prompt (otherwise it clears the input), and 'persist across sessions' is now stated as surviving a resume but deleted after 30 days (cleanupPeriodDays).",
-      "proposed_edit": null,
-      "affected_files": [],
-      "source_excerpt": null,
-      "citation": null
+      "title": "Checkpointing docs: files changed by Bash commands (rm, mv, cp) are not tracked and 'cannot be undone through rewind'...",
+      "note": "APPLIED 2026-10-21 (S62 --fix): clean/SKILL.md step 10 now says /rewind covers Edit-tool removals only; git rm deletions are undone via the branch or git restore/reset. Previous: was applied: APPLIED 2026-07-30 (scoped review-only run). bx/skills/review/SKILL.md: rewrote the post---fix closing line. Corrected 'Checkpoints are created automatically before each edit' -> checkpoints are captured before each USER PROMPT, so one /rewind reverts the whole Step-6 batch rather than a single edit. Also fixed two rider errors in the same sentence: Esc Esc opens the rewind menu only on an EMPTY prompt (otherwise it clears the input), and 'persist across sessions' is now stated as surviving a resume but deleted after 30 days (cleanupPeriodDays).",
+      "proposed_edit": "In bx/skills/clean/SKILL.md Fix Mode step 10, narrow the `/rewind` sentence. Old: 'To undo this session's edits, run `/rewind` (or press `Esc Esc` on an empty prompt) — checkpoints are captured before each user prompt, not each edit, so one rewind reverts the whole batch applied in a turn.' New: say `/rewind` restores only the in-file Edit removals, and that files removed with `git rm` (Bash) are not tracked by checkpoints, so the undo path for deletions is the cleanup branch (`git checkout main && git branch -D cleanup/YYYYMMDD`) or `git restore --staged --worktree <paths>` / `git reset --hard HEAD~1` after the step 8 commit. Keep the 'checkpoints survive resume, deleted after 30 days' clause.",
+      "affected_files": [
+        "bx/skills/clean/SKILL.md"
+      ],
+      "source_excerpt": "### Bash command changes not tracked\n\nCheckpointing does not track files modified by Bash commands. For example, if Claude Code runs:\n\n```bash theme={null}\nrm file.txt\nmv old.txt new.txt\ncp source.txt dest.txt\n```\n\nThese file modifications cannot be undone through rewind. Only direct file edits made through Claude's file editing tools are tracked.",
+      "citation": "https://code.claude.com/docs/en/checkpointing"
     },
     {
       "finding_id": "afe42f6014fccf76d32707b4b330d15dfdbd80b4",
@@ -695,14 +786,18 @@
       "date": "2026-10-20",
       "source_url": "https://code.claude.com/docs/en/memory",
       "affected_capability": "bx:pain/claude-md-over-size-target",
-      "source_content_hash": "a513170929d351fa7843dbb1a613a43a55273504",
+      "source_content_hash": "4971c95898cf16fd27e56d00734c0242c296b9c9",
       "class": "opportunity",
-      "title": "Memory docs name path-scoped `.claude/rules/` as the CLAUDE.md overflow tier and add `/doctor prompt-audit` (v2.1.283) — bx has neither",
-      "note": "remaining half = doc-tiering Phase 2 (.claude/rules tier, spec D4-D6), gated on re-verifying `paths:` against the memory docs",
-      "proposed_edit": null,
-      "affected_files": [],
-      "source_excerpt": null,
-      "citation": null
+      "title": "Memory docs now confirm the exact contract the Doc tiering Phase 2 item was gated on: `.claude/rules/*.md` files are...",
+      "note": "remaining half = doc-tiering Phase 2 (.claude/rules tier, spec D4-D6), gated on re-verifying `paths:` against the memory docs | source changed since deferral (2026-10-21); edit fields filled from the live finding",
+      "proposed_edit": "Unblock Doc tiering Phase 2 (spec D4-D6): in doc-schema.md add a `.claude/rules/` tier for path-specific conventions moved out of CLAUDE.md, with `paths:` as the sole frontmatter key (YAML list form), and teach mode-update.md Part 4 / claude-md-sections.md to route path-scoped content there. Record in the spec that unscoped rules load at launch with CLAUDE.md priority (no context saving), so only `paths:`-scoped rules count as a size relief.",
+      "affected_files": [
+        "bx/skills/save/references/doc-schema.md",
+        "bx/skills/save/references/mode-update.md",
+        "bx/skills/save/references/claude-md-sections.md"
+      ],
+      "source_excerpt": "#### Rule frontmatter reference\n\nConfigure a rule with YAML [frontmatter](/docs/en/glossary#frontmatter) between `---` markers at the top of the file. `paths` is the only field Claude Code reads from a rule; any other field is ignored without an error. Claude Code removes the frontmatter before loading the rule into context.\n\n| Field | Required | Description |\n| :- | :- | :- |\n| `paths` | No | Glob patterns that [scope the rule to matching files](#path-specific-rules). Accepts a YAML list or a comma-separated string |\n\nIf the YAML between the markers doesn't parse, Claude Code ignores the frontmatter and loads the rule as if it had no `paths`. Run `claude --debug` to see the parse error.",
+      "citation": "https://code.claude.com/docs/en/memory"
     },
     {
       "finding_id": "2e4e9a8b9ef2a5d15262847267179f91b3d47d5e",
@@ -884,7 +979,7 @@
       "source_content_hash": "ec9cc532ece8363f59c0cda1cca22c9a398e82ba",
       "class": "opportunity",
       "title": "`claude plugin eval` runs a plugin's prompts in fresh isolated non-interactive sessions with seeded workspaces and grade",
-      "note": null,
+      "note": "re-emitted 2026-10-21 under bx:pain/design-plugin-eval-suite (live edit: scaffold bx/evals/ via `claude plugin eval init`, trigger cases first; keep clean/evals as skill-creator format)",
       "proposed_edit": "Prototype the six doc-schema v2 fixture cases as plugin eval cases under bx/evals/<case>/ (prompt.md + case.yaml workspace seeding + regex/file_exists graders; `--ablation none` halves cost). Document the command in verification-checklists.md as the repeatable check; keep the manual run as fallback. Caveats: requires Claude Code 2.1.269+, every run is a billed model call (3 runs per case by default), 'early access' state unverified for this account, confirm the eval prompt can invoke /bx:save.",
       "affected_files": [
         "bx/skills/save/references/verification-checklists.md",
@@ -925,6 +1020,46 @@
       ],
       "source_excerpt": "#### Restrict which tools a subagent can use\n\nTo restrict tools, use the `tools` field as an allowlist or the `disallowedTools` field as a denylist. If both are set, `disallowedTools` is applied first, then `tools` is resolved against the remaining pool. A tool listed in both is removed.\n\nThis example uses `tools` to allow only Read, Grep, Glob, and Bash. The subagent can't edit files, write files, or use any MCP tools:\n\n```yaml theme={null}\n---\nname: safe-researcher\ndescription: Research agent with restricted capabilities\ntools: Read, Grep, Glob, Bash\n---\n```\n\nA `disallowedTools` entry with a specifier, such as `Bash(git push *)`, still removes the whole tool from the subagent, not only the matching commands. To keep Bash and block specific commands, add a [Bash deny rule](/docs/en/permissions#bash) such as `Bash(git push *)` to `permissions.deny` in your settings. The rule applies to the main conversation and to subagents.\n",
       "citation": "https://code.claude.com/docs/en/sub-agents#restrict-which-tools-a-subagent-can-use"
+    },
+    {
+      "finding_id": "30cfd3b5c0ab22f20dfd72a5e9d03541113f3e0d",
+      "decision": "applied",
+      "date": "2026-10-21",
+      "source_url": "https://code.claude.com/docs/en/tools-reference",
+      "affected_capability": "bx:webdesign/tool:KillShell",
+      "source_content_hash": "866796e98087e1c477744dd6de9584a60ac64dbe",
+      "class": "breakage",
+      "title": "The tools-reference table (the 'exact strings' for allowed-tools, agent tools and hook matchers) has no `KillShell`;...",
+      "note": "APPLIED 2026-10-21 (S62 --fix): KillShell -> TaskStop in webdesign SKILL.md allowed-tools, phase1-extract.md (3.3 + Windows caveat), phase3-inject.md (dev-server paragraph); capabilities.json regenerated (bx:webdesign/tool:TaskStop). Live check on the next webdesign run still owed.",
+      "proposed_edit": "Replace `KillShell` with `TaskStop` in the webdesign SKILL.md allowed-tools line, phase1-extract.md (Step 3.3 stop-server sentence and the 'Windows KillShell can orphan' note) and phase3-inject.md (dev-server start/stop paragraph); keep 'background-shell ID' wording but say 'task ID'. Regenerate bx/skills/evolve/capabilities.json with build-capabilities.py --write (entry bx:webdesign/tool:KillShell becomes bx:webdesign/tool:TaskStop). Verify live on the next webdesign run that the dev-server background ID is accepted by TaskStop before treating as confirmed breakage.",
+      "affected_files": [
+        "bx/skills/webdesign/SKILL.md",
+        "bx/skills/webdesign/references/phase1-extract.md",
+        "bx/skills/webdesign/references/phase3-inject.md",
+        "bx/skills/evolve/capabilities.json"
+      ],
+      "source_excerpt": "# Tools reference\n\n> Complete reference for the tools Claude Code can use, including permission requirements and per-tool behavior.\n\nClaude Code has access to a set of built-in tools that help it understand and modify your codebase. The tool names are the exact strings you use in [permission rules](/docs/en/permissions#tool-specific-permission-rules), [subagent tool lists](/docs/en/sub-agents), and [hook matchers](/docs/en/hooks).\n\nTo control which tools Claude can use and when it asks first, configure [permission rules](/docs/en/permissions#tool-specific-permission-rules) in your settings, [hooks](/docs/en/hooks), or a [subagent's tool list](/docs/en/sub-agents#supported-frontmatter-fields). See [Configure tools with permission rules and hooks](#configure-tools-with-permission-rules-and-hooks) for each place that accepts a tool name.\n\nTo add custom tools, connect an [MCP server](/docs/en/mcp). To extend Claude with reusable prompt-based workflows, write a [skill](/docs/en/skills), which runs through the existing `Skill` tool rather than adding a new tool entry.\n\n> [!NOTE]\n>\n> In [auto mode](/docs/en/permission-modes#eliminate-prompts-with-auto-mode), a classifier decides most permission prompts instead of you. The `Permission required` column shows whether the tool prompts in [Manual mode](/docs/en/permission-modes) for paths inside the working directory. File-access tools marked No, including `Read`, `Grep`, and `Glob`, still prompt for paths outside the [working directory and additional directories](/docs/en/permissions#working-directories). `Bash` is marked Yes but runs a built-in set of [read-only commands](/docs/en/permissions#read-only-commands) without prompting.\n\n| Tool | Description | Permission required |\n| :- | :- | :- |\n| `Agent` | Spawns a [subagent](/docs/en/sub-agents) with its own context window to handle a task. With [agent teams](/docs/en/agent-teams) enabled, a call that carries a `name` can launch a [teammate](/docs/en/agent-teams#how-claude-starts-agent-teams) instead. See [Agent tool behavior](#agent-tool-behavior) | No |\n| `Artifact` | Publishes an HTML or Markdown file as an [artifact](/docs/en/artifacts): a private, interactive page on claude.ai. You can share it with a public link, or inside your organization on Team and Enterprise plans, where public sharing requires an Owner to [enable it](/docs/en/artifacts#control-public-sharing). Requires a Pro, Max, Team, or Enterprise plan and `/login` authentication; see [Availability](/docs/en/artifacts#availability) | Yes |\n| `AskUserQuestion` | Asks multiple-choice questions to gather requirements or clarify ambiguity. Questions stay open until you answer them by default. See [AskUserQuestion tool behavior](#askuserquestion-tool-behavior) | No |\n| `Bash` | Executes shell commands in your environment. See [Bash tool behavior](#bash-tool-behavior) | Yes |\n| `CronCreate` | Schedules a recurring or one-shot prompt within the current session. Tasks are session-scoped and restored on `--resume` or `--continue` if unexpired. See [session-scoped scheduled tasks](/docs/en/scheduled-tasks) | No |\n| `CronDelete` | Cancels a session-scoped scheduled task by ID | No |\n| `CronList` | Lists all session-scoped scheduled tasks | No |\n| `Edit` | Makes targeted edits to specific files. See [Edit tool behavior](#edit-tool-behavior) | Yes |\n| `EndConversation` | Ends the session, in rare cases of sustained abusive input or when you ask Claude to demonstrate the tool. See [EndConversation tool behavior](#endconversation-tool-behavior) | No |\n| `EnterPlanMode` | Switches to plan mode to design an approach before coding | No |\n| `EnterWorktree` | Creates an isolated [git worktree](/docs/en/worktrees) and switches into it. Pass a `path` to switch into an existing worktree instead of creating a new one. On first entry the target may be a worktree of the current repository or, in a multi-repo workspace, of a repository nested inside it. Before v2.1.203, a nested repository's worktree was rejected. A `path` outside `.claude/worktrees/` prompts for your approval before entering, since it moves the session's working directory and write access to that location. New-worktree creation and paths under `.claude/worktrees/` don't prompt. Before v2.1.206, Claude entered paths outside `.claude/worktrees/` without a prompt. From within a worktree session, or from a subagent with a pinned working directory such as [`isolation: worktree`](/docs/en/sub-agents#supported-frontmatter-fields), only the `path` form is available and the target must be under `.claude/worktrees/` of the session's repository | Yes |\n| `ExitPlanMode` | Presents a plan for approval and exits plan mode | Yes |\n| `ExitWorktree` | Exits a worktree session and returns to the original directory. Not available to subagents that already run in their own working directory, such as with [`isolation: worktree`](/docs/en/sub-agents#supported-frontmatter-fields) | No |\n| `Glob` | Finds files based on pattern matching. Absent by default on macOS, Linux, and WSL. See [Glob tool behavior](#glob-tool-behavior) | No |\n| `Grep` | Searches for patterns in file contents. Absent by default on macOS, Linux, and WSL. See [Grep tool behavior](#grep-tool-behavior) | No |\n| `ListAgents` | Lists the agents Claude can message with `SendMessage`: subagents in the session, [agent team](/docs/en/agent-teams) teammates, your other local Claude Code sessions, and, while this session is connected to [Remote Control](/docs/en/remote-control), your [cloud sessions](/docs/en/claude-code-on-the-web) and your Remote Control sessions on other machines. Backs the `/list-agents` command. See [cross-session messaging](/docs/en/cross-session-messaging). Requires Claude Code v2.1.224 or later, and appears only in sessions where [cross-session messaging is enabled](/docs/en/cross-session-messaging#availability). Teammate rows and the first line showing this session's own name require v2.1.239 or later | No |\n| `ListMcpResourcesTool` | Lists resources exposed by connected [MCP servers](/docs/en/mcp), leaving out [MCP Apps UI resources](/docs/en/mcp#reference-mcp-resources), which are pages for a host application to render | No |\n| `LSP` | Code intelligence via language servers: jump to definitions, find references, report type errors and warnings. See [LSP tool behavior](#lsp-tool-behavior) | No |\n| `Monitor` | Runs a command in the background and feeds each output line back to Claude, so it can react to log entries, file changes, or polled status mid-conversation. Can also open a WebSocket and treat each incoming message as an event. See [Monitor tool](#monitor-tool) | Yes |\n| `NotebookEdit` | Modifies Jupyter notebook cells. See [NotebookEdit tool behavior](#notebookedit-tool-behavior) | Yes |\n| `PowerShell` | Executes PowerShell commands natively. See [PowerShell tool](#powershell-tool) for availability | Yes |\n| `PushNotification` | Sends a desktop notification, and a phone push when [Remote Control](/docs/en/remote-control) is connected, so a long-running task or [session-scoped scheduled task](/docs/en/scheduled-tasks) can reach you when you step away. Push delivery runs through Anthropic-hosted infrastructure, which is not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry | No |\n| `Read` | Reads the contents of files. See [Read tool behavior](#read-tool-behavior) | No |\n| `ReadMcpResourceTool` | Reads a specific MCP resource by URI | No |\n| `RemoteTrigger` | Creates, updates, runs, and lists [cloud scheduled tasks](/docs/en/routines), formerly routines, on claude.ai. Backs the `/schedule` command. The [`RemoteTrigger` input reference](/docs/en/agent-sdk/typescript#remotetrigger) documents every action and the organization policies that remove the tool. Cloud scheduled tasks live on claude.ai and require a Pro, Max, Team, or Enterprise plan. This tool is therefore not accessible from Amazon Bedrock, Claude Platform on AWS, Google Cloud's Agent Platform, or Microsoft Foundry | No |\n| `ReportFindings` | Reports code-review findings as a structured list, with a file, summary, and failure scenario per finding, so Claude Code can render them instead of printing them as text. Claude calls it when active code-review instructions tell it to. A finding can also carry an optional `category` slug, such as `correctness` or `test-coverage`, shown next to the file location in the rendered list | No |\n| `ScheduleWakeup` | Reschedules the next iteration of a [self-paced `/loop`](/docs/en/scheduled-tasks#let-claude-choose-the-interval). Claude calls this at the end of each iteration to pick when the next one runs, between one minute and one hour out; you don't call it directly. To end the loop instead, Claude calls it with `stop: true`, which cancels the pending wakeup. The pending wakeup appears in `session_crons` in [Stop hook input](/docs/en/hooks#stop-input) | No |\n| `SendFeedback` | Drafts a feedback report about Claude Code, covering a product problem or Claude's own behavior in the session, and queues it on your machine for you to review. Claude Code sends nothing until you choose to send the draft. See [SendFeedback tool behavior](#sendfeedback-tool-behavior). Requires Claude Code v2.1.238 or later | No |\n| `SendMessage` | Sends a message to another agent: an [agent team](/docs/en/agent-teams) teammate, a [subagent it resumes](/docs/en/sub-agents#resume-subagents) by agent ID or name, or one of your other Claude Code sessions, on this machine or beyond it. Messaging other sessions requires Claude Code v2.1.224 or later. [Cross-session messaging](/docs/en/cross-session-messaging) covers which sessions Claude can reach, [what a message looks like when it arrives](/docs/en/cross-session-messaging#what-a-message-looks-like), and [how Claude gets a notice when another session goes idle](/docs/en/cross-session-messaging#get-a-notice-when-another-session-goes-idle). Claude can include an optional `summary` input, typically 5-10 words, that Claude Code shows as a one-line preview. When Claude omits it on a [plain-text message](/docs/en/cross-session-messaging#limitations), Claude Code uses the first line of the message as the summary. Claude Code truncates a summary longer than 200 characters with an ellipsis | No |\n| `SendUserFile` | Sends files from the session to you with an optional caption, so a generated report, diagram, screenshot, or built artifact reaches your device instead of only being mentioned in the transcript. The optional `display` input controls presentation: `render` opens the file inline in the client, `attach` shows a download card only, and when unset the client decides by file type. Available when a [Remote Control](/docs/en/remote-control) client is connected or in a [cloud session](/docs/en/claude-code-on-the-web). Delivery runs through Anthropic-hosted infrastructure, so the tool is not available on Amazon Bedrock, Google Cloud's Agent Platform, or Microsoft Foundry | No |\n| `ShareOnboardingGuide` | Uploads `ONBOARDING.md` and returns a share link teammates can open in Claude Code. Called from `/team-onboarding` after the guide is written. Available to claude.ai subscribers on Team and Enterprise plans | Yes |\n| `Skill` | Executes a [skill](/docs/en/skills#control-who-invokes-a-skill) within the main conversation | Yes |\n| `SubagentHandback` | Delivers a subagent's final report to whichever conversation receives that subagent's result. Provided only in [auto mode](/docs/en/permission-modes#eliminate-prompts-with-auto-mode), to subagents that the Agent tool runs locally other than [forks](/docs/en/sub-agents#fork-the-current-conversation), and available in the terminal CLI, IDE extensions, cloud sessions, and the Agent SDK; the classifier reviews the report before it's delivered. Requires Claude Code v2.1.271 or later | No |\n| `TaskCreate` | Creates a new task in the task list. Provided by default only on the models listed under [Task tool availability](#task-tool-availability), and on other models when you opt in | No |\n| `TaskGet` | Retrieves full details for a specific task. Provided by default only on the models listed under [Task tool availability](#task-tool-availability), and on other models when you opt in | No |\n| `TaskList` | Lists all tasks with their current status. Provided by default only on the models listed under [Task tool availability](#task-tool-availability), and on other models when you opt in | No |\n| `TaskOutput` | Removed in v2.1.277. Previously retrieved output from a background task; Claude reads a background task's [output file](/docs/en/interactive-mode#how-backgrounding-works) with `Read` instead | No |\n| `TaskStop` | Stops a running background task by ID. It also accepts an [agent-team teammate](/docs/en/agent-teams) or a named background agent by agent ID or name. When no task matches the ID, the error lists the running background agents by ID and description, including agents that another agent spawned | No |\n| `TaskUpdate` | Updates task status, dependencies, details, or deletes tasks. Provided by default only on the models listed under [Task tool availability](#task-tool-availability), and on other models when you opt in | No |\n| `TodoWrite` | Manages the session task checklist. Disabled by default in favor of `TaskCreate`, `TaskGet`, `TaskList`, and `TaskUpdate`. Set `CLAUDE_CODE_ENABLE_TASKS=0` to re-enable it in [sessions that have the task-tracking tools](#task-tool-availability) | No |\n| `ToolSearch` | Searches for and loads deferred tools when [tool search](/docs/en/mcp#scale-with-mcp-tool-search) is enabled | No |\n| `WaitForMcpServers` | Waits for one or more [MCP servers](/docs/en/mcp) that are still connecting in the background, so a request can use their tools without restarting the session. Claude calls it when a needed server isn't connected yet. Only appears when [tool search](/docs/en/mcp#scale-with-mcp-tool-search) is disabled, since `ToolSearch` handles the wait when it's enabled | No |\n| `WebFetch` | Fetches content from a specified URL. See [WebFetch tool behavior](#webfetch-tool-behavior) | Yes |\n| `WebSearch` | Performs web searches. See [WebSearch tool behavior](#websearch-tool-behavior) | Yes |\n| `Workflow` | Runs a [dynamic workflow](/docs/en/workflows): a script that orchestrates many subagents in the background and returns one consolidated result | Yes |\n| `Write` | Creates or overwrites files. See [Write tool behavior](#write-tool-behavior) | Yes |",
+      "citation": "https://code.claude.com/docs/en/tools-reference"
+    },
+    {
+      "finding_id": "570103c2d55911336773e24bc848dba3a7d1fa04",
+      "decision": "applied",
+      "date": "2026-10-21",
+      "source_url": "https://code.claude.com/docs/en/ultrareview",
+      "affected_capability": "bx:health/builtin:code-review-ultra",
+      "source_content_hash": "cee51efb3d56bbec325a31f4ed29a0d6403bd559",
+      "class": "best_practice",
+      "title": "Ultrareview docs give 'roughly 15 to 25 minutes' (free runs, then roughly $5 to $25 in usage credits) and no agent co...",
+      "note": "APPLIED 2026-10-21 (S62 --fix): README ladder item 4, workflow.md, state-buckets.md (33, 60), review/SKILL.md when_to_use — fleet wording, 15–25 min, cost note in README, '/ultrareview is an alias'.",
+      "proposed_edit": "Replace '10–20 min' with '15–25 min' in README.md (ladder item 4) and state-buckets.md (lines 33 and 60); drop the unsourced subagent counts ('5+', '5–20', 'scales to 20') in README.md, workflow.md, state-buckets.md and review/SKILL.md when_to_use in favour of 'multi-agent cloud fleet with independent verification'; optionally add the cost note ('3 free runs on Pro/Max, then ~$5–$25 as usage credits'). Change 'now a deprecated alias' to 'an alias'.",
+      "affected_files": [
+        "README.md",
+        "workflow.md",
+        "bx/skills/health/references/state-buckets.md",
+        "bx/skills/review/SKILL.md"
+      ],
+      "source_excerpt": "## How ultrareview compares to /code-review\n\nBoth reviews examine code, but you use them at different stages of your workflow.\n\n| | `/code-review` | `/code-review ultra` |\n| - | - | - |\n| Target | your working diff, a pull request, a branch, or a path | your working diff or a pull request |\n| Runs | locally in your session | in a cloud sandbox |\n| Depth | scales with the effort argument | multi-agent fleet with independent verification |\n| Duration | seconds to a few minutes | roughly 15 to 25 minutes |\n| Cost | counts toward normal usage | free runs, then roughly \\$5 to \\$25 per review as usage credits |\n| Best for | quick feedback while iterating | pre-merge confidence on substantial changes |\n\nUse `/code-review` for fast feedback as you work, or pass a PR number to review a teammate's pull request before approving it. Use `/code-review ultra` before merging a substantial change when you want a deeper pass that catches issues a local review might miss.",
+      "citation": "https://code.claude.com/docs/en/ultrareview"
     }
   ]
 }

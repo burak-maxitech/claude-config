@@ -135,7 +135,7 @@ Two review skills are available — pick the right tier for the job:
 
 - **`/code-review`** (built-in, lightweight) — quick diff scan for correctness bugs at a chosen effort level (low/medium/high/max). Supports `--comment` to post findings as inline PR comments. Use this as the daily driver.
 - **`/bx:review`** (custom, thorough) — senior-engineer review with codebase-convention scanning, severity-ranked findings, mandatory `file:line` references. Supports `--security` (OWASP), `--verify` (run tests/lint), `--fix` (auto-fix simple findings), `--last-commit`. Reach for this when the diff is non-trivial or touches risky areas.
-- **`/code-review ultra`** (built-in, cloud) — 5+ verifying subagents for high-risk pre-merge (auth, payments, migrations).
+- **`/code-review ultra`** (built-in, cloud) — multi-agent cloud fleet with independent verification for high-risk pre-merge (auth, payments, migrations).
 
 ```bash
 # Quick review of uncommitted changes (default - most common)

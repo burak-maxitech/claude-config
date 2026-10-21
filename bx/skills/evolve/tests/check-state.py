@@ -17,7 +17,7 @@ from pathlib import Path
 HEX40 = re.compile(r"^[0-9a-f]{40}$")
 SENTINEL = "0" * 40
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-CAPABILITY = re.compile(r"^bx:[a-z0-9-]+/[a-z0-9/-]+$")
+CAPABILITY = re.compile(r"^bx:[a-z0-9-]+/[A-Za-z0-9:/_.-]+$")
 DECISIONS = {"open", "applied", "rejected", "deferred"}
 CLASSES = {"breakage", "best_practice", "opportunity"}
 

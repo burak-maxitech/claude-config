@@ -1,7 +1,7 @@
 {
   "generated_by": "bx/skills/evolve/scripts/build-capabilities.py --write",
   "count": 434,
-  "inventory_hash": "e58fe4630c952775b9cfcb46aef46710d41a8e85",
+  "inventory_hash": "45a4793c2c4bd0eb06c1415815108d52830da512",
   "capabilities": [
     "bx:arch-performance/description",
     "bx:arch-performance/model",
@@ -422,9 +422,9 @@
     "bx:webdesign/tool:Edit",
     "bx:webdesign/tool:Glob",
     "bx:webdesign/tool:Grep",
-    "bx:webdesign/tool:KillShell",
     "bx:webdesign/tool:Read",
     "bx:webdesign/tool:Skill",
+    "bx:webdesign/tool:TaskStop",
     "bx:webdesign/tool:WebFetch",
     "bx:webdesign/tool:Write",
     "bx:webdesign/tool:mcp__plugin_playwright_playwright__browser_click",

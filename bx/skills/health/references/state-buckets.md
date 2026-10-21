@@ -30,7 +30,7 @@ Why this order:
 /code-review → /bx:review --security → /bx:review --verify → commit → push → /code-review ultra <PR#> → merge → /bx:save
 ```
 
-`/code-review ultra` adds 5–20 cloud subagents (10–20 min) and is overkill for routine work but the right call for high-risk code.
+`/code-review ultra` runs a multi-agent cloud fleet with independent verification (15–25 min) and is overkill for routine work but the right call for high-risk code.
 
 ---
 
@@ -57,7 +57,7 @@ Why:
 /code-review (no flags)
 ```
 
-Skip `/code-review ultra` for trivial PRs — the cloud cost and 10–20 min wait isn't justified.
+Skip `/code-review ultra` for trivial PRs — the cloud cost and 15–25 min wait isn't justified.
 
 ---
 

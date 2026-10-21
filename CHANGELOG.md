@@ -2,6 +2,29 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.12.1 — 2026-10-21
+
+The first two `/bx:evolve` runs on 2.12.0 (delta with all 22 pages, then `--fix` with every lane
+current) and what they found.
+
+### Fixed
+
+- **Pain-registry matching threshold is `min(3, lead word count)`.** A two-word lead such as
+  `Dogfood /bx:health` could never share three words with its own entry and spawned a duplicate id.
+- **State validator accepts the pinned vocabulary.** The capability pattern rejected
+  `tool:KillShell` and `builtin:code-review-ultra` (`:` and tool-name case); widened to
+  `^bx:[a-z0-9-]+/[A-Za-z0-9:/_.-]+$`, schema normalization text aligned.
+- `--fix` applied three findings: `/bx:clean` step 10 no longer promises `/rewind` for `git rm`
+  deletions (checkpointing docs); `/bx:webdesign` names `TaskStop`, not `KillShell`
+  (tools reference); ultrareview wording follows the docs (fleet, 15–25 min, cost note,
+  `/ultrareview` is an alias). `env-vars` pinned on the docs allowlist; inventory regenerated.
+
+### Known
+
+- Allowlist candidates are not persisted between a delta run and its `--fix`; this run carried
+  one by hand. A `source_url` match with two stored candidates has no tie-break rule (larger
+  file overlap was used). A regenerated inventory hash triggers a full 22-page re-read next run.
+
 ## 2.12.0 — 2026-10-21
 
 The two `/bx:save --full` defects found by v2.10.0's first real run (S61), the three `/bx:evolve`
