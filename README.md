@@ -222,7 +222,7 @@ Then refresh your install with the two `/plugin …` commands from [Updating](#u
 
 ## Subagents
 
-The `bx/agents/` folder contains 19 subagent definitions used by skills (namespaced `bx:<agent>` once installed). These run on Sonnet for cost efficiency and have scoped tool permissions. Skills dispatch them automatically via the Agent tool (renamed from Task in 2.1.63), and you can also reference them by name in `@`-mention typeahead inside the REPL (added in Claude Code 2.1.89).
+The `bx/agents/` folder contains 20 subagent definitions used by skills (namespaced `bx:<agent>` once installed). These run on Sonnet for cost efficiency and have scoped tool permissions. Skills dispatch them automatically via the Agent tool (renamed from Task in 2.1.63), and you can also reference them by name in `@`-mention typeahead inside the REPL (added in Claude Code 2.1.89).
 
 | Agent | Used By | Purpose |
 |-------|---------|---------|
@@ -367,9 +367,15 @@ claude-config/                         # marketplace repo
 │   ├── architecture.md                # Architecture detail (schema v2)
 │   ├── completed-work.md
 │   ├── key-decisions.md
+│   ├── known-issues.md                # Issues moved out of CLAUDE.md (created on demand)
 │   ├── modernization-roadmap.md
 │   ├── session-history.md
+│   ├── archive/                       # Rotated archive volumes (<name>-<K>.md)
+│   ├── superpowers/                   # Specs + plans (dated planning records)
 │   └── upstream/                      # /bx:evolve watermark + decision log
+├── .githooks/pre-push                 # Opt-in version-bump guard (git config core.hooksPath .githooks)
+├── .github/workflows/                 # `plugin version bump` CI check
+├── scripts/check-plugin-version-bump.sh
 ├── .gitignore
 ├── CLAUDE.md                          # AI session context
 ├── README.md                          # This file

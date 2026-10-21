@@ -1,7 +1,7 @@
 <!-- bx-doc-schema: 2 -->
 # CLAUDE.md
 
-Last Updated: 2026-09-28 (Session 60)
+Last Updated: 2026-10-20 (Session 61)
 
 ## Project Overview
 
@@ -16,10 +16,6 @@ Last Updated: 2026-09-28 (Session 60)
 
 | Decision | Rationale |
 |----------|-----------|
-| Cross-skill references must resolve against the skill base directory, not repo-rooted paths (S48) | Sibling-skill reads use `../<skill>/...` against the base dir announced at skill load; every background process a skill starts needs its stop mechanism named and permitted. |
-| `Agent(model:…)` deny rules do NOT guard omitted-model dispatch (S50) | `Tool(param:value)` rules never match an omitted parameter, so they can't guard generic dispatch; the durable guard is frontmatter `model:` + dispatching agents by name. |
-| `${CLAUDE_SKILL_DIR}` is real, but text-substitution — not a shell variable (S50) | Expanded in rendered markdown + `allowed-tools` rules, never by the shell — unexpanded in shell it yields an empty string; the `bin/`-launcher-on-PATH remedy stays correct. |
-| `/bx:webdesign` first dogfood + 15-fix hardening (S52) | E2E run paused clean at `review_pending`; all 15 findings were in the delegation surface — key gotchas: `stitch-design:<name>` naming, Tailwind v4 `@theme`, lossy Stitch palette (verify via `get_project` before batch-generating). |
 | Scoped `/bx:evolve` runs must freeze the watermark (S53) | Advancing the watermark on a narrowed run would record unexamined skills as audited; a scoped run reports the frozen watermark, leaving a full run still owed. |
 | Checkpoints are per-user-prompt, not per-edit — and subagent edits aren't checkpointed at all (S53) | One checkpoint per user prompt (`/rewind` reverts the whole batch), and subagent/background-fork edits are never checkpointed — git is the only undo for those. |
 | Explicit semver plugin versioning replaces commit-SHA versioning (S54) | `version` in plugin.json is the update cache key — every `bx/**` change must bump it (PATCH/MINOR/MAJOR; `/bx:save` Part 8 enforces); history in `CHANGELOG.md`. |
@@ -45,24 +41,16 @@ Last Updated: 2026-09-28 (Session 60)
 
 ## Known Issues / Blockers
 
-**The S37 `/bx:seo` "messed up" breakage is RESOLVED (S39).** Root-caused to the `${CLAUDE_SKILL_DIR}` path bug (not a real Claude Code variable → the helper was never found → GSC silently fell back to heuristic-only) + an impossible "mint token once, reuse across Bash calls" auth model (shell state does not persist across Bash tool calls). Both fixed and verified against live GSC. See Session History S39 + Key Decisions.
-
 **Plugin-versioning sharp edge (S54):** `version` in `bx/.claude-plugin/plugin.json` is the plugin's update cache key — a push that changes `bx/**` without bumping it is never offered to users (`/plugin update` reports "already at the latest version"). `/bx:save` Part 8 enforces the bump; manual committers follow the README contributors note. History in `CHANGELOG.md`.
 
 **18 open upstream findings** live in `docs/upstream/state.json`. Watermark: **changelog 2.1.284 · docs/community 2026-09-28** (S60 delta run). S60 found five new findings and applied four by hand plus two from the backlog (`10294db5`, `7e849e74`); `161ae182` (`claude plugin eval`) and the rules-tier half of `55ba40ea` stay open.
 
-**`start-claude.ps1` cannot be parsed by Windows PowerShell 5.1 (pre-existing, found S55).** The file is BOM-less UTF-8 containing seven non-ASCII characters (em-dashes and an arrow); WinPS 5.1 decodes a BOM-less `.ps1` as the ANSI codepage, so `—` becomes `â€"` and the trailing quote terminates a string early — 2 parse errors on 5.1, 0 on pwsh 7. Predates this branch (`git show d78105e:` confirms), and the user runs pwsh 7, but README tells teammates to install `cc` without naming a host. Fix queued in the S55 fix wave: replace the seven characters with ASCII.
-
-**The interactive `/color` path is still unverified (S55).** `/color <c>` as a *prompt argument* is proven for `-p` (`claude -p "/color blue"` → `Session color set to: blue`, exit 0, no model turn), but the interactive path needs a TTY and could not be exercised from a tool call. The `cc` launcher now ships that argument. If the live gate shows the prompt bar is not colored, the documented fallback is a custom `statusLine` printing a per-project colored banner — a fresh design decision, NOT a launcher patch.
-
 **`/bx:arch` v2 shipped without meeting its own acceptance bar (S58).** Six blind-rehearsal waves ran against the rewritten surfaces; the S56 ≤2 ambiguity bar was not reached (Step 5 15→12→11, report template 24→18→12, scan+rubrics 12→12) and v2.3.0 shipped on the severity curve instead. The residual is formatting conventions and named judgment calls, recorded in the spec's acceptance section rather than waived. **The end-to-end dogfood has since run** (v2.4.0) and found four further defects the rehearsals could not reach.
-
-**The unwired `bx/scripts/session-start-context.ps1` is RESOLVED by deletion (S59, 2026-09-08).** The official hooks reference lists every command-hook field (`command`, `args`, `async`, `asyncRewake`, `shell`) and none selects a script per OS; the only Windows-without-Git-Bash path is a dispatcher wrapper, which cannot be verified from this machine. The `.sh` already runs on Windows via Git Bash, so `.sh`-only is now the deliberate scope (`/bx:evolve` docs-lane finding `7b54fbc1`).
 
 **`/bx:evolve` Step 3.4 has no `applied` branch (S58, found by running it).** The decision-log filter defines branches for `rejected`+unchanged, `rejected`+changed, `deferred`, and `open`-or-new — but not `applied`. A re-emitted applied finding matches none of them, so whether it duplicates or vanishes is undefined; it manifests whenever the watermark has not advanced past the release that produced it. Entries also store `source_content_hash` but not `source_excerpt`, so a re-check cannot compare content without re-fetching. Related: the `bx:pain/<slug>` convention derives from prose that gets reworded, so the same concern re-hashes to new IDs over time (4 entries already carry an older cache-staleness slug). **Also (S59): a follow-up `--fix` run cannot act on the previous run's findings** — fix-mode gates only findings re-emitted in the same run, and the watermark advance at the end of every run means the changelog lane never re-emits them; so the default-mode closing line "Run `/bx:evolve --fix` to act on the open Tier-1 findings" oversells a second pass. Storing `source_excerpt` (above) is the fix; until then, pass `--fix` on the same run, use `--full --fix`, or apply by hand.
 
-**v2.10.0 is merged, and five of its rules are unexecuted (S60, 2026-09-28).** The Known Issues governor passed every blind-rehearsal outcome check, but the ≤2 ambiguity bar was NOT met on raw counts (9–16), and a fresh whole-branch review then found seven defects the synthetic fixtures could not reach. Multi-paragraph entries, tight bullet lists, the 300-char floor, archive liveness in rotation and the block-replace refusal exist only as text and lint strings; the CI workflow had never run before the merge push. The first real `/bx:save --full` after install is the test. Log: `docs/superpowers/plans/2026-09-28-bx-doc-tiering-phase1-rehearsals.md`.
+**v2.10.0's first real `--full` ran S61 (2026-10-20); the open phase of the Known Issues shrinker is still unexecuted.** The CI workflow ran green on the merge push (run 36506759638). The resolved phase fired for real: three `RESOLVED` entries moved to the new `docs/known-issues.md`, archive-first. Two defects found by running: (1) `save-writer` writes the session entry and the state deltas BEFORE Parts 5–7, so a `--full` run's own rollup and shrinker results cannot land in the session that produced them (S61 ran the sweep first by hand); (2) the open phase would have summarized three open entries to save ~550 chars because its 300-char floor is close to the ~200–280-char replacement line, and two of those "open" entries were in fact resolved by `7ed079a` two months earlier — the status-form test cannot see resolution evidence that lives only in git. Multi-paragraph entries, tight bullet lists, the open phase and archive liveness in rotation remain text-only. Log: `docs/superpowers/plans/2026-09-28-bx-doc-tiering-phase1-rehearsals.md`.
 
-**`/bx:health` reading session state from CLAUDE.md is RESOLVED (S60, v2.10.0).** Its pre-injection now reads `docs/STATUS.md` when that file exists and names the file it read; the block was executed against this repo and returned STATUS.md's sections. The skill itself has still never been run end to end.
+> Archived issues: [docs/known-issues.md](docs/known-issues.md)
 
 > Session state: [docs/STATUS.md](docs/STATUS.md)

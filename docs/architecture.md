@@ -12,7 +12,7 @@ claude-config/                         # marketplace repo
 │   ├── .claude-plugin/plugin.json     # manifest (explicit semver `version` = update cache key; skills → /bx:<name>)
 │   ├── agents/                        # 20 subagents (Sonnet-routed) → bx:<agent>
 │   ├── hooks/hooks.json               # SessionStart project-orientation injection
-│   ├── scripts/                       # session-start-context.{sh,ps1}
+│   ├── scripts/                       # session-start-context.sh (bash; runs on Windows via Git Bash — the .ps1 twin was removed S59)
 │   └── skills/                        # 11 skills (SKILL.md + references/) → /bx:<name>
 │       ├── arch/    clean/   evolve/  health/
 │       ├── plan/    resume/  review/
@@ -26,10 +26,13 @@ claude-config/                         # marketplace repo
 │   ├── architecture.md      # This file
 │   ├── completed-work.md
 │   ├── key-decisions.md
+│   ├── known-issues.md      # Issues moved out of CLAUDE.md (created on demand, v2.10.0)
 │   ├── modernization-roadmap.md
 │   ├── session-history.md
+│   ├── archive/             # Rotated archive volumes (Part 7.7)
 │   ├── superpowers/         # Specs + plans from brainstorm→plan workflows
 │   └── upstream/            # /bx:evolve watermark + decision log
+├── .githooks/ .github/workflows/ scripts/   # version-bump guard: hook, CI, script (S60)
 ├── .gitignore
 ├── CLAUDE.md                # Always-loaded AI instructions (schema v2)
 ├── README.md                # Public overview
@@ -40,8 +43,8 @@ claude-config/                         # marketplace repo
 
 **Skills** are directories under `bx/skills/` containing `SKILL.md` (YAML frontmatter) + a `references/` folder. Invocable as `/bx:<name>`.
 
-**Subagents** are the 19 markdown files under `bx/agents/`, dispatched by skills. They run on Sonnet for cost efficiency and have scoped tool permissions. (`save-writer` is dispatched by `/bx:save` to apply doc edits off the main thread; `doc-migrator` performs the one-time v1→v2 schema migration.)
+**Subagents** are the 20 markdown files under `bx/agents/`, dispatched by skills. They run on Sonnet for cost efficiency and have scoped tool permissions. (`save-writer` is dispatched by `/bx:save` to apply doc edits off the main thread; `doc-migrator` performs the one-time v1→v2 schema migration.)
 
 **Cross-skill contract owners (S57 named-owner principle).** Where two or more skills depend on the same rule, one file owns it and the others cite it — satellites never restate. Four exist: `save/references/doc-schema.md` (the doc layout + archive set), `save/references/task-tools.md` (task-tool availability and each skill's degraded path), `arch/references/finding-rubrics.md` (severity/certainty/effort anchors and the mandatory justification fields, read by all five arch scanners), and `arch/references/scan-exclusions.md` (what a repo-wide scan must never read — including during stack detection, which is the half that bit `/bx:tests`). Cross-skill references resolve as `../<skill>/...` against the **citing skill's base directory** (S48). `bx/skills/save/tests/check-doc-rule-consistency.sh` enforces that any deliberately-duplicated block stays byte-identical.
 
-**Doc schema v2 (S56):** CLAUDE.md carries only always-loaded instructions; session state lives in `docs/STATUS.md`; history archives (`session-history.md`, `key-decisions.md`, `completed-work.md`) are append-only, read by no automatic path, and rotate into `docs/archive/` volumes past 100k chars. The contract lives at `bx/skills/save/references/doc-schema.md`; `bx/skills/save/tests/assert-doc-schema.sh` verifies it mechanically.
+**Doc schema v2 (S56):** CLAUDE.md carries only always-loaded instructions; session state lives in `docs/STATUS.md`; history archives (`session-history.md`, `key-decisions.md`, `completed-work.md`, and since v2.10.0 `known-issues.md`) are append-only, read by no automatic path, and rotate into `docs/archive/` volumes past 100k chars. The contract lives at `bx/skills/save/references/doc-schema.md`; `bx/skills/save/tests/assert-doc-schema.sh` verifies it mechanically.

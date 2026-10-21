@@ -2,24 +2,24 @@
 
 > Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
 
-Last Updated: 2026-09-28 (Session 60)
+Last Updated: 2026-10-20 (Session 61)
 
 ## Current Status
 
 | Area | Status |
 |------|--------|
-| Skills (11) | Complete — `/bx:save` model-invocable S59; `/bx:evolve --full --fix` dogfooded S59; only `/bx:health` never run |
+| Skills (11) | Complete — `/bx:save --full` v2.10.0 dogfooded S61 (Known Issues shrinker resolved phase + archive fired); only `/bx:health` never run |
 | Subagents (20) | Complete — `arch-robustness` added S58 |
-| Plugin packaging (`bx`) | **v2.10.0 merged to main and pushed S60; NOT yet installed** (`/plugin update bx` + `/reload-plugins` owed, local cache still 2.9.0). Version-bump guard added: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
+| Plugin packaging (`bx`) | v2.10.0 merged, pushed and **installed** (local cache 2.10.0, confirmed S61); `plugin version bump` CI workflow green on the merge push. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
-| Startup scripts | Complete — S55 live gate still pending |
+| Startup scripts | Complete — S55 live gate passed and fix wave shipped in `7ed079a` (2026-08-17), recorded S61 |
 | Cross-platform setup | Complete |
 | GitHub sync | Complete — main pushed through v2.10.0 (S60) |
 | Documentation | Complete — schema v2 |
 
 ## Completed
 
-All 11 skills, 19 subagents, cross-platform setup, and documentation system are complete.
+All 11 skills, 20 subagents, cross-platform setup, and documentation system are complete.
 
 See [completed-work.md](completed-work.md) for full checklist.
 
@@ -27,11 +27,9 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## In Progress
 
-**Doc tiering phase 1 — merged as v2.10.0, install and dogfood owed (S60).** `docs/known-issues.md` archive, relocate-don't-delete, Known Issues shrinker (4000/2500), 9k advisory rung, derivable-content clause, version-bump guard, six `/bx:evolve` findings, `/bx:health` state-file fix. `omitClaudeMd` is on the three `upstream-*` agents only. Still open: deferred minors (guard checks inequality not increase; guard tests not hermetic against `commit.gpgsign`; lint and fixture tests not in CI; `save-writer`'s unreachable `status: open` path). Plan: `docs/superpowers/plans/2026-09-28-bx-doc-tiering-phase1.md`.
+**Doc tiering phase 1 — v2.10.0 installed and dogfooded S61; two run-found defects to fix.** First `--full` created `docs/known-issues.md` (3 resolved entries), rolled up Parts 5/6, and left CLAUDE.md ~12k. To fix in `bx/skills/save/references/mode-update.md` + `bx/agents/save-writer.md`: (1) on `--full`, run Parts 5–7 before the writer dispatch so the sweep's results reach the session entry; (2) the open-phase 300-char floor vs the replacement-line length (see CLAUDE.md Known Issues). Still open: deferred minors (guard checks inequality not increase; guard tests not hermetic against `commit.gpgsign`; lint and fixture tests not in CI; `save-writer`'s unreachable `status: open` path); Phase 2 (`.claude/rules/` tier) gated on re-verifying `paths:`. Plan: `docs/superpowers/plans/2026-09-28-bx-doc-tiering-phase1.md`.
 
 **Doc schema v2 post-merge verification (S56–57).** The first `/bx:save --full` on schema v2 ran S57: Part 5 found all older sessions already compressed, Parts 6/7 under caps, and rotation did not fire then. It has since fired: `docs/archive/key-decisions-1.md` exists and the live `docs/key-decisions.md` measured 53k on 2026-09-28 (S60). Still owed from the deferred Task 10 skill-steps: live `/bx:save` runs against the fixtures (fx-v2 no-op, fx-partial resume, fx-dirty skip, fx-v1-envvars keep path, fx-v1-sparse scaffold, fx-v1-ineligible decline). Post-merge minors parked in both plans: backlog symptom measurement (7.7's clause is unreachable), checker fence-strip/CR robustness, mode-migrate declines-bullet v1-only phrasing, resume Quick Reference partial row, structure-rules cell wording.
-
-**Per-project `cc` session naming + coloring — built, 2 items open (S55).** Unchanged from S55: the human live gate (`cc claude-config`: prompt bar colored? name chip + tab title? no model turn?) and one batched fix wave held until the gate reports (ASCII-sweep `start-claude.ps1`, `try/catch` guard, `ToLowerInvariant()`, 0-byte registry handling, case-insensitivity assertion, stale plan/spec sweep). Spec: `docs/superpowers/specs/2026-08-12-cc-session-naming-design.md`.
 
 **`/bx:webdesign` kaanarik run paused at `review_pending` (S52).** Unchanged: resume via `/bx:webdesign` after `/plugin update bx`, push through Phase 3 inject+verify; verify open finding `dadac845` while there.
 
@@ -41,8 +39,8 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## Next Steps
 
-1. **Install and dogfood v2.10.0 (S60)** — `/plugin update bx` + `/reload-plugins`, then run `/bx:save --full` here: CLAUDE.md is over 12k with Known Issues over 4000, so the new shrinker fires. Expect defects; five rules have never executed. Confirm the `plugin version bump` workflow ran green on the merge push. Phase 2 (`.claude/rules/` tier, spec D4–D6) stays gated; re-verify `paths:` against the memory docs first. Pairs with #4.
-2. **Finish the `cc` session naming/coloring rollout (S55)** — run the live gate, then dispatch the single fix wave listed in `## In Progress`.
+1. **Fix the two `/bx:save --full` defects found S61** — move the Parts 5–7 sweep ahead of the writer dispatch on `--full`, and revisit the open-phase 300-char floor; PATCH bump + CHANGELOG. Then Phase 2 (`.claude/rules/` tier, spec D4–D6), gated on re-verifying `paths:` against the memory docs. Pairs with #4.
+2. **Revise `/bx:evolve`** — thorough examination started S61 (agent report); turn the prioritized improvement list into a plan, folding in the known defects under #9.
 3. **Doc-schema v2 fixture verification** — the deferred live `/bx:save` runs against the six fixture cases (see `## In Progress`), plus the post-merge minors batch from both plans.
 4. **/simplify follow-up: move Part 7.7 rotation out of Part 7** into its own sibling Part — deletes the five "except 7.7" carve-outs; requires a blind rehearsal before shipping (deliberately skipped S57). The S59 spec's D4 proposes a Part 7.9 sibling on the same reasoning — do these together.
 5. **Resume the `/bx:webdesign` kaanarik run past review** — push through Phase 3 inject+verify; verify finding `dadac845`.
@@ -58,9 +56,9 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 > Full history: [session-history.md](session-history.md)
 
-### Last Session (Session 60) - 2026-09-28
-- **Doc tiering decided and phase 1 built (v2.10.0, unmerged).** All 8 spec decisions accepted with two amendments; Known Issues gets an archive (`docs/known-issues.md`), relocate-don't-delete, and a resolved-first shrinker. Branch `feat/doc-tiering-phase1`, 13 commits.
-- **`/bx:evolve` delta run** (2.1.263 → 2.1.284, 19 releases): 5 findings, 4 applied by hand plus 2 from the backlog; 18 remain open.
-- **Version-bump guard added outside the skill:** script, opt-in pre-push hook, GitHub Actions workflow (9/9 tests; workflow never run).
-- **Rehearsals passed outcomes but not the ambiguity bar** (raw 9–16 vs ≤2); a fresh whole-branch review found seven defects synthetic fixtures could not reach, all fixed (`e511475`).
-- **Merged and pushed; not done:** install and dogfood. `/bx:health` now reads `docs/STATUS.md` on v2 repos; `omitClaudeMd` narrowed to `upstream-*`.
+### Last Session (Session 61) - 2026-10-20
+- **v2.10.0 installed and dogfooded with the first real `/bx:save --full`.** Parts 5/6 rolled up S54–S56 and four Key Decisions rows; the Known Issues shrinker's resolved phase created `docs/known-issues.md` (3 entries); README and `docs/architecture.md` drift fixed (20 agents, `.ps1` gone, new archives, version-bump guard).
+- **Two defects found by running:** the writer composes the session entry before the `--full` sweep, so sweep results can't reach it; the open-phase 300-char floor barely beats the replacement-line length. Recorded in CLAUDE.md Known Issues.
+- **Stale-doc catch:** the S55 `cc` fix wave and live gate shipped in `7ed079a` on 2026-08-17 and went unrecorded for two months; both Known Issues archived as resolved, STATUS cleaned up.
+- CI `plugin version bump` workflow confirmed green on the S60 merge push.
+- `/bx:evolve` revision requested; examination agent dispatched.

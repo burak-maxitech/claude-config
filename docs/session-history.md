@@ -117,60 +117,11 @@
 
 ### Session 53 - 2026-07-30: `/bx:evolve` scoped to `/bx:review` only, with the **watermark advance suppressed** — advancing on a single-skill audit would falsely record the other 10 skills as checked. The methodological result: the docs lane found 0 findings but flagged that two pages it needed (`checkpointing`, `code-review`) were missing from its pinned allowlist, and direct orchestrator fetches of those produced **5 of the 7 findings**, including the only outright-wrong statement in the skill (the per-edit checkpoint claim). `--fix`: 5 applied, 1 rejected (`when_to_use` is a *triggering* field, not a changelog), 1 skipped (`ReportFindings`' contract is exclusive-of-text and would have deleted three sections). (commit: e1bd066)
 
-### Session 54 - 2026-08-11
-**What happened:**
-- First full `/bx:evolve` since the S53 scoped-run freeze, after growing the docs-lane pinned allowlist 9 → 11 (`checkpointing`, `code-review`): 11 releases scanned (2.1.218 → 2.1.228), all 3 lanes ok, 4 Tier-1 findings + 3 community advisories; watermark advanced to 2.1.228 / 2026-08-11. The newly-pinned checkpointing page immediately produced the run's top finding.
-- `--fix` applied 4/4 behind the diff gate: the per-edit checkpoint-undo error S53 fixed in /bx:review alone survived at 9 sites across 8 files (clean/arch/tests SKILL.md closing lines, arch fix-mode.md, seo fix-allowlist.md, tests fix-mode-test.md ×2, evolve fix-mode-evolve.md, workflow.md) — all rewritten to per-user-prompt framing; README review ladder gained the v2.1.223 bare-`/review`-is-the-built-in disambiguation; fix-mode-evolve.md's refresh note carries the v2.1.221 "activate when safe" signal (hedged, manual steps intact); workflow.md's /loop caveat upgraded from "unverified" to "partially confirmed" quoting the code-review docs verbatim.
-- Explicit plugin versioning shipped on user request: plugin.json `version: 1.0.0` + displayName "bx — Burak's Engineering Toolkit"; CHANGELOG.md created with the cache-key rule + 1.0.0 entry; /bx:save Part 8 gained a mandatory bump-on-bx-change step (PATCH/MINOR/MAJOR ladder, --silent defaults PATCH); echo sweep corrected the stale "omitted version = every commit is a version" claims in README (×2) and CLAUDE.md (×2).
-- Community lane's best output was a handoff, not a finding: Anthropic's official auto-mode engineering post + auto-mode-config docs page confirm destructive-git blocking (the premise of open webdesign finding dadac845, to be verified live in the kaanarik Phase-3 run); recorded as an addendum on the finding and flagged auto-mode-config as an allowlist candidate.
-- Resume-time corrections: S53's Known-Issues "5 uncommitted files" claim was stale (committed in e1bd066, pushed, plugin cache current); the stray empty Key Decisions table header in CLAUDE.md removed.
+### Session 54 - 2026-08-11: First full `/bx:evolve` after the S53 freeze (2.1.218 → 2.1.228: 4 Tier-1 findings, `--fix` 4/4 — the per-edit checkpoint-undo error fixed at 9 sites across 8 files; `auto-mode-config` flagged as a docs-lane allowlist candidate); explicit plugin versioning shipped (`plugin.json` `version: 1.0.0`, new `CHANGELOG.md`, `/bx:save` Part 8 bump-on-`bx/**`-change rule). (commit: 1a6900f)
 
-**Files created/modified:**
-- `bx/.claude-plugin/plugin.json` — version 1.0.0 + displayName
-- `CHANGELOG.md` — NEW; cache-key rule + 1.0.0 entry
-- `bx/skills/evolve/references/scan-docs.md` — allowlist 9 → 11 (checkpointing, code-review)
-- `bx/skills/save/references/mode-update.md` — Part-8 plugin-version-bump rule (new step 2)
-- `docs/upstream/state.json` — 4 findings registered → applied; watermark 2.1.228 / 2026-08-11; dadac845 addendum
-- checkpoint-undo sweep (9 sites): `bx/skills/clean/SKILL.md`, `bx/skills/arch/SKILL.md`, `bx/skills/arch/references/fix-mode.md`, `bx/skills/seo/references/fix-allowlist.md`, `bx/skills/tests/SKILL.md`, `bx/skills/tests/references/fix-mode-test.md`, `bx/skills/evolve/references/fix-mode-evolve.md`, `workflow.md`
-- `README.md` — /review-alias note, versioned-update instructions, contributors bump note; `workflow.md` — /loop caveat firmed
+### Session 55 - 2026-08-12: Per-project `cc` session naming + coloring built (brainstorm → spec → plan → subagent-driven execution): `cc <project>` runs `claude -n "<project>" "/color <color>"`; sticky registry `~/.claude/cc-session-colors` chosen over hashing after 8 colors × 8 projects collided 4/8; case-insensitive lookup fix; whole-branch review surfaced the pre-existing WinPS 5.1 parse failure of `start-claude.ps1`. Live gate + one fix wave left open. (commits: aa39b9e, 600ea68, c9c26db, 67eda44)
 
-**Next session should:**
-- Run the smoke-test batch: /loop /bx:review, /plugin update without /reload-plugins (v2.1.221), 2>/dev/null prompt check (093df977), CLAUDE_ENV_FILE UTF-8
-- Resume the kaanarik /bx:webdesign run through Phase 3 — and verify finding dadac845 (auto-mode vs. the Phase-3 rollback) live there
-
-### Session 55 - 2026-08-12
-**What happened:**
-- Built per-project session naming + coloring for the `cc` launcher, brainstorm → spec → plan → subagent-driven execution (4 tasks, 1 fix round, task review after each, whole-branch review at the end). `cc <project>` now runs `claude -n "<project>" "/color <color>"`.
-- Verified the upstream surface first rather than assuming: `-n/--name` officially sets the name in the prompt box, `/resume` picker, and terminal tab title; there is **no** launch-time color flag or settings key (requests #44800, #47332, #40393 closed `not_planned`); `/color` passed as the initial prompt argument is handled as a local command — proved with `claude -p "/color blue"` → `Session color set to: blue`, exit 0, no model turn.
-- Rejected hashing for color assignment on measured evidence: the palette has 8 colors and the machine has 8 project folders, so any hash collides by the birthday paradox (djb2 and byte-sum both gave 4 distinct of 8 — identical partitions, because 33 mod 8 == 1). Chose sticky auto-assign persisted to `~/.claude/cc-session-colors`, which is distinct *and* stable.
-- Task 2's review caught a plan-mandated defect: bash `=` is case-sensitive while PowerShell `-eq` is not, so `cc Horowell` would duplicate `horowell` on macOS. User ruled to fix the bash side; fix round 1 added case-insensitive lookup preserving original casing, plus 3 covering assertions.
-- Whole-branch review (opus) returned **Ready to ship**, verifying parity empirically in bash 5.3, pwsh 7.6.4 and WinPS 5.1 with a 20-case adversarial parse differential (identical accept/reject on all 20), and surfacing a pre-existing defect: `start-claude.ps1` is BOM-less UTF-8 with seven non-ASCII characters, which Windows PowerShell 5.1 fails to parse (2 errors; 0 on pwsh 7). Two items left open — the human live gate, and one batched fix wave held until it reports.
-
-**Files created/modified:**
-- `.claude/scripts/session-color.ps1`, `.claude/scripts/session-color.sh` - new sticky color allocators, one per shell; sourceable with no side effects so they can be tested against a temp registry
-- `.claude/scripts/tests/test-session-color.ps1`, `.claude/scripts/tests/test-session-color.sh` - new zero-dependency test suites (hand-rolled assertions, no Pester); 9 and 12 assertions
-- `.claude/scripts/start-claude.ps1`, `.claude/scripts/start-claude.sh` - Step 5 now sources the allocator and launches named + colored, falling back to a plain `-n` launch if no color is available; `SCRIPT_DIR` hoisted above the `cd` in the shell version
-- `README.md` - paragraph documenting the behavior, the registry path, and delete-to-reshuffle
-- `.gitignore` - `.superpowers/` (subagent-driven-development scratch)
-- `docs/superpowers/specs/2026-08-12-cc-session-naming-design.md`, `docs/superpowers/plans/2026-08-12-cc-session-naming.md` - design spec and 4-task implementation plan
-
-**Next session should:**
-- Run the live gate first: `cc claude-config` — is the prompt bar colored, does the name chip / tab title read the project, and is no model turn consumed? Then `cc horowell` for a second color.
-- Dispatch the single fix wave (ASCII sweep of `start-claude.ps1`, `try/catch` around the helper call, `ToLowerInvariant()`, 0-byte-registry header, PS case-insensitivity assertion, plan/spec doc-drift sweep, README wording per the gate result).
-- If the gate fails, treat the `statusLine` fallback as a fresh design decision — do not patch the launcher.
-
-### Session 56 - 2026-08-18
-
-**Focus:** Doc schema v2 shipped end-to-end (v2.0.0 → v2.0.1 → v2.1.0) + this repo migrated
-
-**What happened:**
-- Resumed `feat/doc-schema-v2` at Task 6's pending review and drove it home: Tasks 6-10 each through implementer → review → fix-round loops (Task 6: warnings-channel split; Task 7: MIGRATE wiring + `Bash(bash:*)`; Task 8: resume dual-layout; Task 9: v2.0.0 release docs + keep-and-document `.ps1` ruling; Task 10: ten fixtures, two new checker assertions, the first committed `--before` run, and blind rehearsals closing both delete-path branches by execution). Final whole-branch review (7 Important, all text) + one 17-item fix wave + a bounded correction for a wave-introduced tier-2 freshness hole; merged to main as 38 commits (`0eedfe2`), suite 13/13 both sides. See commits `2b1ef2e..0eedfe2`.
-- Scalability audit answered "do the archives grow forever?": yes by design (~196k chars at 57 sessions), and three hot paths paid linearly — fixed as v2.0.1 (`3bf748d`): Part 3.0 archive exclusion, save-writer tail-anchored appends, Part 5 windowed compression. Archives are now disk-only.
-- Archive rotation designed (4-question interview → spec `2026-08-18-bx-archive-rotation-design.md` → plan) and built via subagent-driven development: Part 7.7 (100k trigger, `docs/archive/<name>-K.md` volumes, ≤50k minimal cut, per-archive consent + sentinel, byte-conservation freeze-on-violation, no count cap — manual `git rm` escape hatch), registrations, blind-agent rehearsal on a synthetic 136k archive (B≤A≤B+600 held at +364, protected-tail md5 exact), final review + 7-edit fix wave (incl. the unguarded Step 0.3 read that would have voided the volumes-never-read guarantee); merged as v2.1.0 (`dd5c7fe`).
-- Pushed main (49 commits), `/plugin update bx` to 2.1.0 applied mid-session (hot-reload confirmed — the fab78c6a smoke-test answered), then ran the new `/bx:save`: MIGRATE detected v1, consent incl. the named `## Environment Variables` drop, doc-migrator + 20/20 checker assertions with `--before`, migration committed in isolation (`9e47f42`), then the consented compression pass took CLAUDE.md 16.2k → 8.3k (`72c505a`).
-- Process notes: rehearsals (blind agents executing only the instruction text) remained the decisive instrument — they caught the harness's read-back discouragement, the atomic-write ambiguity, and both gate directions that reviews reading the text could not; the fix-wave-introduces-a-regression pattern fired twice (tier-2 freshness; Part 0.5 headers) and was caught both times by scoped re-review.
-
-(commits: 2b1ef2e, 1d3af59, 3afbbab, b93bfc7, 9f2e328, 53e19ec, b3d607c, 0eedfe2, 3bf748d, 0865cd4, 2f86f36, 91da560, 5ce65d7, 8f4407f, ec2002d, dd5c7fe, 9e47f42, 72c505a)
+### Session 56 - 2026-08-18: Doc schema v2 shipped end-to-end — `feat/doc-schema-v2` Tasks 6–10 driven home and merged as v2.0.0 (38 commits), v2.0.1 closed the three linear archive-read paths (Part 3.0 exclusion, save-writer tail appends, windowed Part 5), Part 7.7 archive rotation designed + built as v2.1.0 (100k trigger, `docs/archive/<name>-K.md`, B≤A≤B+600); this repo migrated (`## Environment Variables` drop consented, 20/20 checker assertions) and compressed 16.2k → 8.3k. Blind rehearsals remained the decisive instrument. (commits: 2b1ef2e, 1d3af59, 3afbbab, b93bfc7, 9f2e328, 53e19ec, b3d607c, 0eedfe2, 3bf748d, 0865cd4, 2f86f36, 91da560, 5ce65d7, 8f4407f, ec2002d, dd5c7fe, 9e47f42, 72c505a)
 
 ### Session 57 - 2026-08-18
 **What happened:**
@@ -252,3 +203,22 @@
 **Next session should:**
 - Settle the five open decisions, merge, push, install v2.10.0
 - Dogfood `/bx:save --full` on this repo and expect defects
+
+### Session 61 - 2026-10-20
+**What happened:**
+- Resumed on `main` (clean); found the plugin cache already at 2.10.0 and the `plugin version bump` CI workflow green on the S60 merge push (run 36506759638), contradicting STATUS.md's "not yet installed".
+- First real `/bx:save --full` on v2.10.0, run as the dogfood: Part 5 compressed S54–S56; Part 6 moved the four oldest Key Decisions rows (table 24 → 20 rows, section 9,065 → 7,982 chars — 18 chars under the 8000 size threshold); Part 7 fired on CLAUDE.md at 14.2k with `## Known Issues / Blockers` at 5,491 — consent given, the resolved phase moved the three `RESOLVED` entries to the new `docs/known-issues.md` archive-first (section → 4,341), the open phase was not run because two of its candidates were resolved by the packet instead.
+- Two skill defects found by running: (1) the Save Path dispatches `save-writer` before Parts 5–7, so a `--full` run's own results cannot appear in its session entry — this run inverted the order by hand; (2) the open phase's 300-char floor is close to the 200–280-char replacement line, so it would have summarized three entries to save ~550 chars. Also noted: Windows working copies are CRLF, so `wc -c` and the `awk` section count include `\r` (~1 char/line).
+- Stale-doc catch: `7ed079a` (2026-08-17) shipped the S55 fix wave (ASCII sweep, `try/catch`, `ToLowerInvariant`) and recorded the live gate as passed, but CLAUDE.md, STATUS.md and the S56 save never reflected it. Both S55 Known Issues archived as resolved; STATUS In Progress/Next Steps/Current Status corrected.
+- README (19 → 20 agents, tree gains `known-issues.md`, `archive/`, `superpowers/`, `.githooks/`, `.github/workflows/`, `scripts/`) and `docs/architecture.md` (same, plus `.ps1` removal and the archive set) synced. User requested a `/bx:evolve` revision; a read-only examination agent was dispatched.
+
+**Files created/modified:**
+- `docs/known-issues.md` — NEW; 3 resolved entries from the shrinker + 2 from this session's packet
+- `CLAUDE.md` — 4 Key Decisions rows out, 5 Known Issues out, v2.10.0 entry rewritten, `> Archived issues:` link
+- `docs/STATUS.md` — status rows, In Progress, Next Steps #1/#2, session block
+- `docs/session-history.md` — S54–S56 compressed to one-liners; S61 appended
+- `docs/key-decisions.md` — +4 rolled-up rows; `README.md`, `docs/architecture.md` — drift fixes
+
+**Next session should:**
+- Fix the two `--full` defects in `mode-update.md` / `save-writer.md` (PATCH bump)
+- Turn the `/bx:evolve` examination into a prioritized revision plan

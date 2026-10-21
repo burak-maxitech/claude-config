@@ -263,3 +263,6 @@
 - [x] /bx:evolve delta run 2.1.263 → 2.1.284; six findings applied by hand - docs/upstream/state.json, bx/skills/resume, bx/skills/health, bx/agents, bx/skills/evolve/references
 - [x] Version-bump guard: script, pre-push hook, CI workflow - scripts/, .githooks/, .github/workflows/
 - [x] Known Issues governance lint (28 checks) and three fixtures - bx/skills/save/tests/
+- [x] v2.10.0 installed; `plugin version bump` CI workflow confirmed green on the S60 merge push (run 36506759638) - bx/.claude-plugin/plugin.json, .github/workflows/plugin-version.yml
+- [x] First `/bx:save --full` dogfood of v2.10.0: Parts 5/6 rollups, Known Issues shrinker resolved phase, `docs/known-issues.md` created, README/architecture drift fixed - CLAUDE.md, docs/known-issues.md, docs/session-history.md, docs/key-decisions.md, README.md, docs/architecture.md
+- [x] S55 `cc` fix wave + live gate recorded as done (shipped in `7ed079a`, 2026-08-17; undocumented until S61) - CLAUDE.md, docs/STATUS.md
