@@ -1,0 +1,90 @@
+{
+  "watermark": {
+    "last_changelog_version": "2.1.284",
+    "docs_checked_at": "2026-09-28",
+    "community_checked_at": "2026-09-28",
+    "changelog_gap": null
+  },
+  "decisions": [
+    {
+      "finding_id": "9105434ff9bf5eb8c18fa5469cf15d8266646528",
+      "decision": "open",
+      "date": "2026-09-28",
+      "source_url": "https://code.claude.com/docs/en/permissions",
+      "affected_capability": "bx:save/writer-tools",
+      "source_content_hash": "0000000000000000000000000000000000000000",
+      "class": "best_practice",
+      "title": "Bash permission specifiers: prefer `Bash(cmd *)` over `Bash(cmd:*)` for plugin agents",
+      "note": null,
+      "proposed_edit": "`Bash(wc:*)` → `Bash(wc *)` in the save-writer agent's tools line",
+      "affected_files": [
+        "bx/agents/save-writer.md"
+      ],
+      "source_excerpt": "## Bash specifiers\nPrefer the space form.",
+      "citation": "https://code.claude.com/docs/en/permissions#bash"
+    },
+    {
+      "finding_id": "bf4076dd69699e480f8b06efc06019af56817e35",
+      "decision": "open",
+      "date": "2026-08-24",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.240",
+      "affected_capability": "bx:save/session-start-hook",
+      "source_content_hash": "0000000000000000000000000000000000000000",
+      "class": "breakage",
+      "title": "Hook scripts must be bash; drop the PowerShell twin from README and hooks.json",
+      "note": null,
+      "proposed_edit": "remove `session-start-context.ps1` from README.md and bx/hooks/hooks.json",
+      "affected_files": [
+        "README.md",
+        "bx/hooks/hooks.json"
+      ],
+      "source_excerpt": "### 2.1.240\n- Hooks run under bash on every platform.",
+      "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.240"
+    },
+    {
+      "finding_id": "57874f6044318c79ab6770650e47282b78900f2e",
+      "decision": "open",
+      "date": "2026-06-10",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.157",
+      "affected_capability": "bx:pain/plugin-cache-staleness",
+      "source_content_hash": "0000000000000000000000000000000000000000",
+      "class": "opportunity",
+      "title": "Plugins in `.claude/skills` auto-load (no marketplace) — could eliminate the activation gap",
+      "note": null
+    },
+    {
+      "finding_id": "3117b0b6008f796a1461d2b9c9658a553147c06b",
+      "decision": "open",
+      "date": "2026-09-28",
+      "source_url": "https://code.claude.com/docs/en/plugin-evals",
+      "affected_capability": "bx:pain/bx-health-never-run",
+      "source_content_hash": "0000000000000000000000000000000000000000",
+      "class": "opportunity",
+      "title": "`claude plugin eval` could give bx a committed eval suite",
+      "note": null,
+      "proposed_edit": "Design an eval suite for the bx plugin using the plugin-evals format; no existing text changes.",
+      "affected_files": [
+        "bx/skills/health/SKILL.md"
+      ],
+      "source_excerpt": "## Plugin evals\n…",
+      "citation": "https://code.claude.com/docs/en/plugin-evals"
+    },
+    {
+      "finding_id": "633ecafe1de04b67bbd0e357baa6f83883c6b1b1",
+      "decision": "deferred",
+      "date": "2026-07-05",
+      "source_url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.190",
+      "affected_capability": "bx:webdesign/stitch-design-engine",
+      "source_content_hash": "0000000000000000000000000000000000000000",
+      "class": "opportunity",
+      "title": "Claude Design — candidate to replace Google Stitch",
+      "note": "revisit after the kaanarik run",
+      "proposed_edit": "swap the Stitch MCP for Claude Design",
+      "affected_files": [
+        "bx/skills/webdesign/SKILL.md"
+      ],
+      "source_excerpt": "### 2.1.190\n- Claude Design.",
+      "citation": "https://github.com/anthropics/claude-code/releases/tag/v2.1.190"
+    }
+  ]
+}

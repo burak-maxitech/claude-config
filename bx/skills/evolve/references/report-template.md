@@ -191,18 +191,20 @@ Decision-log entries with `decision: "open"` or `decision: "deferred"` whose `fi
 ```
 ## Carried-Forward Open Findings
 
-| Finding ID (prefix) | Date (last transition, per state-schema `date` semantics) | Class        | Title                              | Badge                     |
-|---------------------|-----------------------------------------------------------|--------------|------------------------------------|-----------------------------|
-| a3f2c1b9            | 2026-06-05                                                | best_practice| Add `effort: high` to /bx:health  |                             |
-| c1d5e9f3            | 2026-05-28                                                | opportunity  | Use glob in allowed-tools          | [deferred 2026-05-28]       |
+| Finding ID (prefix) | Date (last transition, per state-schema `date` semantics) | Class        | Title                              | Edit?  | Badge                     |
+|---------------------|-----------------------------------------------------------|--------------|------------------------------------|--------|-----------------------------|
+| a3f2c1b9            | 2026-06-05                                                | best_practice| Add `effort: high` to /bx:health  | stored |                             |
+| c1d5e9f3            | 2026-05-28                                                | opportunity  | Use glob in allowed-tools          | stored | [deferred 2026-05-28]       |
+| 19758d30            | 2026-06-10                                                | opportunity  | Plugins in `.claude/skills` …      | legacy | [legacy — no stored edit]   |
 ```
 
-**Column values:** `Class` and `Title` are read from the `class` and `title` fields of the stored decision entry (set at the finding's last surfacing). These fields make Section 4 renderable without re-running a lane.
+**Column values:** `Class` and `Title` are read from the `class` and `title` fields of the stored decision entry (set at the finding's last surfacing). `Edit?` is `stored` when the entry carries a non-null `proposed_edit` and non-empty `affected_files` (fix-eligible from state, per `fix-mode-evolve.md`), else `legacy`. These fields make Section 4 renderable — and, since 2.11.0, actionable — without re-running a lane.
 
 **Badge rules:**
 
 - No badge: plain `open` finding from a prior run not re-emitted this run.
 - `[deferred <original date>]`: a `deferred` entry re-surfacing per lifecycle Rule 5 in `bx/skills/evolve/references/state-schema.md`. The date shown is the original deferral date, not today.
+- `[legacy — no stored edit]`: an `open` entry written before bx 2.11.0 (nine keys, or null `proposed_edit`); display-only in `--fix` until a lane re-emits it or it is triaged by hand.
 
 Empty state: render the section header plus "None — no open findings carried from previous runs."
 

@@ -156,9 +156,9 @@ Read `bx/skills/evolve/references/fix-mode-evolve.md` and run the gate flow exac
 
 End with one closing line:
 
-> Run `/bx:evolve --fix` to act on the open Tier-1 findings. M open findings carried forward.
+> Run `/bx:evolve --fix` to act on up to N fix-eligible findings (M open in total, K legacy display-only, D deferred). The pass re-greps each carried-forward one first and reports any it closes as already done or sets aside.
 
-Where M = total `open` + `deferred` entries in the decision log after this run.
+Where N = `open` entries (this run's and carried-forward) with a stored `proposed_edit` and non-empty `affected_files`; M = all `open` entries; K = `open` entries without a stored edit (pre-2.11.0 legacy); D = `deferred` entries. N is an upper bound computed from stored fields alone; the `--fix` pre-pass (`fix-mode-evolve.md`) may auto-close stale entries or set aside prose-only edits, and says so. The line never claims `--fix` can reach an entry it cannot — legacy and deferred entries are named, not folded into N.
 
 ---
 
