@@ -25,6 +25,12 @@ Driven by `skill-creator`: each eval was dispatched twice — once **with** the 
 | 2 (these de-hinted + trap fixtures) | node report | tie, 18/18 both — raw Claude detects as well as the skill |
 | 2 | python report | skill 14/14 vs baseline 13/14 — baseline skipped `datetime.utcnow()` |
 | 2 | node `--fix` | skill 10/10 vs baseline 7/10 — baseline over-deleted Safe-to-Delete files + deps |
+| 3 (bx 2.13.0 content review; baseline = the 2.12.2 skill, not no-skill) | all three | 42/42 both versions — detection and fix-mode discipline held through the rewrite. The runs surfaced one defect neither review had: scanners tagged whole-file deletions `quick_win: true` because the tag was never defined; both orchestrators reconciled by hand, and 2.13.0 pins the closed set in every scan file |
+| 4 (bx 2.13.0, seven new categories; baseline = the pre-change 2.13.0 skill) | all three | new skill 60/60; baseline 59/60. Both found every planted hit, so raw detection is again a tie. The one discriminating assertion is a precision trap: the baseline flagged the env-driven `FLAGS.beta` (`import.meta.env.VITE_BETA`) as an obsolete pattern because no `.env` defines it; the new scan file's rule that environment- and service-driven flags are never stale-flag candidates held |
+
+Iteration 4 added one hit and one trap per new category to both fixtures (see GROUND-TRUTH.md); 11 node, 6 python and 1 fix-mode assertions were appended.
+
+Iteration 3 was a regression check on a rewrite, so its baseline is the previous skill version rather than raw Claude; a tie is the expected pass. The eval subagents were able to dispatch the real `bx:cleanup-*` agents, so the runs exercised the Agent-tool fan-out, not an inline fallback.
 
 **Takeaway:** the skill's measurable value is in (a) **destructive-mode discipline** (quick-wins
 only, defer the rest, never auto-remove deps) and (b) **comprehensive category coverage**

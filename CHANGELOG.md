@@ -2,6 +2,65 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.13.0 — 2026-10-21
+
+Content review of `/bx:clean` (SKILL.md, three scan references, three `cleanup-*` agents) — the
+S46 treatment, repeated after a year of sibling skills learning rules this one never received.
+Four high, six medium, four low findings; all fixed. Verified by re-running the committed eval
+suite against this version and the 2.12.2 snapshot.
+
+### Added
+
+- **Seven detection categories**, each with a planted hit and a precision trap in the eval fixtures:
+  unused exports (one barrel hop followed; framework-convention exports never flagged), orphaned
+  assets (CSS `url()`, HTML and web-manifest references count; glob-imported folders cap at
+  likely-safe), lockfile drift (direct entries the manifest dropped, two lockfiles side by side,
+  orphaned `@types/*`), dead i18n keys (source locale only; dynamic prefixes exclude their subtree)
+  and dead config keys (framework-consumed keys never flagged), stale hard-coded feature flags
+  (git-dated, env- and service-driven flags excluded), trivial directories (`.gitkeep`, empty
+  `__init__.py`, `export {}` barrels), and unused type definitions (ambient augmentations
+  excluded). All roll into the existing eight dashboard rows and none is a Quick Win.
+
+### Fixed
+
+- **Directory scope no longer turns the whole dependency list into false positives.** `/bx:clean
+  src/payments/` greps for references repo-wide and reports only items inside the scope; the
+  manifest-level categories (unused deps, vulns, config cruft) run under a directory scope only when
+  that directory is a workspace root, and the dashboard says why they were skipped otherwise. The
+  scope was never passed to the agents before.
+- **Migrations are never one-off scripts.** The age heuristic excluded nothing, so an applied
+  Django/Alembic/Rails/Prisma migration — one old commit by design — was a deletion candidate. The
+  `git log` it prescribed also lacked `--name-only` and returned no filenames.
+- **Unused-import quick wins carve out side-effect imports, barrel/`__init__.py` re-exports,
+  lint-suppressed lines and type/pragma imports.** `--fix` auto-removed every import with no
+  in-file reference; these four forms have none by design.
+- **`/bx:clean` cites `scan-exclusions.md`** (Step 0.1, all three agents) instead of a private skip
+  list, and excludes fixture trees from stack detection — the very hazard that file documents using
+  this skill's own fixtures as the example. `cleanup-files-code` leaves the "still to be swept" list.
+- **`--dry-run` touches nothing.** It staged removals on a throwaway branch and relied on
+  `git reset --hard` to undo them — a destructive-git form auto mode may deny, and the S46 bug was
+  this same dance carrying staged deletions back onto the user's branch. It now confirms file
+  removals with `git rm -n`, takes in-file counts from the findings, and renders the same impact
+  table. `--fix` records the starting branch instead of assuming `main`.
+- Node dependency search allows a subpath after the package name (`lodash/debounce`, `swiper/css`),
+  covers `.vue/.svelte/.astro/.mdx` and stylesheet imports, names the config files where
+  plugins appear as bare strings, and escapes `.` in package names (the old example escaped nothing).
+- Python requirement lines are parsed (extras, specifiers, markers), the import search is batched,
+  and runtime-loaded packages (`uvicorn` in a `CMD`, `psycopg2` in a URL, pytest plugins) cap at
+  `likely_safe`. Unused env vars are also searched in compose/CI/Dockerfiles and capped for
+  bundler-prefixed, library-convention and platform variables.
+- **Three states on the dashboard.** Every agent returns an `## Unavailable checks` block (no git
+  history for age rules, `gh` absent for TODO lookups, audit tool missing) and the report shows
+  "unavailable" rather than a 0 that reads as clean — the v2.8.0 rule, applied here.
+- **`quick_win` is a closed set** (empty file, backup-suffixed file, 5+ line commented block, carve-out-clean
+  unused import), defined in every scan file and reconciled in Step 2. Found by the eval re-run, not the
+  review: the tag had no definition, so scanners marked whole modules and CSS rules `quick_win: true` and
+  both orchestrators had to override them by hand before `--fix` — one loose tag away from an unconfirmed
+  deletion. Opt-in sections not requested are "not scanned", never "unavailable".
+- Step 1 states that agent `tools:` lists declare intent and the scan instructions are the boundary
+  (S61), passes scan files by absolute path instead of inlining ~640 lines, and defines what two
+  filter flags do (dispatch only the owning agents). "5 or more" commented lines everywhere.
+
 ## 2.12.2 — 2026-10-21
 
 The third and fourth `/bx:evolve` runs of the day (delta on 5 of 23 pages, then `--fix` with every

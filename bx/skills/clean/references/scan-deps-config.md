@@ -4,7 +4,9 @@ You are a subagent scanning for unused dependencies, obsolete patterns, and conf
 
 ## Input
 
-You will receive the detected package manager and config file paths. Use them to target your search.
+Your task prompt gives you the detected package manager(s), the config file paths, the **scope** (a directory, or the repo root), and the **excluded paths** the orchestrator computed from `scan-exclusions.md`. Use them to target your search. Never read a manifest inside an excluded path — a fixture tree's `package.json` declares the fixture's dependencies, not the project's — and never widen the scope on your own.
+
+**Scoped runs.** Dependencies and configuration are declared at the repo or workspace root. The orchestrator dispatches you under a directory scope only when that directory is itself a workspace root; then §4 and §6 apply to *that* manifest and *that* workspace's source, while §5 (obsolete patterns) reports only files inside the scope. If you are handed a scope that is not a workspace root, say so in `## Unavailable checks` and skip §4 and §6 rather than grepping one directory for every dependency in the root manifest — that would flag everything the rest of the app uses.
 
 ## 4. Unused Dependencies
 
@@ -26,21 +28,21 @@ Tag every finding with the workspace it belongs to (use `root` for the top-level
 
 **For Node.js (package.json):**
 - Extract `dependencies` and `devDependencies` keys from the manifest
-- **Batch the search.** Do not loop one-grep-per-package — that's O(N) Grep calls on potentially hundreds of deps. Use the `Grep` tool once with a single regex that alternates all package names, e.g.:
+- **Batch the search.** Do not loop one-grep-per-package — that's O(N) Grep calls on potentially hundreds of deps. Use the `Grep` tool once with a single regex that alternates all package names and **allows a subpath after the name** — `import debounce from 'lodash/debounce'` and `import 'swiper/css'` are uses of `lodash` and `swiper`, and a pattern that demands the closing quote right after the name misses every one of them:
   ```
-  pattern: from ['"](pkg1|pkg2|pkg3|...)['"]|require\(['"](pkg1|pkg2|pkg3|...)['"]\)|import\(['"](pkg1|pkg2|pkg3|...)['"]\)
+  pattern: (from|import|require\(|import\()\s*['"](pkg1|pkg2|pkg3|...)(/[^'"]*)?['"]
   output_mode: content
-  glob: *.{js,jsx,ts,tsx,mjs,cjs}
+  glob: *.{js,jsx,ts,tsx,mjs,cjs,mts,cts,vue,svelte,astro,mdx,scss,sass,less,css}
   ```
-  Then post-process the matches: any package name from the manifest that didn't appear in any match line is an "unused" candidate. Re-verify those candidates with a second targeted Grep pass to rule out string templates and other dynamic references. Escape regex metacharacters in package names (`@scope/pkg` → `@scope/pkg`, but `pkg-name` is literal-safe).
+  The style extensions are there for `@import 'normalize.css'` / `@use 'bootstrap/scss/bootstrap'` — a CSS-only package has no JS import anywhere. Then post-process the matches: any package name from the manifest that didn't appear in any match line is an "unused" candidate. Re-verify those candidates with a second targeted Grep pass to rule out string templates and other dynamic references. Escape regex metacharacters in package names before alternating: `.` is the common one (`socket.io` → `socket\.io`, `lodash.debounce` → `lodash\.debounce`); `@scope/name` and hyphens are literal-safe.
 - Scope the scan to the workspace's source subtree (e.g., `packages/api/src/**` for the `packages/api` workspace; root `src/**` for root) — use the Grep tool's `path` parameter
-- Also check config files that reference packages: `webpack.config.*`, `vite.config.*`, `babel.config.*`, `.eslintrc*`, `jest.config.*`, `tsconfig.json`, `postcss.config.*`
+- Also check config files that reference packages: `webpack.config.*`, `vite.config.*`, `babel.config.*`, `.eslintrc*`, `eslint.config.*`, `jest.config.*`, `vitest.config.*`, `tsconfig.json`, `postcss.config.*`, `tailwind.config.*`, `.prettierrc*`, `.stylelintrc*`. Tool plugins and presets are often named there as bare strings (`"plugins": ["autoprefixer"]`, `"extends": "@acme/eslint-config"`) and nowhere in source.
 - A dependency is "unused" if zero source files AND zero config files reference it AND it's not used via CLI (check `scripts` in that manifest)
 - Watch for `@types/*` packages — only flag if the corresponding runtime package is also unused
 
 **For Python (requirements.txt / pyproject.toml / Pipfile):**
-- Extract package names from the dependency file
-- For each, grep for `import package_name` and `from package_name` across all `.py` files
+- Extract package names from the dependency file. A requirement line carries more than the name — strip extras, version specifiers, markers and comments (`requests[security]>=2.31 ; python_version>"3.8"  # http` → `requests`); in `pyproject.toml` read `[project] dependencies` / `optional-dependencies` and `[tool.poetry.dependencies]`.
+- Resolve each name to its import name(s) (table below), then **batch the search**: one `Grep` call with pattern `^\s*(from|import)\s+(name1|name2|...)\b` across `*.py` (and `*.ipynb` if present). Any name with zero hits is an "unused" candidate.
 - **IMPORTANT**: Python package names often differ from import names. Use this lookup table for the most common mismatches before falling back to the raw package name:
 
   | PyPI Package | Import Name(s) |
@@ -75,7 +77,7 @@ Tag every finding with the workspace it belongs to (use `root` for the top-level
   | Werkzeug | werkzeug |
 
   For packages not in this table, try both the raw package name and the name with hyphens replaced by underscores.
-- Check if the package is used in scripts, Dockerfiles, or CI configs
+- Check if the package is used in scripts, Dockerfiles, or CI configs. Some packages are consumed by the runtime, not imported: `uvicorn`/`gunicorn` appear in a `CMD` or Procfile, `psycopg2` is loaded by SQLAlchemy from a `postgresql+psycopg2://` URL, `python-multipart` is required by FastAPI form handling with no import of its own, pytest plugins (`pytest-asyncio`, `pytest-cov`) are discovered by entry point. Cap these at `likely_safe` and name the mechanism.
 
 **For Rust (Cargo.toml):**
 - If the root `Cargo.toml` has `[workspace]` with `members = [...]`, scan each member crate's `Cargo.toml` separately (the workspace detection above already handled this)
@@ -121,14 +123,34 @@ Tag every finding with the workspace it belongs to (use `root` for the top-level
   recommendation: <which to keep and why>
 ```
 
+### 4.2 Lockfile and manifest drift
+
+The lockfile is derived from the manifest, so the two disagreeing is cruft nobody authored:
+
+- **Lockfile entries the manifest no longer lists.** npm: compare `packages[""].dependencies` / `devDependencies` in `package-lock.json` (v2/v3) against `package.json`; yarn: the top-level entries of `yarn.lock` whose descriptor is not in the manifest; pnpm: `importers` in `pnpm-lock.yaml`; Python: `poetry.lock` / `Pipfile.lock` top-level packages against `pyproject.toml` / `Pipfile`. Only compare **direct** entries — transitive packages are supposed to be in the lockfile and absent from the manifest. `Cargo.lock` and `go.sum` prune themselves and are out of scope.
+- **Two lockfiles for different package managers side by side** (`package-lock.json` + `yarn.lock` + `pnpm-lock.yaml`, or `poetry.lock` + `Pipfile.lock`). Decide which one the repo uses from the `packageManager` field, `engines`, CI workflow commands or the README, and flag the other. If none of those say, flag the pair as `needs_investigation` — never guess which to delete.
+- **`@types/*` whose runtime package is gone from every manifest**, and type stubs (`types-requests`) whose package is gone from the requirements.
+
+A drift finding's `uninstall_command` is the regenerating command (`npm install`, `pnpm install`, `poetry lock --no-update`) or `git rm <stale lockfile>`; the manifest is authoritative. Risk: `safe` for stale entries, `likely_safe` for a duplicate lockfile with a clear owner.
+
+```
+## Lockfile Drift
+- path: <lockfile>
+  type: stale_lock_entry|duplicate_lockfile|orphaned_types
+  package: <name, or the second lockfile's name>
+  reason: <e.g., "listed in package-lock.json packages[\"\"].dependencies, absent from package.json">
+  fix_command: <e.g., npm install>
+  risk: safe|likely_safe|needs_investigation
+```
+
 ## 5. Obsolete Patterns
 
 Scan for patterns that indicate technical debt from past workarounds or migrations:
 
 - **Deprecated API usage**: grep for known deprecated patterns in the project's framework (e.g., `componentWillMount` in React, `datetime.utcnow()` in Python 3.12+)
 - **Old workarounds**: comments containing "workaround", "hack", "temporary", "fixme" — especially if they reference specific version numbers or issue URLs that may now be resolved
-- **Feature flags**: look for feature flag patterns (`if FEATURE_X`, `isEnabled('feature')`) and check if they're always true/false in all environments
-- **TODO/FIXME with dates or issue links**: if a TODO references a specific GitHub issue, check if that issue is closed (if git remote is GitHub and `gh` CLI is available)
+- **Feature flags**: look for feature flag patterns (`if FEATURE_X`, `isEnabled('feature')`) and check if they're always true/false in all environments. A flag whose value is a **hard-coded literal** (`export const ENABLE_X = true`, `ENABLE_X = False`, `"enableX": true` in a config) that code branches on is a candidate the moment it is written — one branch is dead in every environment. Date it: `git log -1 --format=%cs -S<flag name> -- <file>` gives the last change to its value; more than 6 months old → `type: stale_feature_flag`, `risk: likely_safe` (remove the flag and the dead branch); younger → report, `needs_investigation`; no git history → list it undated and record `stale_feature_flag_age` under `## Unavailable checks`. A flag read from the environment, a remote config service, a database or a request header is **not** a candidate — its value genuinely varies — so never flag `process.env.*`, `import.meta.env.*`, `os.getenv(...)`, LaunchDarkly/Unleash/Statsig/ConfigCat lookups or anything with a default fallback.
+- **TODO/FIXME with dates or issue links**: if a TODO references a specific GitHub issue, check if that issue is closed (if git remote is GitHub and `gh` CLI is available). If `gh` is missing or unauthenticated, list the issue-linked TODOs without a resolved/open verdict and record `resolved_todo` under `## Unavailable checks` — an unchecked TODO is not a resolved one.
 
 **Output format:**
 
@@ -136,7 +158,7 @@ Scan for patterns that indicate technical debt from past workarounds or migratio
 ## Obsolete Patterns
 - path: <file_path>
   location: <line_number>
-  type: deprecated_api|workaround|feature_flag|resolved_todo
+  type: deprecated_api|workaround|feature_flag|stale_feature_flag|resolved_todo
   description: <what the pattern is>
   suggestion: <what to do about it>
   risk: safe|likely_safe|needs_investigation
@@ -144,20 +166,29 @@ Scan for patterns that indicate technical debt from past workarounds or migratio
 
 ## 6. Configuration Cruft
 
-- **Unused env vars**: read `.env*` files, grep each variable name across source code. Flag any not referenced
+- **Unused env vars**: read `.env*` files, grep each variable name across source code **and** across `docker-compose*`, `Dockerfile*`, CI workflows, Procfiles and deployment manifests (`${VAR}` substitution there is a use). Flag any not referenced anywhere. Cap at `likely_safe` — never `safe` — when the variable is consumed without its name appearing in the repo: framework-prefixed vars that a bundler injects wholesale (`VITE_*`, `NEXT_PUBLIC_*`, `REACT_APP_*`, `EXPO_PUBLIC_*`), vars a library reads by convention (`DATABASE_URL` for Prisma / `dj-database-url`, `REDIS_URL`, `SENTRY_DSN`, `OPENAI_API_KEY`, `AWS_*`, `GOOGLE_APPLICATION_CREDENTIALS`), and platform vars (`PORT`, `NODE_ENV`, `PYTHONPATH`, `TZ`). Say which convention you suspect.
 - **Dead CI stages**: read `.github/workflows/*.yml` or `.gitlab-ci.yml`, look for jobs that are commented out, have `if: false`, or reference deleted scripts/files
 - **Orphaned configs**: config files for tools no longer in `devDependencies` (e.g., `.eslintrc` exists but `eslint` is not installed)
 - **Docker cleanup**: `Dockerfile` or `docker-compose.yml` referencing images, volumes, or services no longer needed
+- **Dead i18n keys**: translation files under `locales/`, `i18n/`, `lang/`, `translations/`, `messages/` (`*.json`, `*.yaml`, `*.ts` message maps). Read only the **default/source** locale (`en`, the one named in the i18n config, or the largest); other locales mirror its key set and a key missing in one of them is a translation gap, not cruft. Flatten nested keys to dotted paths, strip plural/context suffixes (`_one`, `_other`, `_plural`, `_zero`, `_male`), then one batched `Grep` of the literal keys (quoted: `['"\`]key['"\`]`) across source and templates. A key with zero hits → `type: dead_i18n_key`, `risk: safe`. **Dynamic prefixes are the trap**: when code builds a key (`` t(`error.${code}`) ``, `t('status.' + s)`, `t(key)` with `key` from data), every key under that prefix is live — collect the literal prefixes from such calls and exclude their subtrees, saying so in the finding block. A translation file with no `t(`/`$t(`/`i18n.t(`/`gettext(`/`<Trans` call sites anywhere is served to the client wholesale: record the check as unavailable rather than flag every key.
+- **Dead config keys**: keys in `config/*.{yaml,yml,json,toml}`, `settings.py`, `appsettings*.json`, `application*.yml` that no code reads. Flatten nested keys; a key is read when its name appears as `cfg["key"]`, `cfg.get("key")`, `config.key`, `settings.KEY`, `getenv`-style lookups, `@Value("${key}")`, `Configuration["Key:Sub"]`, or a dotted path. **Never flag keys the framework itself consumes** — Django `DEBUG`/`ALLOWED_HOSTS`/`INSTALLED_APPS`/`MIDDLEWARE`/`DATABASES`, Spring `server.*`/`spring.*`/`logging.*`, ASP.NET `Logging`/`ConnectionStrings`/`AllowedHosts`, Rails `config.*`, Next.js/Vite config keys — nor keys a schema or a `Settings(BaseSettings)` class binds by name (Pydantic, `environ.Env`, `dynaconf`, `node-config`), where the class fields are the readers. When the whole file is loaded into an object that is then passed around (`CONFIG = yaml.safe_load(...)`; `return {"config": CONFIG}`), report at `likely_safe`: the reader may be outside the repo.
 
 **Output format:**
 
 ```
 ## Configuration Cruft
 - path: <file_path>
-  type: unused_env_var|dead_ci_stage|orphaned_config|docker_cruft
+  type: unused_env_var|dead_ci_stage|orphaned_config|docker_cruft|dead_i18n_key|dead_config_key
+  key: <dotted key, for the two key types>
   description: <what it is>
   risk: safe|likely_safe|needs_investigation
+
+## Unavailable checks
+- check: <resolved_todo|stale_feature_flag_age|dead_i18n_keys|lockfile_drift|unused_dependencies|configuration_cruft|vulnerable_dependencies|...>
+  reason: <e.g., "gh not installed — 4 issue-linked TODOs listed without a closed/open verdict">
 ```
+
+The `## Unavailable checks` block is not a list of findings and never ranks: it tells the orchestrator which checks could not be performed here, so the report can say "unavailable" instead of showing a 0 that looks like "clean". Emit `- (none)` when every check ran. §4.5 when `--vulns` was not requested is "not scanned", not unavailable — the orchestrator already renders that; list it here only when `--vulns` was requested and the audit tool was missing or failed.
 
 Limit to top 30 findings per category. If there are more, note the total count.
 

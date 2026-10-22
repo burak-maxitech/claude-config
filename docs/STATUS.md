@@ -2,19 +2,19 @@
 
 > Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
 
-Last Updated: 2026-10-21 (Session 62, cont.)
+Last Updated: 2026-10-21 (Session 63)
 
 ## Current Status
 
 | Area | Status |
 |------|--------|
-| Skills (11) | Complete — `/bx:save --full` run twice on the reordered sweep S62 (incl. a real Part 7.3 size rollup); `/bx:evolve` 2.12.x run four times S62 (freshness skip, hash map, pinned inventory, discovery lane all exercised); only `/bx:health` never run |
+| Skills (11) | Complete — `/bx:clean` content-reviewed and extended with seven categories S63 (bx 2.13.0; 12 eval runs, 60/60 vs 59/60 baseline, fixtures only); `/bx:save --full` run three times on the reordered sweep (S62 ×2, S63); `/bx:evolve` 2.12.x run four times S62; only `/bx:health` never run |
 | Subagents (20) | Complete — `arch-robustness` added S58 |
-| Plugin packaging (`bx`) | **v2.12.2** pushed and installed S62 (cache 2.12.2; 2.12.0 → 2.12.1 → 2.12.2 in one day). Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
+| Plugin packaging (`bx`) | **v2.13.0** committed S63, push + install pending (cache still 2.12.2; 2.12.0 → 2.12.1 → 2.12.2 shipped S62). Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate passed and fix wave shipped in `7ed079a` (2026-08-17), recorded S61 |
 | Cross-platform setup | Complete |
-| GitHub sync | Complete — main pushed through v2.12.2 (S62, `c2388c9`) |
+| GitHub sync | Complete — main pushed through v2.12.2 (S62, `c2388c9`); v2.13.0 committed S63, push pending |
 | Documentation | Complete — schema v2 |
 
 ## Completed
@@ -50,15 +50,16 @@ See [completed-work.md](completed-work.md) for full checklist.
 7. **Dogfood `/bx:health`** — the last skill never run end-to-end; every first run so far produced defects.
 8. **Design the plugin-eval suite** (`69ef485d`, deferred in `docs/upstream/state.json`) — `claude plugin eval` is pinned on the docs allowlist.
 9. **S37 plugin-packaging leftovers** — symlink retirement and the launcher-script symlink check.
-10. **Commit regression tests for S58's two concurrency fixes** (session-color mutex, GSC `_rmw_lock`) and **sweep the 13 remaining exclusion-list restatements** in `/bx:seo`, `/bx:webdesign`, `/bx:clean` (owner: `arch/references/scan-exclusions.md`).
+10. **Commit regression tests for S58's two concurrency fixes** (session-color mutex, GSC `_rmw_lock`) and **sweep the 12 remaining exclusion-list restatements** in `/bx:seo`, `/bx:webdesign` (owner: `arch/references/scan-exclusions.md`; `/bx:clean` repointed S63).
+11. **Push and install bx 2.13.0, then run `/bx:clean` on a real repo** — first run of the seven new categories (unused exports, orphaned assets, lockfile drift, dead i18n/config keys, stale flags, trivial dirs, unused types), the directory-scope rule (`/bx:clean <dir> --deps` should skip, not false-positive), and the redesigned non-destructive `--dry-run`. Expect defects; the fixtures tied on detection.
 
 ## Session History
 
 > Full history: [session-history.md](session-history.md)
 
-### Last Session (Session 62, cont.) - 2026-10-21
-- **bx 2.12.0 → 2.12.2 shipped and installed in one day.** 2.12.0 (save sweep reorder, evolve lane contract, page-hash probe, pinned inventory, discovery lane), 2.12.1 (three findings applied; registry threshold + validator pattern fixed by running), 2.12.2 (`task-tools.md` states the v2.1.268 allowlist rule).
-- **Four real `/bx:evolve` runs:** delta 22/22 pages → 5 findings; `--fix` with every lane current → 3 applied (`/bx:clean` rewind caveat, `KillShell` → `TaskStop`, ultrareview wording) + `env-vars` pinned; delta 5/23 (scan narrowed by hand after a one-token inventory change) → 1 finding; `--fix` all-current → applied. Decision log 41 applied / 14 rejected / 5 deferred / 1 open.
-- **Three run-found defects fixed in place:** pain-registry threshold `min(3, n)`, validator capability pattern, `source_url` tie-break by file overlap (text-only).
-- **Second `/bx:save --full` on the reordered sweep:** Part 7.3's size-based Key Decisions rollup ran for real (8 rows → archive, CLAUDE.md 12.7k → 9.3k); Parts 5/6 silent; no rotation.
-- Full sweep: 8 Key Decisions rows moved by size pressure; README/architecture already current; no memory change.
+### Last Session (Session 63) - 2026-10-21
+- **`/bx:clean` content review (S46 treatment repeated): 14 reading findings fixed.** High: directory scope never passed to agents and deps grepped only the scoped folder (mass false positives); `migrations/` treated as one-off scripts; unused imports auto-removed with no side-effect/barrel/suppression carve-outs; no `scan-exclusions.md` citation despite that file naming this skill's fixtures as the hazard. Medium: `--dry-run` redesigned to touch nothing (was `git reset --hard` on a throwaway branch), hard-coded `main` removed, Node subpath imports and style extensions, Python requirement parsing, env-var conventions, three-state dashboard, intent-only tool lists, scan files by path.
+- **Run-found 15th defect:** `quick_win` had no definition; scanners tagged whole modules and CSS rules, orchestrators reconciled by hand. Now a closed four-class set pinned in every scan file and reconciled in Step 2.4.
+- **Seven new categories** (unused exports, orphaned assets, lockfile drift, dead i18n/config keys, stale feature flags, trivial directories, unused types), each with a planted hit and a trap in both fixtures; suite 42 → 60 assertions. Iteration 3: 42/42 both versions. Iteration 4: 60/60 new vs 59/60 baseline (baseline flagged the env-driven `VITE_BETA` flag).
+- bx **2.13.0** (plugin.json, CHANGELOG Added + Fixed), README/workflow/architecture updated; committed, push + install pending.
+- Full sweep: rolled up sessions 59–60 in `docs/session-history.md` (44.6k → 40.7k); README tree and architecture.md note the clean `evals/` suite; Parts 6/7 silent, no rotation.

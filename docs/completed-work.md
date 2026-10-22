@@ -275,3 +275,7 @@
 - [x] S62: bx 2.12.1 — three evolve findings applied; registry threshold + validator pattern fixed by running
 - [x] S62: bx 2.12.2 — task-tools.md states the v2.1.268 allowlist rule; env-vars pinned
 - [x] S62: four real `/bx:evolve` runs on 2.12.x (freshness skip, hash map, pinned inventory, discovery lane exercised)
+- [x] `/bx:clean` content review — 14 reading findings + 1 run-found (`quick_win` undefined) fixed; non-destructive `--dry-run`; directory-scope rule; `scan-exclusions.md` cited; three-state dashboard - `bx/skills/clean/**`, `bx/agents/cleanup-*.md`, `bx/skills/arch/references/scan-exclusions.md`
+- [x] Seven new `/bx:clean` categories (unused exports, orphaned assets, lockfile drift, dead i18n/config keys, stale flags, trivial dirs, unused types) with a planted hit and a trap each; eval suite 42 → 60 assertions - `bx/skills/clean/references/*`, `bx/skills/clean/evals/**`
+- [x] Eval iterations 3 and 4 (12 subagent runs): 42/42 both versions; 60/60 new vs 59/60 baseline - `bx/skills/clean/evals/README.md`
+- [x] bx 2.13.0 version bump + CHANGELOG (Added, Fixed) - `bx/.claude-plugin/plugin.json`, `CHANGELOG.md`

@@ -127,44 +127,9 @@
 
 ### Session 58 - 2026-08-24: task-tools sweep across 5 skills after v2.1.233 (v2.2.0); `/bx:arch` review depth v2 in 8 phases (catalog 23→54, `arch-robustness`, calibrated rubrics, thesis-first report; v2.3.0); five skills dogfooded, every first run found defects; two concurrency fixes wrong on first attempt (session-color mutex, GSC `_rmw_lock`; v2.5.x); `claude plugin validate` at Part 8 (v2.6.0); shared owners `task-tools.md`, `scan-exclusions.md`, `finding-rubrics.md`; first archive rotation (commits: bf134a8, 7afd51f, db1f3b5, 748e204)
 
-### Session 59 - 2026-09-08
-**What happened:**
-- `/bx:evolve` delta run: watermark 2.1.241 → 2.1.263 (13 releases, 11 doc pages, community degraded 4/5). Four findings; CLAUDE.md's "frozen at 2.1.228" claim found stale. Then applied by hand rather than via a follow-up `--fix`: `83d36fa2` (Part 8 step 2b uses `claude plugin validate --strict --json`, verdict from `success` + `manifest.errors/warnings`), `e6fab951` (`/reload-plugins` headless since 2.1.260 noted in fix-mode-evolve.md and setup-stitch-mcp.md), `7b54fbc1` (deleted `bx/scripts/session-start-context.ps1`; README, CLAUDE.md, STATUS.md updated), `b1397bf6` rejected (no `Skill(stitch-design…)` rule exists).
-- User asked why Claude can never run `/bx:save` itself. Cause: `disable-model-invocation: true` (set S42) removes the description from context per the skills reference. Flipped to `false`, `/bx:resume` wrap-up step reworded to invoke it, workflow.md's "every bx skill is explicit-only" corrected, `.claude/settings.local.json` `Skill(bx:docs)` → `Skill(bx:save)`. Verified by headless A/B (`--plugin-dir ./bx` with cached plugin disabled → YES; cached 2.8.0 → NO, only `bx:plan` visible). Feedback memory saved. v2.8.0 → **v2.9.0**.
-- `/bx:evolve --full --fix`: 50 releases (window floor v2.1.203), 11 pages, community degraded. One gated edit approved (`c0a336b6`: doc-schema.md now names `/doctor`'s trim check and cross-references mode-update.md Part 4.3); `e1e67d43` closed as a duplicate of applied `5d1459d5` (same v2.1.233 release, different capability string); `83d36fa2` re-emitted and suppressed as already applied. The 18 older open findings were NOT re-emitted — my claim that `--full --fix` would gate them was wrong.
-- Two README leftovers from the `.ps1` deletion (lines 247, 281) caught during consolidation, one by the docs lane.
+### Session 59 - 2026-09-08: `/bx:evolve` delta 2.1.241 → 2.1.263 (4 findings, applied by hand) then `--full --fix` (one gated edit; the 18 older open findings were not re-emitted — the claim that `--fix` would gate them was wrong); `/bx:save` made model-invocable (`disable-model-invocation` flipped after a headless A/B proved the flag hides the description; v2.9.0); `bx/scripts/session-start-context.ps1` deleted; Part 8 step 2b reads `claude plugin validate --strict --json` by its `success` field (commits: 511b197, 5389b75)
 
-**Files created/modified:**
-- `bx/skills/save/SKILL.md` (flag), `bx/skills/save/references/mode-update.md` (Part 8 step 2b `--json`), `bx/skills/save/references/doc-schema.md` (`/doctor` paragraph)
-- `bx/skills/resume/SKILL.md` (wrap-up step invokes save), `bx/skills/evolve/references/fix-mode-evolve.md`, `bx/skills/webdesign/references/setup-stitch-mcp.md` (headless `/reload-plugins` notes)
-- `bx/scripts/session-start-context.ps1` — deleted
-- `bx/.claude-plugin/plugin.json` 2.8.0 → 2.9.0, `CHANGELOG.md` 2.9.0 entry
-- `README.md` (validate `--json`, hook tree, Windows paragraph), `workflow.md` (`/loop` caveat), `CLAUDE.md` Known Issues (ps1 resolved, watermark line, `--fix` follow-up defect), `docs/STATUS.md` Next Steps #13
-- `docs/upstream/state.json` — 6 new entries, 6 verdicts; watermark 2.1.263 · 2026-09-08
-
-**Next session should:**
-- Push v2.9.0 and run `/plugin update bx`, then confirm Claude can invoke `/bx:save` interactively
-- Hand-triage the 18 carried-forward evolve findings; fix Step 3.4 (`applied` branch, same-URL dedup) and store `source_excerpt`
-- Dogfood `/bx:health`
-
-### Session 60 - 2026-09-28
-**What happened:**
-- Doc-tiering decision pass: all 8 decisions accepted; #3 amended (2500 target chased with resolved entries only), #6 amended (Invariant 5 warns, not fails). Spec moved to Decided.
-- Built phase 1 (D1, D2, D3, D7, D8) as v2.10.0 on `feat/doc-tiering-phase1`: `docs/known-issues.md` archive, `known_issue_moves` packet field, Part 7.3 shrinker row, 9k rung, derivable-content clause. See commits `579a979`..`a57014d`.
-- `/bx:evolve` delta run (2.1.263 → 2.1.284): applied `2e4e9a8b`, `ee81fa43`, `c0379ca1`, `10294db5`, `7e849e74`, half of `55ba40ea`; added three doc pages to the scan allowlist; added a version-bump guard (`3828540`).
-- Blind rehearsals (3 waves + 1 confirming): every outcome check passed; ambiguity bar not met on raw counts. Final review found 7 Important defects (bare-word "resolved", entry span, open-phase growth, archive liveness, block-replace, README overstatement, CI PR base), fixed in `e511475`.
-- Found but not fixed: `/bx:health` reads state sections from CLAUDE.md (moved to STATUS.md by schema v2).
-
-**Files created/modified:**
-- `bx/skills/save/references/mode-update.md`, `doc-schema.md`, `doc-structure-rules.md`, `claude-md-sections.md`, `verification-checklists.md`; `bx/agents/save-writer.md` - Known Issues governor
-- `bx/skills/save/tests/check-known-issues-governance.sh`, `test-known-issues-fixtures.sh`, `make-fixtures.sh` - lint (28 checks) and three fixtures
-- `scripts/check-plugin-version-bump.sh` + test, `.githooks/pre-push`, `.github/workflows/plugin-version.yml` - version-bump guard
-- `bx/skills/resume/SKILL.md`, `bx/skills/health/SKILL.md`, six `bx/agents/*.md`, `bx/skills/evolve/references/*` - evolve findings
-- `docs/superpowers/plans/2026-09-28-bx-doc-tiering-phase1.md` + `-rehearsals.md`, `docs/upstream/state.json`
-
-**Next session should:**
-- Settle the five open decisions, merge, push, install v2.10.0
-- Dogfood `/bx:save --full` on this repo and expect defects
+### Session 60 - 2026-09-28: doc-tiering decision pass (8 accepted, #3/#6 amended) and phase 1 built as v2.10.0 — `docs/known-issues.md` archive, `known_issue_moves`, Part 7.3 Known Issues shrinker, 9k advisory rung, derivable-content clause; `/bx:evolve` delta 2.1.263 → 2.1.284 (6 applied, 3 pages pinned); version-bump guard (`3828540`); three blind-rehearsal waves passed every outcome check, then a fresh review found 7 defects fixed in `e511475`; `/bx:health` read state from CLAUDE.md, fixed `f48fefd` (commits: 9aa2eed, 44ea452, e511475, be1c64a)
 
 ### Session 61 - 2026-10-20
 **What happened:**
@@ -240,3 +205,22 @@
 - Make the page probe delta-aware; persist candidates into `--fix`; add the `source_url` tie-break rule
 - Doc tiering Phase 2 (`.claude/rules/` tier) — unblocked, edit on `5b91feb3`
 - Dogfood `/bx:health`
+
+### Session 63 - 2026-10-21
+**What happened:**
+- `/bx:evolve --scope bx:clean` requested; the skill has no per-skill scope (the upstream record already had 12 applied entries touching clean), so the user chose a skill-creator content review of `/bx:clean` with improvements. 14 findings by reading — 4 high (scope not passed to agents + deps grepped inside the scope; `migrations/` as one-off scripts and a `git log` without `--name-only`; unused-import quick wins with no side-effect/barrel/suppression/pragma carve-outs; no `scan-exclusions.md` citation and fixture trees in stack detection), 6 medium (`--dry-run` via `git reset --hard` → non-destructive `git rm -n` + findings' line counts; hard-coded `main`; Node subpath imports/extensions/escaping; Python requirement parsing, batched grep, runtime-loaded packages; env-var conventions; three-state dashboard with `## Unavailable checks`), 4 low (intent-only `tools:` claim, scan files by absolute path, two-filter dispatch rule, 5-or-more wording). Six sibling-skill rules the clean skill never received (S58 exclusions, v2.8.0 three states, S61 tool lists, S46 git-safety, dadac845 auto-mode).
+- Re-ran the three committed evals against 2.12.2 and the rewrite (6 subagent runs; the eval subagents dispatched the real `bx:cleanup-*` agents): 42/42 both. The runs surfaced the 15th defect: `quick_win` was never defined, scanners tagged whole-file deletions, both orchestrators reconciled by hand before `--fix`. Closed set pinned in all three scan files + Step 2.4 reconciliation; opt-in sections are "not scanned", not "unavailable".
+- User asked for all seven proposed categories despite the stated false-positive concern: unused exports (one barrel hop; framework exports excluded), orphaned assets (CSS/HTML/manifest refs count; glob dirs cap likely_safe), lockfile drift (direct entries only; duplicate lockfiles; orphaned `@types`), dead i18n keys (source locale, dynamic prefixes exclude subtree) + dead config keys (framework keys excluded), stale hard-coded flags (git-dated; env/service flags excluded), trivial directories, unused types (ambient augmentations excluded). One hit + one trap each in both fixtures; GROUND-TRUTH and evals.json extended (29/20/11 assertions). Iteration 4 (6 runs, baseline = pre-change 2.13.0): 60/60 vs 59/60 — the baseline flagged env-driven `FLAGS.beta`/`VITE_BETA` as obsolete; all other hits found by both. Fix mode on both committed exactly the three quick wins.
+- bx 2.12.2 → 2.13.0 (`plugin.json`, CHANGELOG Added + Fixed); `scan-exclusions.md` cited-by list gains `/bx:clean`, `cleanup-files-code` leaves its "still to be swept" list; README table/tree, workflow.md usage + Finds, architecture.md, evals README iterations 3–4; verify-by-running memory gained the S63 instance.
+- Full sweep: rolled up sessions 59–60 (44.6k → 40.7k); README tree + architecture.md note clean `evals/`; Parts 6/7 silent, no rotation; In Progress 6 items (>5) and Next Steps 11 (>10) warned, not moved.
+
+**Files created/modified:**
+- `bx/skills/clean/SKILL.md`, `references/scan-files-code.md`, `scan-deps-config.md`, `scan-styles-tests.md` - review fixes + seven categories
+- `bx/agents/cleanup-files-code.md`, `cleanup-deps-config.md`, `cleanup-styles-tests.md` - scan file by path, exclusions, new rules
+- `bx/skills/arch/references/scan-exclusions.md` - clean repointed
+- `bx/skills/clean/evals/{evals.json,GROUND-TRUTH.md,README.md}` + 12 new fixture files (node: strings.ts, i18n.ts, locales/en.json, flags.ts, types.ts, legacy/index.ts, public/*.svg, package-lock.json; python: config.yaml, app/flags.py, app/legacy/__init__.py, static/*.svg) + App.tsx/index.html/styles.css/tsconfig.json/main.py edits
+- `bx/.claude-plugin/plugin.json` 2.13.0, `CHANGELOG.md`, `README.md`, `workflow.md`, `docs/architecture.md`
+
+**Next session should:**
+- Push v2.13.0, refresh the plugin (`/plugin marketplace update burak-tools`, shell `claude plugin update bx`, `/reload-plugins`), run `/bx:clean` on a real repo including `<dir> --deps` and `--dry-run`
+- Dogfood `/bx:health`; `/bx:evolve` 2.12.x follow-ups (delta-aware probe)

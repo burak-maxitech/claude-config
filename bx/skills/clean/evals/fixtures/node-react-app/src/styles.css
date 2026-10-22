@@ -6,6 +6,7 @@
 .card {
   border: 1px solid var(--primary);
   padding: 16px;
+  background: url('/bg.svg') no-repeat right top;
 }
 
 .btn {

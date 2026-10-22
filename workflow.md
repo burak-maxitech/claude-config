@@ -358,6 +358,8 @@ on pre-v2 repos. The full breakdown — including what `--full` adds — lives i
 /bx:clean --tests                    # Test cleanup only
 /bx:clean --files                    # Unused files only
 /bx:clean --aggressive               # Move "Likely Safe" into "Safe to Delete"
+/bx:clean --dry-run                  # Impact table of what --fix would remove; changes nothing
+/bx:clean --fix                      # Apply quick wins on a cleanup/<date> branch; confirm the rest
 /bx:clean src/ --code --deps         # Combined: scoped + filtered
 ```
 
@@ -367,12 +369,12 @@ on pre-v2 repos. The full breakdown — including what `--full` adds — lives i
 - Lists "Quick Wins" for zero-risk bulk-approvable deletions
 
 **Finds:**
-- Unused files and dead code
+- Unused files and dead code — including unused exports, unused type definitions, orphaned assets (images, fonts, SVGs nothing references) and trivial directories
 - Unused CSS classes
-- Unused dependencies
+- Unused dependencies, plus lockfile drift (entries the manifest dropped, two lockfiles side by side)
 - Vulnerable dependencies (CVEs) — *only when `--vulns` is passed*
-- Obsolete patterns
-- Configuration cruft
+- Obsolete patterns, including hard-coded feature flags that have not changed in six months
+- Configuration cruft, including dead i18n keys and dead config keys
 - Stale tests
 
 **Vulnerability scanning (`--vulns`):** opt-in only. Runs the audit command appropriate to the detected stack — `npm audit` / `yarn audit` / `pnpm audit` for Node, `pip-audit` (or `safety check`) for Python, `cargo audit` for Rust, `composer audit` for PHP, `govulncheck` for Go, `bundle audit` for Ruby. Findings include CVE ID, severity, fixed version, and a fix command. **Never auto-applied by `--fix`** — version bumps can break the app, so you run the fix command yourself after reviewing.

@@ -1,0 +1,6 @@
+{
+  "greeting": "Hello",
+  "farewell.legacy": "Goodbye and thanks for using v1",
+  "error.notFound": "Not found",
+  "error.timeout": "The request timed out"
+}

@@ -1,6 +1,6 @@
 {
   "skill_name": "clean",
-  "note": "Regression suite for /bx:clean. Fixtures are de-hinted (no giveaway comments) and seeded with precision traps where source-only scanning false-positives: a config-only dependency, a dynamic import(), and an obscure PyPI->import name mismatch. Built with skill-creator; see README.md.",
+  "note": "Regression suite for /bx:clean. Fixtures are de-hinted (no giveaway comments) and seeded with precision traps where source-only scanning false-positives: a config-only dependency, a dynamic import(), and an obscure PyPI->import name mismatch. Built with skill-creator; see README.md. Iteration 4 (bx 2.13.0) added seven categories — unused exports, orphaned assets, lockfile drift, dead i18n/config keys, stale feature flags, trivial directories, unused types — each with one hit and one trap.",
   "evals": [
     {
       "id": 0,
@@ -27,7 +27,18 @@
         "Does NOT flag `src/utils/format.ts` or `src/math.ts` as unused files",
         "Does NOT flag `.btn`, `.card`, or `--primary` as unused CSS",
         "Does NOT flag config/entry files (vite.config.ts, tsconfig.json, index.html, src/main.tsx, postcss.config.js) as unused",
-        "Does NOT flag `@types/react` or `@types/react-dom` as unused"
+        "Does NOT flag `@types/react` or `@types/react-dom` as unused",
+        "Flags the `shout` export in src/utils/strings.ts as an unused export",
+        "Flags `public/hero-old.svg` as an orphaned/unreferenced asset",
+        "Flags `left-pad` as a lockfile entry absent from package.json (lockfile drift)",
+        "Flags the `farewell.legacy` key in src/locales/en.json as a dead i18n key",
+        "Flags `ENABLE_NEW_CHECKOUT` in src/flags.ts as a hard-coded (always-true) feature flag",
+        "Flags `src/legacy/` (index.ts containing only `export {}`) as a trivial/empty directory",
+        "Flags the `LegacyOrder` interface in src/types.ts as an unused type definition",
+        "Does NOT flag `public/logo.svg` (referenced from index.html) or `public/bg.svg` (referenced from styles.css url()) as orphaned",
+        "Does NOT flag `error.notFound` or `error.timeout` as dead i18n keys — reached via the dynamic key t(`error.${code}`)",
+        "Does NOT flag `FLAGS.beta` as a stale feature flag (driven by import.meta.env.VITE_BETA)",
+        "Does NOT flag `capitalize`, `User` or `Status` as unused exports/types"
       ]
     },
     {
@@ -51,7 +62,13 @@
         "Does NOT flag `pycryptodome` as unused — imported as `from Crypto.Cipher import AES` in app/crypto.py (obscure PyPI->import name mismatch)",
         "Does NOT flag `fastapi` or `uvicorn` as unused",
         "Does NOT flag `DATABASE_URL` or `SECRET_KEY` as unused env vars",
-        "Does NOT flag `app/main.py`, `app/images.py`, `app/utils.py`, `app/crypto.py`, or `app/__init__.py` as unused files"
+        "Does NOT flag `app/main.py`, `app/images.py`, `app/utils.py`, `app/crypto.py`, or `app/__init__.py` as unused files",
+        "Flags `legacy_mode` in config.yaml as a dead/unread config key",
+        "Flags `static/old-banner.svg` as an orphaned/unreferenced asset",
+        "Flags `ENABLE_V2_PARSER` in app/flags.py as a hard-coded (always-false) feature flag",
+        "Flags `app/legacy/` (only an empty __init__.py) as a trivial/empty directory",
+        "Does NOT flag `static/favicon.svg` as orphaned (served via FileResponse in app/main.py)",
+        "Does NOT flag `DEBUG` in app/flags.py as a stale flag (env-driven) and does NOT flag `timeout` in config.yaml as dead"
       ]
     },
     {
@@ -71,7 +88,8 @@
         "Does NOT auto-delete `src/utils/oldHelpers.ts` (Safe-to-Delete, not a quick win — defer/confirm)",
         "Does NOT auto-delete `src/components/OldModal.test.tsx` (Safe-to-Delete orphan test, not a quick win)",
         "Does NOT auto-remove `lodash`/`dayjs` from package.json (dependencies are report-only in Fix Mode)",
-        "Does NOT delete `src/plugins/analytics.ts` (loaded via dynamic import — deleting it would break the app)"
+        "Does NOT delete `src/plugins/analytics.ts` (loaded via dynamic import — deleting it would break the app)",
+        "Does NOT auto-delete `public/hero-old.svg` or `src/legacy/index.ts`, and does NOT auto-remove the `shout` export or `LegacyOrder` type (new categories are not Quick Wins)"
       ]
     }
   ]

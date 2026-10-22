@@ -26,6 +26,13 @@ it (the skill prefers `git ls-files`; it falls back to `find` without a repo).
 | 8 | `.legacy-banner`, `.old-tooltip` in `src/styles.css` | unused CSS classes |
 | 9 | `--unused-color` in `src/styles.css` | unused CSS variable |
 | 10 | `src/components/OldModal.test.tsx` | orphaned test (OldModal.tsx absent) |
+| 11 | `shout()` exported from `src/utils/strings.ts` | unused export (`capitalize` from the same file is used) |
+| 12 | `public/hero-old.svg` | orphaned asset |
+| 13 | `left-pad` in `package-lock.json` | lockfile drift (absent from package.json) |
+| 14 | `farewell.legacy` in `src/locales/en.json` | dead i18n key |
+| 15 | `ENABLE_NEW_CHECKOUT = true` in `src/flags.ts` | hard-coded feature flag (age unavailable: single commit) |
+| 16 | `src/legacy/` (only `index.ts` with `export {}`) | trivial directory |
+| 17 | `LegacyOrder` in `src/types.ts` | unused type definition |
 
 ### Must NOT be flagged (traps)
 - **`autoprefixer`** — a devDependency referenced **only in `postcss.config.js`**, never in
@@ -39,6 +46,15 @@ it (the skill prefers `git ls-files`; it falls back to `find` without a repo).
 - `vite.config.ts`, `tsconfig.json`, `.eslintrc.json`, `postcss.config.js`, `index.html`, `src/main.tsx` — config/entry
 - `@types/react`, `@types/react-dom`, `vite`, `vitest`, `eslint`, `typescript` — toolchain
 - `src/components/Button.test.tsx` — valid test
+- **`public/logo.svg`** — referenced only from `index.html` (`<link rel="icon">`); **`public/bg.svg`** —
+  referenced only from `src/styles.css` (`url('/bg.svg')`). A source-only asset scan flags both.
+- **`error.notFound` / `error.timeout`** in `en.json` — reached through the dynamic key
+  `` t(`error.${code}`) `` in `App.tsx`; a literal-key scan flags both. `greeting` is used literally.
+- **`FLAGS.beta`** in `src/flags.ts` — driven by `import.meta.env.VITE_BETA`; not a hard-coded flag.
+- **`User`, `Status`** in `src/types.ts` — used in `App.tsx`; `capitalize` in `strings.ts` — used.
+- **`src/plugins/`** — a one-file directory, but its file is dynamically imported; not trivial.
+- `package-lock.json` lists every manifest dependency correctly besides `left-pad`; `@types/react*` have
+  their runtime packages.
 
 ---
 
@@ -54,6 +70,10 @@ it (the skill prefers `git ls-files`; it falls back to `find` without a repo).
 | 5 | `deprecated_formatter()` in `app/utils.py` | dead code |
 | 6 | `datetime.utcnow()` in `app/utils.py` | deprecated/obsolete API (no inline hint) |
 | 7 | `LEGACY_TOKEN` in `.env` | unused env var |
+| 8 | `legacy_mode` in `config.yaml` | dead config key (`timeout` is read via `CONFIG.get("timeout")`) |
+| 9 | `static/old-banner.svg` | orphaned asset |
+| 10 | `ENABLE_V2_PARSER = False` in `app/flags.py` | hard-coded feature flag (age unavailable) |
+| 11 | `app/legacy/` (only an empty `__init__.py`) | trivial directory |
 
 ### Must NOT be flagged (traps — package name ≠ import name)
 - `Pillow` → `from PIL import Image`
@@ -62,7 +82,11 @@ it (the skill prefers `git ls-files`; it falls back to `find` without a repo).
 - **`pycryptodome` → `from Crypto.Cipher import AES`** (the obscure one — via `app/crypto.py`)
 - `fastapi`, `uvicorn` — used (routes + run entrypoint)
 - `DATABASE_URL`, `SECRET_KEY` — used via `os.getenv` / `os.environ`
-- `app/main.py`, `app/images.py`, `app/utils.py`, `app/crypto.py`, `app/__init__.py`
+- `app/main.py`, `app/images.py`, `app/utils.py`, `app/crypto.py`, `app/__init__.py`, `app/flags.py`
+- **`static/favicon.svg`** — served by `FileResponse("static/favicon.svg")` in `app/main.py`; used.
+- **`DEBUG`** in `app/flags.py` — `os.getenv("DEBUG") == "1"`, env-driven; not a hard-coded flag.
+- **`timeout`** in `config.yaml` — read as `CONFIG.get("timeout", 30)`.
+- **`app/__init__.py`** — empty, but it has modules beneath it; a package marker, not a trivial directory.
 
 > Note: `app/images.py::load_image` is itself dead (uncalled), and `Pillow` is only reachable
 > through it — a correct audit may flag `load_image` as dead code while still keeping `Pillow`
@@ -80,4 +104,6 @@ Correct `--fix` behavior:
 - **Defers** Safe-to-Delete (`oldHelpers.ts`, the orphan test) for confirmation
 - **Does not** auto-remove dependencies (`lodash`/`dayjs` are report-only)
 - **Does not** delete the dynamically-imported `analytics.ts`
+- **Does not** auto-delete `public/hero-old.svg`, `src/legacy/`, the `shout` export or the `LegacyOrder` type —
+  the new categories are Safe-to-Delete, never Quick Wins
 - Preserves all used code

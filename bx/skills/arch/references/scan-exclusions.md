@@ -1,7 +1,8 @@
 # Scan Exclusions — what a repo-wide scanner must never scan
 
 **Canonical owner** for the paths every repo-wide scanning skill excludes. Cited by `/bx:arch`
-(Step 3 + all five `arch-*` agents) and `/bx:tests` (Step 0 + Step 3 + all three `test-*` agents).
+(Step 3 + all five `arch-*` agents), `/bx:tests` (Step 0 + Step 3 + all three `test-*` agents) and
+`/bx:clean` (Step 0.1 + all three `cleanup-*` agents, since bx 2.13.0).
 Satellites cite this file; they do not restate the lists.
 
 The orchestrator computes the scope **once** using these rules and passes the resulting file list to
@@ -71,8 +72,8 @@ directory — not restated here.
 These files still carry their own copy of the §2 list and should be repointed here (S57 named-owner
 principle). Tracked rather than silently tolerated:
 
-`bx/agents/{cleanup-files-code,geo-generative,seo-content,seo-gsc-insights,seo-technical}.md`,
+`bx/agents/{geo-generative,seo-content,seo-gsc-insights,seo-technical}.md`,
 `bx/skills/seo/references/{scan-content,scan-geo,scan-technical}.md`,
 `bx/skills/webdesign/references/{phase1-extract,phase3-inject,web-stack-detection}.md`.
 
-`/bx:arch` and `/bx:tests` are already repointed.
+`/bx:arch`, `/bx:tests` and `/bx:clean` are already repointed.
