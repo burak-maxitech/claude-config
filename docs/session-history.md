@@ -224,3 +224,22 @@
 **Next session should:**
 - Push v2.13.0, refresh the plugin (`/plugin marketplace update burak-tools`, shell `claude plugin update bx`, `/reload-plugins`), run `/bx:clean` on a real repo including `<dir> --deps` and `--dry-run`
 - Dogfood `/bx:health`; `/bx:evolve` 2.12.x follow-ups (delta-aware probe)
+
+### Session 64 - 2026-10-23
+**What happened:**
+- Resumed and ran the first real `/bx:clean` on maxitech-concierge (Python, 122 files, report-only). There were 8 findings and no unused files or deps. The skill is explicit-only, so it was orchestrated by hand from the installed 2.13.0 SKILL.md.
+- Found six skill defects, all fixed in 2.13.1 (see commit 8e964eb). The worst was a dead-config-key false positive on `sign_off`, which is read via `self.config.assistant.get(...)`. It would have reverted every email signature.
+- Iterative verification: five deps-config reruns. Fix 3 (clean vs. unavailable) did not hold across runs in the scan prose, so the normalisation moved into the SKILL.md Step 2.5 orchestrator. A doc-mentioned key reached `safe` in one run, so a docs grep over `*.md`/`docs/**`/`README*` now caps it. The final two runs passed.
+- Correction on the record: the S58 rule ("precondition absent → unavailable") was right. Only the orchestrator-skipped and zero-candidate entries were misfiled.
+- Pushed v2.13.1. maxitech-concierge was left untouched.
+
+**Files created/modified:**
+- `bx/skills/clean/references/scan-deps-config.md`: accessor tracing, mandatory quoted-key and docs grep, `## Used without import`, `## Kept deliberately`, skipped/clean/unavailable rule
+- `bx/skills/clean/references/scan-files-code.md`: settings fields are not exports; `quick_win` implies safe; unavailable rule
+- `bx/skills/clean/references/scan-styles-tests.md`: unavailable rule
+- `bx/skills/clean/SKILL.md`: Step 2.4 quick_win/risk downgrade and cross-agent dedup; Step 2.5 orchestrator-owned unavailable normalisation
+- `bx/.claude-plugin/plugin.json`, `CHANGELOG.md`: 2.13.1
+
+**Next session should:**
+- Install 2.13.1 and run `/bx:clean` on a JS/TS repo (JS categories, directory scope, `--dry-run`), re-running all three scanners
+- Continue with `/bx:evolve` 2.12.x follow-ups (Next Steps #1)

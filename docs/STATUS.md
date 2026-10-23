@@ -2,19 +2,19 @@
 
 > Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
 
-Last Updated: 2026-10-21 (Session 63)
+Last Updated: 2026-10-23 (Session 64)
 
 ## Current Status
 
 | Area | Status |
 |------|--------|
-| Skills (11) | Complete — `/bx:clean` content-reviewed and extended with seven categories S63 (bx 2.13.0; 12 eval runs, 60/60 vs 59/60 baseline, fixtures only); `/bx:save --full` run three times on the reordered sweep (S62 ×2, S63); `/bx:evolve` 2.12.x run four times S62; only `/bx:health` never run |
+| Skills (11) | Complete — `/bx:clean` content-reviewed and extended with seven categories S63 (bx 2.13.0; 60/60 on fixtures) and run for real S64 on maxitech-concierge (Python; 6 defects fixed in 2.13.1); `/bx:save --full` run three times on the reordered sweep (S62 ×2, S63); `/bx:evolve` 2.12.x run four times S62; only `/bx:health` never run |
 | Subagents (20) | Complete — `arch-robustness` added S58 |
-| Plugin packaging (`bx`) | **v2.13.0** committed S63, push + install pending (cache still 2.12.2; 2.12.0 → 2.12.1 → 2.12.2 shipped S62). Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
+| Plugin packaging (`bx`) | **v2.13.1** pushed S64 (`8e964eb`); install pending (cache at 2.13.0). Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate passed and fix wave shipped in `7ed079a` (2026-08-17), recorded S61 |
 | Cross-platform setup | Complete |
-| GitHub sync | Complete — main pushed through v2.12.2 (S62, `c2388c9`); v2.13.0 committed S63, push pending |
+| GitHub sync | Complete — main pushed through v2.13.1 (S64, `8e964eb`) |
 | Documentation | Complete — schema v2 |
 
 ## Completed
@@ -51,15 +51,21 @@ See [completed-work.md](completed-work.md) for full checklist.
 8. **Design the plugin-eval suite** (`69ef485d`, deferred in `docs/upstream/state.json`) — `claude plugin eval` is pinned on the docs allowlist.
 9. **S37 plugin-packaging leftovers** — symlink retirement and the launcher-script symlink check.
 10. **Commit regression tests for S58's two concurrency fixes** (session-color mutex, GSC `_rmw_lock`) and **sweep the 12 remaining exclusion-list restatements** in `/bx:seo`, `/bx:webdesign` (owner: `arch/references/scan-exclusions.md`; `/bx:clean` repointed S63).
-11. **Push and install bx 2.13.0, then run `/bx:clean` on a real repo** — first run of the seven new categories (unused exports, orphaned assets, lockfile drift, dead i18n/config keys, stale flags, trivial dirs, unused types), the directory-scope rule (`/bx:clean <dir> --deps` should skip, not false-positive), and the redesigned non-destructive `--dry-run`. Expect defects; the fixtures tied on detection.
+11. **Install bx 2.13.1, then run `/bx:clean` on a real JS/TS repo** (e.g. horowell or kaanarik). The S64 Python run found six defects, fixed in 2.13.1. Still never exercised: the JS categories, the directory-scope rule (`/bx:clean <dir> --deps` should skip), `--dry-run`, and the files-code/styles-tests scanners after the 2.13.1 edits. Optional: apply the five unused-import quick wins in maxitech-concierge, and decide whether its `title_template`/`personality` keys get wired in or deleted (the PRD calls them configurable, but no code reads them).
 
 ## Session History
 
 > Full history: [session-history.md](session-history.md)
 
-### Last Session (Session 63) - 2026-10-21
-- **`/bx:clean` content review (S46 treatment repeated): 14 reading findings fixed.** High: directory scope never passed to agents and deps grepped only the scoped folder (mass false positives); `migrations/` treated as one-off scripts; unused imports auto-removed with no side-effect/barrel/suppression carve-outs; no `scan-exclusions.md` citation despite that file naming this skill's fixtures as the hazard. Medium: `--dry-run` redesigned to touch nothing (was `git reset --hard` on a throwaway branch), hard-coded `main` removed, Node subpath imports and style extensions, Python requirement parsing, env-var conventions, three-state dashboard, intent-only tool lists, scan files by path.
-- **Run-found 15th defect:** `quick_win` had no definition; scanners tagged whole modules and CSS rules, orchestrators reconciled by hand. Now a closed four-class set pinned in every scan file and reconciled in Step 2.4.
-- **Seven new categories** (unused exports, orphaned assets, lockfile drift, dead i18n/config keys, stale feature flags, trivial directories, unused types), each with a planted hit and a trap in both fixtures; suite 42 → 60 assertions. Iteration 3: 42/42 both versions. Iteration 4: 60/60 new vs 59/60 baseline (baseline flagged the env-driven `VITE_BETA` flag).
-- bx **2.13.0** (plugin.json, CHANGELOG Added + Fixed), README/workflow/architecture updated; committed, push + install pending.
-- Full sweep: rolled up sessions 59–60 in `docs/session-history.md` (44.6k → 40.7k); README tree and architecture.md note the clean `evals/` suite; Parts 6/7 silent, no rotation.
+### Last Session (Session 64) - 2026-10-23
+- **First real `/bx:clean` run** on maxitech-concierge (Python/FastAPI, report-only). The codebase came out clean: 5 unused test imports, `datetime.utcnow()` at about 25 call sites, and 3 unread `assistant.json` keys, two of which the PRD documents. No files were changed in that repo.
+- **Six skill defects found and fixed in bx 2.13.1** (scan-deps-config/files-code/styles-tests + SKILL.md):
+  - The `sign_off` dead-key false positive. Accessors are now traced, and a quoted-key grep plus a docs grep is mandatory.
+  - Runtime-consumed deps now go under `## Used without import`.
+  - Kept-deliberately env vars now go under `## Kept deliberately`.
+  - Skipped, clean and unavailable checks are now separated.
+  - Settings fields are owned by §6 only.
+  - `quick_win` now implies `safe`.
+- **Scanner output varied from run to run.** Three reruns of one scan file produced three different unavailable blocks, so SKILL.md Step 2.5 now normalises the block in the orchestrator. One run also rated a PRD-documented key `safe`, so any doc mention now caps a key at `needs_investigation`.
+- **Verification:** five reruns of the deps-config scanner. The final two independent runs both passed every check. The files-code and styles-tests scanners were not re-run.
+- Committed and pushed v2.13.1 (`8e964eb`). Install is still pending.

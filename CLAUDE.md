@@ -1,7 +1,7 @@
 <!-- bx-doc-schema: 2 -->
 # CLAUDE.md
 
-Last Updated: 2026-10-21 (Session 63)
+Last Updated: 2026-10-23 (Session 64)
 
 ## Project Overview
 
@@ -43,7 +43,7 @@ Last Updated: 2026-10-21 (Session 63)
 
 **bx 2.12.x: four real `/bx:evolve` runs found three defects (fixed in 2.12.1) and left four paths text-only (S62, 2026-10-21).** Fixed by running: the pain-registry threshold spawned duplicate ids for two-word leads (now `min(3, n)`); the validator rejected the pinned `tool:`/`builtin:` vocabulary; a `source_url` match with two stored candidates had no tie-break (larger file overlap used). Still text-only: the changelog lane under `lane-contract.md` (current on every run today), the `--check` drift report and `--fix` regeneration item (no drift occurred), `allowlist_candidates` surviving from a delta run to its `--fix` (carried by hand once), and the probe's full re-read on any inventory change — one renamed token forced a 23-page scan that was narrowed by hand to 5 (new page + pages mentioning the token); the probe should compute the delta from the last committed `capabilities.json` itself. From the v2.10.0 shrinker: multi-paragraph entries, tight bullet lists, the saving-based open phase and archive liveness in rotation remain text-only; the size-based Key Decisions rollup ran for real this save.
 
-**bx 2.13.0 shipped on fixture evidence only (S63, 2026-10-21).** The `/bx:clean` rewrite (directory-scope rule, non-destructive `--dry-run`, `scan-exclusions.md` citation, unused-import carve-outs, three-state dashboard, closed `quick_win` set) and its seven new categories (unused exports, orphaned assets, lockfile drift, dead i18n/config keys, stale feature flags, trivial directories, unused types) passed 60/60 eval assertions on planted fixtures and have never run on a real repository. The pre-change baseline tied on every detection assertion, so the categories' value rests on their precision rules — the one discriminating case was the env-driven `VITE_BETA` flag trap. The redesigned `--dry-run` path has not been executed at all.
+**`/bx:clean` has run on one real repo, a Python one (S64, 2026-10-23).** The first real run (maxitech-concierge, report-only) found six defects that the fixtures could not reach, all fixed in 2.13.1: a dead-config-key false positive on a key read through an accessor; runtime-consumed deps reported as "do NOT remove" findings; skipped/clean checks listed as unavailable; settings fields reported twice; `quick_win` beside a hedge; and deliberately kept env vars as findings. Only the deps-config scanner was re-run (five times; the last two passed). Scanner output varied run to run, so SKILL.md Step 2.5 normalises the unavailable block in the orchestrator. Still never executed: the JS categories (unused exports, orphaned assets, lockfile drift, dead i18n keys, stale flags, unused types), the directory-scope rule, `--dry-run`, and the files-code/styles-tests scanners after the 2.13.1 edits.
 
 > Archived issues: [docs/known-issues.md](docs/known-issues.md)
 

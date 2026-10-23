@@ -279,3 +279,4 @@
 - [x] Seven new `/bx:clean` categories (unused exports, orphaned assets, lockfile drift, dead i18n/config keys, stale flags, trivial dirs, unused types) with a planted hit and a trap each; eval suite 42 → 60 assertions - `bx/skills/clean/references/*`, `bx/skills/clean/evals/**`
 - [x] Eval iterations 3 and 4 (12 subagent runs): 42/42 both versions; 60/60 new vs 59/60 baseline - `bx/skills/clean/evals/README.md`
 - [x] bx 2.13.0 version bump + CHANGELOG (Added, Fixed) - `bx/.claude-plugin/plugin.json`, `CHANGELOG.md`
+- [x] First real `/bx:clean` run (maxitech-concierge, Python) and six defects fixed in bx 2.13.1 - bx/skills/clean/{SKILL.md,references/scan-*.md}, CHANGELOG.md, bx/.claude-plugin/plugin.json (S64, 8e964eb)
