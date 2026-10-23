@@ -8,13 +8,13 @@ Last Updated: 2026-10-23 (Session 64)
 
 | Area | Status |
 |------|--------|
-| Skills (11) | Complete — `/bx:clean` content-reviewed and extended with seven categories S63 (bx 2.13.0; 60/60 on fixtures) and run for real S64 on maxitech-concierge (Python; 6 defects fixed in 2.13.1); `/bx:save --full` run three times on the reordered sweep (S62 ×2, S63); `/bx:evolve` 2.12.x run four times S62; only `/bx:health` never run |
+| Skills (11) | Complete — `/bx:clean` content-reviewed and extended with seven categories S63 (bx 2.13.0; 60/60 on fixtures) and run for real S64 on maxitech-concierge (Python; 6 defects → 2.13.1) and horowell (Next.js; 10 defects → 2.13.2); `/bx:save --full` run three times on the reordered sweep (S62 ×2, S63); `/bx:evolve` 2.12.x run four times S62; only `/bx:health` never run |
 | Subagents (20) | Complete — `arch-robustness` added S58 |
-| Plugin packaging (`bx`) | **v2.13.1** pushed S64 (`8e964eb`); install pending (cache at 2.13.0). Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
+| Plugin packaging (`bx`) | **v2.13.2** pushed S64 (`4e2dc8a`); install pending (cache at 2.13.0). Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate passed and fix wave shipped in `7ed079a` (2026-08-17), recorded S61 |
 | Cross-platform setup | Complete |
-| GitHub sync | Complete — main pushed through v2.13.1 (S64, `8e964eb`) |
+| GitHub sync | Complete — main pushed through v2.13.2 (S64, `4e2dc8a`) |
 | Documentation | Complete — schema v2 |
 
 ## Completed
@@ -51,21 +51,19 @@ See [completed-work.md](completed-work.md) for full checklist.
 8. **Design the plugin-eval suite** (`69ef485d`, deferred in `docs/upstream/state.json`) — `claude plugin eval` is pinned on the docs allowlist.
 9. **S37 plugin-packaging leftovers** — symlink retirement and the launcher-script symlink check.
 10. **Commit regression tests for S58's two concurrency fixes** (session-color mutex, GSC `_rmw_lock`) and **sweep the 12 remaining exclusion-list restatements** in `/bx:seo`, `/bx:webdesign` (owner: `arch/references/scan-exclusions.md`; `/bx:clean` repointed S63).
-11. **Install bx 2.13.1, then run `/bx:clean` on a real JS/TS repo** (e.g. horowell or kaanarik). The S64 Python run found six defects, fixed in 2.13.1. Still never exercised: the JS categories, the directory-scope rule (`/bx:clean <dir> --deps` should skip), `--dry-run`, and the files-code/styles-tests scanners after the 2.13.1 edits. Optional: apply the five unused-import quick wins in maxitech-concierge, and decide whether its `title_template`/`personality` keys get wired in or deleted (the PRD calls them configurable, but no code reads them).
+11. **Install bx 2.13.2, then exercise the untested `/bx:clean` paths**: `--dry-run`, `--fix` on a throwaway branch, and a directory scope (`/bx:clean src/lib/ --deps` should skip). Also re-run the deps-config and styles-tests scanners on horowell after the 2.13.2 edits. Optional: in horowell, delete `cacheStats` and `NewUserWatchRow`, handle `matchMovement` and its comments, and triage the 15 test-only helpers. In maxitech-concierge, apply the 5 import quick wins and decide on the `title_template`/`personality` keys.
 
 ## Session History
 
 > Full history: [session-history.md](session-history.md)
 
 ### Last Session (Session 64) - 2026-10-23
-- **First real `/bx:clean` run** on maxitech-concierge (Python/FastAPI, report-only). The codebase came out clean: 5 unused test imports, `datetime.utcnow()` at about 25 call sites, and 3 unread `assistant.json` keys, two of which the PRD documents. No files were changed in that repo.
-- **Six skill defects found and fixed in bx 2.13.1** (scan-deps-config/files-code/styles-tests + SKILL.md):
-  - The `sign_off` dead-key false positive. Accessors are now traced, and a quoted-key grep plus a docs grep is mandatory.
-  - Runtime-consumed deps now go under `## Used without import`.
-  - Kept-deliberately env vars now go under `## Kept deliberately`.
-  - Skipped, clean and unavailable checks are now separated.
-  - Settings fields are owned by §6 only.
-  - `quick_win` now implies `safe`.
-- **Scanner output varied from run to run.** Three reruns of one scan file produced three different unavailable blocks, so SKILL.md Step 2.5 now normalises the block in the orchestrator. One run also rated a PRD-documented key `safe`, so any doc mention now caps a key at `needs_investigation`.
-- **Verification:** five reruns of the deps-config scanner. The final two independent runs both passed every check. The files-code and styles-tests scanners were not re-run.
-- Committed and pushed v2.13.1 (`8e964eb`). Install is still pending.
+- **Two real `/bx:clean` runs, both report-only, with no files changed in either repo.**
+  - maxitech-concierge (Python): 8 findings.
+  - horowell (Next.js 16, 1,780 files): 3 dead symbols, 15 test-only helpers, about 200 de-export candidates, and a clean lockfile, CSS, assets and tests.
+- **16 skill defects fixed across two releases:**
+  - 2.13.1 (`8e964eb`): the config-key false positive, runtime-consumed deps, unavailable vs clean, and others.
+  - 2.13.2 (`4e2dc8a`): live exports were offered for deletion; `lines: unknown`; a `tsc` run wrote `tsbuildinfo`; doc and comment mentions counted as uses; fixture trees hid references (fix in the shared `scan-exclusions.md`); shadcn exports were flagged; scanners wrote scratch scripts.
+- **Prose did not converge across reruns, so mechanism replaced it.** The unavailable block is now normalised by the orchestrator, and local use is decided by a pinned `git grep` command. That command's first version (mine) dropped every `export` line and caused about 48 false `safe` types. A spot-check caught it.
+- **Verification:** 5 deps-config reruns and 8 files-code reruns. Both final pairs passed every check. The no-write rule was relaxed to OS-temp-only scratch after it failed 4 runs in a row (user decision).
+- A `tsbuildinfo` change at 13:26 was traced to the other horowell session's `next build`, not to a scanner.

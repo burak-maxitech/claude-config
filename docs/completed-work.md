@@ -280,3 +280,4 @@
 - [x] Eval iterations 3 and 4 (12 subagent runs): 42/42 both versions; 60/60 new vs 59/60 baseline - `bx/skills/clean/evals/README.md`
 - [x] bx 2.13.0 version bump + CHANGELOG (Added, Fixed) - `bx/.claude-plugin/plugin.json`, `CHANGELOG.md`
 - [x] First real `/bx:clean` run (maxitech-concierge, Python) and six defects fixed in bx 2.13.1 - bx/skills/clean/{SKILL.md,references/scan-*.md}, CHANGELOG.md, bx/.claude-plugin/plugin.json (S64, 8e964eb)
+- [x] First JS/TS `/bx:clean` run (horowell) and ten defects fixed in bx 2.13.2 - bx/skills/clean/{SKILL.md,references/scan-files-code.md}, bx/skills/arch/references/scan-exclusions.md, CHANGELOG.md, plugin.json (S64, 4e2dc8a)

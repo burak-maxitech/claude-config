@@ -243,3 +243,21 @@
 **Next session should:**
 - Install 2.13.1 and run `/bx:clean` on a JS/TS repo (JS categories, directory scope, `--dry-run`), re-running all three scanners
 - Continue with `/bx:evolve` 2.12.x follow-ups (Next Steps #1)
+
+### Session 64 (cont.) - 2026-10-23
+**What happened:**
+- Ran `/bx:clean` (report-only) on horowell, the first JS/TS run. The orchestration was done by hand against the 2.13.1 scan files in the repo. Results: deps, CSS, assets and tests are clean; 3 dead symbols (`cacheStats`, `matchMovement`, `NewUserWatchRow`), 15 test-only helpers, about 200 de-export candidates, and 1 dead env line.
+- Found 6 defects in that report and 4 more during verification, all fixed in 2.13.2 (commit 4e2dc8a). The worst: locally used exports were rated `unused_export`/`safe`, so Safe to Delete would have broken their files. Also, a scanner's `tsc --noEmit` rewrote `tsconfig.tsbuildinfo` in a repo another session was working in.
+- Verification took four pairs of files-code reruns (A/B through G/H). Failures in order: doc mentions counted as uses; comments counted as local uses; scanners wrote and ran `.mjs` helpers; and my pinned command dropped every `export` line, giving about 48 false `safe` types (caught by spot-checking 11 symbols). G/H passed.
+- User decision: scratch files are allowed in OS temp, deleted before returning, and never in the repo. The strict rule had failed 4 runs in a row.
+- Pushed v2.13.2. horowell was left untouched; its 13:26 `tsbuildinfo` change matches the other session's 13:27 `next build`.
+
+**Files created/modified:**
+- `bx/skills/clean/references/scan-files-code.md`: `export_only` and the De-export block, measured extents, the pinned local-use command, code-only references, the tsc rule, test-only rule, shadcn, scratch-write rule
+- `bx/skills/arch/references/scan-exclusions.md`: "exclusion removes candidates, not evidence" (shared with `/bx:arch` and `/bx:tests`)
+- `bx/skills/clean/SKILL.md`: keep `export_only` out of Safe to Delete; de-export line in the report
+- `bx/.claude-plugin/plugin.json`, `CHANGELOG.md`: 2.13.2
+
+**Next session should:**
+- Install 2.13.2; run `--dry-run` and `--fix` (throwaway branch) and a directory scope on a real repo
+- Re-run deps-config and styles-tests on horowell after 2.13.2; consider a `/bx:arch` re-check that the new exclusion rule changes nothing there
