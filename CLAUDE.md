@@ -35,7 +35,7 @@ Last Updated: 2026-10-23 (Session 64)
 
 ## Known Issues / Blockers
 
-**Plugin-versioning sharp edge (S54):** `version` in `bx/.claude-plugin/plugin.json` is the plugin's update cache key — a push that changes `bx/**` without bumping it is never offered to users (`claude plugin update` reports "already at the latest version"). `/bx:save` Part 8 enforces the bump; manual committers follow the README contributors note. History in `CHANGELOG.md`. **The update is shell-only:** `update` has no `/plugin` session form (verified S61 against the CLI reference and live — `/plugin update bx` left the cache stale); refresh with `/plugin marketplace update burak-tools`, then `claude plugin update bx` from a shell, then `/reload-plugins`. Dropping `version` to version by commit SHA was evaluated and rejected S61 (finding `4519c508`).
+**Plugin-versioning sharp edge (S54):** a `bx/**` push without a `plugin.json` version bump never reaches users, and the update is shell-only. → [docs/known-issues.md](docs/known-issues.md)
 
 **Upstream decision log: 1 open, 5 deferred** in `docs/upstream/state.json` (61 entries). Watermark: **changelog 2.1.306 · docs/community 2026-10-21** · 23 page hashes · inventory `45a4793c` (four S62 runs on bx 2.12.x: delta 22/22, `--fix` all-current, delta 5/23, `--fix` all-current; 4 findings applied, `env-vars` pinned). The one open entry is the plugin-eval design item `69ef485d` (out of `--fix` scope: new files + external run); the 5 deferred are pre-2.11.0 legacy entries without stored edits except `5b91feb3` (`.claude/rules/` tier, edit filled S62).
 

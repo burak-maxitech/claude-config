@@ -261,3 +261,14 @@
 **Next session should:**
 - Install 2.13.2; run `--dry-run` and `--fix` (throwaway branch) and a directory scope on a real repo
 - Re-run deps-config and styles-tests on horowell after 2.13.2; consider a `/bx:arch` re-check that the new exclusion rule changes nothing there
+
+### Session 64 (cont.²) - 2026-10-23
+**What happened:**
+- Full sweep (`/bx:save --full`): no session rollup (sessions 60–64 are already the full-prose window), no Key Decisions rollup (14 rows), no size shrinkers (CLAUDE.md 11.8k, STATUS.md 11.4k) and no archive rotation (largest archive 68.5k). Part 1.10 warnings: Next Steps has 11 items (target 10) and In Progress has 6 (target 5). Part 7: CLAUDE.md re-measured at 12.1k after the S64 (cont.) Known Issues addition, so the Known Issues shrinker fired (4,334 > 4,000; user approved). It moved the open plugin-versioning entry (S54) to `docs/known-issues.md` and left a one-line summary in its place. CLAUDE.md is now 11.5k.
+- Part 3 doc sync: `docs/architecture.md` now describes `scan-exclusions.md` as the rule for what a scan must never *report* on, and notes that references from excluded trees still count (2.13.2).
+
+**Files created/modified:**
+- `docs/architecture.md`: cross-skill contract owners line updated for the 2.13.2 exclusion rule
+
+**Next session should:**
+- See Session 64 (cont.) above

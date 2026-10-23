@@ -67,3 +67,4 @@ See [completed-work.md](completed-work.md) for full checklist.
 - **Prose did not converge across reruns, so mechanism replaced it.** The unavailable block is now normalised by the orchestrator, and local use is decided by a pinned `git grep` command. That command's first version (mine) dropped every `export` line and caused about 48 false `safe` types. A spot-check caught it.
 - **Verification:** 5 deps-config reruns and 8 files-code reruns. Both final pairs passed every check. The no-write rule was relaxed to OS-temp-only scratch after it failed 4 runs in a row (user decision).
 - A `tsbuildinfo` change at 13:26 was traced to the other horowell session's `next build`, not to a scanner.
+- Full sweep: moved the open plugin-versioning issue (S54) from CLAUDE.md to `docs/known-issues.md`, leaving a one-line summary (CLAUDE.md 12.1k → 11.5k); `docs/architecture.md` was synced to the 2.13.2 exclusion rule.
