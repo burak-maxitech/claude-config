@@ -64,7 +64,13 @@ directory — not restated here.
 2. **Report what was excluded** in the run's footer, with counts — a reader cannot distinguish a
    clean codebase from a narrowed scan unless the scan says which it was. "Excluded: 26 planted eval
    fixtures" is the disclosure; silence is not.
-3. **Never let an agent widen its own scope.** If an agent believes something outside its file list
+3. **Exclusion removes candidates, not evidence.** A scanner never *reports* a finding inside an
+   excluded tree, but a *reference from* one still counts when deciding whether something outside
+   it is used. Fixture naming is a convention, not a guarantee: `e2e/fixtures/*.ts` is often real
+   Playwright support code and `__fixtures__/` holds the inputs a real test reads, so dropping their
+   imports makes the modules they use look dead (S64, horowell). The cost runs one way: a planted
+   fixture that imports real code can at worst hide a dead-code finding, never create one.
+4. **Never let an agent widen its own scope.** If an agent believes something outside its file list
    matters, it reports that as a note, not by reading it.
 
 ## Known restatements still to be swept

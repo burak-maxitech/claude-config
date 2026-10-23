@@ -2,6 +2,33 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.13.2 — 2026-10-23
+
+Second real `/bx:clean` run — the first on a JS/TS codebase (a Next.js 16 app, 1,780 files,
+report-only) — found six defects. All fixed; no new categories.
+
+### Fixed
+
+- **A live symbol could be offered for deletion.** Exports used inside their own file but nowhere
+  else arrived as `unused_export`, `risk: safe` — and Safe to Delete says "only the symbol goes",
+  which breaks the file. They are now `export_only`, reported in a `## De-export candidates` block,
+  never a finding and never a `--fix` action.
+- **`lines: unknown`.** Function findings came back without an end line, leaving holes in the
+  `--dry-run` impact table. Extent is now measured from the file, never estimated.
+- **Count-only summaries outside the contract.** About 180 exports arrived as one-line counts; the
+  de-export block gives them a defined, capped shape.
+- **An unlisted command wrote to a report-only repo.** The scanner ran `tsc --noEmit
+  --noUnusedLocals`, which with `incremental: true` rewrote `tsconfig.tsbuildinfo`. `tsc` is now the
+  named TypeScript unused-import method with `--incremental false` mandatory; nothing else may run.
+- **Fixture-named trees hid real references.** `e2e/fixtures/*.ts` was real Playwright support code.
+  `scan-exclusions.md` (shared with `/bx:arch` and `/bx:tests`) now says exclusion removes
+  candidates, not evidence: references from an excluded tree still count.
+- **Doc mentions hid dead functions.** One verification run counted markdown as references, so two dead functions named in the project's session log read as live. A code symbol's reference must be in code; doc mentions are named in the finding instead.
+- **Comments kept dead functions alive, and a scanner wrote and ran its own scripts.** A dead function mentioned in its own file's doc comment was classed `export_only`; local uses are now counted with comments stripped. The same run wrote `.mjs` helpers to a temp directory and ran them with node; no interpreter may run, nothing may be written inside the repo, and scratch files are allowed only in the OS temp directory, deleted before the agent returns (a stricter no-write rule failed four runs in a row on a 1,780-file repo). Test-only references now always rate `needs_investigation` (two runs had disagreed).
+- **Local-use detection is now a pinned command.** Prose rules for "used in its own file" did not converge across runs, so the scan file gives the exact `git grep` pipeline. Its first version dropped every `export` line and called ~48 types live only in another export's signature dead at `risk: safe`; it now drops only the definition line (verified on 3 dead and 8 live symbols).
+- **shadcn/ui kit exports were flagged.** `components/ui/*` with a `components.json` joins the
+  framework-convention never-flag list.
+
 ## 2.13.1 — 2026-10-23
 
 First real `/bx:clean` run (on a Python/FastAPI service, report-only) found four defects the fixtures

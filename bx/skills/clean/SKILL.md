@@ -97,7 +97,7 @@ After all agents return:
 
 ## Step 3 — Output
 
-The eight dashboard rows are stable; the finer `type:` values the agents return roll into them. Unused Files takes unused sources, backup/empty/duplicate files, one-off scripts, **orphaned assets** and **trivial directories**. Dead Code takes dead functions, **unused exports**, **unused type definitions**, commented-out blocks, unreachable code and unused imports. Unused Dependencies takes unused, misplaced and duplicate packages and **lockfile drift**. Obsolete Patterns takes deprecated APIs, workarounds, **stale feature flags** and resolved TODOs. Config Cruft takes unused env vars, dead CI stages, orphaned tool configs, Docker cruft, **dead i18n keys** and **dead config keys**. Mention the sub-types present in each row's detail section so a reader can see which checks produced the count.
+The eight dashboard rows are stable; the finer `type:` values the agents return roll into them. Unused Files takes unused sources, backup/empty/duplicate files, one-off scripts, **orphaned assets** and **trivial directories**. Dead Code takes dead functions, **unused exports**, **unused type definitions**, commented-out blocks, unreachable code and unused imports. Unused Dependencies takes unused, misplaced and duplicate packages and **lockfile drift**. Obsolete Patterns takes deprecated APIs, workarounds, **stale feature flags** and resolved TODOs. Config Cruft takes unused env vars, dead CI stages, orphaned tool configs, Docker cruft, **dead i18n keys** and **dead config keys**. Mention the sub-types present in each row's detail section so a reader can see which checks produced the count. `export_only` items (the agent's `## De-export candidates` block) are not findings and roll into no row: render them as one line after Detailed Findings — "<n> exports are used only in their own file; dropping `export` is a lint tidy-up" — and never offer them under `--fix`.
 
 ### Summary Dashboard
 
@@ -146,7 +146,7 @@ Format as a checklist:
 
 Group into four sections (plus a fifth when `--vulns` was passed):
 
-**Safe to Delete** — Zero references, safe to remove. Include file path and line numbers. For an unused export or type, name the symbol and say the file stays (only the symbol goes) unless the file is otherwise empty; for an orphaned asset give its size; for a trivial directory list what it contains; for a dead i18n or config key give the dotted key and the file.
+**Safe to Delete** — Zero references, safe to remove. Include file path and line numbers. For an unused export or type, name the symbol and say the file stays (only the symbol goes) unless the file is otherwise empty — this applies only to `unused_export`/`unused_type`, whose symbol has no use at all; an `export_only` item (live symbol, needless `export`) never appears in any of these sections, and if an agent filed one under Dead Code, move it to the de-export line; for an orphaned asset give its size; for a trivial directory list what it contains; for a dead i18n or config key give the dotted key and the file.
 
 **Likely Safe** — Appears unused but verify before deleting. Explain what to check.
 
