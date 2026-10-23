@@ -2,6 +2,39 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.13.1 — 2026-10-23
+
+First real `/bx:clean` run (on a Python/FastAPI service, report-only) found four defects the fixtures
+could not reach. All fixed in the scan references; no new categories.
+
+### Fixed
+
+- **Dead config keys: false positive on a read key.** A key read through an accessor
+  (`self.config.assistant.get("sign_off")`) was reported as having no reader, at `likely_safe`,
+  because the whole-dict pass-through rule let the scanner stop at "passed around". A quoted-key
+  grep across all source is now mandatory before reporting, accessors are traced to their call
+  sites, and `likely_safe` is reserved for objects that leave the repo or are consumed wholesale.
+- **Dependencies used without an import were reported as findings.** `uvicorn` (Procfile),
+  `asyncpg` (driver URL), `requests`/`aiohttp` (transitive runtime needs) and `pytest-asyncio`
+  arrived as `likely_safe` findings annotated "do NOT remove" — deletion candidates under
+  `--aggressive --fix`. A confirmed mechanism now means "used": listed under `## Used without import`,
+  never ranked.
+- **Unavailable checks absorbed skipped and clean ones.** An orchestrator-skipped section and checks
+  with zero candidates ("no issue-linked TODOs to look up") were listed as unavailable. All three scan
+  files now separate skipped, clean and unavailable (precondition or tool absent).
+- **Settings fields doubled as unused exports, and `quick_win` coexisted with a hedge.** An unread
+  `Settings` field arrived from two scanners under two types; it now belongs to §6 only, and the
+  orchestrator keeps that entry. A `quick_win: true` finding must be `risk: safe` (scanner rule and
+  Step 2.4 downgrade).
+- **Deliberately kept env vars were still findings.** A `Settings` field commented "unused in code; kept
+  so .env var isn't rejected" arrived as a finding marked "not a deletion candidate". A repo comment
+  marking a variable as kept now moves it to a `## Kept deliberately` line, never ranked.
+- **Unavailable checks varied run to run; doc-described config keys reached `safe`.** Three reruns of
+  one scan file produced three different unavailable blocks, so SKILL.md Step 2.5 now normalises the
+  block in the orchestrator (drop clean entries, add the preconditions Step 0 found absent). A dead
+  config key is now checked against `*.md`/`docs/**`/`README*` in the same grep, and any doc mention
+  caps it at `needs_investigation` — one run had rated a PRD-documented key `safe`.
+
 ## 2.13.0 — 2026-10-21
 
 Content review of `/bx:clean` (SKILL.md, three scan references, three `cleanup-*` agents) — the
