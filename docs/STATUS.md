@@ -2,19 +2,19 @@
 
 > Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
 
-Last Updated: 2026-10-23 (Session 64)
+Last Updated: 2026-10-26 (Session 65)
 
 ## Current Status
 
 | Area | Status |
 |------|--------|
-| Skills (11) | Complete — `/bx:clean` content-reviewed and extended with seven categories S63 (bx 2.13.0; 60/60 on fixtures) and run for real S64 on maxitech-concierge (Python; 6 defects → 2.13.1) and horowell (Next.js; 10 defects → 2.13.2); `/bx:save --full` run three times on the reordered sweep (S62 ×2, S63); `/bx:evolve` 2.12.x run four times S62; only `/bx:health` never run |
+| Skills (11) | Complete — `/bx:clean` content-reviewed and extended with seven categories S63 (bx 2.13.0; 60/60 on fixtures) and run for real S64 on maxitech-concierge (Python; 6 defects → 2.13.1) and horowell (Next.js; 10 defects → 2.13.2); `/bx:save --full` run three times on the reordered sweep (S62 ×2, S63); `/bx:evolve` 2.12.x run four times S62; `/bx:tests` run for real S65 on horowell + maxitech-concierge (29 defects; release 1 → 2.13.3, release 2 → 2.14.0 spec); only `/bx:health` never run |
 | Subagents (20) | Complete — `arch-robustness` added S58 |
-| Plugin packaging (`bx`) | **v2.13.2** pushed S64 (`4e2dc8a`); install pending (cache at 2.13.0). Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
+| Plugin packaging (`bx`) | **v2.13.3** pushed S65 (`c72a98d`); install pending (cache at 2.13.2). Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate passed and fix wave shipped in `7ed079a` (2026-08-17), recorded S61 |
 | Cross-platform setup | Complete |
-| GitHub sync | Complete — main pushed through v2.13.2 (S64, `4e2dc8a`) |
+| GitHub sync | Complete — main pushed through v2.13.3 (S65, `c72a98d`) |
 | Documentation | Complete — schema v2 |
 
 ## Completed
@@ -26,6 +26,8 @@ See [completed-work.md](completed-work.md) for full checklist.
 **`/seo-review` hardened across 4 improvement groups + 15 code-review fixes (S35, 2026-05-26).** Same-day continuation of S34 burakarik.com dogfood. User ran the skill with new `known-bad-urls.txt`; orchestrator wrote a 396-line `_inspect_batch.py` into `.seo-data/gsc/` (third disk-write boundary violation across S31 cont.² + S34 + S35) + only inspected 50 of 100 pasted URLs. Shipped 4 groups + ran `/code-review` extra-high effort surfacing 15 findings, then fixed all 15 same-session (+1105/-71 LOC across 7 files, uncommitted). **Group A:** new `inspect-batch` helper subcommand (parallel HTTP via ThreadPoolExecutor + per-URL cache + atomic write + 429/5xx retry); broader disk-write boundary rule forbidding ALL orchestrator-written scripts under `.seo-data/gsc/`. **Group B:** subagent-skip rule codified (new Step 4.5) with 4 gating conditions + audit-trail marking + `--force-dispatch` escape hatch. **Group C:** cache TTL split — sa-* stays 24h, ui-* becomes 7d (coverageState is weeks-stable; fixes the 0/197 cache-hit problem from S34). **Group D:** finding lifecycle infrastructure — `finding-history.json` (run_count tracker with same-commit guard + ESCALATE marker at run_count>=3) + `watchpoints.json` (auto-emitted on `code_changed_since_gsc_window=true` + 21-day recheck + 90-day evict). Three new helper subcommands. **Top correctness fixes:** `head -1 sa-q2-*.json` race → deterministic hash recomputation; DST off-by-one via `time.mktime` → `datetime.date.fromisoformat()`; null-metric TypeError; operator precedence in `classify_transition`; bare `.tmp` race → PID suffix; 20-worker rate-limit burst → 6 workers + retries.
 
 ## In Progress
+
+**`/bx:tests` upkeep — release 1 shipped (2.13.3), release 2 specced (S65).** Spec: `docs/superpowers/specs/2026-10-26-bx-tests-upkeep-design.md` (33 problems, decisions D1–D6, acceptance controls from both repos). 2.13.3: assertion definition in one place, T01a/T01b split, gated suite-verified `--fix`, `coverage_negatives` + `coverage_partial` in the dispatch block, agents reduced to citations. 2.14.0: committed scripts (`test_bodies.py`, `leverage.py`, `references.py`), accuracy fixes, reduction lane (`life_support`, `consolidate`, growth trend), `/bx:clean` ownership split.
 
 **`/bx:evolve` 2.12.x — shipped, run four times, three run-found defects fixed (S62).** 2.12.0 delivered the three 2.11.0 defects and improvements 7–10 (`lane-contract.md`, `scripts/docs-page-hashes.py` + `watermark.docs_pages`/`inventory_hash`, pinned `capabilities.json` via `scripts/build-capabilities.py`, community lane as a discovery feed). Four real runs: delta 22/22 pages (5 findings), `--fix` with all lanes current (3 applied + `env-vars` pinned), delta 5/23 (1 finding), `--fix` all-current (1 applied). Fixed in 2.12.1: registry threshold `min(3, n)`, validator pattern for the pinned vocabulary. **Open:** the probe's delta-aware scan (narrowed by hand once), candidates persisting into `--fix`, a `source_url` tie-break rule, the plugin-eval design `69ef485d` (needs `bx/evals/` + `claude plugin eval init`).
 
@@ -41,30 +43,24 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## Next Steps
 
-1. **`/bx:evolve` 2.12.x follow-ups** — make `docs-page-hashes.py` delta-aware (diff the live inventory against the last committed `capabilities.json`; scan only pages whose markdown contains an added or removed token, instead of all 23 on any change), persist `allowlist_candidates` from a delta run into its `--fix`, add a `source_url` tie-break rule (larger file overlap) to Step 3.4; PATCH bump.
-2. **Doc tiering Phase 2** (`.claude/rules/` tier, spec D4–D6) — unblocked S62: the memory docs confirm `paths:` is the only rule frontmatter field (YAML list or comma string; unparseable YAML loads the rule unconditionally); the edit is stored on deferred finding `5b91feb3`. Plus the deferred minors listed in `## In Progress`.
-3. **Doc-schema v2 fixture verification** — the deferred live `/bx:save` runs against the six fixture cases (fx-v2 no-op, fx-partial resume, fx-dirty skip, fx-v1-envvars keep path, fx-v1-sparse scaffold, fx-v1-ineligible decline), plus the post-merge minors batch from both plans.
-4. **/simplify follow-up: move Part 7.7 rotation out of Part 7** into its own sibling Part — deletes the five "except 7.7" carve-outs; requires a blind rehearsal before shipping. The S59 spec's D4 proposes a Part 7.9 sibling on the same reasoning — do these together.
-5. **Resume the `/bx:webdesign` kaanarik run past review** — push through Phase 3 inject+verify; verify finding `dadac845` live (Phase 3e asks before the destructive-git rollback).
-6. **Real `/bx:seo` run against burakarik.com** — auth fixed S39, content-review-hardened S45; code-review leftovers (#5/#6/#7) + S25/S27/S29 refactors still deferred.
-7. **Dogfood `/bx:health`** — the last skill never run end-to-end; every first run so far produced defects.
-8. **Design the plugin-eval suite** (`69ef485d`, deferred in `docs/upstream/state.json`) — `claude plugin eval` is pinned on the docs allowlist.
-9. **S37 plugin-packaging leftovers** — symlink retirement and the launcher-script symlink check.
-10. **Commit regression tests for S58's two concurrency fixes** (session-color mutex, GSC `_rmw_lock`) and **sweep the 12 remaining exclusion-list restatements** in `/bx:seo`, `/bx:webdesign` (owner: `arch/references/scan-exclusions.md`; `/bx:clean` repointed S63).
-11. **Install bx 2.13.2, then exercise the untested `/bx:clean` paths**: `--dry-run`, `--fix` on a throwaway branch, and a directory scope (`/bx:clean src/lib/ --deps` should skip). Also re-run the deps-config and styles-tests scanners on horowell after the 2.13.2 edits. Optional: in horowell, delete `cacheStats` and `NewUserWatchRow`, handle `matchMovement` and its comments, and triage the 15 test-only helpers. In maxitech-concierge, apply the 5 import quick wins and decide on the `title_template`/`personality` keys.
+1. **`/bx:tests` 2.14.0** — implement release 2 of `docs/superpowers/specs/2026-10-26-bx-tests-upkeep-design.md`: D1 scripts, accuracy fixes (problems 5–9, 16–17, 19–22, 24–25, 27–28), reduction lane D4 + rest of D5, D6 ownership change in `bx/skills/clean/references/scan-files-code.md`; calibrate the consolidate threshold on horowell; verify against the spec's acceptance table on both repos.
+2. **Install bx 2.13.3 and exercise `/bx:tests --fix`** on a throwaway branch in a repo with a real T01a (gates: branch/clean tree, green baseline, per-file rerun + revert); rerun horowell with the installed agents.
+3. **maxitech-concierge follow-ups (in that repo):** add tests for `SlackService.verify_request` (the only auth on `POST /slack/interactions`, zero tests) and a regression test for `820c2076`; move `build_reply_all_recipients`'s 5 tests to the live `build_reply_recipients` and delete the dead method.
+4. **`/bx:evolve` 2.12.x follow-ups** — make `docs-page-hashes.py` delta-aware, persist `allowlist_candidates` into `--fix`, add the `source_url` tie-break to Step 3.4; regenerate `capabilities.json` (pre-existing `bx:clean/idiom:bin-path-helper` drift); PATCH bump.
+5. **Doc tiering Phase 2** (`.claude/rules/` tier, spec D4–D6) — unblocked S62; edit stored on deferred finding `5b91feb3`. Plus the deferred minors listed in `## In Progress`.
+6. **Doc-schema v2 fixture verification** — the six deferred live `/bx:save` fixture runs plus the post-merge minors batch.
+7. **/simplify follow-up: move Part 7.7 rotation into its own sibling Part** (with S59 D4's Part 7.9); blind rehearsal before shipping.
+8. **Resume the `/bx:webdesign` kaanarik run past review**; verify finding `dadac845` live.
+9. **Real `/bx:seo` run against burakarik.com**; code-review leftovers still deferred.
+10. **Dogfood `/bx:health`**; then the `/bx:clean` untested paths (`--dry-run`, `--fix`, directory scope), the plugin-eval design `69ef485d`, S37 symlink retirement, and S58 concurrency regression tests + the 12 exclusion-list restatements.
 
 ## Session History
 
 > Full history: [session-history.md](session-history.md)
 
-### Last Session (Session 64) - 2026-10-23
-- **Two real `/bx:clean` runs, both report-only, with no files changed in either repo.**
-  - maxitech-concierge (Python): 8 findings.
-  - horowell (Next.js 16, 1,780 files): 3 dead symbols, 15 test-only helpers, about 200 de-export candidates, and a clean lockfile, CSS, assets and tests.
-- **16 skill defects fixed across two releases:**
-  - 2.13.1 (`8e964eb`): the config-key false positive, runtime-consumed deps, unavailable vs clean, and others.
-  - 2.13.2 (`4e2dc8a`): live exports were offered for deletion; `lines: unknown`; a `tsc` run wrote `tsbuildinfo`; doc and comment mentions counted as uses; fixture trees hid references (fix in the shared `scan-exclusions.md`); shadcn exports were flagged; scanners wrote scratch scripts.
-- **Prose did not converge across reruns, so mechanism replaced it.** The unavailable block is now normalised by the orchestrator, and local use is decided by a pinned `git grep` command. That command's first version (mine) dropped every `export` line and caused about 48 false `safe` types. A spot-check caught it.
-- **Verification:** 5 deps-config reruns and 8 files-code reruns. Both final pairs passed every check. The no-write rule was relaxed to OS-temp-only scratch after it failed 4 runs in a row (user decision).
-- A `tsbuildinfo` change at 13:26 was traced to the other horowell session's `next build`, not to a scanner.
-- Full sweep: moved the open plugin-versioning issue (S54) from CLAUDE.md to `docs/known-issues.md`, leaving a one-line summary (CLAUDE.md 12.1k → 11.5k); `docs/architecture.md` was synced to the 2.13.2 exclusion rule.
+### Last Session (Session 65) - 2026-10-26
+- **Scrutinized `/bx:tests`:** read all ~1,770 lines (15 defects), then ran it report-only on horowell (4th prior run found there, lessons never fed back) and maxitech-concierge. 29 defects total; the scanners produced good results only by overriding the spec (three self-written T01 parsers, ~30k false gap lines avoided by hand on maxitech).
+- **`--fix` was unsafe:** literally applied, T01 offered 12 real pytest tests (mock-verification only) for deletion; the one genuine candidate was a deliberate no-raise test.
+- **User concern investigated — suites only grow:** horowell test/source LOC 0.49 → 0.88 since June; no file-level orphans in either repo, but tests keep dead code alive (maxitech `build_reply_all_recipients`, 5 tests, live replacement untested). Added as a reduction lane to the spec.
+- **Spec + split:** `docs/superpowers/specs/2026-10-26-bx-tests-upkeep-design.md`; 2.13.3 (safety + contract) shipped in `c72a98d`, maxitech rerun passed every control; 2.14.0 (scripts, accuracy, reduction) next.
+- Real findings for maxitech: `SlackService.verify_request` has zero tests; fix `820c2076` has no regression test.

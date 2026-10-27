@@ -272,3 +272,23 @@
 
 **Next session should:**
 - See Session 64 (cont.) above
+
+### Session 65 - 2026-10-26
+**What happened:**
+- Read the full `/bx:tests` surface (SKILL.md, 7 references, 3 agents) and found 15 defects; discovered it had already run four times on horowell (S56/S109/S149b/S182) and two of those runs' lessons (framework-invoked files read fan-in 0; always-mocked modules read covered) never reached the skill.
+- Ran it report-only on horowell (866 src / 603 test files) and maxitech-concierge (32 / 15), dispatching the three scanners by hand with RUN NOTES; 29 defects total. Literal T01 rules flagged 12 real maxitech tests (mock verification only); neighbor-only lookup would have produced ~30,000 false gap lines; T03 literal ~130 false on horowell; every scanner improvised `coverage_negatives`.
+- Investigated test-suite growth on the user's request: horowell test/source LOC 0.49 (Jun) → 0.88 (Oct), 6,487 cases, 76 `.each` tables, 281 of 604 files cite a session ID; zero file-level orphans in both repos, but maxitech `Email.build_reply_all_recipients` is dead in production and kept alive by 5 tests while its replacement is untested. Designed a reduction lane (life-support, consolidate, growth trend, suite-verified `--fix`).
+- Wrote the spec (`docs/superpowers/specs/2026-10-26-bx-tests-upkeep-design.md`), split into 2.13.3 and 2.14.0 with the user; shipped 2.13.3 (`c72a98d`). Two spec corrections while scoping: zero helpers with evidence no longer aborts `--fix`; `respects_documented_decision` keeps its name (shared with `/bx:arch`) with pinned semantics.
+- Verified by rerunning maxitech quality + economics from the new scan files with no hints: all controls passed; two residual ambiguities fixed (one place per category; files-searched unit). Not executed: the `--fix` gates, the new agent files (load from plugin cache), a horowell rerun.
+
+**Files created/modified:**
+- `bx/skills/tests/references/test-smell-catalog.md` - canonical assertion definition, allowlist patterns + evidence, T01a/T01b
+- `bx/skills/tests/references/fix-mode-test.md` - rewritten: T01a only, pre-flight (evidence, branch, green baseline), per-file rerun + revert
+- `bx/skills/tests/SKILL.md` - dispatch block carries negatives/partial + field semantics; test command in Step 0; Step 5.7 groups removed
+- `bx/skills/tests/references/{scan-quality,scan-coverage,scan-economics,plan-mode-test,report-template}.md` - addenda, T01a/b, phases at any effort, exact subtotal
+- `bx/agents/test-{quality,coverage,economics}.md` - reduced to role + hard rules, cite scan files
+- `docs/superpowers/specs/2026-10-26-bx-tests-upkeep-design.md` - new spec
+
+**Next session should:**
+- Implement `/bx:tests` 2.14.0 per the spec and verify against its acceptance table
+- Install 2.13.3 and exercise `--fix` on a throwaway branch with a real T01a
