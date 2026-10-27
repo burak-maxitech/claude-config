@@ -1,42 +1,69 @@
 # --fix Mode (bx:tests)
 
-Apply **T01a (no-op test)** deletions, one finding at a time, each previewed, approved and checked
-against the suite. **This mode is deliberately narrow: only one smell type is eligible.** Everything
-else routes to `--plan`.
+`--fix` is a **gated, suite-verified reducer**. It applies three kinds of item, one at a time, each
+previewed, approved and checked against the suite:
 
-## Why T01a only
+| Kind | What it does | Source |
+|---|---|---|
+| **A. T01a deletion** | Deletes a no-op test | test-quality finding, `smell_id: T01a` |
+| **B. Life-support deletion** | Deletes a production symbol nothing calls, and the tests that test only it | economics finding, `economic_signal: life_support` |
+| **C. Consolidate merge** | Replaces N tests that differ only in literals with one table test of N cases | economics finding, `economic_signal: consolidate` |
 
-A no-op test calls nothing under test, so it cannot fail on a regression. Deleting it loses no
-check. Every other finding needs judgment:
+Everything else routes to `--plan`. Each kind has its own count check, because a reduction that
+quietly changes the number of cases is how a check disappears.
+
+## Why only these three
+
+- **T01a** calls nothing under test, so it cannot fail on a regression. Deleting it loses no check.
+- **Life support without a successor** is code no production path runs, kept alive only by its own
+  tests. Deleting both loses no check of anything that ships.
+- **A mechanical consolidate merge** keeps every case: one table row per original test, with that
+  test's literals. Nothing is deleted except repetition.
+
+Everything else needs judgment:
 
 - **T01b (implicit no-raise)**: the body calls code under test and fails if that call starts
   raising, so it is a real, weak check. Make the contract explicit; never delete it. An earlier
   version of this mode treated every assertion-free test as deletable, and on a real repo (S65) the
   only genuine candidate was a deliberate `# Should not raise` test.
-- T02 (weak assertion): deleting removes coverage. It needs a stronger assertion.
-- T03 (mock-heavy): the right behavior assertion depends on domain knowledge.
-- T04 (mystery guest): the fix *adds* explicit setup.
-- T05 (redundant): boundary-value coverage is invisible to static analysis.
-- snapshot_heavy: replacement assertions are domain-specific.
-- Coverage gaps: the fix is *writing* tests.
-- Flakiness: the fix is investigation. Deleting a flaky test hides the race.
+- **Life support with a successor**: the tests move to the successor first. That is a rewrite.
+- **Non-mechanical clusters**: the members differ in more than literals (a different matcher, a
+  different setup), so a table needs an expected-effects column someone has to design.
+- T02/T03/T04/T06, snapshot_heavy, coverage gaps, flakiness: judgment rewrites, new tests, or
+  investigation.
 
-## Eligibility — every condition must hold
+## Eligibility — every condition for the item's kind must hold
 
-1. `smell_id == "T01a"`
-2. `respects_documented_decision: true`
-3. `certainty >= 0.7`
-4. `evidence_body` is present, and **you re-read the current body from the file and confirm, by
-   the catalog's assertion definition, that it still has zero assertions and calls nothing under
-   test.** Mock verification (`assert_called*`, `toHaveBeenCalled*`), throwing queries (`getBy*`)
-   and Playwright actions are assertions. If the body calls code under test, it is T01b: route it to
-   `--plan`.
-5. The body has no `TODO`/`FIXME` comment about asserting. That marks an in-flight test.
-6. The body is not inside a `describe.each` / `it.each` / `@pytest.mark.parametrize` block.
+**All kinds:** `respects_documented_decision: true` and `certainty >= 0.7`. The finding is
+re-read against the current files (another session may have changed them since the scan).
+
+**A. T01a**
+1. `smell_id == "T01a"`, and `evidence_body` is present.
+2. **Re-read the current body and confirm, by the catalog's assertion definition, that it still has
+   zero assertions and calls nothing under test.** Mock verification (`assert_called*`,
+   `toHaveBeenCalled*`), throwing queries (`getBy*`) and Playwright actions are assertions. If the
+   body calls code under test, it is T01b: route it to `--plan`.
+3. No `TODO`/`FIXME` comment about asserting (an in-flight test), and not inside a
+   `describe.each` / `it.each` / `@pytest.mark.parametrize` block.
+
+**B. Life support** (fields from the finding's `metrics` and `references.json`)
+1. `successor` is null, and `used_as_test_helper_in` is empty.
+2. **Every** test row is exclusive (`exclusive_rows` == `test_rows`). A test that also checks other
+   code would need its assertions edited, which is a rewrite.
+3. `prod_refs == 0`, `prod_string_refs == 0`, `prod_import_refs == 0`, re-confirmed now with one
+   repo-wide word search for the name outside the test files. Any hit routes it to `--plan`.
+4. The symbol is a function or method, not a whole file. A file whose every symbol is life support
+   routes to `/bx:clean`.
+
+**C. Consolidate**
+1. `mechanical: true` and `merge_table` present. The table is the script's, not yours: one row per
+   member, one column per literal slot that differs, the name slot first.
+2. `merge_table.comment_lines == 0`, or each comment is carried into its row as a row comment.
+3. All members in one file, and that file has no other edits pending in this pass.
 
 Anything failing a condition auto-routes to `--plan` with a one-line note:
 
-> Auto-routed N findings to --plan (T01b / not T01a, low certainty, in-flight, parameterized, or conflicts with documented posture).
+> Auto-routed N findings to --plan (not eligible: <reason counts>).
 
 ## Pre-flight — all must pass, or abort the pass
 
@@ -51,72 +78,94 @@ Anything failing a condition auto-routes to `--plan` with a one-line note:
 2. Branch and tree. `git rev-parse --abbrev-ref HEAD` must not be the default branch, and
    `git status --porcelain` must be empty.
    - Otherwise → ABORT: "Run --fix on a fresh branch with a clean tree:
-     git checkout -b bx-tests-fix". Multi-file deletions are undone with git, not checkpoints.
+     git checkout -b bx-tests-fix". Multi-file reductions are undone with git, not checkpoints.
 
 3. Green baseline. Run the test command recorded in Step 0 once, over the whole suite.
-   Record the pass/fail state and the test count.
+   Record the pass/fail state and the test count (cases, so a table test counts each row).
    - Red, or no runnable command → ABORT: "The suite is not green before any edit
-     (<summary>). Fix that first; a deletion cannot be verified against a red baseline."
+     (<summary>). Fix that first; a reduction cannot be verified against a red baseline."
+   - Red only in tests that need something the machine lacks (an API token, a service): say which,
+     and offer a scoped command that excludes exactly those files (`--ignore=<file>`). Use it only if
+     the user accepts, and print it in the summary. Never set a credential to make a test pass. (S65
+     dogfood: 6 maxitech tests sent real Calendly requests with an empty token.)
 
 4. Confirm once:
-   "About to walk N T01a findings (M auto-routed to --plan). Baseline: <count> tests passing.
-    Continue? [y/n]"
+   "About to walk A T01a deletions, B life-support deletions and C merges (M auto-routed to
+    --plan). Baseline: <count> tests passing. Continue? [y/n]"
 ```
 
-## Per-finding gate flow
+## Per-item gate flow
 
-For each eligible finding, in rank order (files with several findings: bottom to top, so
-`old_string` edits never collide):
+Order: A, then B, then C. Within a file, bottom to top, so `old_string` edits never collide. Each
+item shows what it changes and waits:
 
 ```
 ─────────────────────────────────────────────────────
-[Finding 1 of 3] T01a — No-op test
-tests/auth/login.test.ts:142-156
+[Item 4 of 9] C. Consolidate merge — cluster C109
+src/lib/canary/search-check.test.ts:122-171 — 4 tests → 1 table test of 4 cases (saves 49 lines)
 
-Test name: "renders without props"
-
-Current test body (re-read from the file just now):
-  it('renders without props', () => {
-    const props = {};
-    // nothing asserted, nothing under test called
-  });
-
-Evidence:
-  - 2 statements, 0 assertions by the catalog definition
-  - Calls nothing under test (only local literals)
-  - No allowlisted helper, no hook assertions, not parameterized, no TODO-assert comment
+Merge table (from consolidate.json; one row per original test):
+  name                                             | url                         | title     | conf | ...
+  "a top candidate whose url/title carry no ..."   | "https://www.junghans.de/…" | "Max Bill…" | 0.9  | ...
+  "partial-ref agreement (url slug '6119g' ...)"   | "https://www.patek.com/…"   | "Calatrava…"| 0.93 | ...
+  ...
 
 Proposed change (diff):
-  --- tests/auth/login.test.ts
-  +++ tests/auth/login.test.ts
-  @@ -142,4 +142,0 @@
-  -  it('renders without props', () => {
-  -    const props = {};
-  -  });
+  - the 4 it(...) blocks
+  + it.each([ { name: "...", url: "...", ... }, ... ])("$name", ({ url, title, ... }) => { <body> });
 
-After this deletion:
-  - Surrounding describe('login', ...) still has 4 tests → no parent prompt.
-  - File still has 11 tests → no file prompt.
+Count check after the edit: this file must still run exactly <n> tests (4 removed, 4 cases added).
 
 Apply? [y / n / skip / abort]
 ```
 
 User responses:
-- `y`: apply with `Edit` (the whole test block in `old_string`). Then **verify** (below).
+- `y`: apply with `Edit`, then **verify** (below).
 - `n`: record "rejected"; do not re-show it this run. Advance.
 - `skip`: record "skipped (revisit later)". Advance.
 - `abort`: stop the pass. Applied and verified edits stay; the branch is the undo.
 
-### Verify after each applied edit
+### Building each edit
 
-Run the test command recorded in Step 0 on **the edited file only**.
+- **A.** Delete the whole test block, from `it(...)` / `def test_` through its end.
+- **B.** Delete the symbol's definition (`line`–`end_line`, plus its own doc comment), every
+  exclusive test row, and the symbol's name from each import statement that imported it (drop the
+  statement if it becomes empty). Touch nothing else in production files.
+- **C.** Replace the member tests with one table test that uses the framework's own form —
+  `it.each` / `test.each` with an object per row and `"$name"` as the title, or
+  `@pytest.mark.parametrize` with one `pytest.param(..., id="<original test name>")` per row. Row *k*
+  holds exactly `merge_table.rows[k]`; the body is the first member's body with each differing slot
+  replaced by its column and every other literal left inline. Never add, drop or reorder a row.
+  - **Slot 0 is the name**: it becomes the row's id or title, so every original test name survives
+    in the runner's output.
+  - **A docstring or title-like string slot** (scenario IDs such as "S1: …", "SE-1 variant") is
+    documentation, not an input: keep it as that row's comment, and give the merged test a docstring
+    that names the cases.
+  - Add the import the table form needs (`import pytest`) if the file lacks it.
 
-- It passes, with the test count down by exactly the number of tests deleted: record it as applied.
-- Anything else (a new failure, a collection error, an unexpected count): **revert that one edit**
-  (`git checkout -- <file>`), record "reverted: <one-line reason>", and continue with the next
-  finding. A no-op test whose removal changes the outcome was not a no-op.
+### Verify after each applied item — the count check
 
-## Cascading prompts (after each verified deletion)
+Run the test command on the files the item touched: for B, the edited test files **and** every test
+file that imports the symbol's module (`leverage.json` `test_importers`), so a dangling import shows
+up as a collection error.
+
+| Kind | Must hold | Otherwise |
+|---|---|---|
+| A | The edited file passes, and its test count dropped by exactly the number of tests deleted | revert |
+| B | Every file run passes, and the total count dropped by exactly the number of exclusive rows (cases, so a parameterized row counts each case) | revert |
+| C | The file passes, and its test count is **unchanged**: the table produced exactly one case per original test | revert |
+
+**Revert** = restore the snapshot. Before applying each item, copy every file it will touch to the
+run's temp dir; on a failed check, copy them back, record "reverted: <one-line reason>", and continue
+with the next item. Never `git checkout -- <file>`: earlier verified items in the same file are
+uncommitted, and checkout would silently undo them too (found in the S65 dogfood, where three items
+shared one file). A count that moved the wrong way is the signal that a case was lost
+(a dropped table row) or that a "no-op" was not one. **The count check is the guard, not your
+reading of the diff**: a merge that drops one row passes every visual review and still loses a check,
+and the count catches it. Proven in the S65 dogfood: a merge that dropped one of three rows left
+the file **green** (5 passed, 0 failed) and only the count check (6 expected, 5 found) reverted it.
+
+## Cascading prompts (after each verified item)
 
 ### 1. Parent block empty?
 
@@ -133,7 +182,7 @@ Was wrapping 1 test, now wrapping 0.
 Delete the empty parent block? [y / n / skip]
 ```
 
-An applied parent deletion is verified the same way.
+An applied parent deletion is verified the same way (count unchanged).
 
 ### 2. File now has zero tests?
 
@@ -147,56 +196,62 @@ After deletions, 0 tests remain.
 This is /bx:clean territory (orphaned test file). Not deleting it here.
 Re-run /bx:clean after this pass; cleanup-styles-tests will catch it.
 
-Continue with next finding? [y/n]
+Continue with next item? [y/n]
 ```
 
-`/bx:clean` owns whole-file deletions.
+`/bx:clean` owns whole-file deletions, of tests and of production files.
 
-## After all findings processed
+## After all items processed
 
-Run the full suite once more and compare it with the baseline: same pass state, count down by
-exactly the number of tests applied. If not, say so plainly and name the last applied edits.
+Run the full suite once more and compare it with the baseline: same pass state, and the count
+changed by exactly −(A tests deleted) −(B exclusive cases deleted) +0 (C merges). If not, say so
+plainly and name the last applied items.
 
 ```
 --fix pass complete.
 
-Applied (verified): 3 T01a deletions
-Reverted (suite changed): 0
+Applied (verified): 2 T01a deletions, 3 life-support deletions (5 tests), 4 merges (19 tests → 4 table tests, 19 cases)
+Reverted (count check or suite failure): 1  — C112: file count 41 → 40 (a row was dropped; the file was still green)
 Rejected: 1
 Skipped: 1
 Auto-routed to --plan: 7
 Cascade-deleted empty parent blocks: 1
 Files flagged for /bx:clean follow-up: 0
-Final suite: <count> passing (baseline <count>, −3 as expected)
+Final suite: <count> passing (baseline <count>, −7 as expected)
+Lines removed: <git diff --stat total>
 
 Undo: everything is on branch <branch>. `git diff <default>...` reviews it;
 `git checkout <default> && git branch -D <branch>` discards it.
 
 Suggested follow-up:
-- Re-run /bx:tests --plan for T01b/T02/T03/T04 rewrite briefs.
+- Re-run /bx:tests --plan for successor moves, non-mechanical merges and T01b/T02/T03/T04/T06 rewrites.
 - Run /bx:clean if any file-level cascades pointed there.
 ```
 
 ## Tool usage
 
-- Use `Edit` with the full test block (from `it(...)` / `def test_` through its end) as `old_string`.
+- Use `Edit` for every change; the full block (test, symbol, or the member run) as `old_string`.
 - Always show the diff before applying. Never apply first and ask afterwards.
-- One `Edit` per finding, then its verification run, before the next finding.
-- The only commands this mode runs: `git rev-parse`, `git status`, `git checkout -- <file>`, and the
-  test command recorded in Step 0.
+- One item, then its verification run, before the next item.
+- The only commands this mode runs: `git rev-parse`, `git status`, file copies to and from the run's
+  temp dir (snapshots), one word search per life-support name, and the test command recorded in
+  Step 0 (with `--co` / `--collect-only` / `--list` to read a file's case count where the runner
+  has one).
 
 ## Edge cases
 
-- **`Edit` fails (non-unique `old_string`):** skip that finding, mark it "skipped (could not apply
+- **`Edit` fails (non-unique `old_string`):** skip that item, mark it "skipped (could not apply
   mechanically)", continue.
-- **Comment lines** above the test: include them only if they refer to the deleted test.
-- **The test command cannot target one file:** run the full suite per edit, and say so once in
+- **Comment lines** above a test or symbol: include them only if they refer to what is deleted.
+- **The test command cannot target files:** run the full suite per item, and say so once in
   pre-flight.
+- **The runner cannot report a per-file count** (some shell harnesses): A and B fall back to "passes
+  and the total count dropped by the expected amount"; C is not applied (no count check, no merge).
 
 ## What this mode does NOT do
 
-- Delete anything but T01a (T01b–T05 always route to `--plan`)
-- Delete whole files (routed to `/bx:clean`)
-- Delete imports left orphaned by a deletion (linter / formatter / `/bx:clean`)
-- Update snapshot files (snapshot_heavy is `--plan`-only)
+- Delete T01b, or apply any T02/T03/T04/T06, snapshot, coverage or flakiness finding (`--plan`)
+- Move tests to a successor, or merge a non-mechanical cluster (`--plan`)
+- Delete whole files, test or production (routed to `/bx:clean`)
+- Update snapshot files
 - Run on the default branch or a dirty tree

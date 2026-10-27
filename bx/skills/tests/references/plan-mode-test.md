@@ -1,6 +1,6 @@
 # --plan Mode (bx:tests)
 
-ultrathink — sequencing coverage gaps, T01-T05 rewrites, and economics findings into a coherent phased plan benefits from deep reasoning. Each phase boundary is a judgment call (provably-safe deletions vs. judgment-required rewrites vs. coverage fills).
+ultrathink — sequencing coverage gaps, T-smell rewrites, the reduction lane and economics findings into a coherent phased plan benefits from deep reasoning. Each phase boundary is a judgment call (provably-safe deletions vs. judgment-required rewrites vs. coverage fills).
 
 Transform the report's findings into a phased rewrite/fill brief that hands off cleanly to `/bx:plan`. Each phase becomes a self-contained payload the user can drop into a fresh session.
 
@@ -14,15 +14,19 @@ After the report is built, group findings into phases:
    - All findings with `deletable_lines > 0` AND `respects_documented_decision: true`, **at any
      effort**. An effort filter here once left medium-effort `snapshot_heavy` findings in no phase
      at all.
-   - Ordered: T01a first (no-op tests, gated by `--fix`), then snapshot_heavy (largest deletions earn the leverage), then qualifying T05; effort ascending within each
-   - **Hand-off:** `/bx:tests --fix` on a branch for T01a; a one-shot rewrite session for snapshot_heavy / T05.
+   - Ordered: T01a first (no-op tests, gated by `--fix`), then `life_support` (each deletes dead production code with its tests; with a successor, the brief is "move these tests to `<successor>`, then delete the symbol"), then snapshot_heavy; effort ascending within each
+   - **Hand-off:** `/bx:tests --fix` on a branch for T01a and successor-less `life_support`; a one-shot session for successor moves and snapshot_heavy.
+
+1b. **Phase 1b: Consolidation**
+   - All `consolidate` findings, largest `saved_lines` first. Mechanical clusters first (pure table rewrites, `--fix`-eligible with the count check); the rest are one `/bx:plan` brief per file.
+   - Each brief lists the cluster's tests and says: one parameterized test, one row per original test, every literal kept, boundary rows kept.
 
 2. **Phase 2: Coverage gaps on critical paths**
    - All findings with `dimension == coverage` AND `respects_documented_decision: true`
    - Ordered by `priority_score × certainty`
    - **Hand-off:** one `/bx:plan` brief per high-priority gap; the high-rank gaps deserve dedicated test-writing sessions.
 
-3. **Phase 3: Rewrites (T01b/T02/T03/T04, plus T05 with no deletable lines)**
+3. **Phase 3: Rewrites (T01b/T02/T03/T04/T06)**
    - Findings with `dimension == quality` AND `deletable_lines == 0` AND `respects_documented_decision: true`, **at any effort**
    - T01b briefs say "make the no-raise contract explicit": assert the post-state, or use an explicit no-raise form. Never "delete".
    - Order by rank score
@@ -80,7 +84,7 @@ Hand-off:
 
 ---
 
-### Phase 3 — Rewrites (T01b/T02/T03/T04/T05, N findings)
+### Phase 3 — Rewrites (T01b/T02/T03/T04/T06, N findings)
 
 These require interview-level context: what should be asserted, how to decouple from mocks, how to surface mystery-guest dependencies.
 

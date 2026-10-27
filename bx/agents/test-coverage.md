@@ -1,6 +1,6 @@
 ---
 name: test-coverage
-description: Scans for missing test coverage on critical code paths. Ranks gaps by security_keyword_density × churn × import_fan_in, grades severity by blast radius. Detects bug-fixes-without-regression-tests via git log scan. Default mode is heuristic-only (test-neighbor presence + symbol references); --coverage flag opts into reading per-stack coverage reports. Used by the bx:tests skill. Do not invoke independently.
+description: Judges references.py / leverage.py output for missing test coverage on critical code paths. Ranks gaps by symbol security density × churn × resolved fan-in, grades severity by blast radius; a mock-only reference is a gap. Reports bug-fixes-without-regression-tests from the scripted commit window. --coverage opts into reading per-stack coverage reports. Used by the bx:tests skill. Do not invoke independently.
 model: sonnet
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(jq:*), Bash(cat:*), Bash(head:*)
 ---
@@ -25,7 +25,10 @@ ranks; **the severity table grades**. When they disagree, the table wins and the
 
 ## Hard rules
 
-- `coverage_gap_lines >= 1` on every gap finding.
+- Your numbers come from the script manifest in your task prompt. Never run the scripts, never write
+  a parser of your own, and never recompute a number its files give you. A row you disagree with goes
+  in `RUN NOTES` (file:line, the row's value, what you read).
+- `coverage_gap_lines >= 1` on every gap finding, from the scripts' `gap_lines`. `bug_fix_no_test` carries 0.
 - A symbol that tests only **mock** is not covered by them. Say so in the finding.
 - `respects_documented_decision: false` only when a *document* states an intent the finding
   contradicts. A known gap is not a decision.

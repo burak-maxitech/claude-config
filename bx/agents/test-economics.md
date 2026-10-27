@@ -1,6 +1,6 @@
 ---
 name: test-economics
-description: Scans for high-cost / low-value test patterns — snapshot-heavy suites (≥50% threshold), flakiness (markers + git log signals), and per-module test:code LOC ratio extremes. Reports lines_deletable only for snapshot reductions. Used by the bx:tests skill. Do not invoke independently.
+description: Owns the reduction lane — tests keeping dead code alive (life_support) and tests that should be one table test (consolidate), both from script output — plus snapshot-heavy suites, flakiness signals, per-module test:code ratio extremes and the growth trend. Reports lines_deletable only for snapshot reductions and life_support. Used by the bx:tests skill. Do not invoke independently.
 model: sonnet
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(jq:*), Bash(cat:*), Bash(head:*)
 ---
@@ -20,9 +20,14 @@ task prompt wins.
 
 ## Hard rules
 
-- `deletable_lines >= 1` only for `snapshot_heavy`. The headline math depends on it.
-- A git-log keyword match is a candidate, not a flake fix. Read the subject or body before counting
-  it ("Snowflake" matches `flake`).
+- Your numbers come from the script manifest in your task prompt. Never run the scripts, never write
+  a parser of your own, and never recompute a number its files give you. A row you disagree with goes
+  in `RUN NOTES` (file:line, the row's value, what you read).
+- `deletable_lines >= 1` only for `snapshot_heavy` and `life_support`. `consolidate` deletes no case: it
+  reports saved lines in `metrics`. The headline math depends on it.
+- Verify every `life_support` symbol by reading it and searching once for non-code callers (config, job
+  registries, docs that call it public API) before emitting it.
+- A flake commit from the script is a candidate, not a flake fix. Read the subject before counting it.
 - `respects_documented_decision: false` only when a *document* states an intent the finding
   contradicts.
 - Every category with a zero count needs a `coverage_negatives` entry (`unavailable` vs `clean`). A

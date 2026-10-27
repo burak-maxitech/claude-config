@@ -8,107 +8,96 @@ Loaded by the orchestrator and passed to the `test-quality` subagent. Detailed s
 - `Test framework` — jest / vitest / pytest / cargo test / go test / etc.
 - `Tier` — full | bounded | sample
 - `Test scope` — exact test paths to evaluate (source files NOT in scope here)
+- `Script manifest` — path to `manifest.json` from `scripts/run.py` (SKILL.md Step 3.5)
 - `Testing-Intent Summary` — 3-5 bullets
-- `Test Smell Catalog` — full content of `test-smell-catalog.md`. Use only T01-T05.
+- `Test Smell Catalog` — full content of `test-smell-catalog.md`. Use T01a, T01b, T02, T03, T04, T06.
+
+## The script decides; you judge
+
+`test_bodies.jsonl` (path in the manifest) holds one row per test in scope. It implements the
+catalog's assertion definition, so **never count assertions yourself and never write a parser.**
+Two real runs (S65) showed what hand counting does: a literal T01 reading offered 12 real pytest
+tests for deletion, and a `{…}`-only parser reported 18 expression-bodied arrows as empty. Run-to-run
+variance on T03 went 5 → 1 between two identical runs. A row you disagree with goes in `RUN NOTES`
+with what you read; you do not re-derive it.
+
+Fields you use: `file`, `line`, `end_line`, `name`, `describe`, `body_lines`, `assertions` (counts
+by kind: `value`, `weak`, `presence`, `mock_verify`, `mock_absent`, `snapshot`, `raises`, `query`,
+`playwright`, `helper`, `assert`), `assertion_total`, `weak_only`, `t03_candidate`,
+`mock_setup_lines`, `calls`, `t01` (`{kind: a|b, signals}` when `assertion_total == 0`),
+`todo_assert`, `skipped`, `param_rows`. `test_bodies.summary.json` holds the helper-allowlist
+evidence and the per-file flags (`hook_asserts`, `property_based`).
 
 ## Approach
 
-**Run this once at the start.** Build the project's assertion-helper allowlist. It is the critical false-positive guard for T01: without it, you will delete real tests.
+### Helper allowlist — copy the evidence, do not rebuild it
 
-### Step 0: Build the assertion-helper allowlist
+The summary's `helper_allowlist_size`, `helper_allowlist`, `helper_allowlist_patterns` and
+`helper_allowlist_files_searched` are the catalog's allowlist, already run over every tracked file
+with each kept name's body confirmed to assert or raise. Copy all four into your addendum. A zero
+with `files_searched > 0` is a legitimate result. `--fix` refuses to run without them.
 
-Use the per-language patterns in the catalog's **What counts as an assertion** section exactly as
-written, across *all* paths. Do not substitute your own anchors. Narrower patterns are how earlier
-runs missed indented, `async` and test-local helpers. Keep a matched name only if a test calls it and
-its body asserts or raises, and record the rejected names with a reason.
+### T01a / T01b — rows with `t01` set
 
-Report the three evidence fields (`helper_allowlist_size`, `helper_allowlist_patterns`,
-`helper_allowlist_files_searched`) in your addendum **even when the size is zero**. `--fix` refuses
-to run without them.
+1. Take every row with `t01 != null` and `skipped == false`.
+2. **Read each body before emitting it.** The row's zero is a hypothesis, not a finding.
+3. Keep the script's `kind` unless reading shows it wrong. `kind: b` means the body calls code
+   (`calls`), or a guard fired (`hook_asserts`, `property_based`, parameterized). Upgrading b → a is
+   allowed only when every call is to a mock or a fixture, and you say which in `evidence`. When in
+   doubt, it stays T01b.
+4. Certainty: start at 0.85. Raise to 0.95 only for T01a with ≥3 statements and nothing under test
+   called. Set 0.5 when `todo_assert` is true or the file's `hook_asserts` is true (both fall below
+   the 0.7 floor).
+5. Emit `evidence_body` (the full body, verbatim) on every T01a and T01b finding.
 
-### Per-entry detection
+### T02 — rows with `weak_only: true`
 
-#### T01 — Assertion-free test (T01a / T01b)
+The script already counts a `getBy*` inside `expect(..)` as `presence` and a positive `toBeNull()`
+as `value`, so those never reach this list. Read each candidate. Apply the catalog's guards
+(existence-is-the-test names → certainty 0.4). Severity: medium. Effort: small.
 
-For each test in scope:
-1. Identify test bodies by framework:
-   - Jest/vitest/jasmine/mocha/Playwright: `it(...)` / `test(...)` / `specify(...)` and their
-     `.only`/`.skip`/`.concurrent`/`.each(...)` variants. **This includes expression-bodied arrows**
-     (`it("x", () => expect(f()).toBe(1))`), whose body is the expression itself. A parser that only
-     reads `{ ... }` blocks reports every one of them as empty. That bug produced 18 false T01s on a
-     real run (S65).
-   - pytest: top-level `def test_*` and methods on `class Test*` (including `async def`)
-   - unittest: `def test_*` methods on `class *(unittest.TestCase)`
-   - Rust: `#[test]` annotated functions
-   - Go: `func Test*(t *testing.T)` (skip `func Benchmark*`)
-   - JUnit: `@Test`-annotated methods
-2. Count assertions using the catalog's definition: mock verification, throwing queries (`getBy*`),
-   Playwright actions, and allowlisted helpers all count.
-3. If the count is 0 and the body has ≥1 non-comment statement, it is a T01 candidate. **Read the
-   candidate body before emitting it.** A script's zero is a hypothesis, not a finding.
-4. Classify it as **T01a** (no-op) or **T01b** (implicit no-raise) per the catalog. When in doubt,
-   use T01b.
-5. Certainty: start at 0.85. Raise it to 0.95 only for T01a bodies of ≥3 statements with nothing
-   under test called. Lower it to 0.5 for an in-flight `TODO assert` comment or for assertions in
-   setup or teardown hooks (both drop below the 0.7 floor).
+### T03 — rows with `t03_candidate: true`
 
-Emit `evidence_body` (the full test body, verbatim) on every T01a and T01b finding. `--fix` shows it
-to the user and re-checks it.
+The script's rule counts verification assertions only (`mock_verify`), never setup lines, and leaves
+"never called" checks (`mock_absent`) out of both sides. Read each candidate and apply the
+catalog's T03 guards, which are canonical there (including the orchestrator guard: a function whose
+job is to call injected dependencies in order). A guarded candidate goes in `suppressed`.
 
-#### T02 — Weak assertion
+### T04 — mystery guest (judgment; no script row)
 
-For each test body with assertions:
-1. Categorize each assertion as:
-   - **Weak**: `toBeTruthy`/`toBeFalsy`/`toBeDefined`/`not.toBeNull`/`not.toBeUndefined`/`>= 0`/`<= max`/`!= null`/`is not None`/`expect(typeof x).toBe('string')`/`expect(x).toBeInstanceOf(Object)`
-   - **Tautological**: `expect(x).toBe(x)`, `expect(x).toEqual(x)`, comparing literal to itself
-   - **Strong**: specific value match, deep object compare, exception type+message match
-2. If ALL assertions in the body are Weak or Tautological → T02.
-3. Severity: medium. Effort: small (rewrite one or two assertions).
+Read the test files with the most `body_lines` first. Look for:
+- File paths not imported in the test file (`readFileSync('fixtures/x.json')`, `open('data/y.csv')`)
+- Env var reads with no setup that sets them (`process.env.X`, `os.environ['X']`)
+- Hardcoded record IDs against a DB with no visible seeding
 
-False-positive guard: parse test name for hints. Names containing `does not throw`, `is defined`, `returns truthy`, `does not return null`, `is callable` legitimize weak assertions. Lower certainty to 0.4.
+If the file has setup that loads or seeds these, it is not T04. A documented fixture-directory
+convention lowers severity to low.
 
-#### T03 — Implementation-coupled / mock-heavy
+### T06 — name/assertion mismatch — rows with `t06_candidate: true`
 
-For each test body:
-1. Count `implementation_lines`:
-   - JS/TS: `toHaveBeenCalledWith`, `toHaveBeenCalledTimes`, `toHaveBeenLastCalledWith`, `toHaveBeenCalled`, lines containing `.mockReturnValue`, `.mockImplementation`, `.mockResolvedValue`, `vi.mock(`, `jest.mock(`
-   - Python: `mock.assert_called*`, `mock.call_args`, `MagicMock(...)`, `patch(...)` decorator lines
-   - JVM (mockito): `verify(`, `when(...).thenReturn`, `Mockito.mock(`
-2. Count `behavior_lines`: assertions that check return values, persisted state, observable side effects.
-3. Flag if `impl / max(behavior, 1) > 2.0` AND `impl >= 4`.
+The script flags a name that promises a visible outcome ("shows", "returns", "sends", "records")
+with no negation ("nothing", "not", "never") whose only assertions are `weak` or `mock_absent`.
+Read each body. A weak-only row that is a better T02 is reported as T02, not both. Report-only. You
+may add a T06 the flag missed (a name promising one outcome while the assertions check another);
+say so in `evidence`.
 
-False-positive guard: scan class/file name for boundary indicators (Publisher, Emitter, Dispatcher, Logger, Tracer, Notifier, Repository, Adapter). For tests on these, interaction *is* behavior — lower severity to low.
+### T05 — not yours
 
-#### T04 — Mystery guest
+Redundant tests are reported by `test-economics` from `consolidate.json`. Do not emit T05.
 
-For each test body:
-1. Look for references to external data:
-   - File paths not imported in the test file (`readFileSync('fixtures/x.json')`, `open('data/y.csv')`)
-   - Env var reads with no setup that sets them (`process.env.X`, `os.environ['X']`)
-   - Database queries returning hardcoded IDs (`User.find(1)`, `db.query('SELECT * FROM users WHERE id=1')`) without seeding visible
-2. Check if the file has setup that loads/seeds these. If not → T04.
+## Sampling
 
-False-positive guard: if `tests/README` or CLAUDE.md describes a fixture-directory convention, lower severity to low.
-
-#### T05 — Redundant test
-
-Within each test file (do NOT cross files for T05):
-1. Tokenize each test body: strip whitespace, normalize variable names (replace identifiers with positional tokens by first-occurrence order), drop literals.
-2. For each pair of tests in the same `describe`/`context`, compute Jaccard similarity of token multisets.
-3. If similarity ≥ 0.8 AND inputs are **not** boundary values (check for `0`, `-1`, `null`, `''`, `MAX_INT`, `MIN_INT` literals in either) → T05.
-4. **Conservative deletable accounting:** report `deletable_lines: 0` unless `certainty >= 0.85` AND duplicates are demonstrably identical (Jaccard >= 0.95).
-
-False-positive guards:
-- Skip `describe.each` / `it.each` / `@pytest.parametrize` / `func Test_table_*` blocks entirely.
-- Boundary-value coverage: if differing inputs include known boundary literals, don't flag.
-- Different `beforeEach`/`setUp` per nested describe → different setup paths → not redundant.
+The tier's deep-read cap limits the candidates you **read in full**. It never limits the rows: every
+row in `test_bodies.jsonl` was produced from the whole scope. When candidates exceed the cap, read in
+order of `body_lines` descending and report the rest in `coverage_partial` as
+`{category: "<smell>_verification", scanned, total, reason: "read cap"}`.
 
 ## Per-finding output shape
 
 ```
 {
   "dimension": "quality",
-  "smell_id": "T01a" | "T01b" | "T02" | "T03" | "T04" | "T05",
+  "smell_id": "T01a" | "T01b" | "T02" | "T03" | "T04" | "T06",
   "location": "tests/auth/session.test.ts:142-156",
   "title": "<one-line>",
   "severity": "low" | "medium" | "high",
@@ -118,15 +107,14 @@ False-positive guards:
   "deletable_lines": <int>,
   "respects_documented_decision": true | false,
   "recommended_action": "<prose>",
-  "evidence": "<one or two lines naming the specific assertions/lines/mocks observed>",
+  "evidence": "<the row's assertion kinds plus what you read>",
   "evidence_body": "<T01a/T01b only: the full test body, verbatim>"
 }
 ```
 
 `deletable_lines` rules per smell are owned by the catalog:
-- T01a: the whole test. T01b: **0**.
-- T02, T03, T04: **0**
-- T05: 0 unless `certainty >= 0.85`, then `(body_lines × (n_duplicates - 1)) - parameterization_overhead`, floor at 1
+- T01a: the row's `body_lines` (the whole test). T01b: **0**.
+- T02, T03, T04, T06: **0**
 
 Severity defaults:
 - T01a: medium (high if the file has several, suggesting a pattern)
@@ -134,39 +122,49 @@ Severity defaults:
 - T02: medium
 - T03: medium
 - T04: low
-- T05: low
+- T06: medium
+
+Starting certainty after reading (guards lower it; T01 has its own rule above):
+- T02: 0.7
+- T03: 0.65
+- T04: 0.6
+- T06: 0.75
 
 Min certainty floors before surfacing:
 - T01a, T01b: 0.7
 - T02: 0.6
 - T03: 0.55
 - T04: 0.5
-- T05: 0.75
+- T06: 0.6
 
 ## Hard rules
 
-- **Every finding must have a `smell_id` from T01a, T01b, T02–T05.** Catalog gaps → `catalog_gap_proposals` at end of output.
+- **Every finding must have a `smell_id` from T01a, T01b, T02, T03, T04, T06.** Catalog gaps → `catalog_gap_proposals` at end of output.
 - **`respects_documented_decision: false` means a *document* states an intent the finding contradicts.** A tests README, an ADR, or a CLAUDE.md testing section counts. A known gap, a history note, or the inferred posture never makes a finding `false`.
-- **Skip non-test paths.** Only files matching common test conventions (`*.test.*`, `*.spec.*`, `_test.go`, `_test.rs`, `test_*.py`, files under `tests/`, `__tests__/`, `spec/`).
-- **Scope is computed by the orchestrator, not by you.** Scan exactly the file list in your task prompt. Its exclusions — synthetic/fixture trees, vendored and generated dirs, immutable history — are owned by the arch skill's `references/scan-exclusions.md`. **Never widen your own scope**; if something outside the list looks relevant, say so as a note rather than reading it. The fixture rule matters most: planted eval fixtures produce true-shaped findings that are false by construction.
-- **Cap output at 30 findings.** Order by `severity_weight × certainty × (1 + log10(deletable_lines + 1))` descending.
+- **Scope is computed by the orchestrator, not by you.** Scan exactly the file list in your task prompt. Its exclusions are owned by the arch skill's `references/scan-exclusions.md`. **Never widen your own scope.**
+- **Cap output at 30 findings.** Order by severity, then `certainty × (1 + log10(deletable_lines + 1))` descending.
+- **`respects_documented_decision` defaults to `true`.**
 - **Defer to /bx:clean** for: orphaned test files, >3mo skipped tests, unused test helpers, stale snapshots. If detected in passing, note in `recommended_action` and DO NOT emit a separate finding.
+- Never run the tests or the scripts. Never write inside the scanned repo.
 
 ## Final output addendum
 
 ```
-total_deletable_lines: <sum of T01a + qualifying-T05 deletable lines>
+total_deletable_lines: <sum of T01a deletable lines>
 files_affected: <distinct test files with deletable findings>
 catalog_gap_proposals: [<list of unmatched-smell descriptions, each with a justification>]
-t01a_count: <int>
-t01b_count: <int>
-t02_count: <int>
-t03_count: <int>
-t04_count: <int>
-t05_count: <int>
+tests_in_rows: <summary.tests>
+t01a_count: <script> / <reported>     (script = the summary's count, reported = your findings)
+t01b_count: <script> / <reported>
+t02_count: <script weak_only> / <reported>
+t03_count: <script t03_candidates> / <reported>
+t04_count: <reported>
+t06_count: <script t06_candidates> / <reported>
 helper_allowlist_size: <int>
-helper_allowlist_patterns: [<the patterns actually run>]
+helper_allowlist_patterns: <the summary's object, copied as-is>
 helper_allowlist_files_searched: <int>
+suppressed: [<{location, smell, reason} for candidates read and dropped by a guard or a floor>]
 coverage_negatives: [<per SKILL.md Step 4 — one entry per T-smell that produced nothing>]
-coverage_partial: [<per SKILL.md Step 4 — any check that did not cover its whole scope>]
+coverage_partial: [<the manifest's test_bodies entries, plus any read-cap entries>]
+RUN NOTES: [<every row you disagreed with: file:line, the row's value, what you read>]
 ```

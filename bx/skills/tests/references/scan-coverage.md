@@ -9,58 +9,81 @@ Loaded by the orchestrator and passed to the `test-coverage` subagent. Detailed 
 - `Coverage mode` — `heuristic` (default) | `report` (`--coverage` opt-in)
 - `Coverage report path` — populated only in `report` mode
 - `Tier` — full | bounded | sample
-- `Source scope` — exact source paths to evaluate
-- `Test scope` — exact test paths (for neighbor lookups)
+- `Source scope` / `Test scope` — exact paths
+- `Script manifest` — path to `manifest.json` from `scripts/run.py` (SKILL.md Step 3.5)
 - `Testing-Intent Summary` — 3-5 bullets from CLAUDE.md/tests-README/ADRs
 
-## Approach
+## The scripts decide; you judge
 
-For each source file in scope, compute a **priority score**, take the top 50 by priority, and drill into each. Drill-down is mode-dependent.
+Every number below comes from the manifest's files. **Do not recompute churn, fan-in, keyword
+density, symbol lists or test references by grep, and do not write a parser.** Two real runs (S65)
+showed what hand computation does: a basename fan-in, a neighbor-only lookup that produced ~30,000
+false gap lines, and mock-only references counted as coverage. If a row looks wrong, read the code,
+say so in `RUN NOTES` with the row and the reason, and judge the finding on what you read. Never
+silently re-derive it.
 
-### Priority scoring (run for every source file in scope)
+| File | What it gives you |
+|---|---|
+| `leverage.json` `files[]` | per source file: `loc`, `churn` (commits in a year), `fan_in` (production importers, **resolved to paths**), `test_importers` (the test files that import it — this replaces the neighbor lookup), `test_mockers`, `entry_point` + `entry_reason`, `security_density`, `priority` |
+| `leverage.json` `bugfix_commits[]` | the last 200 commits filtered to fix subjects (`^fix\b`, so `fix(scope):` matches), with `files` and `touched_tests` |
+| `references.json` `symbols[]` | per public symbol: `kind`, extent (`line`–`end_line`, `lines`), `prod_refs`, `test_status`, `test_call_rows`, `test_mock_rows`, `security_lines`, `priority`, `gap_lines` |
 
-```
-priority = security_keyword_density × (1 + log10(churn + 1)) × (1 + log10(fan_in + 1))
-```
+`test_status` is one of:
+- `covered` — at least one test **calls** it, from a file that imports its module (or its class), without mocking it.
+- `mock_only` — tests reach it only as a mock (`vi.mock` of its module, `vi.mocked`, `spyOn`, `patch("…name")`). **This is a gap** (problem 17): say "tests mock it but never run it".
+- `name_only` — a call of the same name in a test that does not import it. Read one before deciding; usually a name collision, so a gap.
+- `mention_only` — referenced (passed, typed, asserted on) but never called. A gap unless the reference is itself the test (a constant checked by value).
+- `untested` — no test references at all.
 
-where:
+Declarative symbols (`kind: value | type | interface | enum` — tables, config objects, types) carry
+`gap_lines: 0` and are never gap findings.
 
-- **`security_keyword_density`** — `Grep -i -c -w '(auth|password|token|session|crypto|permission|role|payment|charge|refund|secret|key|validate|sanitize|escape|csrf|xss|sql|migrate|encrypt|decrypt|hash|sign|verify)'` ÷ file LOC. Cap at 1.0.
-- **`churn`** — `git log --since='1 year ago' --pretty=format:%H -- <file> | wc -l`.
-- **`fan_in`** — for each file, count importers using one batched grep across the test+source scope: pattern `from\s+['"][^'"]*${basename}['"]` or `require\(['"][^'"]*${basename}['"]\)` or `import\s+["][^"]*${basename}["]` etc. depending on stack.
+## Approach (heuristic mode)
 
-Take the **top 50** files by priority. If `--full-scan` was set, take all.
+1. **Rank.** Take `references.json` symbols with `gap_lines > 0`, in the file's order: by
+   `priority` (symbol security density × file churn × file fan-in, with an entry-point floor so
+   routes and middleware rank), then — for the many symbols with no security words, which tie at 0 —
+   by `leverage × log(gap_lines)`. Read the top 50 in that order (all of them under `--full-scan`).
+   `symbols_read` counts the candidate symbols you opened.
+2. **Group per file.** A file whose every non-declarative symbol is a gap **and** whose
+   `test_importers` is empty is a whole-file gap: one finding, `coverage_gap_lines` = the sum of its
+   symbols' `gap_lines`. A container class with `gap_lines: 0` does not block the rule. Otherwise
+   emit one finding per gap symbol, or per run of gap symbols in one file that lie within ~20 lines
+   of each other. A grouped finding's `priority_score` is its highest member's; a whole-file finding uses the file's
+   `leverage.json` `priority`. Subtract the symbols you suppress (factories, accessors) from a grouped
+   or whole-file `coverage_gap_lines`. Findings that tie keep `references.json`'s order. Never use file LOC: it
+   counts imports, types and blank lines.
+3. **Verify by reading.** Open each candidate symbol and confirm it has logic worth testing. A
+   one-line delegation, a re-export, a framework stub or a declarative class the script missed (an
+   ORM model with only column fields) drops out; record it under `suppressed`. A SQL-fragment builder
+   whose callers' tests render the SQL may be covered indirectly: keep it at certainty 0.6 and say so.
+4. **Entry points.** A file with `entry_point: true` and no `test_importers` is a gap even at low
+   density (S182: `(dashboard)/layout.tsx` held the only auth redirect). Name the `entry_reason`.
+   Entry files whose gap symbols total under 10 lines (thin page wrappers) are counted in the
+   addendum as `entry_wrappers_skipped`, not read.
+5. **Fan-in 0, not an entry point** — may be dead. Lower certainty to 0.5 and point at `/bx:clean`
+   (or at the `life_support` lane when `references.json` lists it there).
+6. **Private helpers** (`_`-prefixed) are not ranked symbols. When a bug fix or a gap touches one,
+   name it inside the public caller's finding.
 
-### Heuristic mode (default — Coverage mode = heuristic)
+`test_status: covered` includes decorated routes a test client reaches by URL (`test_route_files`):
+a FastAPI `@router.post("/webhook")` called as `client.post("/gmail/webhook")` is covered.
 
-For each top-priority source file:
+### Bug fixes without a regression test
 
-**Step 1: Test-neighbor lookup.** Look for a sibling test file. Conventions (try in order, stop at first match):
-- JS/TS: `<base>.test.<ext>`, `<base>.spec.<ext>`, `__tests__/<base>.<ext>`, `__tests__/<base>.test.<ext>`
-- Python: `tests/test_<base>.py`, `test_<base>.py`, `tests/<dir>/test_<base>.py`
-- Rust: `tests/<base>.rs`, `<file>` itself with `#[cfg(test)] mod tests` (inline tests)
-- Go: `<base>_test.go`
-- JVM: `src/test/java/<package>/<Base>Test.java` mirroring `src/main/java/...`
+From `leverage.json` `bugfix_commits`, take the commits with `touched_tests: false`. For each,
+`git show -U0 <sha>` once and read the subject. Keep the ones whose fix changed runtime behaviour, and
+map each hunk to the symbol whose `line`–`end_line` contains it: that symbol's gap finding gets the
+`high` row of the severity table only when a behaviour-changing fix landed inside it, not merely in
+its file.
+`mention_only` rows list where the mention is (`test_mention_rows`).
 
-If **no neighbor exists** at all: surface a finding with `coverage_gap_lines = file_LOC`, severity from priority score, `recommended_action = "Add a test file at <expected_path> covering exported symbols X, Y, Z."`
+Emit `smell_id: bug_fix_no_test` with **`coverage_gap_lines: 0`**: a commit is not a measurable
+line count, and the headline never includes it (problem 22). It carries no `priority_score`; order
+these newest first, after the gap findings. Cap at 10, separate from the 30-finding cap for gaps. Title the section with the window the
+manifest states ("last 200 commits, then fix subjects").
 
-**Step 2: Public-symbol enumeration.** Parse exported / public symbols. Conventions:
-- JS/TS: lines matching `^export (function|const|class|async function|default function)` — capture name
-- Python: top-level `def \w+` and `class \w+` (skip leading-underscore — convention for private)
-- Rust: `pub fn \w+` and `pub struct \w+` and `pub enum \w+`
-- Go: function/method declarations starting with capital letter
-- JVM: `public` method/class declarations
-
-**Step 3: Symbol-level coverage probe.** For each exported symbol, grep the neighbor test file for the symbol's name. A symbol with zero string-match references is uncovered.
-- `coverage_gap_lines` per symbol = symbol body LOC (approximated by counting lines between the declaration and the next sibling declaration / file end).
-
-**Step 4: Bug-fix-without-regression scan.** Run:
-```
-git log -50 --pretty='%H|%s' --regexp-ignore-case --grep='^fix:' --grep='^bugfix' --grep='closes #' --grep='fixes #'
-```
-For each matched commit, `git show --stat --name-only <hash>` and check whether any path matching the test-scope patterns was modified. If only source paths were touched, surface a `smell_id: bug_fix_no_test` finding referencing the commit. **Cap at top 10** to avoid noise.
-
-### Report mode (Coverage mode = report — only when `--coverage` opted in)
+## Report mode (Coverage mode = report — only when `--coverage` opted in)
 
 Read the coverage report at the orchestrator-provided path:
 
@@ -79,7 +102,10 @@ Read the coverage report at the orchestrator-provided path:
 - **phpunit (Clover XML)** — `coverage/coverage.xml`: per `<file>` element, `coverage_gap_lines = statements - coveredstatements` from its `<metrics>` attributes (or count `<line ... count="0">` entries).
 - **JaCoCo XML** — `target/site/jacoco/jacoco.xml`: per `<sourcefile>`, read `<counter type="LINE" missed="M" covered="C"/>`; `coverage_gap_lines = M`.
 
-In `report` mode, do **not** mix heuristic gaps — would double-count. The numbers come straight from the report.
+**Restrict findings to the priority set** — the top 50 files by `leverage.json` `priority` — so the
+headline stays about critical code (problem 8). Report the whole report's uncovered total
+separately in the addendum as `report_total_uncovered_lines`. Do **not** mix heuristic gaps in
+report mode; that double-counts.
 
 If the report file is missing in `report` mode, surface a single finding:
 ```
@@ -114,10 +140,11 @@ Stop after the install_hint finding; do not fall back to heuristic mode.
   "severity": "high" | "medium" | "low",
   "certainty": 0.0-1.0,
   "effort_estimate": "trivial" | "small" | "medium" | "large",
-  "coverage_gap_lines": <int>,
+  "coverage_gap_lines": <int — the symbols' gap_lines; 0 for bug_fix_no_test / install_hint>,
   "deletable_lines": 0,
-  "priority_score": <float>,
-  "priority_factors": { "security_density": <float>, "churn": <int>, "fan_in": <int> },
+  "test_status": "untested" | "mock_only" | "name_only" | "mention_only",
+  "priority_score": <the symbol's priority, verbatim>,
+  "priority_factors": { "security_lines": <int>, "churn": <int>, "fan_in": <int>, "entry_point": <bool> },
   "respects_documented_decision": true | false,
   "recommended_action": "<prose>",
   "smell_id": null | "bug_fix_no_test" | "install_hint"
@@ -126,24 +153,20 @@ Stop after the install_hint finding; do not fall back to heuristic mode.
 
 ### Severity — from blast radius, not from the score
 
-**`priority_score` ranks; it does not grade.** It is a *relative* measure and works at any repo
-size, so order findings by it. Do **not** map it to severity through absolute thresholds: the score
-is the product of a density ≤1.0 and two `log10` terms, so it only reaches 2.0 or 5.0 on repos with
-churn and fan-in in the dozens-to-hundreds. On a small repo every file scores 0.05–0.5, and a
-literal mapping labels *everything* low — including a same-day concurrency fix shipped with no
-regression test. (Measured: this repo's own audit produced 0.08–0.18 across all 7 source files.)
+**`priority_score` ranks; it does not grade.** It is a *relative* measure, so order findings by it,
+but never map it to severity through absolute thresholds: on a small repo every file scores
+0.05–0.5, and a literal mapping labels *everything* low.
 
 Set `severity` from what breaks, using the first row that matches:
 
-| Severity | The file is… |
+| Severity | The code is… |
 |----------|--------------|
-| `high` | On an auth/credential/payment path; **or** carries a `bug_fix_no_test` finding whose fix changed runtime behaviour (a lock, a timeout, a retry, a state transition); **or** is the single largest untested unit in the repo by a wide margin |
-| `medium` | Reachable from an entry point that runs on every invocation (a hook, a launcher, a CLI dispatcher); **or** has real churn and no test neighbour at all |
+| `high` | On an auth/credential/payment/signature path (a request verifier, a webhook signature check, a session or token check); **or** carries a `bug_fix_no_test` finding whose fix changed runtime behaviour (a lock, a timeout, a retry, a state transition, a swallowed exception); **or** is the single largest untested unit in the repo by a wide margin |
+| `medium` | Reachable from an entry point that runs on every invocation (a route, middleware, a hook, a CLI dispatcher); **or** has real churn and no test importer at all |
 | `low` | A leaf utility, a one-off script, or a path you could not confirm is even reachable |
 
-Always emit `priority_score` and `priority_factors` verbatim regardless — they are the audit trail
-for the ranking, and a reader comparing two runs needs them. When the score and the severity table
-disagree, the table wins and the finding says so in one clause.
+Always emit `priority_score` and `priority_factors` verbatim — they are the audit trail for the
+ranking. When the score and the table disagree, the table wins and the finding says so in one clause.
 
 Effort estimate from gap size:
 - `coverage_gap_lines <= 20` → trivial
@@ -153,25 +176,30 @@ Effort estimate from gap size:
 
 ## Hard rules
 
-- **`coverage_gap_lines >= 1` mandatory.** Drop zero-gap findings.
-- **`respects_documented_decision: false` means a *document* states an intent the finding contradicts** (for example "we don't unit-test thin controllers"). A known gap, a history note, or the inferred posture never makes a finding `false`. An "always-mocked" module named as a known gap is an ordinary gap, `true`.
-- **Order by `priority_score × certainty` descending.** Cap at 30.
-- **Scope is computed by the orchestrator, not by you.** Scan exactly the file list in your task prompt. Its exclusions — synthetic/fixture trees, vendored and generated dirs, immutable history — are owned by the arch skill's `references/scan-exclusions.md`. **Never widen your own scope**; if something outside the list looks relevant, say so as a note rather than reading it. The fixture rule matters most: planted eval fixtures produce true-shaped findings that are false by construction.
-- **Skip trivial files**: pure type/interface declaration files, single-line constant export files, framework-generated barrel files (`index.ts` that only re-exports).
+- **`coverage_gap_lines >= 1` on every gap finding**, taken from `gap_lines`, never estimated.
+  `bug_fix_no_test` and `install_hint` carry 0 and stay out of the headline.
+- **`respects_documented_decision: false` means a *document* states an intent the finding contradicts** (for example "we don't unit-test thin controllers"). A known gap, a history note, or the inferred posture never makes a finding `false`.
+- **Order by severity, then `priority_score × certainty` descending** (SKILL.md's shared block defines the weights). Cap at 30.
+- **`respects_documented_decision` defaults to `true`.**
+- **Scope is computed by the orchestrator, not by you.** Scan exactly the file list in your task prompt. Its exclusions are owned by the arch skill's `references/scan-exclusions.md`. **Never widen your own scope.**
+- Never run the test suite, a coverage tool or the scripts yourself. Never write inside the scanned repo.
 
 ## Final output addendum
 
-At the end of your findings, append:
-
 ```
-coverage_gap_total: <sum of all flagged findings' coverage_gap_lines>
-files_affected: <count of distinct source files with gaps>
-heuristic_files_scanned: <int>
-heuristic_files_skipped: <int>
+coverage_gap_total: <sum of gap findings' coverage_gap_lines, each source line once>
+files_affected: <distinct source files with gap findings>
+symbols_ranked: <int — symbols with gap_lines > 0 in references.json>
+symbols_read: <int — candidate symbols you opened>
+entry_wrappers_skipped: <int>
+suppressed: [<{location, smell_or_signal, reason} for candidates read and dropped>]
+status_counts: <references.json status_counts, verbatim>
 report_mode: heuristic | report
 report_path_consumed: <path or null>
+report_total_uncovered_lines: <report mode only>
 coverage_negatives: [<per SKILL.md Step 4 — e.g. bug_fix_no_test clean/unavailable>]
-coverage_partial: [<per SKILL.md Step 4 — e.g. churn computed for src/ only>]
+coverage_partial: [<the manifest's entries for import_graph / reference_index, plus your own>]
+RUN NOTES: [<every script row you disagreed with: row, what you read, why>]
 ```
 
-These power the report's twin headline and footer disclosure.
+These power the report's headline and footer disclosure.

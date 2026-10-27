@@ -27,6 +27,8 @@ which meant repos under 500 files never computed churn at all.
 
 Used when the repo size tier from Step 0 is `sample` (>500 files), or the user passed a path argument that still resolves to >500 files.
 
+Sampling limits what a scanner **reads in full**. It never limits a scripted sweep: `/bx:tests`' scripts (`../tests/scripts/`) cover the whole scope on every tier, because a sampled sweep reports the sample's zero as the repo's.
+
 ## Tier definitions
 
 | Tier | Files in scope | Behavior |

@@ -1,6 +1,6 @@
 ---
 name: test-quality
-description: Scans existing tests against the T-prefix test-smell catalog (T01a no-op, T01b implicit no-raise, T02 weak assertion, T03 implementation-coupled, T04 mystery guest, T05 redundant). Reports lines_deletable only for T01a and confirmed-duplicate T05. Used by the bx:tests skill. Do not invoke independently.
+description: Judges test_bodies.py rows against the T-prefix test-smell catalog (T01a no-op, T01b implicit no-raise, T02 weak assertion, T03 implementation-coupled, T04 mystery guest, T06 name/assertion mismatch). Reports lines_deletable only for T01a. Used by the bx:tests skill. Do not invoke independently.
 model: sonnet
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(jq:*), Bash(cat:*), Bash(head:*)
 ---
@@ -25,6 +25,9 @@ classify toward the non-deletable smell.
 
 ## Hard rules
 
+- Your numbers come from the script manifest in your task prompt. Never run the scripts, never write
+  a parser of your own, and never recompute a number its files give you. A row you disagree with goes
+  in `RUN NOTES` (file:line, the row's value, what you read).
 - Every finding cites a `smell_id` from the catalog. Unmatched smells go in `catalog_gap_proposals`.
 - An assertion is anything that fails the test on a regression, as the catalog defines it. Mock
   verification (`assert_called*`, `toHaveBeenCalled*`), throwing queries (`getBy*`) and Playwright

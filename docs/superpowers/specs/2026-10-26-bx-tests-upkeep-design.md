@@ -1,7 +1,7 @@
 # Design: `/bx:tests` v2 — mechanism over prose, and a reduction lane
 
 **Date:** 2026-10-26
-**Status:** Approved; split into two releases (S65). Release 1 implementing.
+**Status:** Implemented (S65). Release 1 shipped as 2.13.3, release 2 as 2.14.0. Deviations from this design are listed in [Implementation notes](#implementation-notes-2140).
 **Author:** Session 65 with Claude
 **Ships as:** two releases. See [Release split](#release-split).
 
@@ -328,3 +328,30 @@ count check reverts it.
   need a batch mode?
 - **Scope of this release:** all of A–D in 2.14.0, or A + C first (safety + contract, PATCH) and
   B + D in 2.14.0?
+
+---
+
+## Implementation notes (2.14.0)
+
+- **`references.py` implements `/bx:clean`'s local-use rule as an identifier index**, not one
+  `git grep` per name: it has to classify every hit (call / mock / mention / string) and covers
+  ~2,700 symbols in seconds. `/bx:clean` now cites it (D6) rather than the reverse.
+- **`respects_documented_decision` kept its name** (shared with `/bx:arch`); 2.13.3 pinned its
+  semantics instead.
+- **Successor detection** uses four signals, strongest first: a commit that switched the last caller
+  (`git log -S` on code paths, the candidate newly *called* and sharing a name stem), the symbol's
+  doc comment, a thin wrapper over a non-plumbing live function, and a name stem ≥ 0.6. Stem alone at
+  0.5 named a sibling on the Next.js repo.
+- **Consolidate calibration:** 0.9 Jaccard kept; a ≥ 4-saved-lines floor added (207 of 458 clusters
+  saved 1–3 lines). Mechanical = identical raw token sequence outside literals, with a computed merge
+  table; only those are `--fix`-eligible.
+- **Module ratios** attribute a test file by the symbols its tests call, then by imports. Imports alone
+  sent pipeline tests to the models module they import for fixtures.
+- **`--fix` reverts restore a per-item snapshot**, not `git checkout -- <file>` (which undoes earlier
+  verified items in the same file).
+- **Acceptance:** every control in the table above held on scanner reruns from the shipped files,
+  except that the agent definitions themselves were not exercised (the runs used general-purpose
+  agents reading the scan files; the installed plugin cache was 2.13.2). The `--fix` controls ran on a
+  throwaway clone of the pytest repo with planted no-op, life-support and cluster controls plus two
+  real clusters: 210 → 207 cases, as computed; the deliberately bad merge was reverted by the count
+  check alone.

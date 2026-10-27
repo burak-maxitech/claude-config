@@ -1,11 +1,14 @@
 # Test Smell Catalog — T-prefix entries
 
-Each entry follows the same schema as the arch catalogs, whose canonical rules live in `../arch/references/catalog-rules.md` — resolve that against **this skill's base directory** (`bx/skills/tests/`), not against this file's directory. The S-prefix entries this catalog was modelled on are in the sibling `catalog-simplification.md`. The `test-quality` subagent must cite an entry by ID in `smell_id`. Only `T01a` is `--fix`-eligible, and only through the gated flow in `fix-mode-test.md`.
+Each entry follows the same schema as the arch catalogs, whose canonical rules live in `../arch/references/catalog-rules.md` — resolve that against **this skill's base directory** (`bx/skills/tests/`), not against this file's directory. The S-prefix entries this catalog was modelled on are in the sibling `catalog-simplification.md`. The `test-quality` subagent must cite an entry by ID in `smell_id`. Of these entries only `T01a` is `--fix`-eligible, and only through the gated flow in `fix-mode-test.md`.
 
 ## Rules for the catalog
 
+- **The detection is a script.** `../scripts/test_bodies.py` implements this catalog's assertion
+  definition, the T01a/T01b split and the T02/T03 rules, and emits one row per test. Scanners judge
+  its rows; they never count assertions by hand. **Change the catalog and the script together.**
 - **Languages tag is binding.** Detection patterns are language-aware. Don't fire a Jest matcher rule on a pytest file.
-- **`deletable_lines` is honest.** Only T01a (every line) and confirmed-T05 (overlap minus parameter overhead) and snapshot-heavy (in test-economics) contribute to the report's deletion headline. T02/T03/T04 are *rewritable*, not deletable — report `deletable_lines: 0`.
+- **`deletable_lines` is honest.** Only T01a (every line), the economics `life_support` lane and `snapshot_heavy` contribute to the deletion headline. T05's lines go to the consolidate headline instead, because a merge keeps every case. T01b/T02/T03/T04/T06 are *rewritable*, not deletable — report `deletable_lines: 0`.
 - **False-positive guards are mandatory.** Test smells over-fire easily; every entry below includes a guard the subagent must run first.
 
 ---
@@ -96,7 +99,8 @@ the guard did not run.
 - **Languages:** all
 - **Detect when:** the only assertions in a test body are tautological or near-tautological:
   - `toBeTruthy()` / `toBeFalsy()` on values whose type guarantees the polarity (e.g. `expect(arr.length > 0).toBeTruthy()` when `arr.length` is non-negative integer always)
-  - `not.toBeNull()` / `not.toBeUndefined()` / `toBeDefined()` standing alone (asserts existence, not value)
+  - `not.toBeNull()` / `not.toBeUndefined()` / `toBeDefined()` standing alone (asserts existence, not value). A **positive** `toBeNull()` / `toBeUndefined()` pins a value and is not weak: on horowell, counting it as weak inflated weak-only tests from 17 to 359 (S65)
+  - **Not weak:** `expect(getBy…(…)).toBeTruthy()` / `.toBeInTheDocument()`. The query throws on a miss, so the matcher is a presence check (`test_bodies.py` kind `presence`)
   - `expect(x).toBe(x)` / `expect(x).toEqual(x)` (compares value to itself)
   - Python: `assert x` where `x` is a non-empty literal, `assert x is not None` standing alone
   - Numeric "softening": `>= 0`, `<= maxInt`, `!= null` without value range check
@@ -115,17 +119,19 @@ the guard did not run.
 ## T03 — Implementation-coupled / mock-heavy
 
 - **Languages:** all (especially common in JS/TS)
-- **Detect when:** the test body's assertion lines are dominated by interaction verification rather than behavior verification.
-  - Count "implementation lines": `toHaveBeenCalledWith`, `toHaveBeenCalledTimes`, `toHaveBeenLastCalledWith`, mock-setup statements (`vi.mock`, `jest.mock`, `mockReturnValue`, `mockImplementation`), `unittest.mock.assert_called*`, `verify(mock).method(...)` (mockito).
-  - Count "behavior lines": value/shape assertions (`toBe`, `toEqual`, `toMatchObject` on real return values), `assert == value`, real output checks.
-  - Flag when `implementation_lines / max(behavior_lines, 1) > 2.0` AND `implementation_lines >= 4`.
+- **Detect when:** the test body's assertions are dominated by interaction verification rather than behavior verification. `test_bodies.py` computes it as `t03_candidate`:
+  - **Implementation assertions** (kind `mock_verify`): `toHaveBeenCalled*`, `toHaveBeenNthCalledWith`, assertions on `fn.mock.calls`, `assert_called*` / `assert_awaited*` / `assert_has_calls`, `assert m.call_args == …`, mockito `verify(`.
+  - **Behavior assertions**: every other non-weak kind — values, presence, raises, snapshots, throwing queries, helpers.
+  - Flag when `mock_verify >= 4` AND `mock_verify / max(behavior, 1) > 2.0`.
+  - **Setup lines never count** (`vi.mock`, `mockReturnValue`, `patch(`): building a mock is not coupling, and counting it flagged ~130 horowell tests on a literal reading (S65).
+  - **"Never called" checks count on neither side** (kind `mock_absent`: `not.toHaveBeenCalled`, `assert_not_called`). Asserting that a billed call or a DB write did *not* happen is an observable-effect check, not coupling to implementation order.
 - **Replace with:** rewrite to test observable behavior — the function's return value, persisted state, emitted events. Mock only at the system boundary (network, time, RNG, filesystem).
 - **Lines deletable:** **0** (rewritable).
 - **`--fix-eligible:`** **false** — judgment-heavy rewrite.
 - **Min certainty floor:** 0.55
 - **False-positive guards:**
-  1. **Interaction is the contract.** If the unit under test is an event publisher / message dispatcher / logger wrapper, interaction verification *is* behavior verification. Skip if class name suggests this (Publisher, Emitter, Dispatcher, Logger, Tracer, Notifier).
-  2. **Test seam at the boundary.** Tests in an `adapters/` or `infrastructure/` folder are often verifying boundary contracts; lower certainty.
+  1. **Interaction is the contract.** Interaction verification *is* behavior verification when the unit under test is (a) an event publisher, dispatcher, notifier, logger or tracer wrapper (names: Publisher, Emitter, Dispatcher, Logger, Tracer, Notifier), or (b) an **orchestrator** whose job is to call injected dependencies in a given order and whose outputs are those calls (a pipeline phase, a cron route, a server action that only sequences writes). Lower certainty to 0.4, which drops it below the floor. On horowell (S65 rerun) six of nine candidates were orchestrators of kind (b).
+  2. **Test seam at the boundary.** Tests in an `adapters/`, `infrastructure/` or repository folder are often verifying boundary contracts; lower certainty to 0.5.
   3. **TDD-scaffolding scenario.** If `tests/README` or CLAUDE.md says "we use mock-heavy unit tests intentionally as a TDD scaffold, integration tests verify behavior" — mark `respects_documented_decision: false`.
 
 ---
@@ -148,19 +154,48 @@ the guard did not run.
 
 ---
 
-## T05 — Redundant test
+## T05 — Redundant test (reported by the consolidate lane)
 
 - **Languages:** all
-- **Detect when:** within a single test file, ≥2 tests share ≥80% of body lines after normalization (strip whitespace, normalize variable names), differing only in input values that are **not** boundary cases (off-by-one, empty, max, null, negative).
-  - Comparison is line-set similarity, not AST equivalence. Cheap approximation: tokenize → sort → Jaccard index of token multisets.
-- **Replace with:** parameterize into a single test with a data table (`describe.each` / `it.each` in Jest, `@pytest.parametrize`, `table_test` pattern). If the inputs are identical and only the test name differs, delete the duplicates.
-- **Lines deletable:** **conservative 0 by default.** Only when the subagent has certainty ≥0.85 AND the duplicates are demonstrably identical inputs (not boundary cases), report `deletable_lines = (test_body_lines × (n_duplicates - 1)) - parameterization_overhead`. Floor at 1.
-- **`--fix-eligible:`** **false** — even high-confidence "redundant" tests sometimes encode coverage at different boundary conditions a reader can't see without domain context. Route to `--plan`.
+- **Detect when:** ≥2 tests whose literal-stripped token shapes match (multiset Jaccard ≥ 0.9), with
+  the same setup (fixtures, mock-setup line count, top-level `describe`), in one file or calling the
+  same production symbol across files. `../scripts/consolidate.py` finds them; **`test-quality` does
+  not emit T05.** The `test-economics` scanner reports each cluster as `economic_signal: consolidate`
+  (`scan-economics.md`), so a cluster is counted once.
+- **Replace with:** one parameterized test (`it.each` / `describe.each`, `@pytest.mark.parametrize`,
+  a Go table) with **one row per original test**, each row holding that test's literals. Boundary
+  inputs stay as their own rows; that is what the row is for.
+- **Lines deletable:** **0.** The saved lines (`saved_lines` = lines before − one body − one row per
+  case) go to the consolidate headline ("N tests → M"), never to "delete": no case disappears.
+- **`--fix-eligible:`** only `mechanical: true` clusters (every member has the identical token
+  sequence, so the merge is a pure table rewrite), and only through `fix-mode-test.md`'s count
+  check: the merged test's case count must equal the number of tests it replaced.
 - **Min certainty floor:** 0.75
+- **Calibration (S65, horowell):** at 0.9, 458 clusters, 207 of which saved under 4 lines;
+  `consolidate.py` reports only clusters saving ≥4 lines (251 clusters, 774 → 251 tests). 0.85 grew
+  the set by 27% with visibly looser matches; 0.95 cut it 28% and dropped real five-member clusters.
 - **False-positive guards:**
-  1. **Boundary value coverage.** Inputs `[0, -1, MAX_INT, MIN_INT, '', null]` are testing edges, not duplication. Detect numeric / string-empty / null variants explicitly and skip.
-  2. **Different setup paths.** If tests share body but differ in `beforeEach`/`fixture` setup, they're not redundant.
-  3. **Table tests already.** Tests inside `describe.each`, `it.each`, `@pytest.parametrize`, table tests in Go are intentional parameterized variants. Skip the entire `each` block.
+  1. **Different setup paths.** The script groups only tests with matching setup; a cluster whose
+     members still differ in a `beforeEach` you can see is not redundant.
+  2. **Table tests already.** Already-parameterized tests (`param_rows`) are never merge inputs.
+  3. **Comments that explain a case.** A merge keeps each one as a row comment.
+
+---
+
+## T06 — Name/assertion mismatch
+
+- **Languages:** all
+- **Detect when:** the test's name promises an outcome its assertions never check. Example (S65,
+  maxitech): `test_calendar_failure_shows_error` asserts only that a mock was not called; nothing
+  checks that an error is shown. Candidates come from `test_bodies.py` rows: read the `name` against
+  the `assertions` kinds and the body.
+- **Replace with:** assert the named outcome, or rename the test to what it actually checks.
+- **Lines deletable:** **0.**
+- **`--fix-eligible:`** **false** — report-only.
+- **Min certainty floor:** 0.6
+- **False-positive guards:**
+  1. **Vague names** (`works`, `handles input`) promise nothing specific. Skip them.
+  2. **The outcome is asserted through a helper.** Read an allowlisted helper's body before flagging.
 
 ---
 
@@ -172,4 +207,4 @@ the guard did not run.
 - **Coverage-percentage findings** — those are `test-coverage`'s job, not `test-quality`'s.
 - **Orphaned tests, >3mo skipped tests, unused helpers, stale snapshots** — `/bx:clean`'s `cleanup-styles-tests` covers these.
 
-If the subagent encounters a smell it cannot match to T01-T05, it should propose a catalog addition at the end of its output under `catalog_gap_proposals` with a justification — do not surface it as a regular finding.
+If the subagent encounters a smell it cannot match to T01–T06, it should propose a catalog addition at the end of its output under `catalog_gap_proposals` with a justification — do not surface it as a regular finding.

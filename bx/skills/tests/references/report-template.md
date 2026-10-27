@@ -2,24 +2,26 @@
 
 Render the final report exactly in this order. Every section appears even if empty (with "None found" as content) so the output structure is predictable across runs.
 
-## Section 0 — Twin Headline
+## Section 0 — Triple Headline
 
-Render this **first**, before anything else. The twin headline makes both directions of test debt equally visible:
+Render this **first**, before anything else. Gaps, deletions and merges are equally visible:
 
 ```
 ## /bx:tests — <project name>
 
 **Coverage gaps in critical code: <coverage_gap_total> lines across <coverage_files_affected> files.**
 **Tests we can delete: <deletable_total> lines across <deletable_files_affected> files.**
+**Tests we can consolidate: <consolidate_tests_before> → <consolidate_tests_after> (saves <consolidate_saved_lines> lines).**
 ```
 
 Numbers from Step 5 aggregation. Special cases:
 
-- If `coverage_gap_total == 0`: render line 1 as "**No critical-code coverage gaps detected** — high-priority paths all have test neighbors and assertions."
-- If `deletable_total == 0`: render line 2 as "**No safely-deletable test waste detected** — assertion-free / confirmed-duplicate / snapshot-heavy categories are empty."
-- If both are zero: render a single line "**Test suite passes baseline checks on both axes** — no critical-path gaps and no waste hotspots."
+- If `coverage_gap_total == 0`: render line 1 as "**No critical-code coverage gaps detected** — every ranked symbol has a test that calls it."
+- If `deletable_total == 0`: render line 2 as "**No safely-deletable test waste detected** — no-op / life-support / snapshot-heavy categories are empty."
+- If there are no clusters: render line 3 as "**No consolidation candidates** — no two tests differ only in their literals."
+- If all three are zero: render a single line "**Test suite passes baseline checks on all three axes.**"
 
-The twin format is non-negotiable: a single number on either axis is misleading on its own.
+The three-line format is non-negotiable: a single number on any axis is misleading on its own.
 
 ---
 
@@ -64,17 +66,17 @@ Below the table, render a "Top finding detail" block expanding the #1 ranked fin
 ```
 **#1 — No test coverage on session verify (`src/auth/verifySession.ts:14-62`)**
 
-Current state: function `verifySession` has 48 LOC, security_density 0.18 (matches: auth, token, session, verify), churn 22 commits/year, fan_in 9 importers. No test neighbor found at `src/auth/verifySession.test.ts` or `__tests__/auth/verifySession.test.ts`.
+Current state: function `verifySession` has 48 LOC, 9 security lines (auth, token, verify), churn 22 commits/year, fan_in 9 importers, reached from an entry point. test_status: untested — no test file imports `src/auth/verifySession.ts` (or `mock_only`: two test files `vi.mock` it and never run it).
 
 Recommendation: add unit tests covering session expiry, tampered tokens, and valid happy path. Priority score 14.2 — high blast radius on uncovered branches.
 
 Conflict with documented testing posture? No.
 ```
 
-For bug-fix-without-regression findings, render them as a separate row block at the end of Coverage:
+For bug-fix-without-regression findings, render them as a separate row block at the end of Coverage. They carry no gap lines and are never in the headline. The heading names the manifest's window:
 
 ```
-### Bug-Fixes Without Regression Tests (last 50 commits)
+### Bug-Fixes Without Regression Tests (last 200 commits, then fix subjects)
 
 | Commit  | Subject                          | Files touched (source only) |
 |---------|----------------------------------|-----------------------------|
@@ -86,7 +88,7 @@ For bug-fix-without-regression findings, render them as a separate row block at 
 ### Quality
 
 ```
-### Quality Smells (— deletable subset: <T01a+T05 deletable_lines> lines)
+### Quality Smells (— deletable subset: <T01a deletable_lines> lines)
 
 | Rank | Location                            | Title                              | Smell | Sev | Cert | Effort | Lines Δ |
 |------|-------------------------------------|------------------------------------|-------|-----|------|--------|---------|
@@ -95,9 +97,31 @@ For bug-fix-without-regression findings, render them as a separate row block at 
 | ...  | ...                                 | ...                                | ...   | ... | ...  | ...    | ...     |
 ```
 
-The `Lines Δ` column shows deletable lines (negative = lines removed). T02/T03/T04 always show `0` (rewritable, not deletable).
+The `Lines Δ` column shows deletable lines (negative = lines removed). T01b/T02/T03/T04/T06 always show `0` (rewritable, not deletable).
 
 Top-finding detail block as in Coverage.
+
+### Reduction
+
+Two tables, both from the economics scanner. Life support first, because each row deletes production
+code as well as tests:
+
+```
+### Tests Keeping Dead Code Alive (— deletable: <life_support_deletable_lines> lines)
+
+| Rank | Symbol                                   | Prod refs | Tests | Successor (status)                         | Action                          | Lines Δ |
+|------|------------------------------------------|-----------|-------|--------------------------------------------|---------------------------------|---------|
+| 1    | models/email.py:59-95 Email.build_reply_all_recipients | 0 | 5 | services/scheduling_utils.py:build_reply_recipients (untested) | Move the 5 tests to the successor, then delete the method | -37 |
+| 2    | src/lib/scoring/axes.ts:12-20 axisDescription | 0      | 1     | —                                          | Delete the function and its test | -9      |
+
+### Tests We Can Consolidate (— <consolidate_tests_before> → <consolidate_tests_after>, saves <consolidate_saved_lines> lines; top 15 shown)
+
+| Rank | Cluster | Location                                  | Tests | Saved | Mechanical | Action                              |
+|------|---------|-------------------------------------------|-------|-------|------------|-------------------------------------|
+| 1    | C175    | src/lib/db/watch-references.test.ts:1192-1553 | 5 → 1 | 112   | no         | One `it.each` table; one row per test |
+```
+
+`Mechanical: yes` clusters are a pure table rewrite and `--fix`-eligible; the rest route to `--plan`.
 
 ### Economics
 
@@ -174,13 +198,14 @@ Test files in scope: 64
 Source files sampled (top by priority): 50
 Source files skipped: 37   [reason: priority_score below cutoff or non-source]
 
-Twin-headline math:
-- coverage_gap_total: 312 lines across 18 files (from test-coverage)
-- deletable_total: 719 lines across 2 files
+Headline math:
+- coverage_gap_total: 312 lines across 18 files (from test-coverage; bug_fix_no_test excluded)
+- deletable_total: 765 lines across 3 files
   - T01a (no-op): 1 finding, 14 lines
-  - T05 (confirmed duplicate): 0 findings, 0 lines
+  - life_support: 1 finding, 46 lines
   - snapshot_heavy: 1 finding, 705 lines
-  - Subtotal-check: 14 + 0 + 705 = 719 ✓
+  - Subtotal-check: 14 + 46 + 705 = 765 ✓
+- consolidate_total: 774 → 251 tests across 251 clusters, saves 3,238 lines (90 mechanical)
 
 T-catalog hit counts:
 - T01a (no-op, deletable): 1
@@ -188,7 +213,13 @@ T-catalog hit counts:
 - T02: 4
 - T03: 6
 - T04: 2
-- T05: 0
+- T06: 1
+- T05: reported as consolidate clusters (above)
+
+Growth trend (test/source LOC, test cases): 2026-05 0.06 (18) → 2026-07 0.66 (1,813) → 2026-09 0.89 (4,483) → 2026-10 0.91 (6,642)
+
+Scripts: test_bodies 3.3s · leverage 2.7s · references 5.5s · consolidate 1.2s (manifest: <path>)
+RUN NOTES: <count of script rows scanners disagreed with, each listed; "none" when none>
 
 Findings filtered:
 - Dropped 3 ratio_under findings overlapping with test-coverage's file-level gaps (deduplicator)
@@ -204,7 +235,7 @@ genuinely checked:
 
 Partial coverage (checks that ran but did not cover their whole scope — their counts above are
 lower bounds, not results):
-- T05 (redundant) — 212 of 603 test files swept: scanner script crashed on output
+- test_bodies — 212 of 603 test files swept: time budget of 600s exhausted
 - (render `none` when every check covered its scope)
 
 Defer to /bx:clean for: orphaned test files, stale snapshots, >3mo skipped tests, unused test helpers.

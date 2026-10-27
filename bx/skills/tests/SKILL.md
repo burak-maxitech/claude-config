@@ -1,6 +1,6 @@
 ---
 name: tests
-description: 'Repo-wide test suite audit. Surfaces missing coverage on critical code paths AND wasteful/redundant tests in a single report. Twin headline metric ("Coverage gaps in critical code: X lines | Tests we can delete: Y lines"). Three parallel Sonnet subagents (test-coverage / test-quality / test-economics).'
+description: 'Repo-wide test suite audit. Surfaces missing coverage on critical code paths, wasteful tests, tests keeping dead code alive, and tests that should be one table test, in a single report. Triple headline ("Coverage gaps in critical code: X lines | Tests we can delete: Y lines | Tests we can consolidate: N → M"). Committed scripts measure; three parallel Sonnet subagents (test-coverage / test-quality / test-economics) judge.'
 when_to_use: When user mentions test coverage audit, test smell detection, test debt at the repo level, "are our tests any good", "what tests can we delete", or "what's untested that matters". Different from `/bx:review` §7 (diff-scoped checkbox) and `/bx:clean`'s `cleanup-styles-tests` (artifact-level cruft only).
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(sort:*), Bash(uniq:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(go:*), Bash(pytest:*), Bash(cat:*), Bash(head:*), Agent
@@ -10,7 +10,9 @@ argument-hint: "[path] [--plan] [--fix] [--coverage] [--full-scan]"
 
 # Test Review — Repo-Wide Test Suite Audit
 
-Audit this codebase's test suite like a staff engineer doing a quarterly test-health check. Surface missing coverage on critical paths in one direction; surface wasteful, redundant, and untrustworthy tests in the other. Report a **twin headline metric** so both gaps and over-investment are equally visible.
+Audit this codebase's test suite like a staff engineer doing a quarterly test-health check. Surface missing coverage on critical paths in one direction; surface wasteful, redundant, and untrustworthy tests in the other — and give the suite a way to **shrink**: tests that keep dead production code alive, and groups of tests that should be one table test. Report a **triple headline** so gaps, deletions and consolidation are equally visible.
+
+**Scripts measure, scanners judge.** Everything that decides a deletion or a headline number comes from the committed scripts in `scripts/` (Step 3.5), not from a scanner's grep: prose rules did not converge across reruns (S64, S65), and run-to-run variance on one smell went 5 → 1 between identical runs.
 
 This skill is distinct from existing test-touching paths in this repo:
 
@@ -56,13 +58,14 @@ executable test-named scripts that define or call a pass/fail helper. Coverage t
 these run heuristic-only; `--coverage` reports "no coverage tool for a shell harness" rather than
 failing. Do not exit as "no framework detected" when a repo's suite is shell-based.
 
-For monorepos, check `workspaces` (npm/yarn/pnpm), `pnpm-workspace.yaml`, `[workspace] members = [...]` (Cargo), `go.work`. Each workspace may have its own framework — handle per-workspace.
+For monorepos, check `workspaces` (npm/yarn/pnpm), `pnpm-workspace.yaml`, `[workspace] members = [...]` (Cargo), `go.work`. Each workspace may have its own framework. **A monorepo runs Step 3.5 and Step 4 once per workspace** (one script run and one scanner trio each, with that workspace's scope and framework), and Step 5 aggregates the trios: findings are concatenated, headline totals are summed, and each workspace's negatives and partials keep a `workspace` field. A workspace with no test framework is reported in the footer, not scanned.
 
 **Test command** — record the project's own command for running the suite, and for running a
 single file. Take it from `package.json` `scripts.test` (vitest: `npx vitest run <file>`; jest:
 `npx jest <file>`), from `pytest` (`pytest <file>`), `cargo test`, `go test ./<pkg>`, or the shell
-harness's runner. Report it in the detection line. Only `--fix` runs it (baseline, then once per
-applied edit). Report-only and `--plan` runs never execute tests.
+harness's runner, and a way to read the case count it reports (vitest/jest summary line, pytest's
+`N passed`). Report it in the detection line. Only `--fix` runs it (baseline, then once per
+applied item, for the count check). Report-only and `--plan` runs never execute tests.
 
 **Coverage-tool availability** — record whether the tool appears in deps/devDependencies, the lockfile, or tool config (e.g. a `coverage` script, `pytest-cov` in requirements). Deps detection only — don't probe `$PATH` (not cross-platform, needs no extra permission). **Do NOT run it.** Default mode is heuristic-only; running coverage is opt-in via `--coverage`.
 
@@ -129,7 +132,7 @@ Interpret `$ARGUMENTS`:
 | (none) | Default review-only: produce report and stop |
 | path (e.g. `src/auth/`, `tests/api/`) | Scope subagents to that path (filtering both source and test scope to match) |
 | `--plan` | After report, transform top findings into a phased brief ready to hand off to `/bx:plan` (read `references/plan-mode-test.md`) |
-| `--fix` | After report, delete no-op tests (T01a only) with a per-finding diff gate, on a feature branch, each edit verified by rerunning the suite (read `references/fix-mode-test.md`). |
+| `--fix` | After report, apply the safe reductions — T01a deletions, successor-less life-support deletions, mechanical merges — with a per-item diff gate, on a feature branch, each verified by rerunning the suite with a count check (read `references/fix-mode-test.md`). |
 | `--coverage` | Opt into reading coverage tool reports (jest `coverage-summary.json` / pytest `coverage.json` / etc.). Never auto-invoked. |
 | `--full-scan` | Force `full` tier regardless of repo size |
 
@@ -169,6 +172,29 @@ Apply `../arch/references/scan-exclusions.md` (resolved against this skill's bas
 computing scope, exactly as Step 0 applied it to detection. Compute file lists once and pass to all
 subagents; agents never widen their own scope. Record excluded/sampled/skipped counts for the footer.
 
+The tier limits what scanners **read in full**. It never limits the script sweep in Step 3.5, which
+always covers the whole scope (problem 18: a sampled sweep reported a sample's zero as the repo's).
+
+---
+
+## Step 3.5 — Run the scripts
+
+Write the two scope lists (repo-relative, one path per line) to a fresh directory under the OS temp
+dir — never inside the repo — and run, once per workspace:
+
+```
+python -I <this skill's base directory>/scripts/run.py --repo <workspace root> --out <temp dir> \
+    --test-files <temp dir>/tests.txt --source-files <temp dir>/sources.txt
+```
+
+`run.py` runs `test_bodies.py`, `leverage.py`, `references.py` and `consolidate.py` in that order
+(stdlib Python, read-only, a few seconds on a 1,800-file repo) and writes `manifest.json` with each
+output's path. Each script's docstring is its contract. A script that fails or runs out of time
+becomes a `coverage_partial` entry in the manifest rather than an error, so the report discloses it.
+Pass the manifest path to every scanner. **Scanners never run the scripts and never re-derive
+their numbers**; a scanner that disagrees with a row says so in `RUN NOTES`. If `python` is not
+available, stop and say so: without the scripts the run has no mechanism behind its numbers.
+
 ---
 
 ## Step 4 — Parallel Subagent Dispatch
@@ -188,6 +214,7 @@ Coverage report path: <path or null>
 Tier: <full|bounded|sample>
 Source scope: <paths>
 Test scope: <paths>
+Script manifest: <path to manifest.json from Step 3.5 — your numbers come from its files>
 
 Testing-Intent Summary:
 <3-5 bullets from Step 1>
@@ -201,15 +228,18 @@ Each finding includes (subset depending on dimension):
   severity: low | medium | high
   certainty: 0.0–1.0
   effort_estimate: trivial | small | medium | large
-  coverage_gap_lines: <int>   (mandatory for coverage; default 0 elsewhere)
-  deletable_lines: <int>      (mandatory aggregation field; only > 0 for T01a / confirmed-T05 / snapshot_heavy)
-  respects_documented_decision: true | false   (false ONLY when a document — tests README, ADR,
-                                                CLAUDE.md testing section — states an intent the
-                                                finding contradicts; a known gap or the inferred
-                                                posture is never a decision)
+  coverage_gap_lines: <int>   (mandatory for coverage gaps, from the scripts' gap_lines; 0 for
+                               bug_fix_no_test and install_hint, which never enter the headline)
+  deletable_lines: <int>      (mandatory aggregation field; only > 0 for T01a / life_support /
+                               snapshot_heavy. consolidate saves lines but deletes no case: it
+                               reports saved_lines in metrics instead)
+  respects_documented_decision: true | false   (default true. false ONLY when a document — tests
+                                                README, ADR, CLAUDE.md testing section — states an
+                                                intent the finding contradicts; a known gap or the
+                                                inferred posture is never a decision)
   recommended_action: <prose>
-  smell_id: T01a | T01b | T02..T05 | bug_fix_no_test | install_hint | null   (test-quality only requires this)
-  economic_signal: snapshot_heavy | flakiness_marker | flakiness_history | ratio_over | ratio_under   (test-economics only)
+  smell_id: T01a | T01b | T02 | T03 | T04 | T06 | bug_fix_no_test | install_hint | null   (test-quality only requires this)
+  economic_signal: life_support | consolidate | snapshot_heavy | flakiness_marker | flakiness_history | ratio_over | ratio_under   (test-economics only)
 
 Alongside findings, ALWAYS return:
   coverage_negatives:   one entry per category you swept that produced nothing:
@@ -220,11 +250,23 @@ Alongside findings, ALWAYS return:
                         {category, scanned, total, reason}   (a crash, a timeout, a sample, a layout
                                                               the method cannot handle)
 A category goes in exactly one place: findings, a negative, or partial. If it was only partly
-checked, it is partial, not unavailable or clean.
+checked, it is partial, not unavailable or clean. A category with findings needs no negative.
+A judgment sweep you could not read in full (T04, T06) is partial with scanned/total.
+Findings cut by your output cap are counted in your addendum and listed in coverage_partial as
+{category: "<smell or signal>_findings", scanned: <reported>, total: <found>, reason: "finding cap"}.
+Candidates you read and dropped below a floor or by a guard go in your addendum's `suppressed:`
+list ({location, smell_or_signal, reason}), not in RUN NOTES and not in negatives.
 Never encode either as a finding. Never report clean for something you could not check.
 
+Ordering: severity_weight {low: 1, medium: 2, high: 4}. Order your findings by severity first,
+then by the ordering key your scan file names.
+
 Sampling: the tier's deep-read cap limits files you READ IN FULL to verify candidates. It does not
-limit grep or script sweeps — sweep the whole scope when the check is mechanical.
+limit the script sweeps, which already cover the whole scope.
+
+Scripts: never run them, never write your own parser, never recompute a number the manifest's files
+give you. If a row is wrong, say so in RUN NOTES (file:line, the row's value, what you read) and judge
+the finding on what you read.
 ```
 
 The block above is dispatched verbatim. It is the only place scanners learn about the two lists
@@ -263,13 +305,13 @@ own output, and the report would have shown "1 finding" as if the sweep were com
 check is reported with `scanned`/`total` and a reason. Its zero count must never read as clean.
 
 ### Agent 1: test-coverage
-Read `references/scan-coverage.md`, then dispatch the `test-coverage` subagent with those instructions + shared context. Targets: missing tests on critical-rank source files; bug-fixes-without-regression-tests in last 50 commits. Heuristic by default; reads coverage report only in `--coverage` mode.
+Read `references/scan-coverage.md`, then dispatch the `test-coverage` subagent with those instructions + shared context. Targets: untested, mock-only and mention-only symbols ranked by `references.json` priority; bug-fixes-without-regression-tests from the manifest's commit window. Heuristic by default; reads coverage report only in `--coverage` mode.
 
 ### Agent 2: test-quality
-Read `references/scan-quality.md` AND `references/test-smell-catalog.md`, then dispatch the `test-quality` subagent with both + shared context. Catalog is mandatory context — every finding must cite a `smell_id` from T01-T05.
+Read `references/scan-quality.md` AND `references/test-smell-catalog.md`, then dispatch the `test-quality` subagent with both + shared context. Catalog is mandatory context — every finding must cite a `smell_id` from T01a, T01b, T02, T03, T04, T06 (T05 is reported by economics as `consolidate`).
 
 ### Agent 3: test-economics
-Read `references/scan-economics.md`, then dispatch the `test-economics` subagent with those instructions + shared context. Targets: snapshot-heavy files (≥50% threshold), flakiness signals (markers + git log), test:code LOC ratio extremes.
+Read `references/scan-economics.md`, then dispatch the `test-economics` subagent with those instructions + shared context. Targets: the reduction lane (`life_support`, `consolidate`), snapshot-heavy files (≥50% threshold), flakiness signals (markers + git log), test:code ratio extremes, and the growth trend for the footer.
 
 ---
 
@@ -281,6 +323,10 @@ After all three subagents return:
 2. **Deduplicate.**
    - `test-economics` `ratio_under` overlaps with `test-coverage` file-level gaps — when both point at the same module, drop the economics finding (it had certainty 0.55 by design).
    - Within `test-quality`, if a single test triggers both T02 and T03, keep the higher-severity one and append the other's evidence.
+   - A `life_support` finding whose `successor` is also a coverage gap keeps both findings and
+     cross-references them ("closing this gap is the life-support move"). Never sum the successor's
+     gap into `deletable_total`.
+   - A `consolidate` cluster that contains a T01a/T02/T03 test keeps both; the quality fix comes first.
 3. **Honor `respects_documented_decision: false`.** Route those to a separate report section regardless of dimension.
 4. **Rank score.** `severity_weight × certainty / effort_weight × (1 + log(impact + 1))` where:
    - severity {low: 1, medium: 2, high: 4}
@@ -293,15 +339,21 @@ After all three subagents return:
    count with no matching negative, or reports a crash or a truncated sweep only in prose, record it
    as `coverage_partial` with `reason: "not reported by scanner"`. Never treat it as clean.
 
-6. **Twin-headline aggregation.**
-   - `coverage_gap_total = sum(coverage_gap_lines)` across coverage findings, **counting each source
-     line once**. A whole-file finding and a range finding inside that same file overlap — add the
-     whole-file figure and drop the nested range from the sum, keeping both as separate findings.
-     Summing them naively inflates the headline, which is the one number a reader quotes.
-     Distinct files affected = unique source paths.
-   - `deletable_total = sum(deletable_lines)` across **only** these contributing finding types: `smell_id == T01a`, `smell_id == T05 AND certainty >= 0.85` (the deletable subset of T05), `economic_signal == snapshot_heavy`. Distinct files affected = unique paths.
-   - **Never include T01b/T02/T03/T04 or non-snapshot economics in `deletable_total`.** Those are rewritable, not deletable, and including them would mislead the headline.
-   - Both totals are integer sums. The footer's subtotal check must match exactly. A mismatch is
+6. **Triple-headline aggregation.**
+   - `coverage_gap_total = sum(coverage_gap_lines)` across coverage gap findings, **counting each
+     source line once**. A whole-file finding and a range finding inside that same file overlap — add
+     the whole-file figure and drop the nested range from the sum, keeping both as separate findings.
+     `bug_fix_no_test` and `install_hint` carry 0 and are never in the sum; they render in their own
+     table. Distinct files affected = unique source paths.
+   - `deletable_total = sum(deletable_lines)` across **only** these contributing finding types:
+     `smell_id == T01a`, `economic_signal == life_support`, `economic_signal == snapshot_heavy`.
+     Distinct files affected = unique paths.
+   - **Never include T01b/T02/T03/T04/T06, consolidate or the other economics signals in
+     `deletable_total`.** Those are rewrites or merges, not deletions.
+   - `consolidate_total`: from the economics addendum, **all** clusters (not only the ones reported
+     as findings): `consolidate_tests_before → consolidate_tests_after` tests, saving
+     `consolidate_saved_lines` lines.
+   - All totals are integer sums. The footer's subtotal check must match exactly. A mismatch is
      an arithmetic error to fix before rendering, never "rounding".
 7. **Order** findings within each report section by rank score. The report template's sections
    (Coverage / Quality / Economics, then Documented-Decision Conflicts) are the only grouping. Any
@@ -314,11 +366,11 @@ After all three subagents return:
 
 Read `references/report-template.md` for exact formatting. The shape:
 
-**Section 0 — Twin headline** (this is the *first* line of the report, before everything else):
+**Section 0 — Triple headline** (this is the *first* line of the report, before everything else):
 
-> **Coverage gaps in critical code: X lines across Y files | Tests we can delete: Z lines across W files**
+> **Coverage gaps in critical code: X lines across Y files | Tests we can delete: Z lines across W files | Tests we can consolidate: N → M (saves S lines)**
 
-This dual signal makes both directions (under-tested + over-invested) equally visible.
+Gaps, deletions and merges are equally visible, so a suite that only ever grows shows it.
 
 **Sections 1-5** as in `references/report-template.md`:
 
@@ -326,7 +378,7 @@ This dual signal makes both directions (under-tested + over-invested) equally vi
 2. Findings — three subsections (Coverage / Quality / Economics) ordered by rank score
 3. Documented-Decision Conflicts (separate, "**Confirm intent before action:**")
 4. Suggested Next Actions — skill chains (`/bx:clean` for orphans, `/code-review` or `/bx:review` for diff-scoped follow-up); copy-pasteable `/bx:plan <brief>` snippets for top 3 strategic rewrites
-5. Footer disclosure — framework detected, coverage tool used (or "heuristic"), files scanned vs sampled vs skipped, T01a/T01b–T05 hit counts, twin-headline totals, coverage negatives and partial coverage
+5. Footer disclosure — framework detected, coverage tool used (or "heuristic"), files scanned vs sampled vs skipped, T01a/T01b/T02/T03/T04/T06 hit counts, headline totals with the subtotal check, the growth trend line, the script manifest's step timings, coverage negatives and partial coverage
 
 ---
 
@@ -336,18 +388,24 @@ This dual signal makes both directions (under-tested + over-invested) equally vi
 Read `references/plan-mode-test.md` (the test-specific port of `/bx:arch`'s plan mode — the phase mapping lives there). Transform top findings into a phased brief. Each phase emits a self-contained `/bx:plan <brief>` payload the user can drop into another session.
 
 ### If `--fix` in $ARGUMENTS:
-Read `references/fix-mode-test.md` and follow it exactly. **Walk only findings where `smell_id == "T01a"`** (no-op tests). T01b, the implicit no-raise tests, are real checks and route to `--plan`, as does everything else.
+Read `references/fix-mode-test.md` and follow it exactly. It walks three kinds of item: **T01a**
+no-op deletions, **successor-less `life_support`** deletions (the dead symbol plus the tests that
+test only it), and **mechanical `consolidate`** merges (one table test with one row per original
+test, built from the script's `merge_table`). T01b, successor moves, non-mechanical merges and
+everything else route to `--plan`.
 
 The flow, in summary (the reference is canonical):
 1. Pre-flight: a feature branch and a clean tree, allowlist evidence present, and the project's test
    command run once as a green baseline. Any failure aborts.
-2. Per finding: show the body and the diff, wait for y / n / skip / abort, apply with `Edit`, then
-   rerun the affected test file. A new failure reverts that one edit.
+2. Per item: show the change and the diff, wait for y / n / skip / abort, apply with `Edit`, then
+   rerun the affected test files and apply the **count check**: a deletion drops the count by
+   exactly the tests it removed; a merge leaves the count unchanged. A new failure or a count that
+   moved the wrong way reverts that item.
 3. Cascades: an emptied parent block gets a separate prompt. An emptied file is routed to
    `/bx:clean`, never deleted here.
 
-If user invoked `--fix` and no T01a findings surfaced, output:
-> No no-op (T01a) tests found. Other test smells, including implicit no-raise tests (T01b), require human judgment — re-run with `--plan` for a phased rewrite brief.
+If user invoked `--fix` and no eligible item surfaced, output:
+> Nothing `--fix` can apply safely (no T01a, no successor-less life support with exclusive tests, no mechanical merge). The rest needs judgment — re-run with `--plan` for a phased brief.
 
 End with the summary block from `references/fix-mode-test.md`.
 
@@ -356,7 +414,7 @@ End with the summary block from `references/fix-mode-test.md`.
 ## Step 8 — Closing
 
 If running default mode, end with one line:
-> Run `/bx:tests --plan` to convert top findings into a phased rewrite brief, or `/bx:tests --fix` on a branch for gated no-op (T01a) deletions. Run `/bx:clean` first if orphaned-test / stale-snapshot findings appeared above.
+> Run `/bx:tests --plan` to convert top findings into a phased rewrite brief, or `/bx:tests --fix` on a branch for the suite-verified reductions (no-op tests, dead code kept alive by tests, mechanical merges). Run `/bx:clean` first if orphaned-test / stale-snapshot findings appeared above.
 
 ---
 
@@ -368,7 +426,7 @@ If running default mode, end with one line:
 | Dead test files, stale snapshots, >3mo skipped tests | `/bx:clean` |
 | **Repo-wide test coverage + quality audit** | **`/bx:tests` (this)** |
 | Plan a test-refactor effort | `/bx:tests --plan` |
-| Delete no-op tests (T01a), suite-verified, on a branch | `/bx:tests --fix` |
+| Shrink the suite (no-op tests, test-only dead code, mechanical merges), suite-verified, on a branch | `/bx:tests --fix` |
 | Coverage report-based gap analysis | `/bx:tests --coverage` |
 | Architecture-level health | `/bx:arch` |
 | Not sure which to run | `/bx:health` |

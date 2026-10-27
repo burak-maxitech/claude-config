@@ -2,6 +2,67 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.14.0 — 2026-10-26
+
+`/bx:tests` measures with committed scripts and can now shrink a suite. This is release 2 of the S65
+design (`docs/superpowers/specs/2026-10-26-bx-tests-upkeep-design.md`). Built against two real repos
+(a Next.js app with ~6,600 tests, and a pytest service), with eight scanner runs from the new files
+and a `--fix` dogfood on a throwaway clone.
+
+### Added
+
+- **Scripts measure, scanners judge.** `bx/skills/tests/scripts/` (stdlib Python, read-only, writes
+  only to an OS-temp dir; `run.py` runs all four and writes a manifest):
+  - `test_bodies.py` — one row per test (JS/TS incl. expression-bodied arrows, `.each` and generics;
+    pytest/unittest; Go; Rust; JUnit; bats/shell; Pester): assertion counts by kind, T01a/T01b, the
+    T02 weak-only, T03 and T06 candidate flags, the helper allowlist with its evidence, and token
+    shapes. Recall check on the Next.js repo: 0 tests missed.
+  - `leverage.py` — churn, fan-in resolved to paths (tsconfig/vite aliases, Python dotted and
+    relative imports), entry points, security density on identifier sub-words, the bug-fix lane
+    (`^fix` over the last 200 commits), the flake lane (word-bounded, must name a test), and the
+    growth trend.
+  - `references.py` — per public symbol: production references (code only, `/bx:clean`'s local-use
+    rule), and test references classed as **call / mock / mention** (a `vi.mock`ed or `patch`ed name is
+    a mock, never coverage), routes a test client reaches by URL, the `life_support` lane with
+    successor detection (caller-switched commit, doc comment, thin wrapper, name stem), and test:code
+    ratios per module attributed by what the tests call.
+  - `consolidate.py` — clusters of tests that differ only in literals (multiset Jaccard ≥ 0.9, same
+    setup, ≥ 4 lines saved; calibrated on the Next.js repo), with a computed **merge table** for the
+    mechanical ones.
+  A failed or timed-out script becomes a `coverage_partial` entry instead of a silent zero.
+- **The reduction lane and a third headline.** `life_support` (production code only its tests call:
+  15 symbols on the Next.js repo, matching a backlog list the repo's own `/bx:clean` run had made) and
+  `consolidate` (774 → 251 tests there). The headline is now "Coverage gaps | Tests we can delete |
+  Tests we can consolidate: N → M". The footer carries the growth trend (0.06 → 0.91 test/source
+  LOC in six months).
+- **T06 — name/assertion mismatch** (report-only).
+- **`--fix` became a suite-verified reducer** for three kinds of item — T01a deletions,
+  successor-less life-support deletions, mechanical merges — each with a **count check**: a deletion
+  drops the case count by exactly what it removed, a merge leaves it unchanged. Proven on the clone:
+  a merge that dropped one of three rows left the file green, and only the count check reverted it.
+
+### Changed
+
+- The scan files and agents consume the script output; T03 counts verification assertions only
+  (setup lines and "never called" checks are not coupling); a positive `toBeNull()` and a
+  `getBy*` inside `expect` are no longer weak; `bug_fix_no_test` carries 0 gap lines and stays out of
+  the headline; T05 is reported once, as `consolidate`; sampling limits judgment reads, never script
+  sweeps; monorepos run one script pass and scanner trio per workspace.
+- **`/bx:clean` hands test-only functions to `/bx:tests`** (D6): they appear in a non-finding
+  "Test-only symbols — see /bx:tests" block, never as dead code, so the two skills never delete the
+  same symbol.
+
+### Fixed (found by running)
+
+- Thirteen script defects the scanner runs reported, each fixed in the script: successor and
+  helper-use deletable counts, life-support tests double-counted as merges, fixture imports
+  outvoting the code under test, migrations and `types/` counted as code, `toBeInstanceOf(<Class>)`
+  read as weak, URL-routed handlers read as untested, ORM model classes read as gaps, priority-0
+  ties, and successor detection by name stem alone (it named a sibling for one symbol and missed
+  three replacements). The dogfood found two more: Python test names hid every mechanical cluster
+  (the `def` name now fills the name slot), and the draft revert (`git checkout -- <file>`) would
+  have undone earlier verified items in the same file (reverts now restore a per-item snapshot).
+
 ## 2.13.3 — 2026-10-26
 
 `/bx:tests` deletion safety and finding contract. This is release 1 of the S65 design
