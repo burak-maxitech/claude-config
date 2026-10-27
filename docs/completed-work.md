@@ -283,3 +283,5 @@
 - [x] First JS/TS `/bx:clean` run (horowell) and ten defects fixed in bx 2.13.2 - bx/skills/clean/{SKILL.md,references/scan-files-code.md}, bx/skills/arch/references/scan-exclusions.md, CHANGELOG.md, plugin.json (S64, 4e2dc8a)
 - [x] S65: /bx:tests scrutinized — content review + report-only runs on horowell and maxitech-concierge; 29 defects + 4 reduction gaps; spec docs/superpowers/specs/2026-10-26-bx-tests-upkeep-design.md - commit c72a98d
 - [x] S65: bx 2.13.3 shipped — /bx:tests deletion safety (assertion definition, T01a/T01b, gated suite-verified --fix) + finding contract (coverage_negatives/partial, field semantics, agents cite scan files) - bx/skills/tests/, bx/agents/test-*.md, commit c72a98d
+- [x] `/bx:tests` 2.14.0 — scripts, reduction lane, triple headline, suite-verified `--fix`, D6 (S65, `9f7624a`) - bx/skills/tests/**, bx/agents/test-*.md, bx/skills/clean/**
+- [x] `/bx:tests --fix` dogfood on a throwaway maxitech clone with planted controls + 2 real merges (S65)

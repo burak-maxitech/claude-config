@@ -292,3 +292,18 @@
 **Next session should:**
 - Implement `/bx:tests` 2.14.0 per the spec and verify against its acceptance table
 - Install 2.13.3 and exercise `--fix` on a throwaway branch with a real T01a
+
+### Session 65 (cont.) - 2026-10-26
+**What happened:**
+- Implemented `/bx:tests` 2.14.0 in four phases: `test_bodies.py` (T01 = 0 on horowell, recall 100%), `leverage.py` + `references.py` (verify_request ranks #1, life support with successor), then scan files/catalog/SKILL/template rewired onto script output, then `--fix` extension, D6 and docs (see commit 9f7624a).
+- Eight Sonnet scanner runs from the new files on both repos passed every acceptance control; their friction found 13 script defects (successor/helper deletable counts, double-counted clusters, import-based module attribution, migrations/types as code, toBeInstanceOf weak, URL-routed handlers untested, ORM classes as gaps, priority ties, stem-only successors), all fixed in scripts.
+- `--fix` dogfood on a throwaway maxitech clone with planted controls: red baseline aborted (tzdata + Calendly token), scoped command 210 passed; bad merge dropping a row stayed green, count check reverted it; final 207 = 210 − 1 − 2. Found two more defects: Python def names hid mechanical clusters; `git checkout` revert would undo earlier items (now per-item snapshots).
+- Consolidate threshold calibrated on horowell (0.9 kept, ≥4 saved lines floor).
+- Two heredoc escaping slips broke a script mid-run; the manifest flagged each failed step, so neither produced silent zeros.
+
+**Files created/modified:**
+- `bx/skills/tests/scripts/` (new: test_bodies.py, leverage.py, references.py, consolidate.py, run.py)
+- `bx/skills/tests/{SKILL.md,references/*}`, `bx/agents/test-*.md`, `bx/skills/clean/{SKILL.md,references/scan-files-code.md}`, `bx/skills/arch/references/scale-strategy.md`, `README.md`, `docs/architecture.md`, spec implementation notes, `CHANGELOG.md`, `plugin.json` 2.14.0
+
+**Next session should:**
+- Install 2.14.0 and run `/bx:tests` with the installed agents; try one JS merge under `--fix` on horowell.
