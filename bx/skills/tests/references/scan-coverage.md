@@ -154,6 +154,7 @@ Effort estimate from gap size:
 ## Hard rules
 
 - **`coverage_gap_lines >= 1` mandatory.** Drop zero-gap findings.
+- **`respects_documented_decision: false` means a *document* states an intent the finding contradicts** (for example "we don't unit-test thin controllers"). A known gap, a history note, or the inferred posture never makes a finding `false`. An "always-mocked" module named as a known gap is an ordinary gap, `true`.
 - **Order by `priority_score × certainty` descending.** Cap at 30.
 - **Scope is computed by the orchestrator, not by you.** Scan exactly the file list in your task prompt. Its exclusions — synthetic/fixture trees, vendored and generated dirs, immutable history — are owned by the arch skill's `references/scan-exclusions.md`. **Never widen your own scope**; if something outside the list looks relevant, say so as a note rather than reading it. The fixture rule matters most: planted eval fixtures produce true-shaped findings that are false by construction.
 - **Skip trivial files**: pure type/interface declaration files, single-line constant export files, framework-generated barrel files (`index.ts` that only re-exports).
@@ -169,6 +170,8 @@ heuristic_files_scanned: <int>
 heuristic_files_skipped: <int>
 report_mode: heuristic | report
 report_path_consumed: <path or null>
+coverage_negatives: [<per SKILL.md Step 4 — e.g. bug_fix_no_test clean/unavailable>]
+coverage_partial: [<per SKILL.md Step 4 — e.g. churn computed for src/ only>]
 ```
 
 These power the report's twin headline and footer disclosure.

@@ -2,6 +2,54 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.13.3 — 2026-10-26
+
+`/bx:tests` deletion safety and finding contract. This is release 1 of the S65 design
+(`docs/superpowers/specs/2026-10-26-bx-tests-upkeep-design.md`). Report-only runs on two real repos
+(a Next.js app with 603 test files, and a pytest service) showed that `--fix` could delete real
+tests, and that the scanners produced good results only by overriding their instructions.
+
+### Fixed
+
+- **`--fix` could offer real tests for deletion.** The assertion-free check did not count mock
+  verification (`assert_called*`, `assert_awaited*`), Testing Library `getBy*` queries, or
+  Playwright actions as assertions. Applied literally to the pytest repo, it flagged 13 tests, and
+  12 of them were real tests (~220 lines at certainty 0.95). The catalog now defines an assertion as
+  anything that fails the test on a regression, in one canonical place that the scan file and agent
+  cite.
+- **"Assertion-free" split into two smells.** **T01a (no-op)** calls nothing under test and is the
+  only `--fix`-eligible smell. **T01b (implicit no-raise)** calls code under test and fails if it
+  raises, so it routes to a rewrite and is never deleted. The one genuine candidate on the pytest
+  repo was a deliberate `# Should not raise` test that the old premise ("cannot fail meaningfully")
+  would have deleted.
+- **The helper-allowlist guard was written three ways, all too narrow.** There is now one pattern
+  per language, allowing indentation, `async`, `export` and test-local forms. The scan must report
+  its evidence (patterns, files searched) even at zero. Missing evidence aborts `--fix`; zero *with*
+  evidence continues with a warning. The two rules had previously contradicted each other.
+- **`--fix` never verified anything.** It now requires a feature branch and a clean tree, a green
+  baseline run of the project's own test command, and a per-file rerun after each deletion. An edit
+  whose rerun fails or changes the count unexpectedly is reverted automatically. Step 0 records the
+  test command.
+- **In-flight tests.** The "TODO assert" rule that fix mode cited at scan time now exists in the
+  scan.
+- **Empty and partial results were lost.** `coverage_negatives` sat outside the dispatched block, so
+  no scanner received it; six of six scans improvised prose. Both it and a new `coverage_partial`
+  (for a sweep that crashed or could not handle the layout) are now in the dispatched block and in
+  every addendum. The orchestrator records an unreported zero as partial, never as clean.
+- **`respects_documented_decision` had no definition.** It is `false` only when a document states
+  an intent the finding contradicts; a known gap is not a decision. The name is unchanged because
+  `/bx:arch` shares the field.
+- **The report template taught tolerating a wrong sum** (`14 + 0 + 705 = 719` against 819, called
+  "rounding"). The subtotal check must now match exactly.
+- **Findings fell through `--plan`.** Phase 1 filtered by effort, so medium-effort snapshot
+  deletions belonged to no phase, and a T02 at its default effort could never be a rewrite. Phases
+  now select by deletable vs. rewrite at any effort. The unrendered Step 5.7 grouping is removed.
+- **Agent files restated their scan files and had drifted** (churn command, neighbor list, snapshot
+  floor, severity table). The three `test-*` agents now hold only their role and hard rules, and cite
+  the scan files as canonical. `test-coverage` loses the runtime tools it was forbidden to use.
+- **The sample-tier read cap blocked mechanical sweeps.** It now limits full reads used to verify
+  candidates, not grep or script sweeps.
+
 ## 2.13.2 — 2026-10-23
 
 Second real `/bx:clean` run — the first on a JS/TS codebase (a Next.js 16 app, 1,780 files,

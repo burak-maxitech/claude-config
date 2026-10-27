@@ -13,49 +13,47 @@ Loaded by the orchestrator and passed to the `test-quality` subagent. Detailed s
 
 ## Approach
 
-**Run this once at the start.** Build a catalog of project-defined assertion helpers — this is the critical false-positive guard for T01. Without it, you will delete real tests.
+**Run this once at the start.** Build the project's assertion-helper allowlist. It is the critical false-positive guard for T01: without it, you will delete real tests.
 
 ### Step 0: Build the assertion-helper allowlist
 
-```
-# Grep across ALL paths (including non-test) for helper definitions
-Grep -n -E "^(export )?(function |const |async function )(assert|should|expect|check|verify|ensure|require|must)\w*\b" --type ts --type js
-Grep -n -E "^def (assert|should|expect|check|verify|ensure|require|must)\w*\(" --type py
-Grep -n -E "^(pub )?fn (assert|should|expect|check|verify|ensure|require|must)\w*\(" --type rust
+Use the per-language patterns in the catalog's **What counts as an assertion** section exactly as
+written, across *all* paths. Do not substitute your own anchors. Narrower patterns are how earlier
+runs missed indented, `async` and test-local helpers. Keep a matched name only if a test calls it and
+its body asserts or raises, and record the rejected names with a reason.
 
-# Custom matcher extensions
-Grep -n -E "expect\.extend\s*\(" --type ts --type js
-Grep -n -E "chai\.use\s*\(" --type ts --type js
-Grep -n -E "@pytest\.fixture[^)]*assert" --type py
-```
-
-Record helper names. Pass this allowlist to all T01 detection steps.
+Report the three evidence fields (`helper_allowlist_size`, `helper_allowlist_patterns`,
+`helper_allowlist_files_searched`) in your addendum **even when the size is zero**. `--fix` refuses
+to run without them.
 
 ### Per-entry detection
 
-#### T01 — Assertion-free test
+#### T01 — Assertion-free test (T01a / T01b)
 
 For each test in scope:
 1. Identify test bodies by framework:
-   - Jest/vitest/jasmine: `it(...)` / `test(...)` / `specify(...)` / `it.only(...)` etc. callbacks
-   - Mocha: same plus `.skip`/`.only` variants
-   - pytest: top-level `def test_*` and methods on `class Test*`
+   - Jest/vitest/jasmine/mocha/Playwright: `it(...)` / `test(...)` / `specify(...)` and their
+     `.only`/`.skip`/`.concurrent`/`.each(...)` variants. **This includes expression-bodied arrows**
+     (`it("x", () => expect(f()).toBe(1))`), whose body is the expression itself. A parser that only
+     reads `{ ... }` blocks reports every one of them as empty. That bug produced 18 false T01s on a
+     real run (S65).
+   - pytest: top-level `def test_*` and methods on `class Test*` (including `async def`)
    - unittest: `def test_*` methods on `class *(unittest.TestCase)`
    - Rust: `#[test]` annotated functions
-   - Go: `func Test*(t *testing.T)` and `func Benchmark*` (not subject — skip)
+   - Go: `func Test*(t *testing.T)` (skip `func Benchmark*`)
    - JUnit: `@Test`-annotated methods
-2. For each body, count assertion calls. An assertion is:
-   - Framework matchers: `expect(*)` with `.toBe`/`.toEqual`/`.toMatch`/`.toHaveLength`/`.toThrow`/`.rejects.toThrow` etc.; `chai.expect(*).to.*`; `should.*`; `assert.*`; `t.is/t.deepEqual/t.truthy` (ava)
-   - Pytest: `assert <expr>`, `pytest.raises(...)`, `pytest.warns(...)`, `np.testing.assert_*`
-   - Unittest: `self.assert*`, `self.assertRaises`, `self.assertWarns`
-   - Rust: `assert!`/`assert_eq!`/`assert_ne!`/`debug_assert!*`/`panic!` (in error-path test)
-   - Go: `t.Error`/`t.Errorf`/`t.Fatal`/`t.Fatalf`/`t.Fail`; testify `assert.*` / `require.*`
-   - JUnit: `Assertions.*`, `Assert.*`, `assertThat`
-   - **Project-defined helpers** from your Step 0 allowlist
-3. If count == 0 AND the body has ≥1 non-comment statement, surface a T01 finding.
-4. Boost certainty to 0.95 if body has ≥3 lines AND zero matches; lower to 0.75 if body is short (≤3 lines) — short might be intentional smoke test.
+2. Count assertions using the catalog's definition: mock verification, throwing queries (`getBy*`),
+   Playwright actions, and allowlisted helpers all count.
+3. If the count is 0 and the body has ≥1 non-comment statement, it is a T01 candidate. **Read the
+   candidate body before emitting it.** A script's zero is a hypothesis, not a finding.
+4. Classify it as **T01a** (no-op) or **T01b** (implicit no-raise) per the catalog. When in doubt,
+   use T01b.
+5. Certainty: start at 0.85. Raise it to 0.95 only for T01a bodies of ≥3 statements with nothing
+   under test called. Lower it to 0.5 for an in-flight `TODO assert` comment or for assertions in
+   setup or teardown hooks (both drop below the 0.7 floor).
 
-Setup-hook check: if file uses `beforeEach`/`afterEach`/`setUp`/`tearDown` and those hooks contain assertions, lower certainty to 0.5 for any T01 in this file (the assertions may live in hooks).
+Emit `evidence_body` (the full test body, verbatim) on every T01a and T01b finding. `--fix` shows it
+to the user and re-checks it.
 
 #### T02 — Weak assertion
 
@@ -110,7 +108,7 @@ False-positive guards:
 ```
 {
   "dimension": "quality",
-  "smell_id": "T01" | "T02" | "T03" | "T04" | "T05",
+  "smell_id": "T01a" | "T01b" | "T02" | "T03" | "T04" | "T05",
   "location": "tests/auth/session.test.ts:142-156",
   "title": "<one-line>",
   "severity": "low" | "medium" | "high",
@@ -120,24 +118,26 @@ False-positive guards:
   "deletable_lines": <int>,
   "respects_documented_decision": true | false,
   "recommended_action": "<prose>",
-  "evidence": "<one or two lines naming the specific assertions/lines/mocks observed>"
+  "evidence": "<one or two lines naming the specific assertions/lines/mocks observed>",
+  "evidence_body": "<T01a/T01b only: the full test body, verbatim>"
 }
 ```
 
-`deletable_lines` rules per smell (already in the catalog, repeated here for the subagent's quick reference):
-- T01: test body LOC
+`deletable_lines` rules per smell are owned by the catalog:
+- T01a: the whole test. T01b: **0**.
 - T02, T03, T04: **0**
 - T05: 0 unless `certainty >= 0.85`, then `(body_lines × (n_duplicates - 1)) - parameterization_overhead`, floor at 1
 
 Severity defaults:
-- T01: medium (high if file has multiple T01s suggesting a pattern)
+- T01a: medium (high if the file has several, suggesting a pattern)
+- T01b: low (the test does check something, just implicitly)
 - T02: medium
 - T03: medium
 - T04: low
 - T05: low
 
 Min certainty floors before surfacing:
-- T01: 0.7
+- T01a, T01b: 0.7
 - T02: 0.6
 - T03: 0.55
 - T04: 0.5
@@ -145,7 +145,8 @@ Min certainty floors before surfacing:
 
 ## Hard rules
 
-- **Every finding must have a `smell_id` from T01-T05.** Catalog gaps → `catalog_gap_proposals` at end of output.
+- **Every finding must have a `smell_id` from T01a, T01b, T02–T05.** Catalog gaps → `catalog_gap_proposals` at end of output.
+- **`respects_documented_decision: false` means a *document* states an intent the finding contradicts.** A tests README, an ADR, or a CLAUDE.md testing section counts. A known gap, a history note, or the inferred posture never makes a finding `false`.
 - **Skip non-test paths.** Only files matching common test conventions (`*.test.*`, `*.spec.*`, `_test.go`, `_test.rs`, `test_*.py`, files under `tests/`, `__tests__/`, `spec/`).
 - **Scope is computed by the orchestrator, not by you.** Scan exactly the file list in your task prompt. Its exclusions — synthetic/fixture trees, vendored and generated dirs, immutable history — are owned by the arch skill's `references/scan-exclusions.md`. **Never widen your own scope**; if something outside the list looks relevant, say so as a note rather than reading it. The fixture rule matters most: planted eval fixtures produce true-shaped findings that are false by construction.
 - **Cap output at 30 findings.** Order by `severity_weight × certainty × (1 + log10(deletable_lines + 1))` descending.
@@ -154,13 +155,18 @@ Min certainty floors before surfacing:
 ## Final output addendum
 
 ```
-total_deletable_lines: <sum of T01 + qualifying-T05 deletable lines>
+total_deletable_lines: <sum of T01a + qualifying-T05 deletable lines>
 files_affected: <distinct test files with deletable findings>
 catalog_gap_proposals: [<list of unmatched-smell descriptions, each with a justification>]
-t01_count: <int>
+t01a_count: <int>
+t01b_count: <int>
 t02_count: <int>
 t03_count: <int>
 t04_count: <int>
 t05_count: <int>
 helper_allowlist_size: <int>
+helper_allowlist_patterns: [<the patterns actually run>]
+helper_allowlist_files_searched: <int>
+coverage_negatives: [<per SKILL.md Step 4 — one entry per T-smell that produced nothing>]
+coverage_partial: [<per SKILL.md Step 4 — any check that did not cover its whole scope>]
 ```

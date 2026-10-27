@@ -1,103 +1,127 @@
 # --fix Mode (bx:tests)
 
-Apply T01 (assertion-free test) deletions with per-finding diff preview. **This mode is deliberately the narrowest possible — only one smell type is fix-eligible.** Everything else routes to `--plan`.
+Apply **T01a (no-op test)** deletions, one finding at a time, each previewed, approved and checked
+against the suite. **This mode is deliberately narrow: only one smell type is eligible.** Everything
+else routes to `--plan`.
 
-## Why T01 only
+## Why T01a only
 
-A test with zero assertions cannot fail meaningfully. Deletion is provably safe in a way no other test rewrite is:
+A no-op test calls nothing under test, so it cannot fail on a regression. Deleting it loses no
+check. Every other finding needs judgment:
 
-- T02 (weak assertion) — deletion would *remove* coverage, not fix it. Needs human-written replacement.
-- T03 (mock-heavy) — the right behavior assertion depends on domain knowledge the catalog can't encode.
-- T04 (mystery guest) — the fix is *adding* explicit setup, not deleting.
-- T05 (redundant) — even with high similarity, boundary-value coverage is invisible to static analysis. Conservative route to `--plan`.
-- snapshot_heavy — replacement assertions are domain-specific.
-- coverage gaps — the fix is *writing* tests, not deleting.
-- flakiness — the fix is *investigation*, not deletion (deleting a flaky test hides the underlying race).
+- **T01b (implicit no-raise)**: the body calls code under test and fails if that call starts
+  raising, so it is a real, weak check. Make the contract explicit; never delete it. An earlier
+  version of this mode treated every assertion-free test as deletable, and on a real repo (S65) the
+  only genuine candidate was a deliberate `# Should not raise` test.
+- T02 (weak assertion): deleting removes coverage. It needs a stronger assertion.
+- T03 (mock-heavy): the right behavior assertion depends on domain knowledge.
+- T04 (mystery guest): the fix *adds* explicit setup.
+- T05 (redundant): boundary-value coverage is invisible to static analysis.
+- snapshot_heavy: replacement assertions are domain-specific.
+- Coverage gaps: the fix is *writing* tests.
+- Flakiness: the fix is investigation. Deleting a flaky test hides the race.
 
-T01 is unique: the test asserts nothing, so removing it cannot regress coverage of anything that was actually being tested. Worst case the user re-adds it with proper assertions later.
+## Eligibility — every condition must hold
 
-## Hard restrictions
-
-A finding is `--fix-eligible` only if **all** are true:
-
-1. `smell_id == "T01"`
+1. `smell_id == "T01a"`
 2. `respects_documented_decision: true`
-3. `certainty >= 0.7` (the T01 floor — already enforced at scan time, but re-verify)
-4. The orchestrator's assertion-helper allowlist scan ran successfully (`helper_allowlist_size` is present in test-quality's footer). If for any reason it didn't, **abort the entire --fix pass** with an error — never delete T01 findings without the false-positive guard.
-5. The test body contains no `console.log` / `print(...)` / `eprintln!` / `fmt.Println` immediately followed by a comment like `// TODO assert` or `# TODO`. These are in-flight tests; lower certainty to 0.5 at scan time, but defensively re-check here.
+3. `certainty >= 0.7`
+4. `evidence_body` is present, and **you re-read the current body from the file and confirm, by
+   the catalog's assertion definition, that it still has zero assertions and calls nothing under
+   test.** Mock verification (`assert_called*`, `toHaveBeenCalled*`), throwing queries (`getBy*`)
+   and Playwright actions are assertions. If the body calls code under test, it is T01b: route it to
+   `--plan`.
+5. The body has no `TODO`/`FIXME` comment about asserting. That marks an in-flight test.
+6. The body is not inside a `describe.each` / `it.each` / `@pytest.mark.parametrize` block.
 
-Anything failing any of these auto-routes to `--plan` instead, with a one-line note:
+Anything failing a condition auto-routes to `--plan` with a one-line note:
 
-> Auto-routed N findings to --plan (not T01, low-certainty, or conflicts with documented posture).
+> Auto-routed N findings to --plan (T01b / not T01a, low certainty, in-flight, parameterized, or conflicts with documented posture).
 
-## Pre-flight check
-
-Before showing the first finding, verify:
+## Pre-flight — all must pass, or abort the pass
 
 ```
-1. test-quality's footer included `helper_allowlist_size: <N>` — if missing or N == 0, surface a warning:
-   "WARNING: Project-defined assertion helper scan returned 0 helpers. This is unusual unless the project uses only framework matchers. Continuing anyway, but review each diff carefully."
+1. Allowlist evidence. test-quality's addendum must contain helper_allowlist_size,
+   helper_allowlist_patterns and helper_allowlist_files_searched.
+   - Any field missing → ABORT: "The assertion-helper guard did not run. Not deleting anything."
+   - Present with size 0 → continue, with a warning:
+     "0 project assertion helpers found (searched <files> files with <patterns>). Normal for
+      repos using only framework matchers. Review each body carefully."
 
-2. Confirm with user once before starting:
-   "About to walk N T01 findings for per-finding deletion gate. Continue? [y/n]"
+2. Branch and tree. `git rev-parse --abbrev-ref HEAD` must not be the default branch, and
+   `git status --porcelain` must be empty.
+   - Otherwise → ABORT: "Run --fix on a fresh branch with a clean tree:
+     git checkout -b bx-tests-fix". Multi-file deletions are undone with git, not checkpoints.
+
+3. Green baseline. Run the test command recorded in Step 0 once, over the whole suite.
+   Record the pass/fail state and the test count.
+   - Red, or no runnable command → ABORT: "The suite is not green before any edit
+     (<summary>). Fix that first; a deletion cannot be verified against a red baseline."
+
+4. Confirm once:
+   "About to walk N T01a findings (M auto-routed to --plan). Baseline: <count> tests passing.
+    Continue? [y/n]"
 ```
-
-Show the count of T01 findings the user will see and the count auto-routed to `--plan`.
 
 ## Per-finding gate flow
 
-For each eligible finding, in rank order:
+For each eligible finding, in rank order (files with several findings: bottom to top, so
+`old_string` edits never collide):
 
 ```
 ─────────────────────────────────────────────────────
-[Finding 1 of 5] T01 — Assertion-free test
+[Finding 1 of 3] T01a — No-op test
 tests/auth/login.test.ts:142-156
 
-Test name: "logs in valid user"
+Test name: "renders without props"
 
-Current test body:
-  it('logs in valid user', async () => {
-    const user = await createUser({ email: 'a@b.com' });
-    const session = await login(user.email, 'password');
-    // Asserts: none found.
-    // Helper allowlist scanned for these names: assertValidSession, expectAuthenticated, ...
+Current test body (re-read from the file just now):
+  it('renders without props', () => {
+    const props = {};
+    // nothing asserted, nothing under test called
   });
 
 Evidence:
-  - Body has 3 statements, 0 assertion calls
-  - No assertion-helper names from allowlist matched
-  - No after-hooks contain assertions
-  - Test name does NOT match "does not throw" / "is callable" / "is defined" patterns
+  - 2 statements, 0 assertions by the catalog definition
+  - Calls nothing under test (only local literals)
+  - No allowlisted helper, no hook assertions, not parameterized, no TODO-assert comment
 
 Proposed change (diff):
   --- tests/auth/login.test.ts
   +++ tests/auth/login.test.ts
-  @@ -142,15 +142,1 @@
-  -  it('logs in valid user', async () => {
-  -    const user = await createUser({ email: 'a@b.com' });
-  -    const session = await login(user.email, 'password');
+  @@ -142,4 +142,0 @@
+  -  it('renders without props', () => {
+  -    const props = {};
   -  });
 
 After this deletion:
-  - Surrounding `describe('login', ...)` block still has 4 other tests → no parent prompt.
+  - Surrounding describe('login', ...) still has 4 tests → no parent prompt.
   - File still has 11 tests → no file prompt.
 
 Apply? [y / n / skip / abort]
 ```
 
 User responses:
-- `y` — apply via `Edit` (delete the test block). Advance to next finding.
-- `n` — record "rejected" (do not re-show this run). Advance.
-- `skip` — record "skipped (revisit later)". Advance.
-- `abort` — stop the whole `--fix` pass. Already-applied edits stay; `/rewind` reverts the whole turn's batch (checkpoints are per user prompt, not per edit).
+- `y`: apply with `Edit` (the whole test block in `old_string`). Then **verify** (below).
+- `n`: record "rejected"; do not re-show it this run. Advance.
+- `skip`: record "skipped (revisit later)". Advance.
+- `abort`: stop the pass. Applied and verified edits stay; the branch is the undo.
 
-## Cascading prompts (after each deletion)
+### Verify after each applied edit
 
-After applying a T01 deletion, check two conditions before advancing to the next finding:
+Run the test command recorded in Step 0 on **the edited file only**.
+
+- It passes, with the test count down by exactly the number of tests deleted: record it as applied.
+- Anything else (a new failure, a collection error, an unexpected count): **revert that one edit**
+  (`git checkout -- <file>`), record "reverted: <one-line reason>", and continue with the next
+  finding. A no-op test whose removal changes the outcome was not a no-op.
+
+## Cascading prompts (after each verified deletion)
 
 ### 1. Parent block empty?
 
-If the surrounding `describe(...)` / `context(...)` / `class Test*:` (Python) / `mod tests {...}` (Rust) block now has zero child tests, prompt separately:
+If the surrounding `describe(...)` / `context(...)` / `class Test*:` / `mod tests {...}` now has
+zero tests, prompt separately:
 
 ```
 ─────────────────────────────────────────────────────
@@ -109,66 +133,70 @@ Was wrapping 1 test, now wrapping 0.
 Delete the empty parent block? [y / n / skip]
 ```
 
-User responses are independent of the prior T01 prompt — this is a separate question.
+An applied parent deletion is verified the same way.
 
 ### 2. File now has zero tests?
-
-If the file now contains zero `it/test/def test_*/#[test]/func Test*` declarations, prompt:
 
 ```
 ─────────────────────────────────────────────────────
 Cascade: file has zero tests
 
 File: tests/auth/login.test.ts
-After deletions, 0 tests remain. The file likely only contains imports and helpers now.
+After deletions, 0 tests remain.
 
-Recommendation: this is now /bx:clean territory (orphaned test file). Do NOT delete here.
-Re-run /bx:clean after the --fix pass completes; cleanup-styles-tests will catch it.
+This is /bx:clean territory (orphaned test file). Not deleting it here.
+Re-run /bx:clean after this pass; cleanup-styles-tests will catch it.
 
 Continue with next finding? [y/n]
 ```
 
-Do not delete the file from `--fix` mode — `/bx:clean` owns whole-file deletions. The prompt is informational + cross-skill routing.
+`/bx:clean` owns whole-file deletions.
 
 ## After all findings processed
 
-Print a summary:
+Run the full suite once more and compare it with the baseline: same pass state, count down by
+exactly the number of tests applied. If not, say so plainly and name the last applied edits.
 
 ```
 --fix pass complete.
 
-Applied: 3 T01 deletions
+Applied (verified): 3 T01a deletions
+Reverted (suite changed): 0
 Rejected: 1
 Skipped: 1
 Auto-routed to --plan: 7
 Cascade-deleted empty parent blocks: 1
 Files flagged for /bx:clean follow-up: 0
+Final suite: <count> passing (baseline <count>, −3 as expected)
 
-Undo: run /rewind (or Esc Esc on an empty prompt) — checkpoints are per user prompt, not per edit, so one rewind reverts this whole pass, not a single edit.
-Whole-pass undo: if you did this on a branch, `git checkout main && git branch -D <fix-branch>` discards all changes.
+Undo: everything is on branch <branch>. `git diff <default>...` reviews it;
+`git checkout <default> && git branch -D <branch>` discards it.
 
 Suggested follow-up:
-- Re-run /bx:tests --plan to convert remaining T02/T03/T04 findings into rewrite briefs.
+- Re-run /bx:tests --plan for T01b/T02/T03/T04 rewrite briefs.
 - Run /bx:clean if any file-level cascades pointed there.
 ```
 
 ## Tool usage
 
-- Use the `Edit` tool with exact `old_string` / `new_string` for each change. Include the full test block (from `it(...)` open through closing `});`) in `old_string`.
-- Always show the diff *before* applying — never apply and ask later.
-- If the same file has multiple T01 findings, process them sequentially from bottom to top (highest line number first) so earlier line numbers stay valid across edits.
-- After each edit, allow the harness state to update; do not batch multiple Edits to the same file in a single tool call.
+- Use `Edit` with the full test block (from `it(...)` / `def test_` through its end) as `old_string`.
+- Always show the diff before applying. Never apply first and ask afterwards.
+- One `Edit` per finding, then its verification run, before the next finding.
+- The only commands this mode runs: `git rev-parse`, `git status`, `git checkout -- <file>`, and the
+  test command recorded in Step 0.
 
 ## Edge cases
 
-- **Edit tool errors (non-unique `old_string`)**: abort that finding only, mark as "skipped (could not apply mechanically)", continue. Surface in the summary.
-- **Comment lines** between the test and the previous test: include in the deletion only if the comment directly references the deleted test (`// TODO: assert against returned session`). Otherwise leave alone.
-- **Test inside a `describe.each` / `it.each` loop**: T01 finding here is suspicious — the assertion may live in the iteration callback. Defensively skip with a warning, route to `--plan`.
+- **`Edit` fails (non-unique `old_string`):** skip that finding, mark it "skipped (could not apply
+  mechanically)", continue.
+- **Comment lines** above the test: include them only if they refer to the deleted test.
+- **The test command cannot target one file:** run the full suite per edit, and say so once in
+  pre-flight.
 
 ## What this mode does NOT do
 
-- Run tests after edits (call `/bx:review --verify` separately if you want that)
-- Delete other smell types (T02-T05 always route to `--plan`)
-- Delete whole files (cross-skill routing to `/bx:clean`)
-- Delete imports left orphaned by the test deletion (handled by linter / formatter / future `/bx:clean` pass)
+- Delete anything but T01a (T01b–T05 always route to `--plan`)
+- Delete whole files (routed to `/bx:clean`)
+- Delete imports left orphaned by a deletion (linter / formatter / `/bx:clean`)
 - Update snapshot files (snapshot_heavy is `--plan`-only)
+- Run on the default branch or a dirty tree

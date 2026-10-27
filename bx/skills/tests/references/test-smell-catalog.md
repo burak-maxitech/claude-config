@@ -1,33 +1,93 @@
 # Test Smell Catalog — T-prefix entries
 
-Each entry follows the same schema as the arch catalogs, whose canonical rules live in `../arch/references/catalog-rules.md` — resolve that against **this skill's base directory** (`bx/skills/tests/`), not against this file's directory. The S-prefix entries this catalog was modelled on are in the sibling `catalog-simplification.md`. The `test-quality` subagent must cite an entry by ID in `smell_id`. Entries marked `--fix-eligible: true` may be auto-applied in `--fix` mode (still gated by per-finding diff preview).
+Each entry follows the same schema as the arch catalogs, whose canonical rules live in `../arch/references/catalog-rules.md` — resolve that against **this skill's base directory** (`bx/skills/tests/`), not against this file's directory. The S-prefix entries this catalog was modelled on are in the sibling `catalog-simplification.md`. The `test-quality` subagent must cite an entry by ID in `smell_id`. Only `T01a` is `--fix`-eligible, and only through the gated flow in `fix-mode-test.md`.
 
 ## Rules for the catalog
 
 - **Languages tag is binding.** Detection patterns are language-aware. Don't fire a Jest matcher rule on a pytest file.
-- **`deletable_lines` is honest.** Only T01 (every line) and confirmed-T05 (overlap minus parameter overhead) and snapshot-heavy (in test-economics) contribute to the report's deletion headline. T02/T03/T04 are *rewritable*, not deletable — report `deletable_lines: 0`.
+- **`deletable_lines` is honest.** Only T01a (every line) and confirmed-T05 (overlap minus parameter overhead) and snapshot-heavy (in test-economics) contribute to the report's deletion headline. T02/T03/T04 are *rewritable*, not deletable — report `deletable_lines: 0`.
 - **False-positive guards are mandatory.** Test smells over-fire easily; every entry below includes a guard the subagent must run first.
 
 ---
 
-## T01 — Assertion-free test
+## What counts as an assertion
+
+**This section is canonical.** `scan-quality.md`, `fix-mode-test.md` and the `test-quality` agent cite
+it; none of them restates it.
+
+**An assertion is any call that fails the test when the code under test regresses.** That includes
+calls that throw, not only calls named `assert` or `expect`. Two real runs (S65) showed what a
+narrower list does: it classed 12 real pytest tests whose only checks were `mock.assert_called_once()`
+as assertion-free, and offered them for deletion at certainty 0.95.
+
+| Language | Counts as an assertion |
+|---|---|
+| JS/TS | `expect(` (incl. `expect.soft`, `expect.poll`, `.resolves`/`.rejects`); `assert.*` / `assert(`; `chai.expect`/`chai.assert`/`should`; ava `t.*`; mock verification (`toHaveBeenCalled*`, `toHaveBeenNthCalledWith`, `verify(`); **Testing Library queries that throw on a miss** (`getBy*`, `getAllBy*`, `findBy*`, `findAllBy*`, called bare or on `screen`/a render result); **Playwright locator actions and `expect`** (`page.click`, `locator.click/fill/check`, `waitForSelector`, `waitForURL`); `expectTypeOf`/`assertType` |
+| Python | `assert` statements; `self.assert*`; `pytest.raises` / `pytest.warns`; `np.testing.assert_*`; **mock verification** (`.assert_called*`, `.assert_awaited*`, `.assert_not_called`, `.assert_not_awaited`, `.assert_has_calls`, `.assert_any_call`) |
+| Rust | `assert!`, `assert_eq!`, `assert_ne!`, `debug_assert*`, `panic!` in an error-path test, `#[should_panic]` on the function |
+| Go | `t.Error*`, `t.Fatal*`, `t.Fail*`; testify `assert.*`, `require.*` |
+| JVM | `Assertions.*`, `Assert.*`, `assertThat`, mockito `verify(` |
+| Shell / PowerShell | a call to the harness's `fail`/`pass`/`assert_*` helper, `exit 1` on a failed comparison, Pester `Should` |
+| All | a call to a **project-defined assertion helper** from the allowlist below |
+
+**Project-defined assertion helpers (the allowlist).** Search *every* path, test and non-test, with
+one pattern per language. Leading whitespace is allowed, so class methods and nested helpers match,
+and so do `export`, `async` and test-local `const` forms:
+
+```
+JS/TS:  ^\s*(export\s+)?(default\s+)?(async\s+)?(function\s+|const\s+|let\s+)(assert|should|expect|check|verify|ensure|require|must)\w*
+Python: ^\s*(async\s+)?def\s+(assert|should|expect|check|verify|ensure|require|must)\w*\s*\(
+Rust:   ^\s*(pub(\([a-z]+\))?\s+)?fn\s+(assert|should|expect|check|verify|ensure|require|must)\w*
+Go:     ^func\s+(\([^)]*\)\s*)?(assert|should|expect|check|verify|ensure|require|must)\w*\(
+```
+
+Also record names exported through `expect.extend(...)`, `chai.use(...)` and `pytest_plugins`. A
+matching name is a production function as often as a helper (`should_process_email`, `verify_request`).
+Keep a name only if a test calls it **and** its body asserts or raises. Record what was rejected and
+why.
+
+**Evidence the allowlist ran** is mandatory output, even when zero helpers survive:
+`helper_allowlist_size`, `helper_allowlist_patterns` (the patterns actually used) and
+`helper_allowlist_files_searched` (the number of files the patterns ran over, not the number that
+matched). A zero with evidence is a legitimate result. A missing field means
+the guard did not run.
+
+---
+
+## T01 — Assertion-free test (two kinds)
 
 - **Languages:** all
-- **Detect when:** a test function body contains zero assertion-shaped calls.
-  - JS/TS (jest/vitest/mocha/jasmine): no `expect(`, no `assert.`, no `chai.expect`, no `should`, no `t.is`/`t.deepEqual` (ava), no `chai.assert`
-  - Python (pytest/unittest): no `assert ` statement, no `self.assert*` method call, no `pytest.raises` context, no `pytest.warns`
-  - Rust: no `assert!` / `assert_eq!` / `assert_ne!` / `debug_assert*` / `panic!`-in-error-path
-  - Go: no `t.Error*` / `t.Fatal*` / `t.Fail*` / `require.*` / `assert.*` (testify)
-  - JVM (JUnit): no `Assertions.*` / `Assert.*` / `assertThat`
-- **Replace with:** delete the test entirely. Greenness from a no-op test is a lie.
-- **Lines deletable:** entire test body LOC, including the `it(...)` / `def test_...` wrapper. If the surrounding `describe`/`context` becomes empty after deletion, the orchestrator's `--fix` flow prompts about parent-block removal.
-- **`--fix-eligible:`** **true** — the only T-entry that is. Deletion is provably safe: a test that asserts nothing cannot fail meaningfully.
-- **Min certainty floor to surface:** 0.7
+- **Detect when:** a test body contains **zero assertions** as defined above, after the guards below.
+  Then classify it, because the two kinds call for opposite actions:
+  - **T01a — No-op test.** The body calls nothing under test. It holds only literals, local setup,
+    `pass`, logging, or calls to mocks and fixtures. It cannot fail on a regression.
+  - **T01b — Implicit no-raise test.** The body calls code under test and relies on "no exception
+    propagated" as its check. It *does* fail if that call starts raising, so it is a weak test, not a
+    fake one. Signals include a `# should not raise` / `// does not throw` comment, a test name
+    containing `does not raise|does not throw|handles|gracefully|no error|is safe`, or any call into
+    a module under test. **When in doubt, it is T01b.** The cost of the error is one-sided: a
+    wrongly-kept T01a costs a few lines, and a wrongly-deleted T01b removes a real check.
+- **Replace with:**
+  - T01a: delete the test.
+  - T01b: make the contract explicit. Assert the post-state (`assert wr._renewal_task is None`), or
+    use an explicit no-raise form (`expect(() => f()).not.toThrow()`, `await expect(p).resolves...`,
+    or a call plus a value assertion). **Never delete.**
+- **Lines deletable:** T01a: the whole test including its `it(...)` / `def test_...` wrapper. T01b:
+  **0**.
+- **`--fix-eligible:`** **T01a only.** T01b routes to `--plan` as a rewrite.
+- **Min certainty floor to surface:** 0.7 for both.
+- **In-flight tests:** a body with a `TODO`/`FIXME` comment that mentions asserting
+  (`# TODO assert`, `// TODO: check`) is unfinished, not fake. Lower certainty to 0.5, which drops
+  it below the floor and out of `--fix`.
 - **False-positive guards (the subagent MUST run these first):**
-  1. **Project-defined assertion helpers.** Grep the entire codebase for definitions matching `^(function |def |fn |const )\s*(assert|should|expect|check|verify|ensure|require|must)\w*`. Any test body calling one of these matched names is **not** assertion-free.
-  2. **Custom matcher extensions.** Grep for `expect.extend({...})` (Jest), `expect_extends` (vitest), `pytest_plugins` definitions adding assertion helpers, `chai.use(...)` plugin loads. Treat their exported names as assertion calls.
-  3. **Hook-based assertions.** Some setups assert in `afterEach` / `tearDown`. If the test file's setup hooks contain assertions and the body just sets up state for the hook to check, do not flag.
-  4. **Property-based generators.** `fast-check`, `hypothesis`, `proptest` — bodies often look bare because the assertion is in the generator callback. Check for these imports before flagging.
+  1. **The assertion definition above**, including mock verification, throwing queries and the
+     project-helper allowlist.
+  2. **Hook-based assertions.** If the file's `afterEach`/`tearDown`/fixture teardown asserts, the
+     body may only set up state for it. Lower certainty to 0.5.
+  3. **Property-based generators.** `fast-check`, `hypothesis`, `proptest`: the assertion lives in
+     the generator callback. Check for these imports before flagging.
+  4. **Parameterized wrappers.** A body inside `describe.each`/`it.each`/`@pytest.mark.parametrize`
+     whose assertion lives in a shared helper. Read the helper before flagging.
 
 ---
 

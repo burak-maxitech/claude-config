@@ -103,7 +103,7 @@ For each commit hash, `git show --stat --name-only <hash>` (one call per commit)
 ## Hard rules
 
 - **`deletable_lines >= 1` ONLY for `economic_signal == "snapshot_heavy"`.** Other signals always report 0 — the twin-headline math depends on this.
-- **Honor `respects_documented_decision`.** Snapshots in paths the intent summary marks as "visual-regression boundary" (e.g. `components/`) → mark `respects_documented_decision: false`.
+- **Honor `respects_documented_decision`.** `false` means a *document* states an intent the finding contradicts; a known gap or the inferred posture never makes a finding `false`. Snapshots in paths the intent summary marks as "visual-regression boundary" (e.g. `components/`) → mark `respects_documented_decision: false`.
 - **Scope is computed by the orchestrator, not by you.** Scan exactly the file list in your task prompt. Its exclusions — synthetic/fixture trees, vendored and generated dirs, immutable history — are owned by the arch skill's `references/scan-exclusions.md`. **Never widen your own scope**; if something outside the list looks relevant, say so as a note rather than reading it. The fixture rule matters most: planted eval fixtures produce true-shaped findings that are false by construction.
 - **Cap output at 25 findings**, ordered by `severity_weight × certainty × (1 + log10(deletable_lines + 1))` desc.
 
@@ -129,4 +129,10 @@ flakiness_findings_count: <int>
 ratio_findings_count: <int>
 total_deletable_lines: <same as snapshot_deletable_lines — economics only contributes via snapshots>
 files_affected: <distinct test files with snapshot_heavy>
+coverage_negatives: [<per SKILL.md Step 4 — one entry per category: snapshot_heavy, flakiness_marker, flakiness_history, ratio_over, ratio_under>]
+coverage_partial: [<per SKILL.md Step 4 — e.g. ratio scan could not attribute tests in a flat tests/ dir>]
 ```
+
+A count of 0 reads as "clean" to anyone skimming the addendum. **Every category with a 0 count
+needs a matching `coverage_negatives` entry**, so that "unavailable" (no snapshot mechanism at all)
+cannot be mistaken for "clean".

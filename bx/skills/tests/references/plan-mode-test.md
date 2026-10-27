@@ -10,18 +10,21 @@ The shape mirrors `bx:arch/references/plan-mode.md` but the phases and hand-off 
 
 After the report is built, group findings into phases:
 
-1. **Phase 1: Quick wins (deletions)**
-   - All findings with `effort_estimate ∈ {trivial, small}` AND `respects_documented_decision: true` AND `deletable_lines > 0`
-   - Ordered: T01 first (provably safe), then snapshot_heavy (largest deletions earn the leverage), then qualifying T05
-   - **Hand-off:** these go straight to `/bx:tests --fix` for T01s, or a one-shot rewrite session for snapshot_heavy / T05.
+1. **Phase 1: Deletions**
+   - All findings with `deletable_lines > 0` AND `respects_documented_decision: true`, **at any
+     effort**. An effort filter here once left medium-effort `snapshot_heavy` findings in no phase
+     at all.
+   - Ordered: T01a first (no-op tests, gated by `--fix`), then snapshot_heavy (largest deletions earn the leverage), then qualifying T05; effort ascending within each
+   - **Hand-off:** `/bx:tests --fix` on a branch for T01a; a one-shot rewrite session for snapshot_heavy / T05.
 
 2. **Phase 2: Coverage gaps on critical paths**
    - All findings with `dimension == coverage` AND `respects_documented_decision: true`
    - Ordered by `priority_score × certainty`
    - **Hand-off:** one `/bx:plan` brief per high-priority gap; the high-rank gaps deserve dedicated test-writing sessions.
 
-3. **Phase 3: Strategic rewrites (T02/T03/T04)**
-   - Findings with `dimension == quality` AND `smell_id ∈ {T02, T03, T04}` AND `respects_documented_decision: true`
+3. **Phase 3: Rewrites (T01b/T02/T03/T04, plus T05 with no deletable lines)**
+   - Findings with `dimension == quality` AND `deletable_lines == 0` AND `respects_documented_decision: true`, **at any effort**
+   - T01b briefs say "make the no-raise contract explicit": assert the post-state, or use an explicit no-raise form. Never "delete".
    - Order by rank score
    - **Hand-off:** these need human judgment about *what* to assert / how to decouple from mocks / how to make fixtures explicit. One `/bx:plan` per finding or per cluster.
 
@@ -46,7 +49,7 @@ Replace Section 4 of the standard report with:
 
 Low-risk, high-leverage. Run a single follow-up session.
 
-**1.1** T01 — Assertion-free test (`tests/auth/login.test.ts:142-156`)
+**1.1** T01a — No-op test (`tests/auth/login.test.ts:142-156`)
 - Effort: trivial | Lines Δ: -14
 - Action: run `/bx:tests --fix` to delete after diff preview.
 
@@ -57,7 +60,7 @@ Low-risk, high-leverage. Run a single follow-up session.
 /bx:plan "Convert tests/components/Page.test.tsx from a single bulk toMatchSnapshot to 3 focused property assertions: title, child count, aria-attributes. Delete the __snapshots__/Page.test.tsx.snap file. Behavior coverage stays the same; LOC drops by ~705."
 \`\`\`
 
-Hand-off for T01s: `/bx:tests --fix` (per-finding gate).
+Hand-off for T01a: `/bx:tests --fix` on a branch (per-finding gate, suite-verified).
 
 ---
 
@@ -77,7 +80,7 @@ Hand-off:
 
 ---
 
-### Phase 3 — Strategic Rewrites (T02/T03/T04, N findings)
+### Phase 3 — Rewrites (T01b/T02/T03/T04/T05, N findings)
 
 These require interview-level context: what should be asserted, how to decouple from mocks, how to surface mystery-guest dependencies.
 
@@ -132,7 +135,7 @@ Each `/bx:plan <brief>` snippet must be **fully self-contained**:
 
 ## What this mode does NOT do
 
-- Apply edits (use `--fix` for T01s)
+- Apply edits (use `--fix` for T01a)
 - Spawn subagents
 - Hydrate tasks directly (user runs `/bx:plan` per brief → that hydrates tasks via its own flow)
 - Run coverage tooling (that's `--coverage` in default mode, never inside `--plan`)

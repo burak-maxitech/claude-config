@@ -86,11 +86,11 @@ For bug-fix-without-regression findings, render them as a separate row block at 
 ### Quality
 
 ```
-### Quality Smells (— deletable subset: <T01+T05 deletable_lines> lines)
+### Quality Smells (— deletable subset: <T01a+T05 deletable_lines> lines)
 
 | Rank | Location                            | Title                              | Smell | Sev | Cert | Effort | Lines Δ |
 |------|-------------------------------------|------------------------------------|-------|-----|------|--------|---------|
-| 1    | tests/auth/login.test.ts:142-156    | Assertion-free test                | T01   | M   | 0.95 | trivial| -14     |
+| 1    | tests/auth/login.test.ts:142-156    | No-op test                         | T01a  | M   | 0.95 | trivial| -14     |
 | 2    | tests/api/users.test.ts:80-220      | Mock-heavy, no behavior assertion  | T03   | M   | 0.75 | medium | 0       |
 | ...  | ...                                 | ...                                | ...   | ... | ...  | ...    | ...     |
 ```
@@ -158,7 +158,7 @@ If empty: render `## ⚠ Documented-Decision Conflicts\n\nNone — all findings 
 ```
 
 If `--plan` flag is set, this section is replaced by the full phased brief (see Step 7 in SKILL.md).
-If `--fix` flag is set, this section is replaced by the per-finding T01 gate flow (see Step 7 in SKILL.md).
+If `--fix` flag is set, this section is replaced by the per-finding T01a gate flow (see Step 7 in SKILL.md).
 
 ---
 
@@ -176,14 +176,15 @@ Source files skipped: 37   [reason: priority_score below cutoff or non-source]
 
 Twin-headline math:
 - coverage_gap_total: 312 lines across 18 files (from test-coverage)
-- deletable_total: 819 lines across 4 files
-  - T01 (assertion-free): 1 finding, 14 lines
+- deletable_total: 719 lines across 2 files
+  - T01a (no-op): 1 finding, 14 lines
   - T05 (confirmed duplicate): 0 findings, 0 lines
   - snapshot_heavy: 1 finding, 705 lines
-  - Subtotal-check: 14 + 0 + 705 = 719 — discrepancy means rounding or near-duplicate adjustment
+  - Subtotal-check: 14 + 0 + 705 = 719 ✓
 
 T-catalog hit counts:
-- T01: 1
+- T01a (no-op, deletable): 1
+- T01b (implicit no-raise, rewrite): 0
 - T02: 4
 - T03: 6
 - T04: 2
@@ -201,8 +202,13 @@ genuinely checked:
 - flakiness_history — unavailable: no CI, so no flake-fix commits exist to mine
 - (render `none reported` when no subagent returned any)
 
+Partial coverage (checks that ran but did not cover their whole scope — their counts above are
+lower bounds, not results):
+- T05 (redundant) — 212 of 603 test files swept: scanner script crashed on output
+- (render `none` when every check covered its scope)
+
 Defer to /bx:clean for: orphaned test files, stale snapshots, >3mo skipped tests, unused test helpers.
 Defer to /code-review or /bx:review for: per-commit / per-PR test quality.
 ```
 
-The footer's "subtotal-check" line is intentionally surfaced — if the orchestrator's arithmetic doesn't add up, the user sees it immediately rather than the headline silently lying. If subtotals do match exactly, render the line as "Subtotal-check: <a> + <b> + <c> = <total> ✓".
+The footer's "subtotal-check" line is intentionally surfaced. The totals are integer sums, so they must match exactly; render "Subtotal-check: <a> + <b> + <c> = <total> ✓". A mismatch is an arithmetic error: fix the aggregation before rendering, never explain it away as rounding.
