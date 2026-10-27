@@ -169,61 +169,11 @@
 - Push 2.11.1, refresh the plugin, run `/bx:evolve` once more to see the truncation fix and the new allowlist rows work
 - Fix the three 2.11.0 run-found defects; then improvements 7–10
 
-### Session 62 - 2026-10-21
-**What happened:**
-- Fixed the two `/bx:save --full` defects from S61: the Full Path is now a nine-step sequence with the sweep (Parts 0.5/2/3/4/1.10/5/6/7) before the writer dispatch, packet `old` strings sourced post-sweep, a `Full sweep:` session bullet, and pending-entry accounting in Parts 5/6/7.7; the Known Issues open phase qualifies by saving (entry ≥ 500 chars longer than its composed replacement line) with a *looks resolved — confirm* heading. Lint K20 updated, K23 added (watched failing first).
-- Fixed the three `/bx:evolve` 2.11.0 run-found defects: Step 1.5 lane freshness (changelog head via `git ls-remote --tags`, verified equal to the 2.1.306 watermark; docs via the page probe; community same-day), fix-mode re-grep classifies edit shape (replacement → old token absent = done; additive → new text present = done; ambiguous gates on all files), Step 3.4 pain-id match (adopts the stored entry, appends the citation, skips the hash comparison).
-- Shipped improvements 7–10 as bx 2.12.0: `references/lane-contract.md` owns the shared lane text (scan files −300 lines net, drift check clean); `scripts/docs-page-hashes.py` hashes all 22 allowlisted pages via `<url>.md` (text/markdown, stable across fetches) into `watermark.docs_pages` with `inventory_hash` forcing a full re-read when the inventory changes; `scripts/build-capabilities.py` pins `capabilities.json` (434 entries; `--check` reports drift, `--fix` offers regeneration); `scan-community.md` rewritten as a discovery feed (official domains + `anthropics/*` maintainer posts → `allowlist_candidates`, `findings: []`). Interview answers: generated + drift report; discovery feed only.
-- Verified by running: one docs-lane dispatch (one page; conformant footer, counted gate discard) and one community-lane dispatch (3 queries, 2 fetches, 2 reasoned discards, no findings). `check-state.py` + 2 new planted failures, `check-doc-rule-consistency.sh`, `check-known-issues-governance.sh`, `claude plugin validate --strict` all pass.
-- Full sweep (first run of the reordered path): compressed S57–58 (session-history 46.3k → 39.0k), moved 6 Key Decisions rows (CLAUDE.md 13.9k → 12.2k, still ~160 chars over the soft cap with no section over threshold), repaired the blank line that split the Key Decisions table, README/architecture trees list the new evolve files, memory `claude-docs-md-endpoint` added; archives all under 100k, no rotation.
+### Session 62 - 2026-10-21: `/bx:save --full` sweep-before-writer reorder + saving-based Known Issues open phase; `/bx:evolve` 2.12.0 — `lane-contract.md`, `docs-page-hashes.py` page probe, pinned `capabilities.json`, community lane as discovery feed (commit: 78fdc68)
 
-**Files created/modified:**
-- `bx/skills/save/references/mode-update.md`, `verification-checklists.md`, `tests/check-known-issues-governance.sh` — Full Path reorder, open-phase rule, lint pins
-- `bx/skills/evolve/SKILL.md`, `references/{lane-contract.md (new), scan-changelog.md, scan-docs.md, scan-community.md (rewritten), fix-mode-evolve.md, report-template.md, state-schema.md}`, `scripts/{docs-page-hashes.py, build-capabilities.py} (new)`, `capabilities.json (new)`, `tests/{check-state.py, test-check-state.sh}`
-- `bx/agents/upstream-community.md`, `docs/upstream/state.json` (six-key watermark), `README.md`, `workflow.md`, `docs/architecture.md`, `CHANGELOG.md` (2.12.0), `bx/.claude-plugin/plugin.json` (2.11.1 → 2.12.0)
+### Session 62 (cont.) - 2026-10-21: bx 2.12.0–2.12.2 released; four real `/bx:evolve` runs found three defects (registry threshold, capability pattern, source_url tie-break) and applied 4 findings incl. `task-tools.md` v2.1.268 allowlist (commits: fd04dc1, c2388c9, 5aaa1a1)
 
-**Next session should:**
-- Push 2.12.0, refresh the plugin cache, run the first `/bx:evolve` on it (seeds the hash map; first execution of Step 1.5, the pain-id match, the drift line, the changelog lane under the contract)
-- Doc tiering Phase 2 and the deferred save minors
-- Dogfood `/bx:health`
-
-### Session 62 (cont.) - 2026-10-21
-**What happened:**
-- Released and installed bx 2.12.0 (`78fdc68`), 2.12.1 (`fd04dc1`) and 2.12.2 (`c2388c9`); cache refreshed each time via `claude plugin update bx` + `/reload-plugins`.
-- First `/bx:evolve` on 2.12.0: changelog current (`git ls-remote` head = 2.1.306), docs 22/22 pages (hash map seeded), community discovery clean. 5 findings: clean's `/rewind` promise wrong for `git rm` deletions (re-raised applied `4ed0fc0c` by source_url), `KillShell` → `TaskStop` in webdesign, ultrareview numbers unsourced, `.claude/rules/` contract confirmed (deferred `5b91feb3`, edit filled), plugin-eval overlap joined to `69ef485d` by judgment. Pain registry: 14 active / 10 retired; `tiering-phase` merged into `claude-md-over-size-target`.
-- Defects found by running, fixed before the state write: the registry's fixed three-word threshold spawned duplicate ids for two-word leads (`min(3, n)`); the validator's capability pattern rejected `tool:KillShell` / `builtin:code-review-ultra` (widened to `^bx:[a-z0-9-]+/[A-Za-z0-9:/_.-]+$`).
-- `--fix` minutes later: all three lanes current, pure fix pass; 3 applied across 9 files, `env-vars` pinned (candidate carried by hand — not persisted between runs), inventory regenerated.
-- Second delta: inventory hash changed by one rename, rule prescribed a 23-page re-read; narrowed by orchestrator judgment to the new page + 4 pages mentioning `TaskStop`/`KillShell` (delta from git). One finding: `task-tools.md` stated a v2.1.233 denylist; docs define a v2.1.268 allowlist. Second `--fix`: all-current, applied (2.12.2).
-- `/bx:save --full` twice on the reordered sweep; the second ran Part 7.3's size rollup for real.
-
-**Files created/modified:**
-- `bx/skills/evolve/references/state-schema.md` (registry threshold, capability pattern text), `bx/skills/evolve/tests/check-state.py` (pattern), `references/scan-docs.md` (env-vars row), `capabilities.json` (regenerated)
-- `bx/skills/clean/SKILL.md`, `bx/skills/webdesign/{SKILL.md, references/phase1-extract.md, references/phase3-inject.md}`, `bx/skills/health/references/state-buckets.md`, `bx/skills/review/SKILL.md`, `bx/skills/save/references/task-tools.md`, `README.md`, `workflow.md`
-- `docs/upstream/state.json` (61 entries; six-key watermark with 23 page hashes), `docs/upstream/pain-points.json`, `CHANGELOG.md` (2.12.1, 2.12.2), `bx/.claude-plugin/plugin.json`
-
-**Next session should:**
-- Make the page probe delta-aware; persist candidates into `--fix`; add the `source_url` tie-break rule
-- Doc tiering Phase 2 (`.claude/rules/` tier) — unblocked, edit on `5b91feb3`
-- Dogfood `/bx:health`
-
-### Session 63 - 2026-10-21
-**What happened:**
-- `/bx:evolve --scope bx:clean` requested; the skill has no per-skill scope (the upstream record already had 12 applied entries touching clean), so the user chose a skill-creator content review of `/bx:clean` with improvements. 14 findings by reading — 4 high (scope not passed to agents + deps grepped inside the scope; `migrations/` as one-off scripts and a `git log` without `--name-only`; unused-import quick wins with no side-effect/barrel/suppression/pragma carve-outs; no `scan-exclusions.md` citation and fixture trees in stack detection), 6 medium (`--dry-run` via `git reset --hard` → non-destructive `git rm -n` + findings' line counts; hard-coded `main`; Node subpath imports/extensions/escaping; Python requirement parsing, batched grep, runtime-loaded packages; env-var conventions; three-state dashboard with `## Unavailable checks`), 4 low (intent-only `tools:` claim, scan files by absolute path, two-filter dispatch rule, 5-or-more wording). Six sibling-skill rules the clean skill never received (S58 exclusions, v2.8.0 three states, S61 tool lists, S46 git-safety, dadac845 auto-mode).
-- Re-ran the three committed evals against 2.12.2 and the rewrite (6 subagent runs; the eval subagents dispatched the real `bx:cleanup-*` agents): 42/42 both. The runs surfaced the 15th defect: `quick_win` was never defined, scanners tagged whole-file deletions, both orchestrators reconciled by hand before `--fix`. Closed set pinned in all three scan files + Step 2.4 reconciliation; opt-in sections are "not scanned", not "unavailable".
-- User asked for all seven proposed categories despite the stated false-positive concern: unused exports (one barrel hop; framework exports excluded), orphaned assets (CSS/HTML/manifest refs count; glob dirs cap likely_safe), lockfile drift (direct entries only; duplicate lockfiles; orphaned `@types`), dead i18n keys (source locale, dynamic prefixes exclude subtree) + dead config keys (framework keys excluded), stale hard-coded flags (git-dated; env/service flags excluded), trivial directories, unused types (ambient augmentations excluded). One hit + one trap each in both fixtures; GROUND-TRUTH and evals.json extended (29/20/11 assertions). Iteration 4 (6 runs, baseline = pre-change 2.13.0): 60/60 vs 59/60 — the baseline flagged env-driven `FLAGS.beta`/`VITE_BETA` as obsolete; all other hits found by both. Fix mode on both committed exactly the three quick wins.
-- bx 2.12.2 → 2.13.0 (`plugin.json`, CHANGELOG Added + Fixed); `scan-exclusions.md` cited-by list gains `/bx:clean`, `cleanup-files-code` leaves its "still to be swept" list; README table/tree, workflow.md usage + Finds, architecture.md, evals README iterations 3–4; verify-by-running memory gained the S63 instance.
-- Full sweep: rolled up sessions 59–60 (44.6k → 40.7k); README tree + architecture.md note clean `evals/`; Parts 6/7 silent, no rotation; In Progress 6 items (>5) and Next Steps 11 (>10) warned, not moved.
-
-**Files created/modified:**
-- `bx/skills/clean/SKILL.md`, `references/scan-files-code.md`, `scan-deps-config.md`, `scan-styles-tests.md` - review fixes + seven categories
-- `bx/agents/cleanup-files-code.md`, `cleanup-deps-config.md`, `cleanup-styles-tests.md` - scan file by path, exclusions, new rules
-- `bx/skills/arch/references/scan-exclusions.md` - clean repointed
-- `bx/skills/clean/evals/{evals.json,GROUND-TRUTH.md,README.md}` + 12 new fixture files (node: strings.ts, i18n.ts, locales/en.json, flags.ts, types.ts, legacy/index.ts, public/*.svg, package-lock.json; python: config.yaml, app/flags.py, app/legacy/__init__.py, static/*.svg) + App.tsx/index.html/styles.css/tsconfig.json/main.py edits
-- `bx/.claude-plugin/plugin.json` 2.13.0, `CHANGELOG.md`, `README.md`, `workflow.md`, `docs/architecture.md`
-
-**Next session should:**
-- Push v2.13.0, refresh the plugin (`/plugin marketplace update burak-tools`, shell `claude plugin update bx`, `/reload-plugins`), run `/bx:clean` on a real repo including `<dir> --deps` and `--dry-run`
-- Dogfood `/bx:health`; `/bx:evolve` 2.12.x follow-ups (delta-aware probe)
+### Session 63 - 2026-10-21: `/bx:clean` content review (15 defects incl. undefined `quick_win`, now a closed set) + seven detection categories; evals 60/60 vs 59/60 baseline; bx 2.13.0 (commit: 15da8fe)
 
 ### Session 64 - 2026-10-23
 **What happened:**
@@ -300,6 +250,7 @@
 - `--fix` dogfood on a throwaway maxitech clone with planted controls: red baseline aborted (tzdata + Calendly token), scoped command 210 passed; bad merge dropping a row stayed green, count check reverted it; final 207 = 210 − 1 − 2. Found two more defects: Python def names hid mechanical clusters; `git checkout` revert would undo earlier items (now per-item snapshots).
 - Consolidate threshold calibrated on horowell (0.9 kept, ≥4 saved lines floor).
 - Two heredoc escaping slips broke a script mid-run; the manifest flagged each failed step, so neither produced silent zeros.
+- Full sweep: rolled up S62–S63 (55.3k → 45.7k); Part 7 moved 6 Key Decisions rows (8.5k → 5.8k) and the open bx 2.12.x Known Issues entry (4.6k → 3.8k), CLAUDE.md 13.9k → 10.4k; memory `feedback-edit-tool-for-escapes`; archives under 100k, no rotation.
 
 **Files created/modified:**
 - `bx/skills/tests/scripts/` (new: test_bodies.py, leverage.py, references.py, consolidate.py, run.py)

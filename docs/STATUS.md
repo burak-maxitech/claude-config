@@ -64,3 +64,4 @@ See [completed-work.md](completed-work.md) for full checklist.
 - **Verified by running:** eight scanner runs passed every acceptance control and surfaced 13 script defects, all fixed in the scripts; `--fix` dogfood on a maxitech clone: 210 -> 207 exactly, bad merge green but reverted by the count check.
 - **`--fix` is a reducer** (T01a, successor-less life support, mechanical merges) with per-item snapshot reverts; `/bx:clean` hands test-only symbols to `/bx:tests` (D6).
 - Not exercised: the agent definitions (cache 2.13.2), a JS merge under `--fix`.
+- Full sweep: rolled up S62–S63 (session-history 55.3k → 45.7k); size-pressure moved 6 Key Decisions rows and one open Known Issues entry (bx 2.12.x) to the archives, CLAUDE.md 13.9k → 10.4k; memory `feedback-edit-tool-for-escapes` added; no rotation.
