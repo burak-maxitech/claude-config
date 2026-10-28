@@ -36,7 +36,9 @@ For each entry:
    non-code callers the index cannot see: a config file, a job registry, a CLI table, a docs page that
    says it is public API. Any live production caller drops the finding.
 2. **Test-support use** (`used_as_test_helper_in` non-empty): another module's test imports it as a
-   helper (a guard test using `scripts/lib/record.ts`). It is test-support code living in the
+   helper (a guard test using `scripts/lib/record.ts`), or a test-support file references it (e2e
+   stubs, fixtures, `conftest.py`, anything under a `testing/` or `e2e/` folder that is not itself
+   a test file). It is test-support code living in the
    production tree, not dead code: `deletable_lines` 0, action "move it to a test-support file", and
    certainty 0.4.
 3. **With a `successor`**, by `successor_kind` (strongest first):

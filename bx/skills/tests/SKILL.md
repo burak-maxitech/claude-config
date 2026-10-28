@@ -67,6 +67,20 @@ harness's runner, and a way to read the case count it reports (vitest/jest summa
 `N passed`). Report it in the detection line. Only `--fix` runs it (baseline, then once per
 applied item, for the count check). Report-only and `--plan` runs never execute tests.
 
+**Type-check command** — when the stack has one, record a command that type-checks the whole
+project **including test files**, and how to count its errors:
+
+| Stack | Command | Error count |
+|---|---|---|
+| TypeScript | `npx tsc --noEmit -p <the tsconfig that includes the test files> --incremental false` | lines matching `error TS\d+` |
+| Python with `mypy` / `pyright` configured (pyproject, `mypy.ini`, `pyrightconfig.json`) | the configured tool over the package and its tests | `error:` lines / pyright's `N errors` |
+| Go, Rust, JVM | none: the test command already compiles the tests | — |
+
+The test runner does not type-check: vitest strips types, so a merged table that widens a union
+to `string` stays green (S257: two new tsc errors, invisible to vitest). Use the project's own
+tsconfig; if its `include` leaves the test files out, say so and use the one that covers them.
+Only `--fix` runs it.
+
 **Coverage-tool availability** — record whether the tool appears in deps/devDependencies, the lockfile, or tool config (e.g. a `coverage` script, `pytest-cov` in requirements). Deps detection only — don't probe `$PATH` (not cross-platform, needs no extra permission). **Do NOT run it.** Default mode is heuristic-only; running coverage is opt-in via `--coverage`.
 
 **Repo size tier** (`git ls-files | wc -l` for source + test files):
@@ -184,8 +198,16 @@ dir — never inside the repo — and run, once per workspace:
 
 ```
 python -I <this skill's base directory>/scripts/run.py --repo <workspace root> --out <temp dir> \
-    --test-files <temp dir>/tests.txt --source-files <temp dir>/sources.txt
+    --test-files <temp dir>/tests.txt --source-files <temp dir>/sources.txt \
+    --save-to <repo root>/.bx/tests/<YYYY-MM-DD>
 ```
+
+`--save-to` copies the outputs into the repo, so a `--plan` brief or a later `--fix` can still read
+them after the temp dir is gone (S257: a brief cited cluster ids whose only definition was a
+cleared session scratchpad). `run.py` excludes `.bx/` through `.git/info/exclude`, never
+`.gitignore`, so the tree stays clean and nothing is committed. A second run on the same day
+overwrites that day's folder. Scanners read the temp manifest; everything after the report cites
+the saved one.
 
 `run.py` runs `test_bodies.py`, `leverage.py`, `references.py` and `consolidate.py` in that order
 (stdlib Python, read-only, a few seconds on a 1,800-file repo) and writes `manifest.json` with each
@@ -378,7 +400,11 @@ Gaps, deletions and merges are equally visible, so a suite that only ever grows 
 2. Findings — three subsections (Coverage / Quality / Economics) ordered by rank score
 3. Documented-Decision Conflicts (separate, "**Confirm intent before action:**")
 4. Suggested Next Actions — skill chains (`/bx:clean` for orphans, `/code-review` or `/bx:review` for diff-scoped follow-up); copy-pasteable `/bx:plan <brief>` snippets for top 3 strategic rewrites
-5. Footer disclosure — framework detected, coverage tool used (or "heuristic"), files scanned vs sampled vs skipped, T01a/T01b/T02/T03/T04/T06 hit counts, headline totals with the subtotal check, the growth trend line, the script manifest's step timings, coverage negatives and partial coverage
+5. Footer disclosure — framework detected, coverage tool used (or "heuristic"), files scanned vs sampled vs skipped, T01a/T01b/T02/T03/T04/T06 hit counts, headline totals with the subtotal check, the growth trend line, the script manifest's step timings, coverage negatives and partial coverage, and the saved folder (`.bx/tests/<date>/`)
+
+**Write the rendered report to `<saved folder>/report.md`** as well as printing it. With the saved
+`consolidate.json` and `references.json` beside it, a later session can act on the report without
+this one.
 
 ---
 
@@ -397,10 +423,14 @@ everything else route to `--plan`.
 The flow, in summary (the reference is canonical):
 1. Pre-flight: a feature branch and a clean tree, allowlist evidence present, and the project's test
    command run once as a green baseline. Any failure aborts.
-2. Per item: show the change and the diff, wait for y / n / skip / abort, apply with `Edit`, then
-   rerun the affected test files and apply the **count check**: a deletion drops the count by
-   exactly the tests it removed; a merge leaves the count unchanged. A new failure or a count that
-   moved the wrong way reverts that item.
+   The type-check command from Step 0, if any, also runs once, and its error count, test files
+   included, is the type baseline. It need not be zero.
+2. Per item: find the tests by anchor (file, describe path, test name), never by the recorded line
+   numbers, which go stale after the first edit in a file. Show the change and the diff, wait for
+   y / n / skip / abort, apply with `Edit`, then rerun the affected test files and apply the
+   **count check**: a deletion drops the count by exactly the tests it removed; a merge leaves the
+   count unchanged. Then the **type check**: the error count must not rise above the last verified
+   count. A new failure, a count that moved the wrong way, or a new type error reverts that item.
 3. Cascades: an emptied parent block gets a separate prompt. An emptied file is routed to
    `/bx:clean`, never deleted here.
 

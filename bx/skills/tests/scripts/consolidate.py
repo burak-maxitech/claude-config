@@ -20,7 +20,11 @@ Usage:
         [--threshold 0.9] [--min-tokens 12] [--min-saved 4]
 
 Writes <out>/consolidate.json:
-    clusters[]  {id, same_file, files[], symbol, rows[{file,line,end_line,name,body_lines}],
+    clusters[]  {id (positional, this run only), key (stable: hash of the member anchors),
+                 same_file, files[], symbol,
+                 rows[{anchor, file, describe[], name, line, end_line, body_lines}]
+                   anchor = "file :: describe > ... > name" is how a row is found; line and
+                   end_line are a hint that goes stale after any earlier edit in the file,
                  tests_before, tests_after: 1, cases_after (must equal tests_before),
                  lines_before, lines_after_est, saved_lines, jaccard_min, mechanical,
                  merge_table {name_slot, slots, rows[member][slot], comment_lines} | null,
@@ -29,6 +33,7 @@ Writes <out>/consolidate.json:
     threshold, calibration{0.8, 0.85, 0.9, 0.95: cluster/test counts}
 """
 import argparse
+import hashlib
 import io
 import json
 import os
@@ -42,6 +47,16 @@ def jaccard(a, b):
     inter = sum((a & b).values())
     union = sum((a | b).values())
     return inter / union if union else 0.0
+
+
+def anchor(r):
+    """file :: describe > ... > test name — survives line shifts, unlike line numbers."""
+    return "%s :: %s" % (r["file"], " > ".join(list(r.get("describe") or []) + [r["name"] or "?"]))
+
+
+def cluster_key(members):
+    """Stable across reruns, unlike the positional C### id: a hash of the member anchors."""
+    return hashlib.sha1("\n".join(sorted(anchor(m) for m in members)).encode("utf-8")).hexdigest()[:8]
 
 
 def setup_key(r):
@@ -205,7 +220,11 @@ def main():
             "same_file": key[0] == "file",
             "files": sorted({m["file"] for m in members}),
             "symbol": key[1] if key[0] == "symbol" else None,
-            "rows": [{"file": m["file"], "line": m["line"], "end_line": m["end_line"], "name": m["name"],
+            "key": cluster_key(members),
+            # locate a row by its anchor; line/end_line are only a hint, stale after any earlier
+            # edit in the file (S257: later clusters moved 50-300 lines after the first merge)
+            "rows": [{"anchor": anchor(m), "file": m["file"], "describe": m.get("describe") or [],
+                      "name": m["name"], "line": m["line"], "end_line": m["end_line"],
                       "body_lines": m["body_lines"]} for m in members],
             "tests_before": len(members), "tests_after": 1, "cases_after": len(members),
             "lines_before": lines_before, "lines_after_est": lines_after,

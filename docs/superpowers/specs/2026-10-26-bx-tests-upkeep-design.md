@@ -355,3 +355,44 @@ count check reverts it.
   throwaway clone of the pytest repo with planted no-op, life-support and cluster controls plus two
   real clusters: 210 → 207 cases, as computed; the deliberately bad merge was reverted by the count
   check alone.
+
+## First use of the output (S66, 2026-10-28) — 2.14.1 and 2.15.0
+
+A horowell session (its S257) acted on a `/bx:tests --plan` brief: six hand merges and six
+life-support deletions. Its report named nine problems with acting on the output. Each was checked
+against the 2.14.0 source:
+
+| # | Problem | Verdict | Release |
+|---|---|---|---|
+| 1 | The brief cites cluster ids whose only definition is a temp scratchpad | Confirmed: scripts write only to `--out` (OS temp) | 2.14.1 |
+| 2 | Line numbers go stale after the first edit in a file | Confirmed: rows were `{file, line, end_line, name}`; `--fix` B deleted by `line`–`end_line` | 2.14.1 |
+| 3 | Mock-only ignores coverage through another export of the same module | Plausible (status is per symbol name) | 2.15.0 |
+| 4 | Private SQL twins reached only through callers count as untested; the twin recipe downgrades behavioural tests to SQL-text checks | Plausible | 2.15.0 |
+| 5 | Cluster similarity ignores matcher differences (`toBe(n)` vs `≥ 1`) | Plausible: shape Jaccard strips literals but not intent | 2.15.0 |
+| 6 | No cross-cluster pairing (same policy, two fields) | Plausible | 2.15.0 |
+| 7 | `--fix` never type-checks; vitest strips types | Confirmed: no type-check step anywhere; the S257 `tsc-before/after` files were improvised | 2.14.1 |
+| 8 | "774 → 251" headline overstates the worthwhile work | Report-template change | 2.15.0 |
+| 9 | Life-support false positives on test helpers inside `src/` | Confirmed when the source list includes them: horowell 246 → 21 deletable lines | 2.14.1 |
+
+**2.14.1 decisions**
+- **Persist under `<repo>/.bx/tests/<date>/`, excluded through `.git/info/exclude`.** `.gitignore`
+  would dirty the tree, and `--fix` requires a clean one. The scripts still write to temp (their
+  in-repo guard stays). `run.py --save-to` copies the outputs and rewrites the saved manifest's paths.
+- **Anchor = `file :: describe > … > name`**, plus a stable cluster `key` (hash of the anchors),
+  because `C###` is positional per run. On horowell, all 739 clustered rows have unique anchors.
+  `--fix` skips an item whose anchor is gone and never falls back to the line number.
+- **The type check compares against a baseline, not zero.** Horowell carries 47 test-file tsc
+  errors on main behind a "0 non-test" gate. A rise reverts the item.
+- **Test-support code is never life support**, by two rules: a symbol defined in a test path is
+  skipped, and a production symbol that any test-support file references (a test path that is not a
+  test file by name) gets `used_as_test_helper_in` and 0 deletable lines. The definition rule alone
+  missed nothing on horowell. The reference rule covers production helpers that e2e stubs import.
+  The proposed "never delete" allowlist was not added: both rules address the cause.
+
+**Verified by running (2.14.1):** old and new scripts on horowell and maxitech-concierge. With
+horowell's `e2e/` and `testing/` files in the source list, 2.14.0 lists `stubResponseFor` (168
+lines), `neonApiGatewayHost` (26) and `stripComments` (31) as deletable, and 2.14.1 drops all
+three. maxitech's life support is unchanged (`build_reply_all_recipients`, 37). `--save-to` was run
+twice on a throwaway repo: the tree stayed clean, the exclude line was written once, and a path
+outside the repo was refused. **Text-only until a real `--fix` run:** the type-check gate and
+finding items by anchor.

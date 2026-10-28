@@ -30,9 +30,12 @@ Writes <out>/references.json:
                      owner class) and has not mocked it. A call in a test file that vi.mock()s
                      the module, or inside a test that patch()es the name, is a mock.
     life_support[]  {symbol, prod_refs: 0, test_rows[], exclusive_rows[], deletable_lines,
-                     successor, successor_evidence, successor_status}
+                     successor, successor_evidence, successor_status, used_as_test_helper_in}
                      deletable_lines = the symbol, plus its exclusive test rows only when there is
-                     no successor (with one, the tests move and survive)
+                     no successor (with one, the tests move and survive). A symbol defined in a
+                     test-support path is never listed; 0 deletable when any test-support
+                     file (a test path that is not a test file by name: e2e stubs, fixtures,
+                     conftest.py) references the symbol
     modules         test:code ratio per module, test files attributed by the symbols they call
     coverage_partial[]
 """
@@ -55,6 +58,12 @@ from leverage import (CONFIG_LIKE, DENSITY_FLOOR_LOC, Resolver, file_imports, gi
                       is_test_path, module_of, security_lines, subwords)
 
 IDENT = re.compile(r"[A-Za-z_$][\w$]*")
+# a test file proper, by its NAME. A test path that does not match (src/lib/e2e/stubs.ts,
+# src/lib/testing/fixtures.ts) is test-support code: a symbol it uses is live test infrastructure,
+# never life support (S257: stubResponseFor, neonApiGatewayHost, stripComments)
+TEST_FILE_NAME = re.compile(
+    r"(\.(test|spec)\.[cm]?[jt]sx?$)|(^|/)(test_[^/]*\.py|[^/]*_test\.py)$|_test\.go$"
+    r"|(Test|Tests|IT)\.(java|kt)$|\.bats$|(^|/)test-[^/]*\.(sh|bash)$|\.Tests\.ps1$")
 JS_EXPORT_DEF = re.compile(
     r"^[ \t]*export\s+(default\s+)?(?:declare\s+)?(?:async\s+)?"
     r"(function\*?|const|let|var|class|abstract\s+class|enum|const\s+enum|interface|type)\s+([A-Za-z_$][\w$]*)", re.M)
@@ -552,6 +561,7 @@ def main():
                             test_status=status, test_call_rows=call_rows[:20], test_mock_rows=mock_rows[:20],
                             test_mention_rows=mention_rows[:10],
                             test_name_only_hits=name_only, reached_from_entry_point=reached_from_entry,
+                            test_support_files=sorted(tf for tf in test_hits if not TEST_FILE_NAME.search(tf))[:10],
                             security_lines=sec, priority=round(prio, 4),
                             gap_lines=0 if status == "covered" or s["kind"] in TYPE_KINDS else s["lines"]))
 
@@ -578,6 +588,8 @@ def main():
             continue  # framework-invoked: the router calls it by file convention
         if r["name"].startswith("_"):
             continue  # a deliberate test seam (__setClient) or private by convention
+        if is_test_path(r["file"]):
+            continue  # defined in test-support code (src/lib/testing/, e2e/): test infrastructure, not dead code
         rows, exclusive = [], []
         for c in r["test_call_rows"]:
             if c["line"] is None:
@@ -601,6 +613,9 @@ def main():
         excl = {(x["file"], x["line"]) for x in exclusive}
         helper_use = sorted({c["file"] for c in rows if (c["file"], c["line"]) not in excl and re.sub(
             r"\.(test|spec)$|^test_", "", os.path.splitext(os.path.basename(c["file"]))[0]) != own_stem})
+        # any reference (call, mention or import) from a test-support file: e2e stubs, fixtures,
+        # test utilities. Those files have no test rows, so the call-row check above never sees them
+        helper_use = sorted(set(helper_use) | set(r["test_support_files"]))
         life.append({
             "symbol": r["id"], "file": r["file"], "line": r["line"], "end_line": r["end_line"],
             "symbol_lines": r["lines"], "prod_refs": 0, "prod_import_refs": r["prod_import_refs"],

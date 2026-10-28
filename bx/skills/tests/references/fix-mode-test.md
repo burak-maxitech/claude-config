@@ -47,7 +47,9 @@ re-read against the current files (another session may have changed them since t
    `describe.each` / `it.each` / `@pytest.mark.parametrize` block.
 
 **B. Life support** (fields from the finding's `metrics` and `references.json`)
-1. `successor` is null, and `used_as_test_helper_in` is empty.
+1. `successor` is null, and `used_as_test_helper_in` is empty. That list includes every
+   test-support file (a test path that is not a test file by name: `src/lib/e2e/stubs.ts`,
+   fixtures, `conftest.py`) referencing the symbol; such a symbol is live test infrastructure.
 2. **Every** test row is exclusive (`exclusive_rows` == `test_rows`). A test that also checks other
    code would need its assertions edited, which is a rewrite.
 3. `prod_refs == 0`, `prod_string_refs == 0`, `prod_import_refs == 0`, re-confirmed now with one
@@ -89,10 +91,33 @@ Anything failing a condition auto-routes to `--plan` with a one-line note:
      the user accepts, and print it in the summary. Never set a credential to make a test pass. (S65
      dogfood: 6 maxitech tests sent real Calendly requests with an empty token.)
 
-4. Confirm once:
+4. Type baseline. If Step 0 recorded a type-check command, run it once and record its error
+   count, test files included. It does not have to be zero: a repo whose CI checks only
+   non-test files can carry test-file errors (S257: 47 on main, hidden by a "0 non-test errors"
+   gate), and the check below compares against this number, not against zero.
+   - No type-check command for this stack → say so once ("no type check: <stack>") and continue.
+   - The command cannot run (missing tsconfig, the tool not installed) → ABORT: "Cannot record
+     a type baseline (<reason>). A merge can pass the suite and still break types."
+
+5. Confirm once:
    "About to walk A T01a deletions, B life-support deletions and C merges (M auto-routed to
-    --plan). Baseline: <count> tests passing. Continue? [y/n]"
+    --plan). Baseline: <count> tests passing, <n> type errors. Continue? [y/n]"
 ```
+
+## Finding the code — anchors, not line numbers
+
+Every line number in the scripts' output is a hint from scan time. After the first applied item
+in a file, every later item in that file has moved (S257: 50–300 lines after one merge in
+`watch-references.test.ts`). Locate each test by its **anchor** — `file :: describe > … > test name`
+(`consolidate.json` rows carry it; a life-support or T01a row gives `file` and `name`) — and a
+symbol by its name and kind in its file. Read the current file, find the block whose title and
+enclosing describes match, and build `old_string` from what is there now.
+
+- Exactly one match → use it, whatever its line number.
+- No match → skip: "skipped (anchor not found: <anchor>)". The test was renamed or removed since
+  the scan; never fall back to the line number.
+- More than one match (the same title in the same describe) → use the line hint to choose, and
+  say so in the item preview.
 
 ## Per-item gate flow
 
@@ -128,7 +153,7 @@ User responses:
 ### Building each edit
 
 - **A.** Delete the whole test block, from `it(...)` / `def test_` through its end.
-- **B.** Delete the symbol's definition (`line`–`end_line`, plus its own doc comment), every
+- **B.** Delete the symbol's definition (found by name, plus its own doc comment), every
   exclusive test row, and the symbol's name from each import statement that imported it (drop the
   statement if it becomes empty). Touch nothing else in production files.
 - **C.** Replace the member tests with one table test that uses the framework's own form —
@@ -154,6 +179,14 @@ up as a collection error.
 | A | The edited file passes, and its test count dropped by exactly the number of tests deleted | revert |
 | B | Every file run passes, and the total count dropped by exactly the number of exclusive rows (cases, so a parameterized row counts each case) | revert |
 | C | The file passes, and its test count is **unchanged**: the table produced exactly one case per original test | revert |
+
+**Then the type check**, when the pass has a type baseline: run the type-check command and count
+its errors. The count must not exceed the last verified count (the baseline, or the count after
+the last item that passed). A rise reverts the item, with the new errors quoted in the reason:
+"reverted: +2 type errors (TS2322 at watch-references.test.ts:412: string is not assignable to
+Status)". A drop is fine and becomes the new verified count. The test runner cannot catch this
+itself: vitest and jest-with-babel strip types, and a table row literal widened to `string`
+passes every case (S257).
 
 **Revert** = restore the snapshot. Before applying each item, copy every file it will touch to the
 run's temp dir; on a failed check, copy them back, record "reverted: <one-line reason>", and continue
@@ -211,13 +244,14 @@ plainly and name the last applied items.
 --fix pass complete.
 
 Applied (verified): 2 T01a deletions, 3 life-support deletions (5 tests), 4 merges (19 tests → 4 table tests, 19 cases)
-Reverted (count check or suite failure): 1  — C112: file count 41 → 40 (a row was dropped; the file was still green)
+Reverted (count check, type check or suite failure): 1  — C112: file count 41 → 40 (a row was dropped; the file was still green)
 Rejected: 1
 Skipped: 1
 Auto-routed to --plan: 7
 Cascade-deleted empty parent blocks: 1
 Files flagged for /bx:clean follow-up: 0
 Final suite: <count> passing (baseline <count>, −7 as expected)
+Type errors: <n> (baseline <n>)
 Lines removed: <git diff --stat total>
 
 Undo: everything is on branch <branch>. `git diff <default>...` reviews it;
@@ -234,9 +268,9 @@ Suggested follow-up:
 - Always show the diff before applying. Never apply first and ask afterwards.
 - One item, then its verification run, before the next item.
 - The only commands this mode runs: `git rev-parse`, `git status`, file copies to and from the run's
-  temp dir (snapshots), one word search per life-support name, and the test command recorded in
+  temp dir (snapshots), one word search per life-support name, the test command recorded in
   Step 0 (with `--co` / `--collect-only` / `--list` to read a file's case count where the runner
-  has one).
+  has one), and the type-check command recorded in Step 0.
 
 ## Edge cases
 

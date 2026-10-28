@@ -19,7 +19,7 @@ After the report is built, group findings into phases:
 
 1b. **Phase 1b: Consolidation**
    - All `consolidate` findings, largest `saved_lines` first. Mechanical clusters first (pure table rewrites, `--fix`-eligible with the count check); the rest are one `/bx:plan` brief per file.
-   - Each brief lists the cluster's tests and says: one parameterized test, one row per original test, every literal kept, boundary rows kept.
+   - Each brief lists the cluster's file and every member test's anchor, and says: one parameterized test, one row per original test, every literal kept, boundary rows kept. After the merge, type-check the file with the project's type-check command, test files included: the test runner alone misses a row literal widened to `string`.
 
 2. **Phase 2: Coverage gaps on critical paths**
    - All findings with `dimension == coverage` AND `respects_documented_decision: true`
@@ -131,7 +131,12 @@ These conflict with documented testing posture. **Confirm intent before action.*
 
 Each `/bx:plan <brief>` snippet must be **fully self-contained**:
 
-- Quote file path + line range
+- Quote file path + line range, and name tests by their anchor (`describe > … > test name`): line
+  numbers are a scan-time hint that goes stale after the first edit in the file
+- **Never cite a cluster or finding id alone.** A consolidate brief lists its file, every member
+  test's anchor, and the table columns (`merge_table.slots`). Then add the cluster's stable `key` and
+  the saved folder (`.bx/tests/<date>/consolidate.json`) for detail. S257: a brief that said
+  "C169/C173/C174/C178" was resumable only by grepping another session's scratchpad.
 - For coverage gaps: list specific scenarios to cover (don't say "add tests"; say "cover the expired-session branch and tampered-token branch")
 - State the invariant: "test names stay the same so coverage attribution doesn't shift", "mocks remain at HTTP boundary"
 - State the success criterion: "100% branch coverage on this file", "no toHaveBeenCalledWith except at boundary"

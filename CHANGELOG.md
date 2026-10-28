@@ -2,6 +2,34 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.14.1 — 2026-10-28
+
+`/bx:tests` fixes from the first session that acted on its output (horowell S257: six hand merges
+and six life-support deletions from a `--plan` brief). Each fix guards against something that broke
+or misled there. Spec addendum: `docs/superpowers/specs/2026-10-26-bx-tests-upkeep-design.md`,
+"First use of the output".
+
+### Fixed
+
+- **`--fix` now type-checks.** Step 0 records a type-check command that includes test files (`tsc
+  --noEmit --incremental false`, or a configured mypy/pyright). `--fix` records its error count as a
+  baseline, which need not be zero, and reverts any item that raises it. vitest strips types, so a
+  merged table that widened a union to `string` passed the suite and added two tsc errors.
+- **Tests are found by anchor, not line number.** `consolidate.json` rows carry
+  `anchor` (`file :: describe > … > name`) and `describe[]`, and each cluster carries a stable `key`.
+  `--fix` locates every test and symbol by name and skips an item whose anchor is gone. After the
+  first merge in a file, later clusters had moved 50–300 lines.
+- **Reports persist.** `run.py --save-to <repo>/.bx/tests/<date>/` copies the outputs into the repo,
+  with a manifest pointing at the copies, and excludes `.bx/` through `.git/info/exclude`, so the tree
+  stays clean. The report is also written there as `report.md`. `--plan` briefs list each cluster's
+  file and member anchors instead of a bare `C###` id, which was resumable only by grepping another
+  session's temp scratchpad.
+- **Test-support code is never life support.** A symbol defined in a test path
+  (`src/lib/e2e/`, `src/lib/testing/`) is skipped. A production symbol that a test-support file
+  references gets `used_as_test_helper_in` and 0 deletable lines. On horowell with those folders in
+  scope, this drops 225 falsely deletable lines (`stubResponseFor`, `neonApiGatewayHost`,
+  `stripComments`).
+
 ## 2.14.0 — 2026-10-26
 
 `/bx:tests` measures with committed scripts and can now shrink a suite. This is release 2 of the S65

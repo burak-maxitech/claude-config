@@ -7,6 +7,8 @@ never run the scripts or write parsers of their own (spec D1).
 Usage:
     python -I bx/skills/tests/scripts/run.py --repo <path> --out <dir>
         [--test-files <list.txt>] [--source-files <list.txt>] [--time-budget <secs per script>]
+        [--save-to <repo>/.bx/tests/<YYYY-MM-DD>]   copy the outputs into the repo, excluded via
+                                                    .git/info/exclude (never .gitignore)
 
 Writes <out>/manifest.json:
     {test_bodies, test_bodies_summary, leverage, references, consolidate: <paths>,
@@ -18,6 +20,7 @@ discloses it instead of silently reading zero.
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -32,6 +35,7 @@ def main():
     ap.add_argument("--test-files")
     ap.add_argument("--source-files")
     ap.add_argument("--time-budget", default="600")
+    ap.add_argument("--save-to", help="also copy the outputs here (inside --repo, e.g. <repo>/.bx/tests/<date>)")
     a = ap.parse_args()
     out = os.path.realpath(a.out)
     os.makedirs(out, exist_ok=True)
@@ -71,10 +75,47 @@ def main():
         except ValueError:
             pass
     manifest = dict(paths, coverage_partial=partial, steps=log)
+    if a.save_to:
+        manifest["saved_to"] = save(a.repo, a.save_to, paths)
     with open(os.path.join(out, "manifest.json"), "w", encoding="utf-8") as fh:
         json.dump(manifest, fh, indent=1, ensure_ascii=False)
+    if a.save_to:  # the saved copy points at the saved files, so it outlives the temp dir
+        saved = dict(manifest, **{k: os.path.join(manifest["saved_to"], os.path.basename(p)) for k, p in paths.items()})
+        with open(os.path.join(manifest["saved_to"], "manifest.json"), "w", encoding="utf-8") as fh:
+            json.dump(saved, fh, indent=1, ensure_ascii=False)
     print(json.dumps({"steps": [(s["script"], s["ok"], s["seconds"]) for s in log], "partial": len(partial)}))
     print("manifest=%s" % os.path.join(out, "manifest.json"))
+    if a.save_to:
+        print("saved_to=%s" % manifest["saved_to"])
+
+
+def save(repo, dest, paths):
+    """Copy the outputs to <repo>/.bx/tests/<date>/ so a --plan brief survives the temp dir (S257:
+    the brief cited cluster ids whose only definition was a session scratchpad). The directory is
+    excluded through .git/info/exclude, never .gitignore, so the tree stays clean for --fix."""
+    repo = os.path.realpath(repo)
+    dest = os.path.realpath(dest)
+    if os.path.commonpath([repo, dest]) != repo:
+        raise SystemExit("--save-to must be inside --repo: %s" % dest)
+    top = os.path.relpath(dest, repo).replace("\\", "/").split("/")[0]
+    exclude = subprocess.run(["git", "-C", repo, "rev-parse", "--git-path", "info/exclude"],
+                             capture_output=True, text=True).stdout.strip()
+    if exclude:
+        exclude = os.path.join(repo, exclude) if not os.path.isabs(exclude) else exclude
+        os.makedirs(os.path.dirname(exclude), exist_ok=True)
+        try:
+            with open(exclude, encoding="utf-8") as fh:
+                have = {l.strip() for l in fh}
+        except OSError:
+            have = set()
+        if not have & {top, top + "/", "/" + top, "/" + top + "/"}:
+            with open(exclude, "a", encoding="utf-8") as fh:
+                fh.write("\n/%s/\n" % top)
+    os.makedirs(dest, exist_ok=True)
+    for p in paths.values():
+        if os.path.exists(p):
+            shutil.copy2(p, os.path.join(dest, os.path.basename(p)))
+    return dest
 
 
 if __name__ == "__main__":
