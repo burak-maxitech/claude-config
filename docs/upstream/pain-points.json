@@ -10,7 +10,7 @@
         "plugin-cache-staleness-skills-run-from-cache-a-bx-push-without-a-version-bump-reaches-no-user"
       ],
       "first_seen": "2026-06-10",
-      "last_seen": "2026-10-21"
+      "last_seen": "2026-10-28"
     },
     {
       "id": "open-upstream-findings",
@@ -28,7 +28,7 @@
       "status": "active",
       "aliases": [],
       "first_seen": "2026-10-20",
-      "last_seen": "2026-10-21"
+      "last_seen": "2026-10-28"
     },
     {
       "id": "bx-evolve-step-applied-branch",
@@ -73,16 +73,16 @@
       "status": "active",
       "aliases": [],
       "first_seen": "2026-10-20",
-      "last_seen": "2026-10-21"
+      "last_seen": "2026-10-28"
     },
     {
       "id": "simplify-follow-up-move-part",
-      "text": "/simplify follow-up: move Part 7.7 rotation out of Part 7",
+      "text": "/simplify follow-up: move Part 7.7 rotation into its own sibling Part",
       "source": "status-md",
       "status": "active",
       "aliases": [],
       "first_seen": "2026-10-20",
-      "last_seen": "2026-10-21"
+      "last_seen": "2026-10-28"
     },
     {
       "id": "resume-bx-webdesign-kaanarik-past",
@@ -91,7 +91,7 @@
       "status": "active",
       "aliases": [],
       "first_seen": "2026-10-20",
-      "last_seen": "2026-10-21"
+      "last_seen": "2026-10-28"
     },
     {
       "id": "real-bx-seo-against-burakarik-com",
@@ -100,7 +100,7 @@
       "status": "active",
       "aliases": [],
       "first_seen": "2026-10-20",
-      "last_seen": "2026-10-21"
+      "last_seen": "2026-10-28"
     },
     {
       "id": "dogfood-bx-health",
@@ -111,13 +111,13 @@
         "bx-health-never-run-end-to-end"
       ],
       "first_seen": "2026-10-20",
-      "last_seen": "2026-10-21"
+      "last_seen": "2026-10-28"
     },
     {
       "id": "plugin-packaging-leftovers",
       "text": "S37 plugin-packaging leftovers",
       "source": "status-md",
-      "status": "active",
+      "status": "retired",
       "aliases": [
         "s37-leftovers-install-smoke-test-symlink-retirement-settings-skillbx-to-skillbx",
         "s37-plugin-packaging-leftovers-install-smoke-test-symlink-retirement"
@@ -147,7 +147,7 @@
       "id": "commit-regression-tests-concurrency",
       "text": "Commit regression tests for S58's two concurrency fixes",
       "source": "status-md",
-      "status": "active",
+      "status": "retired",
       "aliases": [],
       "first_seen": "2026-10-20",
       "last_seen": "2026-10-21"
@@ -193,7 +193,7 @@
         "tiering-phase"
       ],
       "first_seen": "2026-10-20",
-      "last_seen": "2026-10-21"
+      "last_seen": "2026-10-28"
     },
     {
       "id": "upstream-decision-open-deferred",
@@ -202,13 +202,13 @@
       "status": "active",
       "aliases": [],
       "first_seen": "2026-10-21",
-      "last_seen": "2026-10-21"
+      "last_seen": "2026-10-28"
     },
     {
       "id": "2120-text-verified-only-first",
       "text": "bx 2.12.0 is text-verified only; its first real runs are owed (S62, 2026-10-21)",
       "source": "claude-md",
-      "status": "active",
+      "status": "retired",
       "aliases": [],
       "first_seen": "2026-10-21",
       "last_seen": "2026-10-21"
@@ -217,7 +217,7 @@
       "id": "push-2120-refresh-cache",
       "text": "Push 2.12.0, refresh the cache, run the first `/bx:evolve` on it",
       "source": "status-md",
-      "status": "active",
+      "status": "retired",
       "aliases": [],
       "first_seen": "2026-10-21",
       "last_seen": "2026-10-21"
@@ -226,10 +226,73 @@
       "id": "design-plugin-eval-suite",
       "text": "Design the plugin-eval suite",
       "source": "status-md",
-      "status": "active",
+      "status": "retired",
       "aliases": [],
       "first_seen": "2026-10-21",
       "last_seen": "2026-10-21"
+    },
+    {
+      "id": "2-12-x-four-real-bx-evolve",
+      "text": "bx 2.12.x: four real `/bx:evolve` runs found three defects (fixed in 2.12.1) and left four paths text-only (S62, 2026-10-21)",
+      "source": "claude-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-28",
+      "last_seen": "2026-10-28"
+    },
+    {
+      "id": "bx-clean-real-repos-2026-10-23",
+      "text": "`/bx:clean` has run on two real repos (S64, 2026-10-23)",
+      "source": "claude-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-28",
+      "last_seen": "2026-10-28"
+    },
+    {
+      "id": "bx-tests-2-15-0-scripts-verified",
+      "text": "`/bx:tests` 2.15.0: scripts verified, agents and `--fix` gates still unrun (S66, 2026-10-28)",
+      "source": "claude-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-28",
+      "last_seen": "2026-10-28"
+    },
+    {
+      "id": "install-2-15-0",
+      "text": "Install bx 2.15.0",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-28",
+      "last_seen": "2026-10-28"
+    },
+    {
+      "id": "bx-clean-rerun",
+      "text": "`/bx:clean` rerun",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-28",
+      "last_seen": "2026-10-28"
+    },
+    {
+      "id": "maxitech-concierge-follow-ups-repo",
+      "text": "maxitech-concierge follow-ups (in that repo)",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-28",
+      "last_seen": "2026-10-28"
+    },
+    {
+      "id": "bx-evolve-2-12-x-follow-ups",
+      "text": "`/bx:evolve` 2.12.x follow-ups",
+      "source": "status-md",
+      "status": "active",
+      "aliases": [],
+      "first_seen": "2026-10-28",
+      "last_seen": "2026-10-28"
     }
   ]
 }

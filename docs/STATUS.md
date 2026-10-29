@@ -2,7 +2,7 @@
 
 > Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
 
-Last Updated: 2026-10-28 (Session 66)
+Last Updated: 2026-10-28 (Session 67)
 
 ## Current Status
 
@@ -10,11 +10,11 @@ Last Updated: 2026-10-28 (Session 66)
 |------|--------|
 | Skills (11) | Complete — `/bx:clean` content-reviewed and extended with seven categories S63 (bx 2.13.0; 60/60 on fixtures) and run for real S64 on maxitech-concierge (Python; 6 defects → 2.13.1) and horowell (Next.js; 10 defects → 2.13.2); `/bx:save --full` run three times on the reordered sweep (S62 ×2, S63); `/bx:evolve` 2.12.x run four times S62; `/bx:tests` run for real S65 on horowell + maxitech-concierge (29 defects; 2.13.3 safety, 2.14.0 scripts + reduction lane + suite-verified `--fix`), and its first acted-on output fixed S66 (2.14.1, 2.15.0); only `/bx:health` never run |
 | Subagents (20) | Complete — `arch-robustness` added S58 |
-| Plugin packaging (`bx`) | **v2.15.0** committed S66 (2.14.1 pushed `bd03bff`); installed cache at 2.14.0. Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
+| Plugin packaging (`bx`) | **v2.15.2** committed S67 (2.15.1 pushed `45bb20d`); installed cache at 2.15.0. Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate passed and fix wave shipped in `7ed079a` (2026-08-17), recorded S61 |
 | Cross-platform setup | Complete |
-| GitHub sync | Complete — main pushed through v2.14.1 (S66, `bd03bff`); 2.15.0 push pending |
+| GitHub sync | Complete — main pushed through v2.15.1 (S67, `45bb20d`); 2.15.2 push pending |
 | Documentation | Complete — schema v2 |
 
 ## Completed
@@ -43,10 +43,10 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## Next Steps
 
-1. **Install bx 2.15.0** (`/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`) and run `/bx:tests` once on horowell with the installed `test-*` agents (never exercised); then `/bx:tests --fix` on a horowell branch for one mechanical JS merge once the other session's edits there are committed — this is the first run of the 2.14.1 type-check baseline and anchor gates.
+1. **Install bx 2.15.2** (`/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`); the first `/bx:save` on the installed 2.15.1+ confirms the default path never opens `mode-update-full.md`. Then run `/bx:tests` once on horowell with the installed `test-*` agents (never exercised); then `/bx:tests --fix` on a horowell branch for one mechanical JS merge once the other session's edits there are committed — this is the first run of the 2.14.1 type-check baseline and anchor gates.
 2. **`/bx:clean` rerun** to confirm the new "Test-only symbols — see /bx:tests" block (D6) replaces the S240-style test-only dead-code items.
 3. **maxitech-concierge follow-ups (in that repo):** add tests for `SlackService.verify_request` (the only auth on `POST /slack/interactions`, zero tests) and a regression test for `820c2076`; move `build_reply_all_recipients`'s 5 tests to the live `build_reply_recipients` and delete the dead method. 2.14.0 also found three mechanical merges there (C007, C014 in the S65 clone).
-4. **`/bx:evolve` 2.12.x follow-ups** — make `docs-page-hashes.py` delta-aware, persist `allowlist_candidates` into `--fix`, add the `source_url` tie-break to Step 3.4; regenerate `capabilities.json` (pre-existing `bx:clean/idiom:bin-path-helper` drift); PATCH bump.
+4. **`/bx:evolve` 2.12.x follow-ups** — make `docs-page-hashes.py` strip the site-wide `> ## Documentation Index` header before hashing (S67: that header alone flagged 23/23 pages changed, ~290k tokens); make it delta-aware, persist `allowlist_candidates` into `--fix`, add the `source_url` tie-break to Step 3.4; PATCH bump.
 5. **Doc tiering Phase 2** (`.claude/rules/` tier, spec D4–D6) — unblocked S62; edit stored on deferred finding `5b91feb3`. Plus the deferred minors listed in `## In Progress`.
 6. **Doc-schema v2 fixture verification** — the six deferred live `/bx:save` fixture runs plus the post-merge minors batch.
 7. **/simplify follow-up: move Part 7.7 rotation into its own sibling Part** (with S59 D4's Part 7.9); blind rehearsal before shipping.
@@ -58,9 +58,8 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 > Full history: [session-history.md](session-history.md)
 
-### Last Session (Session 66) - 2026-10-28
-- **First acted-on `/bx:tests` output:** horowell S257 worked from a `--plan` brief and reported 9 problems; all nine traced to the code and fixed across two releases.
-- **2.14.1 (`bd03bff`):** `run.py --save-to <repo>/.bx/tests/<date>/` (git-excluded) + stable cluster keys and test anchors, so briefs stay resumable; `--fix` type-check baseline gate and anchor-based locating; test-path helpers are never life support (246 → 21 false deletable lines).
-- **2.15.0:** `indirect` coverage status through unmocked callers (horowell gap lines 7,615 → 3,359; maxitech mocked-module filter cut 81 → 20); private SQL twins with a two-option rule; `matcher_variants`; same-file `siblings`; headline leads with 56 merges worth doing (1,663 lines). Found and fixed a `js_extent` bug that truncated 14 horowell functions at a multi-line `Promise<` return type.
-- Not exercised: scanner prose for the new fields, `--fix` gates (await horowell branch run).
-- Full sweep: rolled up S64; workflow.md `/bx:tests` section rewritten (was pre-2.13.3), README headline + architecture.md save-to synced; no rotation.
+### Last Session (Session 67) - 2026-10-28
+- **`/bx:save` 2.15.1 (`45bb20d`):** `mode-update.md` split — the default save loads 28 KB instead of 75 KB (+ `doc-structure-rules.md` skipped), the `--full` sweep moved to `mode-update-full.md`; the session commit window is anchored on the last commit that wrote `docs/STATUS.md`, not the `Last Updated` date (S65 replay: 3 commits → 1). This save ran the anchor for real: window = `45bb20d` only.
+- **`/bx:evolve` delta + `--fix`:** changelog 2.1.306 → 2.1.312 and 23 docs pages, 0 new findings; all 23 pages read as changed because of a new site-wide "Documentation Index" header (~290k tokens) — strip-before-hash added to Next Step 4. Deferred `5b91feb3` gained the on-demand rules size cap (40k chars) as context.
+- **2.15.2:** allowlist + `model-config`, `plugins/mods/overview`; `capabilities.json` regenerated (435).
+- Status rows corrected: 2.15.0 had already been pushed and installed.

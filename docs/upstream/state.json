@@ -1,101 +1,101 @@
 {
   "watermark": {
-    "last_changelog_version": "2.1.306",
-    "docs_checked_at": "2026-10-21",
-    "community_checked_at": "2026-10-21",
+    "last_changelog_version": "2.1.312",
+    "docs_checked_at": "2026-10-28",
+    "community_checked_at": "2026-10-28",
     "changelog_gap": null,
     "docs_pages": {
       "https://code.claude.com/docs/en/skills": {
-        "hash": "72ed85eb9ed83dda1ccdb07e52a0f0c3ed7f9372",
-        "scanned": "2026-10-21"
+        "hash": "2109b54555acda6656e01ece8bf4b5f2d0cecb93",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/plugins": {
-        "hash": "b0ffa2642d392b4c3d38ec35351b556088ea4170",
-        "scanned": "2026-10-21"
+        "hash": "7ec7237cb2be5c105b00567f424491a6d967ec6b",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/plugins-reference": {
-        "hash": "43b2ee02b97697080f1b16019abf8b4c3d59ae42",
-        "scanned": "2026-10-21"
+        "hash": "090549a90c93b940fc74547efa8da1b5c498dca6",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/plugins/loading": {
-        "hash": "601eab5cc8456e6d01d0cf2579560f135a899f21",
-        "scanned": "2026-10-21"
+        "hash": "6fdff75e9c2cb7af9ff3ce6167e98ba9841894d8",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/plugins/cli-reference": {
-        "hash": "4505b0e4de9bbcf0a34ff6a4381bfa4d83e57839",
-        "scanned": "2026-10-21"
+        "hash": "b9fbcf90cc5d8c5f36127e1a542899ab8d6e4529",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/plugin-evals": {
-        "hash": "1cb6b6a8e3d100df9bdf11bff143356b9849259f",
-        "scanned": "2026-10-21"
+        "hash": "3624cb7b99d6495f5bc03a90bf84483c6dcf7835",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/hooks": {
-        "hash": "f3e50ab36bf547ca1d6886b405626d8490012e25",
-        "scanned": "2026-10-21"
+        "hash": "645ed6db3dcec182d7638706bf510c00c0663069",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/settings": {
-        "hash": "84d7181b94b382760c8c691c4e7c68ded7911bfb",
-        "scanned": "2026-10-21"
+        "hash": "e38f49f18875c1e2e7c75c22c48cf48807d2e8f9",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/permissions": {
-        "hash": "8344b43d1161a236d05129740f65ef5cd774ced2",
-        "scanned": "2026-10-21"
+        "hash": "932d2689e519b969b5fdd93712e1b1bbd8287566",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/sub-agents": {
-        "hash": "b9e92e6158019fcbc65eba521df82860a2398b34",
-        "scanned": "2026-10-21"
+        "hash": "2125439efb29f5ca0eb9b2ac02e2fd04c2142e63",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/memory": {
-        "hash": "0bec33eaf52f64da3608a71e8a121e6135154398",
-        "scanned": "2026-10-21"
+        "hash": "b00cd8d5690cadcfdebbcd87da2b6c2a202d6dde",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/commands": {
-        "hash": "2b54d1df0004924432a52595c805beef4f7b1f90",
-        "scanned": "2026-10-21"
+        "hash": "524989fcc1c5bff390ea36eff7e8d900ef07c0a6",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/checkpointing": {
-        "hash": "4143b0886c0c1853c683c66034bb6050bab22c27",
-        "scanned": "2026-10-21"
+        "hash": "ad740ad88f109ad7b5f71d03f08970ed1d3bdcf7",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/code-review": {
-        "hash": "c3ca71068ef9e313aae729d21d7f2e7e65366c9f",
-        "scanned": "2026-10-21"
+        "hash": "d970924392e23d954d43c773f833f72474fda545",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/auto-mode-config": {
-        "hash": "c4d8163098a6715cae85d4052e0ce8d9492eee43",
-        "scanned": "2026-10-21"
+        "hash": "b7d75ec13d35ebcee80213c13c512606ea6f4d97",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/code-review-local": {
-        "hash": "9de30f8b111f7b6043f7f1c18ed5549d2ac63691",
-        "scanned": "2026-10-21"
+        "hash": "e09f0f023228a1b5594d000a346a43763056466a",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/ultrareview": {
-        "hash": "f65bf9bf4d69efd22ac9f766554cd119b758f3bc",
-        "scanned": "2026-10-21"
+        "hash": "719a3554e1c3c6c70a4ed7077d24f35f1a86b740",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/plugins/manifest-reference": {
-        "hash": "43b2ee02b97697080f1b16019abf8b4c3d59ae42",
-        "scanned": "2026-10-21"
+        "hash": "090549a90c93b940fc74547efa8da1b5c498dca6",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/plugins/marketplace-reference": {
-        "hash": "43f82f7207d6a05b8b4505ce26c6bb551291320c",
-        "scanned": "2026-10-21"
+        "hash": "a324a5f42244fd2bc0ec859eeef526e301ab2c82",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/plugins/components": {
-        "hash": "63d5a566e3fe8dda11c763b28fe79522d23c4f19",
-        "scanned": "2026-10-21"
+        "hash": "060f458070f419f9dd1dda289b5bfbe1647d005a",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/permission-modes": {
-        "hash": "f9741c8f25bd12e757b849290517c4cc042d8b54",
-        "scanned": "2026-10-21"
+        "hash": "c6d01d5736b0ff07be9606cb468c118afd7d7912",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/tools-reference": {
-        "hash": "a16431c435ad4d4e01fd9a0b705c0e7e61a623ed",
-        "scanned": "2026-10-21"
+        "hash": "6ac01e9a26b88a96344a102bef32a7cb67f75d9b",
+        "scanned": "2026-10-28"
       },
       "https://code.claude.com/docs/en/env-vars": {
-        "hash": "04c4ed4a713392d5fa837dbb80da3d4d680587b1",
-        "scanned": "2026-10-21"
+        "hash": "1ce151d205b4a510acfdfbaf880359ec0537f76f",
+        "scanned": "2026-10-28"
       }
     },
     "inventory_hash": "45a4793c2c4bd0eb06c1415815108d52830da512"
@@ -790,7 +790,7 @@
       "date": "2026-10-20",
       "source_url": "https://code.claude.com/docs/en/memory",
       "affected_capability": "bx:pain/claude-md-over-size-target",
-      "source_content_hash": "4971c95898cf16fd27e56d00734c0242c296b9c9",
+      "source_content_hash": "28473a91e4ce896d5649e97b06459d41e6754033",
       "class": "opportunity",
       "title": "Memory docs now confirm the exact contract the Doc tiering Phase 2 item was gated on: `.claude/rules/*.md` files are...",
       "note": "remaining half = doc-tiering Phase 2 (.claude/rules tier, spec D4-D6), gated on re-verifying `paths:` against the memory docs | source changed since deferral (2026-10-21); edit fields filled from the live finding",

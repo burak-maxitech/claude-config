@@ -1,7 +1,7 @@
 {
   "generated_by": "bx/skills/evolve/scripts/build-capabilities.py --write",
-  "count": 434,
-  "inventory_hash": "45a4793c2c4bd0eb06c1415815108d52830da512",
+  "count": 435,
+  "inventory_hash": "b237eb615975740294654e4c77a4fbf4e867e668",
   "capabilities": [
     "bx:arch-performance/description",
     "bx:arch-performance/model",
@@ -71,6 +71,7 @@
     "bx:clean/effort",
     "bx:clean/idiom:agent-dispatch",
     "bx:clean/idiom:allowed-tools-enumeration",
+    "bx:clean/idiom:bin-path-helper",
     "bx:clean/idiom:model-invocation-flag",
     "bx:clean/idiom:rewind-checkpoints",
     "bx:clean/name",

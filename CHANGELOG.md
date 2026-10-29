@@ -2,6 +2,14 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.15.2 — 2026-10-28
+
+`/bx:evolve` upkeep from the S67 run.
+
+### Changed
+- `scan-docs.md` allowlist: `model-config` (what `model: sonnet` resolves to, `CLAUDE_CODE_SUBAGENT_MODEL`) and `plugins/mods/overview` (the `agent.spawn` model override, mod hook events) added from the docs lane's candidates.
+- `capabilities.json` regenerated (434 → 435; adds `bx:clean/idiom:bin-path-helper`, drift since 2.13.x). The next run re-reads every docs page because the inventory hash changed.
+
 ## 2.15.1 — 2026-10-28
 
 `/bx:save`: a smaller everyday save, and a commit window that no longer repeats earlier saves.

@@ -287,3 +287,5 @@
 - [x] `/bx:tests --fix` dogfood on a throwaway maxitech clone with planted controls + 2 real merges (S65)
 - [x] /bx:tests 2.14.1 — resumable saved runs, anchors + cluster keys, --fix type-check gate, test-support helpers excluded from life support - bx/skills/tests/scripts/{run,consolidate,references}.py, SKILL.md, fix-mode-test.md, plan-mode-test.md
 - [x] /bx:tests 2.15.0 — indirect status, private SQL twins, matcher_variants, siblings, worthwhile headline, js_extent generic fix - references.py, consolidate.py, scan-coverage.md, scan-economics.md, report-template.md
+- [x] `/bx:save` 2.15.1: default path loads only the save-path instructions; commit window anchored on the last state-file commit (S67)
+- [x] `/bx:evolve` S67 delta + `--fix`: watermark 2.1.312, 2 docs pages pinned, capabilities.json regenerated (2.15.2)

@@ -259,3 +259,20 @@
 
 **Next session should:**
 - Install 2.15.0, run `/bx:tests` on horowell with the installed agents, then `--fix` on a branch for the type-check and anchor gates
+
+### Session 67 - 2026-10-28
+
+**What happened:**
+- Reviewed `/bx:save` for speed and function; shipped two of eight ideas as 2.15.1 (`45bb20d`): split `mode-update.md` (75 KB) into a 28 KB save-path file and a 47 KB `mode-update-full.md`, skip `doc-structure-rules.md` on the default path (~13k tokens less per save); anchor the commit window on the last `docs/STATUS.md` commit (S65 replay: date cutoff took 3 commits, anchor 1). Governance checks repointed per file; all 4 save test scripts pass.
+- Ran `/bx:evolve` (delta) and `--fix`: changelog 2.1.307–2.1.312 and discovery produced nothing; the docs lane re-read all 23 pages because a new site-wide header changed every hash (~290k tokens), found only the on-demand size cap for deferred `5b91feb3`; 4 partially-read pages re-scanned in the `--fix` run.
+- `--fix` accepted 2 allowlist candidates (`model-config`, `plugins/mods/overview`) and the `capabilities.json` regeneration → 2.15.2.
+- This save was the first real run of the 2.15.1 anchor (window = `45bb20d` + uncommitted); the split-file loading is verified only after the plugin cache updates.
+- Remaining `/bx:save` ideas (not done): one probe script for Step 0 measurements + live status rows (ahead/behind, installed version), writer overlapped with Part 8 prep, version bump decided before dispatch, skip re-reading CLAUDE.md.
+
+**Files created/modified:**
+- `bx/skills/save/references/mode-update.md`, `mode-update-full.md` (new), `SKILL.md`, `doc-schema.md`, `doc-structure-rules.md`, `tests/check-known-issues-governance.sh`
+- `bx/skills/evolve/references/scan-docs.md`, `bx/skills/evolve/capabilities.json`, `docs/upstream/state.json`, `docs/upstream/pain-points.json`
+- `CHANGELOG.md`, `bx/.claude-plugin/plugin.json` (2.15.1, 2.15.2), `README.md`
+
+**Next session should:**
+- Install 2.15.2, then the `/bx:tests` horowell run (Next Step 1)
