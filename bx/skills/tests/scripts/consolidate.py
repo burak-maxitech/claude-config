@@ -28,8 +28,16 @@ Writes <out>/consolidate.json:
                  tests_before, tests_after: 1, cases_after (must equal tests_before),
                  lines_before, lines_after_est, saved_lines, jaccard_min, mechanical,
                  merge_table {name_slot, slots, rows[member][slot], comment_lines} | null,
-                 not_mechanical_because}
-    totals      {clusters, tests_before, tests_after, saved_lines, mechanical_clusters}
+                 not_mechanical_because,
+                 matcher_variants[{matchers[], rows[]}] (non-mechanical only: members that assert
+                   different relations, e.g. toBe vs toBeGreaterThanOrEqual; the table needs a
+                   per-row matcher column),
+                 worthwhile (saved_lines >= 20, or mechanical and >= 10)}
+    totals      {clusters, tests_before, tests_after, saved_lines, mechanical_clusters,
+                 worthwhile {clusters, tests_before, saved_lines, rule}}
+    siblings[]  {clusters[2], keys[2], matched_members, differs_by[2][], saved_lines, suggestion}:
+                 two clusters in one file that are one table on two fields (>= 75% of the smaller
+                 one's members match a member of the other by shape; split only by setup)
     threshold, calibration{0.8, 0.85, 0.9, 0.95: cluster/test counts}
 """
 import argparse
@@ -41,6 +49,10 @@ import re
 import textwrap
 import tokenize
 from collections import Counter
+
+
+WORTH_MIN = 20
+WORTH_MIN_MECHANICAL = 10  # a mechanical merge costs a y/n under --fix, so a smaller saving earns it
 
 
 def jaccard(a, b):
@@ -123,6 +135,80 @@ def raw_tokens(src, lang):
     return out
 
 
+def member_src(m, repo):
+    with open(os.path.join(repo, m["file"]), encoding="utf-8", errors="replace") as fh:
+        return "\n".join(fh.read().split("\n")[m.get("start_line", m["line"]) - 1:m["end_line"]])
+
+
+JS_MATCHER = re.compile(r"\.\s*((?:not\s*\.\s*)?(?:resolves\s*\.\s*|rejects\s*\.\s*)?to[A-Z]\w*)\s*\(")
+PY_ASSERT = re.compile(r"^\s*assert\b(.*)$", re.M)
+PY_SELF_ASSERT = re.compile(r"\bself\.(assert\w+)\s*\(")
+PY_OPS = re.compile(r"\s(==|!=|>=|<=|>|<|not\s+in|in|is\s+not|is)\s")
+
+
+def matchers(src, lang):
+    """The ordered assertion relations a test checks: `toBe`, `toBeGreaterThanOrEqual`, `==`, `>=`.
+    Shape Jaccard strips literals, so two tests asserting `toBe(1)` and `>= 1` look alike (S257)."""
+    if lang == "py":
+        out = []
+        for line in PY_ASSERT.findall(src):
+            op = PY_OPS.search(line)
+            out.append(re.sub(r"\s+", " ", op.group(1)) if op else "truthy")
+        return out + PY_SELF_ASSERT.findall(src)
+    return [re.sub(r"\s+", "", m) for m in JS_MATCHER.findall(src)]
+
+
+def matcher_variants(members, repo):
+    """[{matchers, rows}] when members check different relations, else []. A table built from such
+    a cluster needs a per-row matcher column (S257 C174: three rows toBe(n), one deliberately >= 1)."""
+    if not repo:
+        return []
+    groups = {}
+    for k, m in enumerate(members):
+        try:
+            sig = tuple(matchers(member_src(m, repo), m["lang"]))
+        except OSError:
+            return []
+        groups.setdefault(sig, []).append(k)
+    if len(groups) < 2:
+        return []
+    return [{"matchers": list(sig), "rows": rows} for sig, rows in sorted(groups.items(), key=lambda g: g[1][0])]
+
+
+def sibling_pairs(clusters, members_of, threshold, cover=0.75):
+    """Pairs of clusters in one file that are the same table on two fields: at least `cover` of the
+    smaller cluster's members match a distinct member of the other (shape Jaccard >= threshold).
+    They were split only because their setup differs (the field is a describe block in one and a
+    name prefix in the other). One shared runner can serve both tables (S257: dial_finishes and
+    straps, two clusters with the same merge policy). `differs_by` is the identifiers only one side
+    uses, which is usually the field."""
+    out = []
+    for i, a in enumerate(clusters):
+        for b in clusters[i + 1:]:
+            if set(a["files"]) != set(b["files"]):
+                continue
+            ma, mb = members_of(a), members_of(b)
+            small, big = (ma, mb) if len(ma) <= len(mb) else (mb, ma)
+            sb = [Counter(m["shape"].split()) for m in big]
+            used, hits = set(), 0
+            for m in small:
+                sm = Counter(m["shape"].split())
+                j = next((j for j, s in enumerate(sb) if j not in used and jaccard(sm, s) >= threshold), None)
+                if j is not None:
+                    used.add(j)
+                    hits += 1
+            if hits < 2 or hits < cover * len(small):
+                continue
+            ida = set().union(*(set(re.findall(r"[A-Za-z_$][\w$]*", m["shape"])) for m in ma))
+            idb = set().union(*(set(re.findall(r"[A-Za-z_$][\w$]*", m["shape"])) for m in mb))
+            out.append({"clusters": [a["id"], b["id"]], "keys": [a["key"], b["key"]],
+                        "matched_members": hits,
+                        "differs_by": [sorted(ida - idb)[:6], sorted(idb - ida)[:6]],
+                        "saved_lines": a["saved_lines"] + b["saved_lines"],
+                        "suggestion": "one shared runner serving both tables, parameterized by the field"})
+    return out
+
+
 def merge_table(members, repo):
     """The literal table a mechanical merge needs: one row per member, one column per literal slot
     whose value differs between members. A cluster is mechanical only if every member's NON-literal
@@ -132,11 +218,9 @@ def merge_table(members, repo):
     seqs, comments = [], 0
     for m in members:
         try:
-            with open(os.path.join(repo, m["file"]), encoding="utf-8", errors="replace") as fh:
-                lines = fh.read().split("\n")[m.get("start_line", m["line"]) - 1:m["end_line"]]
+            src = member_src(m, repo)
         except OSError:
             return None, "could not read %s" % m["file"]
-        src = "\n".join(lines)
         comments += len(re.findall(r"^\s*(//|#)", src, re.M))
         toks = raw_tokens(src, m["lang"])
         if toks is None:
@@ -207,9 +291,10 @@ def main():
         f = build(t)
         calibration[str(t)] = {"clusters": len(f), "tests": sum(len(cl) for _, cl, _ in f)}
 
-    clusters = []
+    clusters, members_by_id = [], {}
     for n, (key, cl, low) in enumerate(build(a.threshold)):
         members = [rows[i] for i in cl]
+        members_by_id["C%03d" % (n + 1)] = members
         table, why_not = merge_table(members, a.repo) if len({m["shape"] for m in members}) == 1 \
             else (None, "token shapes differ (Jaccard match, not identical)")
         lines_before = sum(m["body_lines"] for m in members)
@@ -234,20 +319,31 @@ def main():
             "mechanical": table is not None,
             "merge_table": table,
             "not_mechanical_because": why_not,
+            # rows that check a different relation need their own matcher column in the table
+            "matcher_variants": [] if table else matcher_variants(members, a.repo),
         })
     # a merge that saves 1-3 lines costs a reviewer more than it returns (S65 calibration on horowell:
     # 207 of 458 clusters at 0.9 saved under 4 lines)
     clusters = [c for c in clusters if c["saved_lines"] >= a.min_saved]
     clusters.sort(key=lambda c: -c["saved_lines"])
+    for c in clusters:
+        c["worthwhile"] = c["saved_lines"] >= WORTH_MIN or c["mechanical"] and c["saved_lines"] >= WORTH_MIN_MECHANICAL
+    worth = [c for c in clusters if c["worthwhile"]]
     totals = {
         "clusters": len(clusters),
         "tests_before": sum(c["tests_before"] for c in clusters),
         "tests_after": len(clusters),
         "saved_lines": sum(c["saved_lines"] for c in clusters),
         "mechanical_clusters": sum(1 for c in clusters if c["mechanical"]),
+        # the headline leads with these: "774 -> 251" set an expectation the brief then cut by ~240
+        # clusters (S257); all six merges it did by hand saved >= 20 lines
+        "worthwhile": {"clusters": len(worth), "tests_before": sum(c["tests_before"] for c in worth),
+                       "saved_lines": sum(c["saved_lines"] for c in worth),
+                       "rule": "saved_lines >= %d, or mechanical and saved_lines >= %d" % (WORTH_MIN, WORTH_MIN_MECHANICAL)},
     }
+    siblings = sibling_pairs(clusters, lambda c: members_by_id[c["id"]], a.threshold)
     result = {"threshold": a.threshold, "min_tokens": a.min_tokens, "min_saved": a.min_saved, "calibration": calibration,
-              "totals": totals, "clusters": clusters}
+              "totals": totals, "clusters": clusters, "siblings": siblings}
     path = os.path.join(a.out, "consolidate.json")
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(result, fh, indent=1, ensure_ascii=False)

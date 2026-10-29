@@ -11,8 +11,12 @@ Render this **first**, before anything else. Gaps, deletions and merges are equa
 
 **Coverage gaps in critical code: <coverage_gap_total> lines across <coverage_files_affected> files.**
 **Tests we can delete: <deletable_total> lines across <deletable_files_affected> files.**
-**Tests we can consolidate: <consolidate_tests_before> → <consolidate_tests_after> (saves <consolidate_saved_lines> lines).**
+**Tests we can consolidate: <consolidate_worthwhile_clusters> merges worth doing (<consolidate_worthwhile_tests_before> tests, saves <consolidate_worthwhile_saved_lines> lines); all clusters: <consolidate_tests_before> → <consolidate_tests_after>, saves <consolidate_saved_lines>.**
 ```
+
+Line 3 leads with the worthwhile merges (`saved_lines >= 20`, or mechanical and `>= 10`). The raw
+total comes second. S257: "774 → 251 consolidable" set an expectation the brief then cut by ~240
+clusters; the six merges actually worth doing were all in the worthwhile set.
 
 Numbers from Step 5 aggregation. Special cases:
 
@@ -114,14 +118,16 @@ code as well as tests:
 | 1    | models/email.py:59-95 Email.build_reply_all_recipients | 0 | 5 | services/scheduling_utils.py:build_reply_recipients (untested) | Move the 5 tests to the successor, then delete the method | -37 |
 | 2    | src/lib/scoring/axes.ts:12-20 axisDescription | 0      | 1     | —                                          | Delete the function and its test | -9      |
 
-### Tests We Can Consolidate (— <consolidate_tests_before> → <consolidate_tests_after>, saves <consolidate_saved_lines> lines; top 15 shown)
+### Tests We Can Consolidate (— <consolidate_worthwhile_clusters> worth doing, saves <consolidate_worthwhile_saved_lines> lines; top 15 shown)
 
-| Rank | Cluster | Location                                  | Tests | Saved | Mechanical | Action                              |
-|------|---------|-------------------------------------------|-------|-------|------------|-------------------------------------|
-| 1    | C175    | src/lib/db/watch-references.test.ts:1192-1553 | 5 → 1 | 112   | no         | One `it.each` table; one row per test |
+| Rank | Cluster (key) | Location                                  | Tests | Saved | Mechanical | Action                              |
+|------|---------------|-------------------------------------------|-------|-------|------------|-------------------------------------|
+| 1    | C173 (`3f2a9c10`) | src/lib/db/watch-references.test.ts › upsertWatchReferenceFromExtraction | 5 → 1 | 112 | no | One `it.each` table with a matcher column (row 3 asserts `>= 1`); shares a runner with C177 (straps) |
 ```
 
 `Mechanical: yes` clusters are a pure table rewrite and `--fix`-eligible; the rest route to `--plan`.
+Name the rows whose matcher differs (`matcher_variants`) and the sibling cluster (`siblings`) in
+the Action cell.
 
 ### Economics
 
@@ -205,7 +211,8 @@ Headline math:
   - life_support: 1 finding, 46 lines
   - snapshot_heavy: 1 finding, 705 lines
   - Subtotal-check: 14 + 46 + 705 = 765 ✓
-- consolidate_total: 774 → 251 tests across 251 clusters, saves 3,238 lines (90 mechanical)
+- consolidate_worthwhile: 56 merges, 213 tests, saves 1,663 lines
+- consolidate_total: 761 → 249 tests across 249 clusters, saves 3,092 lines (86 mechanical, 16 sibling pairs)
 
 T-catalog hit counts:
 - T01a (no-op, deletable): 1

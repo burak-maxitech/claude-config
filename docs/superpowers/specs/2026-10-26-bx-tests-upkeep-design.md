@@ -396,3 +396,29 @@ three. maxitech's life support is unchanged (`build_reply_all_recipients`, 37). 
 twice on a throwaway repo: the tree stayed clean, the exclude line was written once, and a path
 outside the repo was refused. **Text-only until a real `--fix` run:** the type-check gate and
 finding items by anchor.
+
+**2.15.0 decisions** (problems 3–6 and 8 above)
+- **Indirect coverage is reachability, filtered by mocking.** A symbol counts as `indirect` when a
+  test calls its production caller (up to 2 public levels, with private links in between). That
+  test's file must not mock anything in the symbol's module and must not mention the symbol. The
+  module filter uses parsed `patch(...)` and `vi.mock` facts, because a string patch target leaves
+  no identifier hit. The first version without it marked 81 maxitech symbols indirect through
+  handlers whose tests patch every service factory; with it, 20, each spot-checked as really
+  reached. The coverage scanner still reads security-dense indirect symbols.
+- **Twins get options, not a recipe.** `successor_twin` plus `private_twin`. Option 1 render-tests
+  the twin and deletes the JS symbol. Option 2 keeps the JS twin as the spec and adds an agreement
+  test. Option 2 leads when the twin is already reached.
+- **Siblings by member shape, not by label.** The label-swap rule found nothing on horowell, because
+  the field is a describe in one cluster and a name prefix in the other, and the wording drifts.
+  Pairwise member shape match (≥ 75% of the smaller cluster) found the S257 pair.
+- **Worthwhile = saved ≥ 20, or mechanical and ≥ 10.** It includes all six S257 hand merges
+  (20–112 lines each).
+- **Found while verifying:** `js_extent` cut multi-line generic signatures (`): Promise<`), hiding
+  every call inside 14 horowell functions. Fixed.
+
+**Verified by running (2.15.0):** a horowell clone at `e9986d99`, the commit before S257's edits,
+plus current horowell and maxitech-concierge. Every S257 problem reproduces as fixed:
+`withTodaysDialChoice` and the private `stuckLeadSql` are indirect, `isStuckLead` gets a private
+twin reached via `stuckLeadRows` / `listGrowth`, the clusters carry the `>= 1` row as a matcher
+variant, and `dial_finishes` / `straps` are siblings. Not exercised: the scanner prose for twins,
+indirect gaps and siblings, which awaits a real `/bx:tests` run with the installed agents.

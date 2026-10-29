@@ -2,6 +2,43 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.15.0 — 2026-10-28
+
+`/bx:tests` accuracy: the five remaining problems from the first session that acted on its output
+(horowell S257). Each was reproduced on a clone of horowell at the commit before that session's
+edits, then checked against maxitech-concierge.
+
+### Added
+
+- **`indirect` coverage status.** A symbol no test calls, but whose production caller a test does
+  call without mocking it, is reached through that caller: `reached_via`, `reached_by_tests`,
+  `indirect_depth` (up to 2 public levels, following private helpers in between), gap 0. A caller's
+  test does not count when it mocks anything in the symbol's module (a `patch("…factory")` string
+  target or a `vi.mock`) or mentions the symbol (mock configuration). horowell: 256 symbols, gap lines
+  7,615 → 3,359, including `withTodaysDialChoice` (was mock_only) and the private `stuckLeadSql`.
+  maxitech: 20, including `build_reply_recipients` through its Slack handler. Security-dense
+  indirect symbols are still read by the coverage scanner, which reports a gap when the caller's
+  tests never take the calling branch.
+- **Twin detection on life support.** `successor_twin` (a query-language twin, by name suffix or a
+  comment), the new `private_twin` successor kind for a non-exported twin in the same file, and
+  `successor_reached_via`. The scanner offers two options (render-test the twin, or keep the JS
+  twin as the spec plus an agreement test) instead of "move the tests, then delete".
+- **`matcher_variants` on non-mechanical clusters.** These are the members that assert different
+  relations (`toBe` vs `toBeGreaterThanOrEqual`), so the table gets a per-row matcher column. On
+  horowell this flags the verified-row case S257 found by hand in both merge-policy clusters.
+- **`siblings[]`.** Two clusters in one file that are one table on two fields, split only because
+  their setup differs: found by pairwise member shape match. On horowell it found S257's
+  `dial_finishes` / `straps` pair, plus 15 others.
+- **Worthwhile consolidation leads the headline.** `totals.worthwhile` counts clusters that save at
+  least 20 lines, or mechanical ones that save at least 10. On horowell that is 56 merges saving
+  1,663 lines, ahead of the raw 249 clusters. All six S257 hand merges are in the set.
+
+### Fixed
+
+- **Multi-line generic return types cut a function's extent at its signature.** `js_extent` ended
+  `extractWatchFromUrl` (476 lines) at line 3 on `): Promise<`. 14 horowell symbols had wrong extents,
+  which understated their gap lines and hid every call inside them.
+
 ## 2.14.1 — 2026-10-28
 
 `/bx:tests` fixes from the first session that acted on its output (horowell S257: six hand merges

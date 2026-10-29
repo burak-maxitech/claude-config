@@ -18,7 +18,7 @@ After the report is built, group findings into phases:
    - **Hand-off:** `/bx:tests --fix` on a branch for T01a and successor-less `life_support`; a one-shot session for successor moves and snapshot_heavy.
 
 1b. **Phase 1b: Consolidation**
-   - All `consolidate` findings, largest `saved_lines` first. Mechanical clusters first (pure table rewrites, `--fix`-eligible with the count check); the rest are one `/bx:plan` brief per file.
+   - All `consolidate` findings (the worthwhile set), largest `saved_lines` first. Sibling clusters go in one brief (one shared runner, two tables). A cluster with `matcher_variants` gets a per-row matcher column, with the differing rows named in the brief. Mechanical clusters first (pure table rewrites, `--fix`-eligible with the count check); the rest are one `/bx:plan` brief per file.
    - Each brief lists the cluster's file and every member test's anchor, and says: one parameterized test, one row per original test, every literal kept, boundary rows kept. After the merge, type-check the file with the project's type-check command, test files included: the test runner alone misses a row literal widened to `string`.
 
 2. **Phase 2: Coverage gaps on critical paths**

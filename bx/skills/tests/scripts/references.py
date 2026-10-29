@@ -23,14 +23,19 @@ Writes <out>/references.json:
     symbols[]       {id, name, kind, file, line, end_line, lines, owner,
                      prod_refs, prod_ref_files[<=10], prod_string_refs, prod_import_refs,
                      test_route_files (a decorated route a test client reaches by URL), leverage,
-                     test_status: covered | mock_only | mention_only | name_only | untested,
-                     test_call_rows[], test_mock_rows[], security_lines, priority, gap_lines}
+                     test_status: covered | indirect | mock_only | mention_only | name_only | untested,
+                     test_call_rows[], test_mock_rows[], security_lines, priority, gap_lines,
+                     reached_via[], direct_status, indirect_depth (indirect only)}
+                     indirect = no test calls it directly, but a test calls a production caller
+                     of it (found by enclosing extent, up to 2 levels) without mocking it; gap 0.
                      A test reference is a CALL only from a test that can see the symbol (it
                      imports the defining module or a barrel re-exporting it; for methods, the
                      owner class) and has not mocked it. A call in a test file that vi.mock()s
                      the module, or inside a test that patch()es the name, is a mock.
     life_support[]  {symbol, prod_refs: 0, test_rows[], exclusive_rows[], deletable_lines,
-                     successor, successor_evidence, successor_status, used_as_test_helper_in}
+                     successor, successor_evidence, successor_status, used_as_test_helper_in,
+                     successor_twin (a query-language twin: stuckLead / stuckLeadSql, or a comment
+                     calling it a twin), successor_reached_via[]}
                      deletable_lines = the symbol, plus its exclusive test rows only when there is
                      no successor (with one, the tests move and survive). A symbol defined in a
                      test-support path is never listed; 0 deletable when any test-support
@@ -153,7 +158,9 @@ def js_extent(masked, start):
         elif c == "\n" and depth <= 0:
             before = masked[start:i].rstrip()
             after = masked[i + 1:i + 200].lstrip()
-            if before and before[-1] in "=,(+-*/?:|&" or before.endswith("=>") or (after and after[0] in "|&.?:+-*/=,)>"):
+            # "<" continues a multi-line generic (`): Promise<` — S66: extractWatchFromUrl's extent
+            # ended at its signature, so nothing inside its body had an enclosing symbol)
+            if before and before[-1] in "=,(+-*/?:|&<" or before.endswith("=>") or (after and after[0] in "|&.?:+-*/=,)>"):
                 i += 1
                 continue
             return i
@@ -230,6 +237,36 @@ def py_symbols(rel, src):
                         deco = [d for d in sub.decorator_list if not (isinstance(d, ast.Name) and d.id in ("staticmethod", "classmethod", "property"))]
                         out.append({"name": sub.name, "kind": "method", "file": rel, "line": f2,
                                     "end_line": sub.end_lineno, "owner": node.name, "decorated": bool(deco)})
+    return out
+
+
+JS_PRIVATE_DEF = re.compile(r"^(?:async\s+)?(?:function\*?\s+([A-Za-z_$][\w$]*)|(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]+)?=\s*)", re.M)
+
+
+def private_functions(rel, src, masked):
+    """[(name, line, end_line)] of a file's non-exported top-level functions (JS) or `_`-prefixed
+    functions and methods (Python): the private links an indirect-coverage chain passes through
+    (S257: extractWatchFromUrl -> a private impl -> withTodaysDialChoice)."""
+    lang = EXT_LANG.get(os.path.splitext(rel)[1])
+    out = []
+    if lang == "js":
+        starts = line_starts(src)
+        for m in JS_PRIVATE_DEF.finditer(masked):
+            if m.group(2) and not re.match(JS_FN_RHS, masked[m.end():m.end() + 200]):
+                continue  # a const holding data, not a function
+            end = js_extent(masked, m.start())
+            out.append((m.group(1) or m.group(2), lineno(starts, m.start()), lineno(starts, max(m.start(), end - 1))))
+    elif lang == "py":
+        try:
+            tree = ast.parse(src)
+        except (SyntaxError, ValueError):
+            return out
+        for node in tree.body:
+            subs = [node] + (list(node.body) if isinstance(node, ast.ClassDef) else [])
+            for n in subs:
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name.startswith("_") \
+                        and not (n.name.startswith("__") and n.name.endswith("__")):
+                    out.append((n.name, n.lineno, n.end_lineno))
     return out
 
 
@@ -477,7 +514,7 @@ def main():
         s["id"] = sid
         s["lines"] = s["end_line"] - s["line"] + 1
         mod_aliases = aliases(s["file"])
-        prod_files, prod_imports, test_hits = {}, 0, {}
+        prod_files, prod_imports, test_hits, prod_calls = {}, 0, {}, []
         for (rel, ln, kind, attr) in occ.get(s["name"], ()):
             if is_test_path(rel):
                 test_hits.setdefault(rel, []).append((ln, kind, attr))
@@ -490,6 +527,7 @@ def main():
             if s["kind"] == "method" and rel != s["file"] and not attr:
                 continue  # a bare name elsewhere is not this method
             prod_files[rel] = prod_files.get(rel, 0) + 1
+            prod_calls.append((rel, ln))
         string_refs = sum(strings.get(s["name"], {}).values())
         call_rows, mock_rows, mention_rows, name_only = [], [], [], 0
         for tf, hits in test_hits.items():
@@ -562,6 +600,7 @@ def main():
                             test_mention_rows=mention_rows[:10],
                             test_name_only_hits=name_only, reached_from_entry_point=reached_from_entry,
                             test_support_files=sorted(tf for tf in test_hits if not TEST_FILE_NAME.search(tf))[:10],
+                            prod_call_sites=prod_calls,
                             security_lines=sec, priority=round(prio, 4),
                             gap_lines=0 if status == "covered" or s["kind"] in TYPE_KINDS else s["lines"]))
 
@@ -576,6 +615,38 @@ def main():
         r["gap_lines"] = 0
         if r["test_status"] != "covered" and any(m["test_status"] == "covered" for m in methods):
             r["test_status"] = "covered"
+
+    priv_cache = {}
+
+    def masked_of(rel):
+        if rel not in mask_cache:
+            mask_cache[rel] = masks(rel, srcs.get(rel, ""))
+        return mask_cache[rel][0]
+
+    def privates(rel):
+        if rel not in priv_cache:
+            priv_cache[rel] = private_functions(rel, srcs.get(rel, ""), masked_of(rel))
+        return priv_cache[rel]
+
+    # test files that mock anything defined in a source file: a patch("…get_slack_service") string
+    # target or a vi.mock of the module. A string target leaves no identifier hit, so the per-symbol
+    # mock rows miss it (S66 maxitech: every handler test patches the service factories in a fixture)
+    names_by_file = {}
+    for r in results:
+        names_by_file.setdefault(r["file"], set()).add(r["name"])
+    alias_cache = {f: aliases(f) for f in names_by_file}
+    mod_mocked = {}
+    for tf, facts in test_facts.items():
+        mocked = set(facts.get("mocked_names", set())) | {nm for _, nm in facts.get("patches", [])}
+        if tf.endswith(".py"):
+            for v in fixture_patches_for(tf).values():
+                mocked |= set(v)
+        mods = set(facts.get("mocked_modules", {}))
+        for f, ns in names_by_file.items():
+            if ns & mocked or alias_cache[f] & mods:
+                mod_mocked.setdefault(f, set()).add(tf)
+
+    private_reached_via = mark_indirect(results, privates, masked_of, mod_mocked)
 
     # ---------------------------------------------------------------- life support
     by_id = {r["id"]: r for r in results}
@@ -607,6 +678,18 @@ def main():
         succ, evidence, how = successor(repo, r, live, srcs)
         if succ and succ["file"] in entry_files and succ.get("default_export"):
             succ, evidence, how = None, None, None  # a page component is not a successor for a helper
+        if succ is None:
+            # a private twin in the same file (`isStuckLead` / private `stuckLeadSql`): not a
+            # public symbol, so successor() cannot see it
+            near = "\n".join(srcs[r["file"]].split("\n")[max(0, r["line"] - 13):r["end_line"]])
+            named = set(IDENT.findall(near))
+            for nm, _, _ in privates(r["file"]):
+                if nm != r["name"] and (twin_of(r["name"], nm) or nm in named and stem_similarity(nm, r["name"]) >= 0.4):
+                    via = private_reached_via(r["file"], nm)
+                    succ = {"id": "%s:%s" % (r["file"], nm), "name": nm, "reached_via": via,
+                            "test_status": "indirect" if via else "untested"}
+                    evidence, how = "private twin in the same file", "private_twin"
+                    break
         # a non-exclusive caller in ANOTHER module's test file uses it as a test helper (a guard test
         # importing scripts/lib/record.ts), which is test-support code, not dead code
         own_stem = os.path.splitext(os.path.basename(r["file"]))[0]
@@ -628,6 +711,13 @@ def main():
             "successor_status": succ["test_status"] if succ else None,
             "successor_evidence": evidence,
             "successor_kind": how,
+            # a JS predicate kept as the executable spec of a query-language twin: moving its
+            # behavioural tests onto the twin turns them into checks on SQL text (S257), so the
+            # scanner offers two options instead of "move, then delete"
+            "successor_twin": bool(succ) and (twin_of(r["name"], succ["name"]) or bool(re.search(
+                r"(Sql|SQL|_sql|Query|_query)$", succ["name"])) or bool(re.search(
+                r"(?i)\btwin\b", "\n".join(srcs[r["file"]].split("\n")[max(0, r["line"] - 13):r["end_line"]])))),
+            "successor_reached_via": succ.get("reached_via", []) if succ else [],
         })
 
     modules = module_ratios(results, lev_files, row_symbols, test_facts, srcs)
@@ -652,6 +742,121 @@ def main():
     print(json.dumps({"symbols": len(results), "status_counts": counts, "life_support": len(life),
                       "partial": bool(partial), "elapsed_s": result["elapsed_s"]}))
     print("references=%s" % path)
+
+
+INDIRECT_DEPTH = 2
+
+
+PRIVATE_HOPS = 3
+
+
+def mark_indirect(results, privates, masked_of, mod_mocked):
+    """A symbol no test calls directly, but whose production caller a test does call, is covered
+    through that caller: test_status "indirect", gap 0, reached_via names the caller(s).
+
+    S257: withTodaysDialChoice read mock_only because route.test.ts mocks it, while extract.test.ts
+    ran it for real through extractWatchFromUrl (via a private impl); stuckLeadSql read untested
+    while growth.test.ts rendered it through stuckLeadRows(). Callers are found by enclosing
+    extent, up to INDIRECT_DEPTH public levels; private functions in between are followed (up to
+    PRIVATE_HOPS) without counting as a level. A caller's test that mocks the symbol does not count.
+    """
+    by_file = {}
+    for r in results:
+        if r["kind"] not in TYPE_KINDS:
+            by_file.setdefault(r["file"], []).append(r)
+
+    def public_callers(rel, ln, own_name, hops=0):
+        """The innermost public symbols whose body holds line `ln`, through private links."""
+        inside = [c for c in by_file.get(rel, ()) if c["name"] != own_name and c["line"] <= ln <= c["end_line"]]
+        if inside:
+            return [min(inside, key=lambda c: c["end_line"] - c["line"])]
+        privs = [p for p in privates(rel) if p[0] != own_name and p[1] <= ln <= p[2]]
+        if not privs or hops >= PRIVATE_HOPS:
+            return []
+        name, first, last = min(privs, key=lambda p: p[2] - p[1])
+        masked = masked_of(rel)
+        st = line_starts(masked)
+        out = []
+        for m in re.finditer(r"(?<![\w$])%s\s*\(" % re.escape(name), masked):
+            cl = lineno(st, m.start())
+            if not first <= cl <= last:  # a recursive call is not a caller
+                out += [c for c in public_callers(rel, cl, name, hops + 1) if c not in out]
+        return out
+
+    # a test file that mocks ANY symbol of a module (patch("…get_gmail_service")) runs that module's
+    # other symbols as mocks too, and a test that mentions the symbol without calling it is usually
+    # configuring a mock (mock_gmail.fetch_email.return_value = …). Neither reaches it for real
+    # (S66 maxitech: service methods read "indirect" through handlers whose tests patch the service
+    # factory). mod_mocked[file] = test files mocking anything in it, from parsed patch/vi.mock facts
+    mocked_module_in = {f: set(v) for f, v in mod_mocked.items()}
+    for r in results:
+        mocked_module_in.setdefault(r["file"], set()).update(m["file"] for m in r["test_mock_rows"])
+    reached = {r["id"] for r in results if r["test_status"] == "covered"}
+    tests_of = {r["id"]: {x["file"] for x in r["test_call_rows"]} | set(r.get("test_route_files", []))
+                for r in results if r["test_status"] == "covered"}
+
+    def caller_tests(c):
+        return tests_of.get(c["id"], set())
+
+    for depth in range(1, INDIRECT_DEPTH + 1):
+        found = {}
+        for r in results:
+            if r["id"] in reached or r["kind"] in TYPE_KINDS:
+                continue
+            mocked_in = mocked_module_in.get(r["file"], set()) | {m["file"] for m in r["test_mention_rows"]}
+            via, through = [], set()
+            for rel, ln in r["prod_call_sites"]:
+                for c in public_callers(rel, ln, r["name"]):
+                    if c["id"] not in reached or c["id"] in via:
+                        continue
+                    # tests that reach the caller without mocking this symbol's module; an indirect
+                    # caller inherits the test files that reached it
+                    usable = caller_tests(c) - mocked_in
+                    if not usable:
+                        continue
+                    via.append(c["id"])
+                    through |= usable
+            if via:
+                found[r["id"]] = (via, through)
+        if not found:
+            break
+        for r in results:
+            if r["id"] in found:
+                via, through = found[r["id"]]
+                tests_of[r["id"]] = through
+                r.update(direct_status=r["test_status"], test_status="indirect", gap_lines=0,
+                         reached_via=via[:5], reached_by_tests=sorted(through)[:5], indirect_depth=depth)
+        reached |= set(found)
+    for r in results:
+        r.pop("prod_call_sites", None)
+
+    def private_reached_via(rel, name):
+        """Covered or indirect public callers of a private function, for a private twin."""
+        priv = next((p for p in privates(rel) if p[0] == name), None)
+        if not priv:
+            return []
+        masked = masked_of(rel)
+        st = line_starts(masked)
+        out = []
+        for m in re.finditer(r"(?<![\w$])%s\s*\(" % re.escape(name), masked):
+            cl = lineno(st, m.start())
+            if not priv[1] <= cl <= priv[2]:
+                out += [c["id"] for c in public_callers(rel, cl, name) if c["id"] in reached and c["id"] not in out]
+        return out[:5]
+    return private_reached_via
+
+
+# a name that is another symbol's name plus one of these is its query-language twin
+TWIN_SUFFIX = re.compile(r"^(?P<stem>.+?)(Sql|SQL|_sql|Query|_query|Where|_where|Predicate)$")
+
+
+def twin_of(a, b):
+    """True when one name is the other plus a query suffix (stuckLead / stuckLeadSql)."""
+    for x, y in ((a, b), (b, a)):
+        m = TWIN_SUFFIX.match(y)
+        if m and m.group("stem").lower().rstrip("_") == x.lower():
+            return True
+    return False
 
 
 def module_ratios(results, lev_files, row_symbols, test_facts, srcs):

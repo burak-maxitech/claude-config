@@ -1,6 +1,6 @@
 ---
 name: tests
-description: 'Repo-wide test suite audit. Surfaces missing coverage on critical code paths, wasteful tests, tests keeping dead code alive, and tests that should be one table test, in a single report. Triple headline ("Coverage gaps in critical code: X lines | Tests we can delete: Y lines | Tests we can consolidate: N → M"). Committed scripts measure; three parallel Sonnet subagents (test-coverage / test-quality / test-economics) judge.'
+description: 'Repo-wide test suite audit. Surfaces missing coverage on critical code paths, wasteful tests, tests keeping dead code alive, and tests that should be one table test, in a single report. Triple headline ("Coverage gaps in critical code: X lines | Tests we can delete: Y lines | Tests we can consolidate: K merges worth doing"). Committed scripts measure; three parallel Sonnet subagents (test-coverage / test-quality / test-economics) judge.'
 when_to_use: When user mentions test coverage audit, test smell detection, test debt at the repo level, "are our tests any good", "what tests can we delete", or "what's untested that matters". Different from `/bx:review` §7 (diff-scoped checkbox) and `/bx:clean`'s `cleanup-styles-tests` (artifact-level cruft only).
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Edit, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(sort:*), Bash(uniq:*), Bash(jq:*), Bash(npx:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(python:*), Bash(python3:*), Bash(cargo:*), Bash(go:*), Bash(pytest:*), Bash(cat:*), Bash(head:*), Agent
@@ -372,9 +372,11 @@ After all three subagents return:
      Distinct files affected = unique paths.
    - **Never include T01b/T02/T03/T04/T06, consolidate or the other economics signals in
      `deletable_total`.** Those are rewrites or merges, not deletions.
+   - `consolidate_worthwhile`: from the economics addendum, the merges worth doing
+     (`consolidate_worthwhile_clusters`, `_tests_before`, `_saved_lines`). The headline leads with these.
    - `consolidate_total`: from the economics addendum, **all** clusters (not only the ones reported
      as findings): `consolidate_tests_before → consolidate_tests_after` tests, saving
-     `consolidate_saved_lines` lines.
+     `consolidate_saved_lines` lines. The headline gives this second.
    - All totals are integer sums. The footer's subtotal check must match exactly. A mismatch is
      an arithmetic error to fix before rendering, never "rounding".
 7. **Order** findings within each report section by rank score. The report template's sections
@@ -390,7 +392,7 @@ Read `references/report-template.md` for exact formatting. The shape:
 
 **Section 0 — Triple headline** (this is the *first* line of the report, before everything else):
 
-> **Coverage gaps in critical code: X lines across Y files | Tests we can delete: Z lines across W files | Tests we can consolidate: N → M (saves S lines)**
+> **Coverage gaps in critical code: X lines across Y files | Tests we can delete: Z lines across W files | Tests we can consolidate: K merges worth doing (saves S lines; all clusters N → M)**
 
 Gaps, deletions and merges are equally visible, so a suite that only ever grows shows it.
 

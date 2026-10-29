@@ -46,9 +46,21 @@ For each entry:
      successor's call site in that commit's file to confirm it does the symbol's job. Action:
      **"move these tests to `<successor>`, then delete the symbol"**. Only the symbol is deletable;
      the moved tests survive.
-   - `doc_comment` — the symbol's own comment names the successor. Often a **reference twin**: a
-     JS predicate kept as the executable spec of a live SQL twin. If the successor is untested, its
-     tests are the rule's only spec: the action is "test the successor, then delete", certainty 0.5.
+   - `doc_comment` — the symbol's own comment names the successor.
+   - `private_twin` — a non-exported function in the same file is its twin (named in its comment, or
+     the same name plus `Sql`/`Query`/`Where`).
+   - **`successor_twin: true`** (any kind) — a **reference twin**: a JS predicate kept as the
+     executable spec of a live query-language twin. Never prescribe "move the tests to the twin,
+     then delete". That turns behavioural tests (rows in, boolean out) into checks on SQL text, and
+     often needs an export added only for the test (S257: `sectionSql`). Offer both options and
+     let the user pick:
+     1. **Render-test the twin**: move the cases onto the twin's rendered SQL (or run them against a
+        test database), then delete the JS symbol. The shipped predicate is the one tested.
+     2. **Keep the JS twin as the spec**: keep its tests, and add one test asserting the two agree
+        on the same rows. Nothing is deleted. The finding becomes "add an agreement test".
+     Say whether the twin is already reached (`successor_status: indirect`, `successor_reached_via`
+     names the callers whose tests render it). If it is, option 1 adds little, so lead with option 2.
+     If the twin is `untested`, its JS twin's tests are the rule's only spec: certainty 0.5.
    - `wrapper` — the symbol is a thin wrapper over a live function, so its tests exercise live code.
      Action: "re-point the tests at the live function, then delete the wrapper". Never delete them.
    - `stem` — shared name stem only. The weakest signal: read the candidate and confirm it replaces
@@ -76,7 +88,11 @@ For each cluster, largest `saved_lines` first:
 1. Read the first two member bodies in full (all members of a `mechanical` cluster). Confirm they
    differ only in literals (inputs and expected values) and that every member's case survives as a
    row. A cluster whose members assert different things (`toHaveLength(1)` vs `toEqual([])`) is
-   still mergeable only if the table gets an "expected" column; say which. Certainty 0.8 when the
+   still mergeable only if the table gets an "expected" column; say which. `matcher_variants`
+   lists those groups for you (`{matchers, rows}`): name the rows whose relation differs and say the
+   table needs a per-row matcher column, or that those rows stay outside the table. Never let a
+   table hard-code one matcher for all rows (S257 C174: three rows `toBe(n)`, the verified-row case
+   deliberately `>= 1`; one `toBe` would fail or pin an incidental count). Certainty 0.8 when the
    members you read differ only in literals, 0.6 otherwise. A `mechanical` cluster whose members
    carry long per-case rationale comments or different setup you can see is routed to `--plan`
    anyway; say so.
@@ -85,9 +101,16 @@ For each cluster, largest `saved_lines` first:
 3. `mechanical: true` clusters are `--fix`-eligible (pure table rewrite); everything else routes to
    `--plan`. Copy `mechanical` and the cluster `id` into the finding.
 4. Severity: low. Effort: trivial for mechanical clusters, else small.
-5. Select the 15 clusters with the largest `saved_lines` (fewer if the cap leaves fewer slots), then
-   order them by the ordering key. Report them as findings. Report the cluster totals for **all** clusters in the
-   addendum: the headline uses the full totals, not the 15.
+5. Select up to 15 clusters from those with `worthwhile: true`, largest `saved_lines` first (fewer
+   if the cap leaves fewer slots), then order them by the ordering key. Report them as findings.
+   Report the totals for **all** clusters and for the worthwhile ones in the addendum. The headline
+   leads with the worthwhile count, and the raw total comes second (S257: "774 → 251" set an
+   expectation the brief then cut by ~240 clusters).
+6. **Siblings** (`consolidate.json` `siblings[]`): two clusters in one file that are one table on two
+   fields, split only because their setup differs (the field is a describe block in one, a name
+   prefix in the other). When both are reported, say so in each finding (`metrics.sibling_of`) and
+   recommend one shared runner serving both tables, parameterized by the field (`differs_by` usually
+   names it). S257 wrote that runner by hand for `dial_finishes` and `straps`.
 
 ## Category 3: Snapshot-heavy tests — `economic_signal: snapshot_heavy`
 
@@ -165,8 +188,8 @@ the manifest's `coverage_partial` as `growth_trend`.
 ```
 
 `metrics` per signal:
-- `life_support`: `{ "symbol": str, "symbol_lines": int, "test_rows": [..], "exclusive_rows": int, "successor": str|null, "successor_status": str|null, "successor_evidence": str|null }`
-- `consolidate`: `{ "cluster_id": str, "tests_before": int, "tests_after": 1, "cases_after": int, "saved_lines": int, "jaccard_min": float, "mechanical": bool, "rows": [..] }`
+- `life_support`: `{ "symbol": str, "symbol_lines": int, "test_rows": [..], "exclusive_rows": int, "successor": str|null, "successor_status": str|null, "successor_evidence": str|null, "successor_twin": bool, "successor_reached_via": [..] }`
+- `consolidate`: `{ "cluster_id": str, "cluster_key": str, "tests_before": int, "tests_after": 1, "cases_after": int, "saved_lines": int, "jaccard_min": float, "mechanical": bool, "worthwhile": bool, "matcher_variants": [..], "sibling_of": str|null, "rows": [..] }`. Each row keeps its `anchor`.
 - `snapshot_heavy`: `{ "snapshot_line_count": int, "test_line_count": int, "snapshot_ratio": float, "snapshot_path": str }`
 - `flakiness_marker`: `{ "marker_kind": str, "count_in_file": int }`
 - `flakiness_history`: `{ "flake_fix_commits": [{"hash": str, "subject": str}], "total_flake_fix_commits": int }`
@@ -192,6 +215,10 @@ consolidate_tests_before: <totals.tests_before>
 consolidate_tests_after: <totals.tests_after>
 consolidate_saved_lines: <totals.saved_lines>
 consolidate_mechanical: <totals.mechanical_clusters>
+consolidate_worthwhile_clusters: <totals.worthwhile.clusters>
+consolidate_worthwhile_tests_before: <totals.worthwhile.tests_before>
+consolidate_worthwhile_saved_lines: <totals.worthwhile.saved_lines>
+consolidate_siblings: <len(siblings)>
 snapshot_findings_count: <int>
 snapshot_deletable_lines: <sum across snapshot_heavy findings>
 flakiness_findings_count: <int>

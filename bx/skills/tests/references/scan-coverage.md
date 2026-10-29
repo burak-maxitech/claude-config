@@ -30,6 +30,15 @@ silently re-derive it.
 
 `test_status` is one of:
 - `covered` — at least one test **calls** it, from a file that imports its module (or its class), without mocking it.
+- `indirect` — no test calls it, but a test calls a production caller of it without mocking it
+  (`reached_via` names the caller; `indirect_depth` 1 or 2 public levels, private helpers in between
+  followed; `direct_status` keeps what it would have been). **Not a gap**: `gap_lines` is 0. S257:
+  `withTodaysDialChoice` read mock_only because one route test mocks it, while `extract.test.ts`
+  ran it through `extractWatchFromUrl`; a private SQL builder read untested while its callers' tests
+  rendered it. It is reachability, not proof the caller's tests take the branch that calls it, so
+  read the ones with `security_lines > 0` (up to 10, highest `priority` first): when the caller's
+  tests never reach the call (it sits in a branch none of them enters), report a gap at certainty
+  0.6 with `coverage_gap_lines` = the symbol's `lines`, and say which branch.
 - `mock_only` — tests reach it only as a mock (`vi.mock` of its module, `vi.mocked`, `spyOn`, `patch("…name")`). **This is a gap** (problem 17): say "tests mock it but never run it".
 - `name_only` — a call of the same name in a test that does not import it. Read one before deciding; usually a name collision, so a gap.
 - `mention_only` — referenced (passed, typed, asserted on) but never called. A gap unless the reference is itself the test (a constant checked by value).
@@ -56,7 +65,8 @@ Declarative symbols (`kind: value | type | interface | enum` — tables, config 
 3. **Verify by reading.** Open each candidate symbol and confirm it has logic worth testing. A
    one-line delegation, a re-export, a framework stub or a declarative class the script missed (an
    ORM model with only column fields) drops out; record it under `suppressed`. A SQL-fragment builder
-   whose callers' tests render the SQL may be covered indirectly: keep it at certainty 0.6 and say so.
+   whose callers' tests render the SQL is `indirect` when the script saw the call; when it did not
+   (a call through a variable or a table of builders), keep it at certainty 0.6 and say so.
 4. **Entry points.** A file with `entry_point: true` and no `test_importers` is a gap even at low
    density (S182: `(dashboard)/layout.tsx` held the only auth redirect). Name the `entry_reason`.
    Entry files whose gap symbols total under 10 lines (thin page wrappers) are counted in the
