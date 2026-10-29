@@ -427,7 +427,7 @@ session. `/bx:resume` reads it on demand; it is not auto-loaded.
 This table is a reader's map, not the contract: the canonical schema definition lives at
 [`bx/skills/save/references/doc-schema.md`](bx/skills/save/references/doc-schema.md), and
 the rollup windows and rotation thresholds are owned by
-[`bx/skills/save/references/mode-update.md`](bx/skills/save/references/mode-update.md).
+[`bx/skills/save/references/mode-update-full.md`](bx/skills/save/references/mode-update-full.md).
 Where they disagree, those files win.
 
 **The flow in one breath:** a session starts with CLAUDE.md and auto-memory loaded for free and `/bx:resume` reading `docs/STATUS.md`; it ends with `/bx:save` composing an update packet from the conversation and the `save-writer` subagent writing CLAUDE.md + `docs/STATUS.md` and appending to the three history archives — via anchored tail reads, so no read path grows with the project's age. `--full` adds the README/docs sync, the rollups, and archive rotation.

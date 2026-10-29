@@ -43,7 +43,7 @@ and resume idempotently, never as complete.
 
 CLAUDE.md holds what Claude cannot derive from the codebase. Since Claude Code 2.1.206,
 `/doctor` proposes trimming checked-in CLAUDE.md files by cutting derivable content (tech
-stack, common commands, key paths, architecture patterns); `mode-update.md` Part 4.3 applies
+stack, common commands, key paths, architecture patterns); `mode-update-full.md` Part 4.3 applies
 the same rule to memory sync. Treat a `/doctor` trim proposal as input to the ~7k target above,
 never as licence to drop a required section. `/doctor prompt-audit` (2.1.283+) is the
 companion check for stale or contradictory instructions; same rule applies.
@@ -70,13 +70,13 @@ consent prompt, and quoted verbatim again in the run's report.
 The canonical set of **auto-managed archives**: `docs/session-history.md`,
 `docs/key-decisions.md`, `docs/completed-work.md`, `docs/known-issues.md` (created on
 demand, the first time an issue leaves CLAUDE.md), plus `docs/next-steps-backlog.md`
-(created on demand by a size-pressure shrinker). Exclusion lists elsewhere — `mode-update.md`
+(created on demand by a size-pressure shrinker). Exclusion lists elsewhere — `mode-update-full.md`
 Steps 0.3/3.0, the resume skill's do-not-read list — follow this set; extend it here first.
 
 Access rule: archives are append-only outputs, never sync inputs. Writers append via
 anchored tail reads (Grep the anchor's line number, then offset-Read a window); **no
 automatic path reads an archive in full**, so growth is disk-only. Rotation — procedure and
-thresholds owned by `mode-update.md` Part 7.7 — moves the oldest entries of an oversized
+thresholds owned by `mode-update-full.md` Part 7.7 — moves the oldest entries of an oversized
 archive byte-verbatim into numbered volumes under `docs/archive/`; volumes are read by
 nothing automatic, ever — they are grep-on-demand history.
 
@@ -88,7 +88,7 @@ the status: `### <title> — Resolved S<N> (<date>)`, optionally `, commit <hash
 summary + link there for as long as the issue is open. Headers are never rewritten: when an
 `Open` issue is later fixed, its summary line is archived as a new `Resolved` entry and the
 older `Open` entry simply stops being live. This section owns the file's existence and format. Its lifecycle is
-owned by `mode-update.md`: Part 1.7 (relocation) and Part 7.3 (size threshold).
+owned by `mode-update.md` Part 1.7 (relocation) and `mode-update-full.md` Part 7.3 (size threshold).
 
 ## v1 layout (legacy)
 

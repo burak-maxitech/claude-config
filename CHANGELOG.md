@@ -2,6 +2,14 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.15.1 — 2026-10-28
+
+`/bx:save`: a smaller everyday save, and a commit window that no longer repeats earlier saves.
+
+### Changed
+- `mode-update.md` is split. The default save now loads only Step 0, the Save Path, Part 0, Part 1.0–1.8 and Part 8 (28 KB). The Full Path, Step 0.3, Part 0.5, Parts 1.9–1.10 and Parts 2–7 moved to the new `mode-update-full.md` (47 KB), loaded only with `--full`. Part numbers are unchanged. `doc-structure-rules.md` is also skipped on the default path. Together that is about 51 KB (~13k tokens) less to read on every save without `--full`.
+- Step 0 finds this session's commits from the **save anchor**, the last commit that wrote `docs/STATUS.md`, not from the `Last Updated` date. With a date cutoff, a second save on the same day picked up the first save's commits again. Replayed on S65's second save of 2026-10-26: the date cutoff took 3 commits (two from the earlier save), the anchor takes 1. One `git log --name-only` call replaces `git log` + `git diff --stat HEAD~5`.
+
 ## 2.15.0 — 2026-10-28
 
 `/bx:tests` accuracy: the five remaining problems from the first session that acted on its output

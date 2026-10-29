@@ -53,8 +53,8 @@ never CREATE.
 
 Read these reference files from this skill's `references/` directory:
 1. `references/doc-schema.md` — the layout contract and detection predicate (read FIRST; Step 1's mode depends on it)
-2. `references/doc-structure-rules.md` — target structure and context preservation rules
-3. `references/claude-md-sections.md` — required CLAUDE.md sections contract
+2. `references/claude-md-sections.md` — required CLAUDE.md sections contract
+3. `references/doc-structure-rules.md` — target structure and context preservation rules. **Skip it on the default UPDATE path:** the Save Path composes a packet and moves no structure. Read it for REFACTOR, CREATE, MIGRATE, and UPDATE with `--full`.
 
 ---
 
@@ -67,7 +67,7 @@ Based on the detected mode, read **only** the relevant reference file and follow
 | **REFACTOR** | `references/mode-refactor.md` |
 | **CREATE** | `references/mode-create.md` |
 | **MIGRATE** | `references/mode-migrate.md` |
-| **UPDATE** | `references/mode-update.md` |
+| **UPDATE** | `references/mode-update.md`; with `--full`, also `references/mode-update-full.md` |
 
 **UPDATE mode dispatches the `save-writer` subagent** (Sonnet) to apply the file edits off the main thread — see `references/mode-update.md` (Save Path / Dispatch). CREATE and REFACTOR run inline on the orchestrator. MIGRATE runs on both the fast path and --full, then falls through to UPDATE in the same run.
 
