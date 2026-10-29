@@ -2,19 +2,19 @@
 
 > Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
 
-Last Updated: 2026-10-26 (Session 65, cont.)
+Last Updated: 2026-10-28 (Session 66)
 
 ## Current Status
 
 | Area | Status |
 |------|--------|
-| Skills (11) | Complete — `/bx:clean` content-reviewed and extended with seven categories S63 (bx 2.13.0; 60/60 on fixtures) and run for real S64 on maxitech-concierge (Python; 6 defects → 2.13.1) and horowell (Next.js; 10 defects → 2.13.2); `/bx:save --full` run three times on the reordered sweep (S62 ×2, S63); `/bx:evolve` 2.12.x run four times S62; `/bx:tests` run for real S65 on horowell + maxitech-concierge (29 defects; 2.13.3 safety, 2.14.0 scripts + reduction lane + suite-verified `--fix`); only `/bx:health` never run |
+| Skills (11) | Complete — `/bx:clean` content-reviewed and extended with seven categories S63 (bx 2.13.0; 60/60 on fixtures) and run for real S64 on maxitech-concierge (Python; 6 defects → 2.13.1) and horowell (Next.js; 10 defects → 2.13.2); `/bx:save --full` run three times on the reordered sweep (S62 ×2, S63); `/bx:evolve` 2.12.x run four times S62; `/bx:tests` run for real S65 on horowell + maxitech-concierge (29 defects; 2.13.3 safety, 2.14.0 scripts + reduction lane + suite-verified `--fix`), and its first acted-on output fixed S66 (2.14.1, 2.15.0); only `/bx:health` never run |
 | Subagents (20) | Complete — `arch-robustness` added S58 |
-| Plugin packaging (`bx`) | **v2.14.0** pushed S65 (`9f7624a`); install pending (cache at 2.13.2). Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
+| Plugin packaging (`bx`) | **v2.15.0** committed S66 (2.14.1 pushed `bd03bff`); installed cache at 2.14.0. Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate passed and fix wave shipped in `7ed079a` (2026-08-17), recorded S61 |
 | Cross-platform setup | Complete |
-| GitHub sync | Complete — main pushed through v2.14.0 (S65, `9f7624a`) |
+| GitHub sync | Complete — main pushed through v2.14.1 (S66, `bd03bff`); 2.15.0 push pending |
 | Documentation | Complete — schema v2 |
 
 ## Completed
@@ -27,7 +27,7 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## In Progress
 
-**`/bx:tests` upkeep — release 1 shipped (2.13.3), release 2 specced (S65).** Spec: `docs/superpowers/specs/2026-10-26-bx-tests-upkeep-design.md` (33 problems, decisions D1–D6, acceptance controls from both repos). 2.13.3: assertion definition in one place, T01a/T01b split, gated suite-verified `--fix`, `coverage_negatives` + `coverage_partial` in the dispatch block, agents reduced to citations. 2.14.0: committed scripts (`test_bodies.py`, `leverage.py`, `references.py`), accuracy fixes, reduction lane (`life_support`, `consolidate`, growth trend), `/bx:clean` ownership split.
+**`/bx:tests` upkeep — 2.13.3, 2.14.0 (S65), 2.14.1 + 2.15.0 (S66) shipped.** S66 fixed the nine problems from horowell S257's use of a `--plan` brief: resumable saved runs + anchors + type-check gate + test-support files (2.14.1); `indirect` status, SQL/private twins, `matcher_variants`, `siblings`, worthwhile headline, `js_extent` generic fix (2.15.0). Spec: `docs/superpowers/specs/2026-10-26-bx-tests-upkeep-design.md` (33 problems, decisions D1–D6, acceptance controls from both repos). 2.13.3: assertion definition in one place, T01a/T01b split, gated suite-verified `--fix`, `coverage_negatives` + `coverage_partial` in the dispatch block, agents reduced to citations. 2.14.0: committed scripts (`test_bodies.py`, `leverage.py`, `references.py`), accuracy fixes, reduction lane (`life_support`, `consolidate`, growth trend), `/bx:clean` ownership split.
 
 **`/bx:evolve` 2.12.x — shipped, run four times, three run-found defects fixed (S62).** 2.12.0 delivered the three 2.11.0 defects and improvements 7–10 (`lane-contract.md`, `scripts/docs-page-hashes.py` + `watermark.docs_pages`/`inventory_hash`, pinned `capabilities.json` via `scripts/build-capabilities.py`, community lane as a discovery feed). Four real runs: delta 22/22 pages (5 findings), `--fix` with all lanes current (3 applied + `env-vars` pinned), delta 5/23 (1 finding), `--fix` all-current (1 applied). Fixed in 2.12.1: registry threshold `min(3, n)`, validator pattern for the pinned vocabulary. **Open:** the probe's delta-aware scan (narrowed by hand once), candidates persisting into `--fix`, a `source_url` tie-break rule, the plugin-eval design `69ef485d` (needs `bx/evals/` + `claude plugin eval init`).
 
@@ -43,7 +43,7 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## Next Steps
 
-1. **Install bx 2.14.0** (`/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`) and run `/bx:tests` once on horowell with the installed `test-*` agents (never exercised); then `/bx:tests --fix` on a horowell branch for one mechanical JS merge (89 available) once the other session's edits there are committed.
+1. **Install bx 2.15.0** (`/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`) and run `/bx:tests` once on horowell with the installed `test-*` agents (never exercised); then `/bx:tests --fix` on a horowell branch for one mechanical JS merge once the other session's edits there are committed — this is the first run of the 2.14.1 type-check baseline and anchor gates.
 2. **`/bx:clean` rerun** to confirm the new "Test-only symbols — see /bx:tests" block (D6) replaces the S240-style test-only dead-code items.
 3. **maxitech-concierge follow-ups (in that repo):** add tests for `SlackService.verify_request` (the only auth on `POST /slack/interactions`, zero tests) and a regression test for `820c2076`; move `build_reply_all_recipients`'s 5 tests to the live `build_reply_recipients` and delete the dead method. 2.14.0 also found three mechanical merges there (C007, C014 in the S65 clone).
 4. **`/bx:evolve` 2.12.x follow-ups** — make `docs-page-hashes.py` delta-aware, persist `allowlist_candidates` into `--fix`, add the `source_url` tie-break to Step 3.4; regenerate `capabilities.json` (pre-existing `bx:clean/idiom:bin-path-helper` drift); PATCH bump.
@@ -58,10 +58,9 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 > Full history: [session-history.md](session-history.md)
 
-### Last Session (Session 65, cont.) - 2026-10-26
-- **`/bx:tests` 2.14.0 shipped (`9f7624a`):** four stdlib scripts + `run.py` measure every number (test bodies/assertions, path-resolved leverage + git lanes, call/mock/mention references + life support with successor detection, consolidate clusters with merge tables); scanners judge.
-- **Reduction lane + triple headline:** horowell 15 test-only production symbols (matching its own backlog list) and 774 -> 251 tests consolidable; maxitech `build_reply_all_recipients` -> `build_reply_recipients`.
-- **Verified by running:** eight scanner runs passed every acceptance control and surfaced 13 script defects, all fixed in the scripts; `--fix` dogfood on a maxitech clone: 210 -> 207 exactly, bad merge green but reverted by the count check.
-- **`--fix` is a reducer** (T01a, successor-less life support, mechanical merges) with per-item snapshot reverts; `/bx:clean` hands test-only symbols to `/bx:tests` (D6).
-- Not exercised: the agent definitions (cache 2.13.2), a JS merge under `--fix`.
-- Full sweep: rolled up S62–S63 (session-history 55.3k → 45.7k); size-pressure moved 6 Key Decisions rows and one open Known Issues entry (bx 2.12.x) to the archives, CLAUDE.md 13.9k → 10.4k; memory `feedback-edit-tool-for-escapes` added; no rotation.
+### Last Session (Session 66) - 2026-10-28
+- **First acted-on `/bx:tests` output:** horowell S257 worked from a `--plan` brief and reported 9 problems; all nine traced to the code and fixed across two releases.
+- **2.14.1 (`bd03bff`):** `run.py --save-to <repo>/.bx/tests/<date>/` (git-excluded) + stable cluster keys and test anchors, so briefs stay resumable; `--fix` type-check baseline gate and anchor-based locating; test-path helpers are never life support (246 → 21 false deletable lines).
+- **2.15.0:** `indirect` coverage status through unmocked callers (horowell gap lines 7,615 → 3,359; maxitech mocked-module filter cut 81 → 20); private SQL twins with a two-option rule; `matcher_variants`; same-file `siblings`; headline leads with 56 merges worth doing (1,663 lines). Found and fixed a `js_extent` bug that truncated 14 horowell functions at a multi-line `Promise<` return type.
+- Not exercised: scanner prose for the new fields, `--fix` gates (await horowell branch run).
+- Full sweep: rolled up S64; workflow.md `/bx:tests` section rewritten (was pre-2.13.3), README headline + architecture.md save-to synced; no rotation.

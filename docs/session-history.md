@@ -175,24 +175,7 @@
 
 ### Session 63 - 2026-10-21: `/bx:clean` content review (15 defects incl. undefined `quick_win`, now a closed set) + seven detection categories; evals 60/60 vs 59/60 baseline; bx 2.13.0 (commit: 15da8fe)
 
-### Session 64 - 2026-10-23
-**What happened:**
-- Resumed and ran the first real `/bx:clean` on maxitech-concierge (Python, 122 files, report-only). There were 8 findings and no unused files or deps. The skill is explicit-only, so it was orchestrated by hand from the installed 2.13.0 SKILL.md.
-- Found six skill defects, all fixed in 2.13.1 (see commit 8e964eb). The worst was a dead-config-key false positive on `sign_off`, which is read via `self.config.assistant.get(...)`. It would have reverted every email signature.
-- Iterative verification: five deps-config reruns. Fix 3 (clean vs. unavailable) did not hold across runs in the scan prose, so the normalisation moved into the SKILL.md Step 2.5 orchestrator. A doc-mentioned key reached `safe` in one run, so a docs grep over `*.md`/`docs/**`/`README*` now caps it. The final two runs passed.
-- Correction on the record: the S58 rule ("precondition absent → unavailable") was right. Only the orchestrator-skipped and zero-candidate entries were misfiled.
-- Pushed v2.13.1. maxitech-concierge was left untouched.
-
-**Files created/modified:**
-- `bx/skills/clean/references/scan-deps-config.md`: accessor tracing, mandatory quoted-key and docs grep, `## Used without import`, `## Kept deliberately`, skipped/clean/unavailable rule
-- `bx/skills/clean/references/scan-files-code.md`: settings fields are not exports; `quick_win` implies safe; unavailable rule
-- `bx/skills/clean/references/scan-styles-tests.md`: unavailable rule
-- `bx/skills/clean/SKILL.md`: Step 2.4 quick_win/risk downgrade and cross-agent dedup; Step 2.5 orchestrator-owned unavailable normalisation
-- `bx/.claude-plugin/plugin.json`, `CHANGELOG.md`: 2.13.1
-
-**Next session should:**
-- Install 2.13.1 and run `/bx:clean` on a JS/TS repo (JS categories, directory scope, `--dry-run`), re-running all three scanners
-- Continue with `/bx:evolve` 2.12.x follow-ups (Next Steps #1)
+### Session 64 - 2026-10-23: first real `/bx:clean` run (maxitech-concierge, Python) found six defects incl. a `sign_off` dead-config false positive; clean-vs-unavailable normalisation moved to the orchestrator; bx 2.13.1 (commits: 8e964eb, 3783a5c)
 
 ### Session 64 (cont.) - 2026-10-23
 **What happened:**
@@ -258,3 +241,21 @@
 
 **Next session should:**
 - Install 2.14.0 and run `/bx:tests` with the installed agents; try one JS merge under `--fix` on horowell.
+
+### Session 66 - 2026-10-28
+**What happened:**
+- Triaged a 9-item report from horowell S257, the first session to act on a `/bx:tests --plan` brief: non-resumable cluster ids, stale line numbers, mock-only false positives, SQL-twin advice that weakens tests, matcher-blind clusters, no sibling merging, `--fix` without type-check, an overstated consolidation headline, life-support false positives on test helpers.
+- Shipped 2.14.1 (items 1, 2, 7, 9; commit bd03bff) and 2.15.0 (items 3, 4, 5, 6, 8), each verified by running on a pre-S257 horowell clone and maxitech-concierge.
+- Run-found defects: `js_extent` cut 14 functions at a multi-line generic return type; the first `indirect` pass counted handlers with string-patched factories (81 → 20 after module-mock facts); label-based sibling matching found nothing, replaced by member shape.
+- Not exercised: the new scanner prose and the `--fix` type-check/anchor gates.
+- Full sweep: rolled up S64; workflow.md `/bx:tests` section rewritten, README headline and architecture.md synced; no rotation.
+
+**Files created/modified:**
+- `bx/skills/tests/scripts/references.py` — test-support files, indirect status, private twins, js_extent fix
+- `bx/skills/tests/scripts/consolidate.py` — anchors, keys, matcher_variants, siblings, worthwhile totals
+- `bx/skills/tests/scripts/run.py` — `--save-to`
+- `bx/skills/tests/SKILL.md`, `references/{fix-mode-test,plan-mode-test,scan-coverage,scan-economics,report-template}.md`
+- `CHANGELOG.md`, `bx/.claude-plugin/plugin.json` (2.14.1, 2.15.0), spec addendum, workflow.md, README.md, docs/architecture.md
+
+**Next session should:**
+- Install 2.15.0, run `/bx:tests` on horowell with the installed agents, then `--fix` on a branch for the type-check and anchor gates

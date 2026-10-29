@@ -285,3 +285,5 @@
 - [x] S65: bx 2.13.3 shipped — /bx:tests deletion safety (assertion definition, T01a/T01b, gated suite-verified --fix) + finding contract (coverage_negatives/partial, field semantics, agents cite scan files) - bx/skills/tests/, bx/agents/test-*.md, commit c72a98d
 - [x] `/bx:tests` 2.14.0 — scripts, reduction lane, triple headline, suite-verified `--fix`, D6 (S65, `9f7624a`) - bx/skills/tests/**, bx/agents/test-*.md, bx/skills/clean/**
 - [x] `/bx:tests --fix` dogfood on a throwaway maxitech clone with planted controls + 2 real merges (S65)
+- [x] /bx:tests 2.14.1 — resumable saved runs, anchors + cluster keys, --fix type-check gate, test-support helpers excluded from life support - bx/skills/tests/scripts/{run,consolidate,references}.py, SKILL.md, fix-mode-test.md, plan-mode-test.md
+- [x] /bx:tests 2.15.0 — indirect status, private SQL twins, matcher_variants, siblings, worthwhile headline, js_extent generic fix - references.py, consolidate.py, scan-coverage.md, scan-economics.md, report-template.md

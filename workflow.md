@@ -14,7 +14,7 @@
 | **During Development** | `/code-review` (quick) or `/bx:review` (thorough) | Review code quality |
 | **During Development** | `/bx:clean` | Find dead code & cruft |
 | **Architecture Audit** | `/bx:arch` | Six-dimension repo audit — complexity (cyclomatic + cognitive), SOLID/design, refactors, over-engineering, robustness (thread safety / error safety / scalability), performance. Opens with the top 3 architectural themes |
-| **Test Suite Audit** | `/bx:tests` | Repo-wide test health — coverage gaps on critical paths + smells (T01-T05) + suite economics. Twin headline metric. |
+| **Test Suite Audit** | `/bx:tests` | Repo-wide test health — coverage gaps on critical paths + smells (T01a–T06) + the reduction lane (test-only dead code, consolidation). Triple headline. |
 | **SEO + GEO Audit** | `/bx:seo` | Repo-wide SEO + Generative Engine Optimization audit for web projects. Fetches current best practices every run. Probes sitemap URL health. **Optional GSC integration via Search Console API** (Performance via `searchanalytics.query` + per-URL Indexing via `urlInspection.index.inspect`). Configure `.seo-data/gsc/config.yaml` `site_url:` after `gcloud auth application-default login`. Score `/100` tracked over time. |
 | **Visual Re-skin** | `/bx:webdesign` | Re-skin an existing web project's visual design via Google Stitch (MCP). Web projects only. Requires one-time Stitch MCP + `stitch-skills` setup. Works on a dedicated `webdesign/<date>` branch. |
 | **End Session** | `/bx:save` | Save progress & context |
@@ -385,37 +385,28 @@ on pre-v2 repos. The full breakdown — including what `--full` adds — lives i
 
 ### /bx:tests
 
-**When:** Repo-wide test suite audit — when you want to know both "what isn't tested that matters" and "what tests can we delete" in a single report. Complements diff-scoped `/bx:review` §7 (or built-in `/code-review` for a quick pass) and artifact-level `cleanup-styles-tests` §7.
+**When:** Repo-wide test suite audit — what isn't tested that matters, which tests can go, and which tests should be one table test, in a single report. Complements diff-scoped `/bx:review` §7 (or built-in `/code-review`) and artifact-level `cleanup-styles-tests` §7.
 
 **Usage:**
 ```bash
 /bx:tests                             # Default review-only report
 /bx:tests src/auth/                   # Scope to a path
-/bx:tests --plan                      # Phased rewrite/fill brief with /bx:plan hand-offs
-/bx:tests --fix                       # Apply T01 deletions with per-finding diff preview (T01 only — assertion-free tests)
-/bx:tests --coverage                  # Read existing coverage reports (jest/vitest/pytest-cov/cargo-tarpaulin/go cover); never auto-runs the tool
+/bx:tests --plan                      # Phased brief with /bx:plan hand-offs (anchors, never bare cluster ids)
+/bx:tests --fix                       # Suite-verified reductions on a branch: T01a no-op tests, test-only dead code, mechanical merges
+/bx:tests --coverage                  # Read existing coverage reports; never auto-runs the tool
 /bx:tests --full-scan                 # Force full scan even on >500-file repos
 ```
 
-**Three deliberate design choices:**
-1. **Twin headline metric.** Section 0 of the report shows *both* `Coverage gaps in critical code: X lines across Y files` and `Tests we can delete: Z lines across W files`. A single number on either axis is misleading on its own.
-2. **`--coverage` is opt-in only.** Coverage tooling hits network/runtime; the default scan is heuristic-only (test-neighbor presence + public-symbol enumeration). Even with `--coverage`, only *reading* an existing report is auto — never running the tool.
-3. **`--fix` is T01-only.** Assertion-free tests are the one provably-safe deletion (a test that asserts nothing cannot fail meaningfully). T02-T05, snapshot bloat, coverage gaps, and flakiness all auto-route to `--plan` because they need human judgment.
+**Design choices:**
+1. **Scripts measure, scanners judge.** `skills/tests/scripts/run.py` computes every number (test bodies, leverage, references, consolidation clusters) and saves the run to `<repo>/.bx/tests/<date>/` (git-excluded) so a plan stays resumable; three Sonnet subagents (`test-coverage` / `test-quality` / `test-economics`) judge the output.
+2. **Triple headline.** `Coverage gaps in critical code` · `Tests we can delete` · `Tests we can consolidate: K merges worth doing (saves S lines; all clusters N → M)`. A symbol reached only through an unmocked caller is `indirect`, not a gap.
+3. **`--fix` is a reducer, guarded by counts.** Each item must change the case count by exactly what it removed (a merge leaves it unchanged) and must not raise the type-error count over the baseline; a failing item reverts its own snapshot. Everything else routes to `--plan`.
 
-**Decomposition:** Three parallel Sonnet subagents — `test-coverage` (priority-ranked gaps + bug-fix-without-regression scan), `test-quality` (T01-T05 catalog with project-defined-assertion-helper false-positive guard), `test-economics` (snapshot bloat / flakiness / LOC-ratio extremes).
+**Smell catalog** (`references/test-smell-catalog.md`): T01a no-op (deletable), T01b implicit no-raise (rewrite, never delete), T02 weak assertion, T03 implementation-coupled, T04 mystery guest, T06 name/assertion mismatch. An assertion is anything that fails the test on a regression, mock verification included.
 
-**T01-T05 catalog** (full schema in `references/test-smell-catalog.md`):
-- **T01** — Assertion-free test (only `--fix-eligible` entry; deletable)
-- **T02** — Weak assertion (`toBeTruthy`, `not.toBeNull` standing alone; rewritable)
-- **T03** — Implementation-coupled / mock-heavy (impl/behavior ratio >2:1; rewritable)
-- **T04** — Mystery guest (depends on data not in test file; rewritable)
-- **T05** — Redundant (≥80% body overlap, non-boundary inputs; conservative — routes to `--plan`)
-
-**Non-overlap with `/bx:clean`:** `/bx:tests` does **not** flag orphaned test files, >3mo skipped tests, unused helpers, or stale snapshots — `cleanup-styles-tests` §7 owns those. Bidirectional pointers in the report footer cross-reference. If you're auditing for those four categories, run `/bx:clean --tests` instead.
+**Non-overlap with `/bx:clean`:** `/bx:tests` does **not** flag orphaned test files, >3mo skipped tests, unused helpers, or stale snapshots — `cleanup-styles-tests` §7 owns those. `/bx:clean` hands test-only production symbols to `/bx:tests` (`life_support`).
 
 **Scale tiers:** <100 files = full, 100-500 = bounded, >500 = smart sample (reuses `bx:arch/references/scale-strategy.md`).
-
-**Output:** Twin headline → Testing posture summary → Findings (Coverage / Quality / Economics, ranked) → Documented-decision conflicts (separate, requires confirmation) → Suggested next actions (skill chains + copy-pasteable `/bx:plan` snippets for strategic rewrites).
 
 **Useful chain:** `/bx:clean` (deletes orphaned test artifacts) → `/bx:tests` (audits what remains) → `/bx:tests --plan` → `/bx:plan` per phase. Or post-ship: `/bx:tests` → `/bx:review --security` on the critical-path gaps it surfaces.
 
