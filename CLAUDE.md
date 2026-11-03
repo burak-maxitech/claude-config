@@ -1,7 +1,7 @@
 <!-- bx-doc-schema: 2 -->
 # CLAUDE.md
 
-Last Updated: 2026-10-28 (Session 67)
+Last Updated: 2026-11-02 (Session 68)
 
 ## Project Overview
 
@@ -30,6 +30,7 @@ Last Updated: 2026-10-28 (Session 67)
 | A brief must survive its own first edit: name tests by anchor and runs by saved folder, never by line or temp-dir cluster id (S66, 2026-10-28) | Horowell S257 could resume a plan only by grepping another session's scratchpad, and its line numbers went stale after the first merge. `run.py --save-to` keeps the run in a git-excluded `<repo>/.bx/tests/<date>/`, clusters carry a sha1 key of their anchors, and `--fix` locates by anchor. (v2.14.1) |
 | Coverage through an unmocked caller is `indirect`, not a gap — and a caller whose test mocks the symbol's module does not count (S66) | Mock-only and untested statuses flagged functions S257 found well tested through another export; the naive fix then counted handlers whose tests patch service factories by string. Module-mock facts from the parsed tests are the filter (maxitech 81 → 20, sample verified). (v2.15.0) |
 | `/bx:save` loads `--full` instructions only on `--full`, and finds the session's commits from the last commit that wrote `docs/STATUS.md` (S67, 2026-10-28) | The everyday save read 75 KB of instructions to use 28 KB of them. A `Last Updated` date cutoff re-counted the earlier saves' commits whenever a day had more than one save (S65: three saves on 10-26). (v2.15.1) |
+| `/bx:seo` snapshot retention runs only after a successful write; a baseline is never pruned at run start (S68, 2026-11-02) | Turn 1's `find snapshots -mtime +30 -delete` ran before the auth probe, so a ~monthly cadence always lost its baseline and a run that then failed auth lost it with no replacement (burakarik.com, 31-day snapshot). `snapshot-write` now keeps the newest 5 always and prunes others after 180 days by filename date. (v2.15.3) |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 

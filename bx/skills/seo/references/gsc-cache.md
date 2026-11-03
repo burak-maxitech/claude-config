@@ -51,7 +51,7 @@ Already covered by the `.gitignore` sentinel block (`.seo-data/gsc/` is fully ig
 | | `cache/` | `snapshots/` |
 |---|---|---|
 | Purpose | Same-day quota savings (avoid refetching API responses) | Longitudinal coverage-state history (regression detection) |
-| Retention | 7 days (auto-prune) | 30 days (auto-prune) |
+| Retention | 7 days (auto-prune) | Newest 5 always kept; older ones pruned after 180 days, only after a successful snapshot write |
 | TTL on read | 24h for `sa-*` / 7d for `ui-*` (cache hit/miss decision; see "TTL policy" above) | None (every snapshot is read on demand for diff) |
 | Files | `sa-q{1,2,3}-<hash>.json` + `ui-<hash>.json` (raw API responses) | `<YYYY-MM-DDTHHMMSS>-<commit_sha7>.json` (orchestrator-aggregated `{url: coverageState}` map + metadata) |
 | Managed by | This file's cache wrapper | `references/gsc-ingestion.md` sub-dim 14 + `SKILL.md` Step 1.6.13 |

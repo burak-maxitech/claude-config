@@ -289,3 +289,4 @@
 - [x] /bx:tests 2.15.0 — indirect status, private SQL twins, matcher_variants, siblings, worthwhile headline, js_extent generic fix - references.py, consolidate.py, scan-coverage.md, scan-economics.md, report-template.md
 - [x] `/bx:save` 2.15.1: default path loads only the save-path instructions; commit window anchored on the last state-file commit (S67)
 - [x] `/bx:evolve` S67 delta + `--fix`: watermark 2.1.312, 2 docs pages pinned, capabilities.json regenerated (2.15.2)
+- [x] /bx:seo 2.15.3 — snapshot retention after write, auth cause classification, run-scoped snapshots, indexed-caveat diff fix (S68) - bx/skills/seo/references/gsc-parse-helper.py, bx/skills/seo/SKILL.md, bx/skills/seo/tests/test_auth_and_snapshots.py

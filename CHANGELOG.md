@@ -2,6 +2,20 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.15.3 — 2026-11-02
+
+`/bx:seo`: a failed run no longer destroys the coverage baseline, and auth failures name their real cause. Found when a burakarik.com run stopped on expired credentials after its Turn-1 prune had already deleted the 31-day-old snapshot the run was meant to compare against.
+
+### Fixed
+- **Snapshot retention moved out of Turn 1.** `find snapshots -mtime +30 -delete` ran at the start of every run, before the auth probe, so a monthly cadence always lost its baseline and a failed run lost it without writing a replacement. Retention now runs inside `snapshot-write`, only after a successful write: the newest 5 snapshots are always kept, and older ones are removed once more than 180 days old. Age is taken from the filename date, not mtime. The Turn-1 `ls | tail -1` no longer races the prune in the same parallel turn.
+- **`snapshot-write` refuses an empty snapshot** (`snapshot_write_failed:no_inspections_in_cache`). An empty one became the next baseline and hid every regression.
+- **Snapshots and clusters cover this run's URLs only.** Both globbed every `ui-*` file in the 14-day cache, mixing stale entries and URLs this run never selected, so consecutive snapshots covered different sets. `inspect-batch` now writes `cache/last-inspect-run.json` and both read through it.
+- **Dropping a URL from the sitemap is not a deindex.** The regression diff treated only `Submitted and indexed` as indexed, so `→ Indexed, not submitted in sitemap` was reported as a `deindex_regression`. Indexed-with-caveat states now count as indexed.
+- **`mint_failed` is split by cause.** The token endpoint's answer is classified: `token_revoked` (`invalid_grant`), `reauth_required` (`invalid_rapt`, session-control policy), `client_invalid`, `network` (retried 3× with backoff; the message says not to re-login), with `mint_failed` kept for anything else. `auth-token` and `inspect-batch` print a non-secret `AUTH_DETAIL:` line that the probe passes through, and the gcloud fallback is skipped for causes it cannot fix (it read the same file and added up to 30 s).
+
+### Added
+- `bx/skills/seo/tests/test_auth_and_snapshots.py`: 16 stdlib tests, no network. All 16 fail on the 2.15.2 helper. Checked live: the probe against the expired credential now reports `AUTH_ERROR:token_revoked` / `AUTH_DETAIL:HTTP 400 invalid_grant: Bad Request`.
+
 ## 2.15.2 — 2026-10-28
 
 `/bx:evolve` upkeep from the S67 run.

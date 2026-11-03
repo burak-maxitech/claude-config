@@ -276,3 +276,19 @@
 
 **Next session should:**
 - Install 2.15.2, then the `/bx:tests` horowell run (Next Step 1)
+
+### Session 68 - 2026-11-02
+**What happened:**
+- `/bx:seo` run on burakarik.com halted: GSC ADC refresh token dead (`mint_failed`), and Turn 1's `find snapshots -mtime +30 -delete` had already removed the 2026-10-02 baseline before the auth probe failed.
+- 2.15.3: snapshot retention moved into `snapshot-write` (post-write only; keep newest 5, prune >180 days by filename date); empty snapshot refused; snapshots/clusters scoped to the run's URL manifest; indexed-with-caveat states count as indexed in the regression diff.
+- Auth classification: `token_revoked`, `reauth_required`, `client_invalid`, `network` (retried 3×, no re-login advice), `mint_failed` fallback; `AUTH_DETAIL:` passed through the probe; gcloud fallback skipped where it cannot help.
+- Verified: 16 tests pass, all 16 fail on the old helper; live probe returns `token_revoked` / `HTTP 400 invalid_grant`. Snapshot/diff changes not yet run on a real site.
+
+**Files created/modified:**
+- `bx/skills/seo/references/gsc-parse-helper.py` - classification, retry, retention, manifest, indexed-state fix
+- `bx/skills/seo/SKILL.md`, `references/gsc-cache.md`, `gsc-ingestion.md`, `gsc-setup-readme-template.md` - docs synced
+- `bx/skills/seo/tests/test_auth_and_snapshots.py` - new
+- `bx/.claude-plugin/plugin.json`, `CHANGELOG.md` - 2.15.3
+
+**Next session should:**
+- Push, install 2.15.3, re-auth GSC, re-run `/bx:seo` on burakarik.com.

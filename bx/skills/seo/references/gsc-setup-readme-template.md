@@ -168,7 +168,7 @@ your account can read. Empty array means no properties on this account.
 - API auth probe: `gcloud auth application-default print-access-token` should print a token. The skill calls `GET /webmasters/v3/sites` at start of each run to verify access; failures surface in footer with specific remediation.
 - Performance: 3 `searchanalytics.query` calls per run (queries digest, pages digest, url_impressions_map).
 - Indexing: up to 200 `urlInspection.index.inspect` calls per run (4-slice mix: 80 high-impression URLs + 20 recently-changed paths + up to 100 user-supplied URLs from `known-bad-urls.txt` + sitemap-orphan URLs filling the rest of the shared 100-slot bucket — sitemap-orphan catches deindex risks early, before Google emails; user-supplied catches URLs no longer in your sitemap that Google still remembers). Well under the 2,000/day per-property quota.
-- Index Coverage snapshots: one `.json` written to `.seo-data/gsc/snapshots/` per run, retained 30 days. Next run diffs against the prior snapshot to surface URLs that flipped from indexed → not-indexed (sub-dim 14 `deindex_regression` — the early-warning loop catching Google's "Validation failed" emails before they hit your inbox).
+- Index Coverage snapshots: one `.json` written to `.seo-data/gsc/snapshots/` per run; the newest 5 are always kept and older ones are removed after 180 days (only after a new snapshot is written, so a failed run never deletes one). Next run diffs against the prior snapshot to surface URLs that flipped from indexed → not-indexed (sub-dim 14 `deindex_regression` — the early-warning loop catching Google's "Validation failed" emails before they hit your inbox).
 
 ## Privacy
 
@@ -189,7 +189,7 @@ want to commit anyway (e.g., team-shared config), remove the
 └── snapshots/           (auto-managed coverage-state history; 30d retention — needed for regression detection)
 ```
 
-The `cache/` and `snapshots/` subdirectories are created by the skill on first GSC-enabled run. **Cache** holds JSON responses from `searchanalytics.query` (Q1/Q2/Q3) and `urlInspection.index.inspect` so reruns within the TTL window (24 hours for Search Analytics, 7 days for URL Inspection) don't burn API quota; pruned at 7/14 days respectively. **Snapshots** record `{url → coverageState}` per run for sub-dim 14 regression detection; pruned at 30 days. You don't need to manage either — both are skill-managed and reproducible from the API on demand (snapshots regenerate from cache on the same run; cache regenerates from API on next run).
+The `cache/` and `snapshots/` subdirectories are created by the skill on first GSC-enabled run. **Cache** holds JSON responses from `searchanalytics.query` (Q1/Q2/Q3) and `urlInspection.index.inspect` so reruns within the TTL window (24 hours for Search Analytics, 7 days for URL Inspection) don't burn API quota; pruned at 7/14 days respectively. **Snapshots** record `{url → coverageState}` per run for sub-dim 14 regression detection; the newest 5 are always kept and older ones are pruned after 180 days. You don't need to manage either. The cache is reproducible from the API; **snapshots are not** — each is a point-in-time record, so don't delete them by hand if you want month-over-month comparisons.
 
 ### Optional: `known-bad-urls.txt` — fallback for URLs the algorithmic slices can't see
 

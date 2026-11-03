@@ -142,6 +142,8 @@ def load_json(path):
 
 OAUTH_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 TOKEN_REFRESH_TIMEOUT_SEC = 20
+TOKEN_REFRESH_ATTEMPTS = 3        # network / 5xx only; 4xx is never retried
+TOKEN_REFRESH_BACKOFF_SEC = 2
 GCLOUD_TOKEN_TIMEOUT_SEC = 30
 REAUTH_HINT = ("gcloud auth application-default login "
                "--scopes=https://www.googleapis.com/auth/webmasters.readonly,"
@@ -154,9 +156,10 @@ class CredentialError(Exception):
     'no credentials' message. reason ∈ {no_credentials, unreadable, wrong_type,
     mint_failed, quota_missing}."""
 
-    def __init__(self, reason, message):
+    def __init__(self, reason, message, detail=''):
         super().__init__(message)
         self.reason = reason
+        self.detail = detail  # non-secret server/OS error text, may be ''
 
 
 def _default_adc_path():
@@ -196,12 +199,78 @@ def _refresh_user_token(adc, cred_path):
     req = urllib.request.Request(
         OAUTH_TOKEN_ENDPOINT, data=body, method='POST',
         headers={'Content-Type': 'application/x-www-form-urlencoded'})
-    with urllib.request.urlopen(req, timeout=TOKEN_REFRESH_TIMEOUT_SEC) as resp:
-        payload = json.loads(resp.read().decode('utf-8'))
+    last_exc = None
+    for attempt in range(TOKEN_REFRESH_ATTEMPTS):
+        try:
+            with urllib.request.urlopen(
+                    req, timeout=TOKEN_REFRESH_TIMEOUT_SEC) as resp:
+                payload = json.loads(resp.read().decode('utf-8'))
+            break
+        except urllib.error.HTTPError as e:
+            # 4xx is a definitive answer from Google (revoked, reauth, bad
+            # client) — retrying cannot change it. Only 5xx is retried.
+            if e.code < 500:
+                raise
+            last_exc = e
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            last_exc = e
+        if attempt + 1 < TOKEN_REFRESH_ATTEMPTS:
+            time.sleep(TOKEN_REFRESH_BACKOFF_SEC * (attempt + 1))
+    else:
+        raise last_exc
     token = (payload.get('access_token') or '').strip()
     if not token:
         raise RuntimeError('OAuth token endpoint returned no access_token')
     return token
+
+
+def _classify_mint_error(exc):
+    """Map a refresh-grant failure to (reason, detail) so the orchestrator can
+    tell "log in again" apart from "the network is down, just retry".
+
+    Google's token endpoint answers a dead refresh token with HTTP 400 and a
+    JSON body: {"error": "invalid_grant", "error_description": "..."}. A
+    Workspace session-control policy shows up as invalid_grant with
+    error_subtype "invalid_rapt" (reauth required). Neither body contains a
+    secret, so `detail` is safe to print.
+
+      token_revoked    invalid_grant           → re-run gcloud ADC login
+      reauth_required  invalid_rapt / reauth   → re-login; session policy expired it
+      client_invalid   invalid_client/unauth.. → ADC file from a deleted client; re-login
+      network          URLError/timeout/5xx    → retry later, do NOT re-login
+      mint_failed      anything else           → generic (old behaviour)"""
+    if isinstance(exc, urllib.error.HTTPError):
+        err, desc, subtype = '', '', ''
+        try:
+            body = json.loads(exc.read().decode('utf-8', 'replace') or '{}')
+            err = str(body.get('error') or '')
+            desc = str(body.get('error_description') or '')
+            subtype = str(body.get('error_subtype') or '')
+        except Exception:
+            pass
+        detail = f"HTTP {exc.code} {err}".strip()
+        if desc:
+            detail += f": {desc}"
+        low = f"{err} {subtype} {desc}".lower()
+        if exc.code >= 500:
+            return 'network', detail
+        if 'rapt' in low or 'reauth' in low:
+            return 'reauth_required', detail
+        if err == 'invalid_grant':
+            return 'token_revoked', detail
+        if err in ('invalid_client', 'unauthorized_client'):
+            return 'client_invalid', detail
+        return 'mint_failed', detail
+    if isinstance(exc, (urllib.error.URLError, TimeoutError, OSError)):
+        return 'network', f"{type(exc).__name__}: {exc}"
+    return 'mint_failed', f"{type(exc).__name__}: {exc}"
+
+
+# Reasons for which a gcloud CLI fallback cannot help: gcloud reads the same
+# ADC file and gets the same answer from the same endpoint (S68: it only
+# added up to 30s before the same failure).
+_NO_GCLOUD_FALLBACK = {'token_revoked', 'reauth_required', 'client_invalid',
+                       'network'}
 
 
 def _gcloud_token():
@@ -307,17 +376,19 @@ def resolve_credentials():
         except CredentialError:
             raise
         except Exception as e:
-            if explicit:
-                raise CredentialError(
-                    'mint_failed',
-                    f"failed to mint a token from '{cred_path}' (revoked token "
-                    f"or network error): {e}. Re-auth with: {REAUTH_HINT}")
-            tok = _gcloud_token()  # default path: a stale gcloud login may still work
+            reason, detail = _classify_mint_error(e)
+            if reason == 'network':
+                msg = (f"could not reach Google's token endpoint to mint a "
+                       f"token from '{cred_path}' ({detail}). The login is "
+                       f"probably fine — check the connection and retry.")
+            else:
+                msg = (f"failed to mint a token from '{cred_path}' ({detail}). "
+                       f"Re-auth with: {REAUTH_HINT}")
+            if explicit or reason in _NO_GCLOUD_FALLBACK:
+                raise CredentialError(reason, msg, detail)
+            tok = _gcloud_token()  # unknown failure: gcloud may still work
             if not tok:
-                raise CredentialError(
-                    'mint_failed',
-                    f"failed to mint a token from '{cred_path}': {e}. "
-                    f"Re-auth with: {REAUTH_HINT}")
+                raise CredentialError(reason, msg, detail)
     elif not tok and cred_type == 'service_account':
         raise CredentialError(
             'wrong_type',
@@ -366,6 +437,10 @@ def cmd_auth_token():
         token, quota = resolve_credentials()
     except CredentialError as e:
         print(f"AUTH_ERROR:{e.reason}")
+        if e.detail:
+            # One line, no secrets: Google's error code/description or the
+            # OS error. Lets the orchestrator quote the actual cause.
+            print("AUTH_DETAIL:" + ' '.join(str(e.detail).split())[:300])
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(4)
     sys.stdout.write(token + '\n')
@@ -687,10 +762,11 @@ def cluster_for(coverage, fetch):
 
 
 def parse_clusters(cache_dir):
-    """Aggregate all ui-*.json in cache_dir into sub-dim clusters."""
-    pattern = os.path.join(cache_dir, 'ui-*.json')
-    files = sorted(glob.glob(pattern))
+    """Aggregate this run's ui-*.json (see _run_ui_files) into sub-dim clusters."""
+    files, scoped = _run_ui_files(cache_dir)
     print(f"inspected_count:{len(files)}")
+    if not scoped:
+        print("scope:all_cached_ui_files (no run manifest)")
 
     clusters = defaultdict(list)
     other_states = []  # unmapped coverage states for footer audit
@@ -791,9 +867,11 @@ def snapshot_write(cache_dir, run_timestamp, commit_sha, site_url, output_path):
         }
 
     Atomic via os.replace — partial-write interrupts can't leave half-written
-    snapshot files that would corrupt the next run's regression diff."""
-    pattern = os.path.join(cache_dir, 'ui-*.json')
-    files = sorted(glob.glob(pattern))
+    snapshot files that would corrupt the next run's regression diff.
+
+    Only this run's URLs are included (the manifest inspect-batch writes), so
+    consecutive snapshots compare like with like."""
+    files, _ = _run_ui_files(cache_dir)
 
     inspections = {}
     for fp in files:
@@ -822,10 +900,61 @@ def snapshot_write(cache_dir, run_timestamp, commit_sha, site_url, output_path):
     # finding #15: previously this function had its own inline atomic-write
     # block that drifted from _atomic_write_json's contract.
     print(f"inspection_count:{len(inspections)}")
+    if not inspections:
+        # An empty snapshot would become the next run's "previous" baseline and
+        # silently disable regression detection (nothing to flip from). It also
+        # must not trigger retention, which could then evict a real baseline.
+        print("snapshot_write_failed:no_inspections_in_cache")
+        sys.exit(1)
     if not _atomic_write_json(output_path, snapshot):
         print(f"snapshot_write_failed:{output_path}")
         sys.exit(1)
     print(f"snapshot_written:{output_path}")
+    removed, kept = snapshot_prune(os.path.dirname(output_path) or '.')
+    print(f"snapshots_pruned:{removed}")
+    print(f"snapshots_retained:{kept}")
+
+
+# Snapshot retention. Runs ONLY after a successful snapshot write — never at
+# run start. S68 (burakarik.com): the old Turn-1 `find -mtime +30 -delete`
+# deleted the 31-day-old baseline a planned month-later comparison depended
+# on, and did so before the auth probe failed, so the run lost its baseline
+# AND wrote no replacement. Rules:
+#   - the newest SNAPSHOT_KEEP_MIN snapshots are kept regardless of age, so a
+#     site audited every few months still has a baseline;
+#   - older ones are removed once past SNAPSHOT_MAX_AGE_DAYS.
+# Age comes from the filename's run timestamp (<YYYY-MM-DDTHHMMSS>-<sha7>.json),
+# not mtime — copying or syncing .seo-data/ resets mtimes.
+SNAPSHOT_KEEP_MIN = 5
+SNAPSHOT_MAX_AGE_DAYS = 180
+_SNAPSHOT_NAME_RE = re.compile(r'^(\d{4}-\d{2}-\d{2})T\d{6}-[0-9a-f]+\.json$')
+
+
+def snapshot_prune(snap_dir, today=None):
+    """Apply the retention rule to snap_dir. Returns (removed, kept).
+    Files that don't match the snapshot name pattern are left alone."""
+    today = today or date.today()
+    try:
+        names = sorted(n for n in os.listdir(snap_dir)
+                       if _SNAPSHOT_NAME_RE.match(n))
+    except OSError:
+        return 0, 0
+    protected = set(names[-SNAPSHOT_KEEP_MIN:])
+    removed = 0
+    for n in names:
+        if n in protected:
+            continue
+        try:
+            run_day = date.fromisoformat(_SNAPSHOT_NAME_RE.match(n).group(1))
+        except ValueError:
+            continue
+        if (today - run_day).days > SNAPSHOT_MAX_AGE_DAYS:
+            try:
+                os.remove(os.path.join(snap_dir, n))
+                removed += 1
+            except OSError:
+                pass
+    return removed, len(names) - removed
 
 
 def classify_transition(cur_state_lower):
@@ -897,6 +1026,9 @@ def compute_path_clusters(urls):
     return [(p, c) for p, c in sorted_clusters if c >= 3][:3]
 
 
+_INDEXED_CLUSTERS = ('submitted_indexed', 'indexed_info')
+
+
 def regression(current_path, previous_path):
     """sub-dim 14 step 1.6.13.3 — diff two snapshots, emit transitions + clusters.
 
@@ -930,8 +1062,12 @@ def regression(current_path, previous_path):
         prev_lower = (previous_state or '').strip().lower()
         cur_lower = (current_state or '').strip().lower()
 
-        prev_was_indexed = 'submitted and indexed' in prev_lower
-        cur_is_indexed = 'submitted and indexed' in cur_lower
+        # "Indexed, not submitted in sitemap" / "Indexed, though blocked by
+        # robots.txt" are still indexed (cluster_for's indexed_info). Counting
+        # only "Submitted and indexed" reported a URL merely dropped from the
+        # sitemap as a deindex regression.
+        prev_was_indexed = cluster_for(prev_lower, '') in _INDEXED_CLUSTERS
+        cur_is_indexed = cluster_for(cur_lower, '') in _INDEXED_CLUSTERS
 
         # Recovery: was non-indexed, now indexed
         if cur_is_indexed and not prev_was_indexed:
@@ -1026,6 +1162,29 @@ def _ui_cache_path(cache_dir, site_url, inspection_url):
     so the same key produces the same file across dispatch paths."""
     key = f"{site_url}|{inspection_url}".encode('utf-8')
     return os.path.join(cache_dir, f"ui-{hashlib.sha1(key).hexdigest()}.json")
+
+
+RUN_MANIFEST_NAME = 'last-inspect-run.json'
+
+
+def _run_ui_files(cache_dir):
+    """The ui-*.json files belonging to the most recent inspect-batch run.
+
+    The cache keeps ui-* entries for up to 14 days, so globbing every ui-*
+    file mixed URLs this run never selected (stale coverage states, other
+    properties sharing the cache) into clusters and snapshots — and two
+    snapshots then covered different URL sets, so the regression diff read
+    set drift as transitions. inspect-batch writes a manifest of its URL set;
+    use it when present. Returns (files, scoped: bool)."""
+    manifest = os.path.join(cache_dir, RUN_MANIFEST_NAME)
+    try:
+        with open(manifest, 'r', encoding='utf-8') as f:
+            m = json.load(f)
+        site, urls = m['site_url'], m['urls']
+    except (OSError, ValueError, KeyError, TypeError):
+        return sorted(glob.glob(os.path.join(cache_dir, 'ui-*.json'))), False
+    files = [_ui_cache_path(cache_dir, site, u) for u in urls]
+    return sorted(p for p in files if os.path.exists(p)), True
 
 
 def _ui_cache_is_fresh(path, ttl_sec):
@@ -1170,6 +1329,8 @@ def inspect_batch(cache_dir, site_url, urls_file):
         # mistake a credential failure for "total_attempted:0 / zero findings"
         # and silently drop the entire indexing signal.
         print(f'inspect_batch_error:{e.reason}')
+        if e.detail:
+            print('AUTH_DETAIL:' + ' '.join(str(e.detail).split())[:300])
         print(f'ERROR: {e}', file=sys.stderr)
         sys.exit(4)
     no_cache = os.environ.get('NO_CACHE', '') == '1'
@@ -1191,6 +1352,11 @@ def inspect_batch(cache_dir, site_url, urls_file):
     except FileNotFoundError:
         print(f'ERROR: URLs file not found: {urls_file}', file=sys.stderr)
         sys.exit(1)
+
+    # Record this run's URL set so clusters/snapshot-write read only these
+    # entries, not every ui-* file still in the 14-day cache.
+    _atomic_write_json(os.path.join(cache_dir, RUN_MANIFEST_NAME),
+                       {'site_url': site_url, 'urls': urls})
 
     if not urls:
         print('total_attempted:0')
