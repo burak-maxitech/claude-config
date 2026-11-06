@@ -1,7 +1,7 @@
 <!-- bx-doc-schema: 2 -->
 # CLAUDE.md
 
-Last Updated: 2026-11-02 (Session 68)
+Last Updated: 2026-11-06 (Session 69)
 
 ## Project Overview
 
@@ -31,6 +31,7 @@ Last Updated: 2026-11-02 (Session 68)
 | Coverage through an unmocked caller is `indirect`, not a gap — and a caller whose test mocks the symbol's module does not count (S66) | Mock-only and untested statuses flagged functions S257 found well tested through another export; the naive fix then counted handlers whose tests patch service factories by string. Module-mock facts from the parsed tests are the filter (maxitech 81 → 20, sample verified). (v2.15.0) |
 | `/bx:save` loads `--full` instructions only on `--full`, and finds the session's commits from the last commit that wrote `docs/STATUS.md` (S67, 2026-10-28) | The everyday save read 75 KB of instructions to use 28 KB of them. A `Last Updated` date cutoff re-counted the earlier saves' commits whenever a day had more than one save (S65: three saves on 10-26). (v2.15.1) |
 | `/bx:seo` snapshot retention runs only after a successful write; a baseline is never pruned at run start (S68, 2026-11-02) | Turn 1's `find snapshots -mtime +30 -delete` ran before the auth probe, so a ~monthly cadence always lost its baseline and a run that then failed auth lost it with no replacement (burakarik.com, 31-day snapshot). `snapshot-write` now keeps the newest 5 always and prunes others after 180 days by filename date. (v2.15.3) |
+| `/bx:seo` page fetching for rendering checks happens in the helper as raw HTML; a browser render is optional; a spam-policy violation forces priority 1 instead of costing points (S69, 2026-11-06) | Most AI crawlers and WebFetch do not run JavaScript, so raw HTML is what they see; Playwright is not always installed. A policy breach risks a manual action regardless of score, so ranking it first is more honest than a points deduction. (v2.17.0) |
 
 > Full decision log: [docs/key-decisions.md](docs/key-decisions.md)
 
@@ -38,7 +39,7 @@ Last Updated: 2026-11-02 (Session 68)
 
 **Plugin-versioning sharp edge (S54):** a `bx/**` push without a `plugin.json` version bump never reaches users, and the update is shell-only. → [docs/known-issues.md](docs/known-issues.md)
 
-**Upstream decision log: 1 open, 5 deferred** in `docs/upstream/state.json` (61 entries). Watermark: **changelog 2.1.312 · docs/community 2026-10-28** · 23 page hashes (25 pages pinned; `model-config` and `plugins/mods/overview` added S67, unhashed) · inventory `b237eb61` (regenerated S67, so the next run re-reads every page). S67: delta run 23/23 pages flagged changed by a site-wide header (~290k tokens, 0 new findings, `5b91feb3` source hash refreshed) and a `--fix` pass (no findings applied). The one open entry is the plugin-eval design item `69ef485d` (out of `--fix` scope: new files + external run); the 5 deferred are pre-2.11.0 legacy entries without stored edits except `5b91feb3` (`.claude/rules/` tier, edit filled S62).
+**Upstream decision log: 1 open, 5 deferred** in `docs/upstream/state.json`; the open plugin-eval item `69ef485d` needs new files and an external run, outside `--fix` scope. → [docs/known-issues.md](docs/known-issues.md)
 
 **`/bx:arch` v2 shipped without meeting its own acceptance bar (S58).** Six blind-rehearsal waves ran against the rewritten surfaces; the S56 ≤2 ambiguity bar was not reached (Step 5 15→12→11, report template 24→18→12, scan+rubrics 12→12) and v2.3.0 shipped on the severity curve instead. The residual is formatting conventions and named judgment calls, recorded in the spec's acceptance section rather than waived. **The end-to-end dogfood has since run** (v2.4.0) and found four further defects the rehearsals could not reach.
 

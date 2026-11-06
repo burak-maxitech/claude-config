@@ -2,7 +2,7 @@
 
 > Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).
 
-Last Updated: 2026-11-02 (Session 68)
+Last Updated: 2026-11-06 (Session 69)
 
 ## Current Status
 
@@ -10,11 +10,11 @@ Last Updated: 2026-11-02 (Session 68)
 |------|--------|
 | Skills (11) | Complete — `/bx:clean` content-reviewed and extended with seven categories S63 (bx 2.13.0; 60/60 on fixtures) and run for real S64 on maxitech-concierge (Python; 6 defects → 2.13.1) and horowell (Next.js; 10 defects → 2.13.2); `/bx:save --full` run three times on the reordered sweep (S62 ×2, S63); `/bx:evolve` 2.12.x run four times S62; `/bx:tests` run for real S65 on horowell + maxitech-concierge (29 defects; 2.13.3 safety, 2.14.0 scripts + reduction lane + suite-verified `--fix`), and its first acted-on output fixed S66 (2.14.1, 2.15.0); only `/bx:health` never run |
 | Subagents (20) | Complete — `arch-robustness` added S58 |
-| Plugin packaging (`bx`) | **v2.15.3** committed S68 (`/bx:seo` fixes); installed cache at 2.15.2. Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
+| Plugin packaging (`bx`) | **v2.17.0** pushed S69 (`/bx:seo` 2.16.0 + 2.17.0); installed cache at 2.15.3. Refresh is `/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`. Version-bump guard: `scripts/check-plugin-version-bump.sh`, `.githooks/pre-push` (enabled on this clone), CI workflow. Symlink retirement still pending |
 | Doc schema v2 | Complete — shipped S56; this repo migrated |
 | Startup scripts | Complete — S55 live gate passed and fix wave shipped in `7ed079a` (2026-08-17), recorded S61 |
 | Cross-platform setup | Complete |
-| GitHub sync | Complete — main pushed through v2.15.1 (S67, `45bb20d`); 2.15.2 + 2.15.3 push pending |
+| GitHub sync | Complete — main pushed through v2.17.0 (S69, `90f0ff5`) |
 | Documentation | Complete — schema v2 |
 
 ## Completed
@@ -43,7 +43,7 @@ See [completed-work.md](completed-work.md) for full checklist.
 
 ## Next Steps
 
-1. **Push, then install bx 2.15.3** (`/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`). Then re-auth GSC (`gcloud auth application-default login --scopes=...webmasters.readonly,...cloud-platform`) and re-run `/bx:seo` on burakarik.com — first live run of the 2.15.3 snapshot retention, run manifest and indexed-caveat diff (only the auth probe was run live). Optional: `--baseline <date>` to pick the comparison snapshot. The first `/bx:save` on the installed 2.15.1+ confirms the default path never opens `mode-update-full.md`. Then run `/bx:tests` once on horowell with the installed `test-*` agents (never exercised); then `/bx:tests --fix` on a horowell branch for one mechanical JS merge once the other session's edits there are committed — this is the first run of the 2.14.1 type-check baseline and anchor gates.
+1. **Install bx 2.17.0** (`/plugin marketplace update burak-tools` + shell `claude plugin update bx` + `/reload-plugins`). Then re-auth GSC (`gcloud auth application-default login --scopes=...webmasters.readonly,...cloud-platform`) and re-run `/bx:seo` on burakarik.com — first end-to-end run of 2.15.3 snapshot retention, the 2.16.0 site-profile intake + CrUX field CWV, and the 2.17.0 page audit, Playwright rendered pass and `sa-trends` (helper commands were run live; the full skill was not). Expect one cannibalized query ("signs of ai in travel photography", two articles 51/49). Optional: `--baseline <date>` to pick the comparison snapshot. The first `/bx:save` on the installed 2.15.1+ confirms the default path never opens `mode-update-full.md`. Then run `/bx:tests` once on horowell with the installed `test-*` agents (never exercised); then `/bx:tests --fix` on a horowell branch for one mechanical JS merge once the other session's edits there are committed — this is the first run of the 2.14.1 type-check baseline and anchor gates.
 2. **`/bx:clean` rerun** to confirm the new "Test-only symbols — see /bx:tests" block (D6) replaces the S240-style test-only dead-code items.
 3. **maxitech-concierge follow-ups (in that repo):** add tests for `SlackService.verify_request` (the only auth on `POST /slack/interactions`, zero tests) and a regression test for `820c2076`; move `build_reply_all_recipients`'s 5 tests to the live `build_reply_recipients` and delete the dead method. 2.14.0 also found three mechanical merges there (C007, C014 in the S65 clone).
 4. **`/bx:evolve` 2.12.x follow-ups** — make `docs-page-hashes.py` strip the site-wide `> ## Documentation Index` header before hashing (S67: that header alone flagged 23/23 pages changed, ~290k tokens); make it delta-aware, persist `allowlist_candidates` into `--fix`, add the `source_url` tie-break to Step 3.4; PATCH bump.
@@ -51,15 +51,15 @@ See [completed-work.md](completed-work.md) for full checklist.
 6. **Doc-schema v2 fixture verification** — the six deferred live `/bx:save` fixture runs plus the post-merge minors batch.
 7. **/simplify follow-up: move Part 7.7 rotation into its own sibling Part** (with S59 D4's Part 7.9); blind rehearsal before shipping.
 8. **Resume the `/bx:webdesign` kaanarik run past review**; verify finding `dadac845` live.
-9. **Real `/bx:seo` run against burakarik.com**; code-review leftovers still deferred.
+9. **`/bx:seo` deferred items:** 2 MB/back-button eval fixtures, Bing/IndexNow, crawler-table refresh, core-update dates, Preferred Sources; site-profile.md effects table and Step 4.5.2 inheritance table not yet updated for 2.17.0.
 10. **Dogfood `/bx:health`**; then the `/bx:clean` untested paths (`--dry-run`, `--fix`, directory scope), the plugin-eval design `69ef485d`, S37 symlink retirement, and S58 concurrency regression tests + the 12 exclusion-list restatements.
 
 ## Session History
 
 > Full history: [session-history.md](session-history.md)
 
-### Last Session (Session 68) - 2026-11-02
-- **`/bx:seo` 2.15.3:** a burakarik.com run stopped on expired GSC credentials after Turn 1 had already pruned the 31-day-old snapshot it meant to compare against. Retention moved into `snapshot-write` (newest 5 always kept, others after 180 days, only after a successful write); empty snapshots refused.
-- **Auth:** `mint_failed` split into `token_revoked` / `reauth_required` / `client_invalid` / `network` (3× retry) with a non-secret `AUTH_DETAIL:` line; live probe against the expired credential reports `token_revoked` (`HTTP 400 invalid_grant`).
-- **Diff accuracy:** snapshots and clusters scoped to this run's URLs via `cache/last-inspect-run.json`; `Indexed, not submitted in sitemap` no longer reported as a deindex regression.
-- 16 stdlib tests in `bx/skills/seo/tests/test_auth_and_snapshots.py`; all fail on the 2.15.2 helper (control).
+### Last Session (Session 69) - 2026-11-06
+- **`/bx:seo` 2.16.0 (`6a0ef21`):** site-profile intake (Step 0.5) for what the GSC API cannot supply, CrUX field Core Web Vitals, GEO rescored to Google's AI-features guide.
+- **`/bx:seo` 2.17.0 (`90f0ff5`):** helper `page-audit` (raw HTML per URL: client-only content, 2 MB Googlebot limit, back-button hijack heuristic) + optional Playwright rendered pass; `sa-trends` for cannibalization and content decay (GSC sub-dims 14 → 16); scanners consume field CWV, exports and the profile; Technical url_health 8 → 5, new rendering 3, spam_policy forced priority 1; methodology marker 2.17.0.
+- Verified: 29 helper tests pass; `page-audit` live on burakarik.com + react.dev; `sa-trends` live on sc-domain:burakarik.com. No full `/bx:seo` run yet. Unverified "enforced 2026-06" back-button date claim removed.
+- Full sweep: rolled up S65, moved the upstream decision-log entry to docs/known-issues.md (CLAUDE.md 12.4k → 11.9k), README/workflow.md synced to the 5-point cap.

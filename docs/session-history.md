@@ -206,25 +206,7 @@
 **Next session should:**
 - See Session 64 (cont.) above
 
-### Session 65 - 2026-10-26
-**What happened:**
-- Read the full `/bx:tests` surface (SKILL.md, 7 references, 3 agents) and found 15 defects; discovered it had already run four times on horowell (S56/S109/S149b/S182) and two of those runs' lessons (framework-invoked files read fan-in 0; always-mocked modules read covered) never reached the skill.
-- Ran it report-only on horowell (866 src / 603 test files) and maxitech-concierge (32 / 15), dispatching the three scanners by hand with RUN NOTES; 29 defects total. Literal T01 rules flagged 12 real maxitech tests (mock verification only); neighbor-only lookup would have produced ~30,000 false gap lines; T03 literal ~130 false on horowell; every scanner improvised `coverage_negatives`.
-- Investigated test-suite growth on the user's request: horowell test/source LOC 0.49 (Jun) → 0.88 (Oct), 6,487 cases, 76 `.each` tables, 281 of 604 files cite a session ID; zero file-level orphans in both repos, but maxitech `Email.build_reply_all_recipients` is dead in production and kept alive by 5 tests while its replacement is untested. Designed a reduction lane (life-support, consolidate, growth trend, suite-verified `--fix`).
-- Wrote the spec (`docs/superpowers/specs/2026-10-26-bx-tests-upkeep-design.md`), split into 2.13.3 and 2.14.0 with the user; shipped 2.13.3 (`c72a98d`). Two spec corrections while scoping: zero helpers with evidence no longer aborts `--fix`; `respects_documented_decision` keeps its name (shared with `/bx:arch`) with pinned semantics.
-- Verified by rerunning maxitech quality + economics from the new scan files with no hints: all controls passed; two residual ambiguities fixed (one place per category; files-searched unit). Not executed: the `--fix` gates, the new agent files (load from plugin cache), a horowell rerun.
-
-**Files created/modified:**
-- `bx/skills/tests/references/test-smell-catalog.md` - canonical assertion definition, allowlist patterns + evidence, T01a/T01b
-- `bx/skills/tests/references/fix-mode-test.md` - rewritten: T01a only, pre-flight (evidence, branch, green baseline), per-file rerun + revert
-- `bx/skills/tests/SKILL.md` - dispatch block carries negatives/partial + field semantics; test command in Step 0; Step 5.7 groups removed
-- `bx/skills/tests/references/{scan-quality,scan-coverage,scan-economics,plan-mode-test,report-template}.md` - addenda, T01a/b, phases at any effort, exact subtotal
-- `bx/agents/test-{quality,coverage,economics}.md` - reduced to role + hard rules, cite scan files
-- `docs/superpowers/specs/2026-10-26-bx-tests-upkeep-design.md` - new spec
-
-**Next session should:**
-- Implement `/bx:tests` 2.14.0 per the spec and verify against its acceptance table
-- Install 2.13.3 and exercise `--fix` on a throwaway branch with a real T01a
+### Session 65 - 2026-10-26: `/bx:tests` read in full (15 defects) and run report-only on horowell + maxitech-concierge (29 defects); test-suite growth investigated (horowell 0.49 → 0.88 test/source LOC, dead `build_reply_all_recipients` kept alive by 5 tests); upkeep spec written and 2.13.3 shipped (T01a/T01b split, gated suite-verified `--fix`). (commit: c72a98d)
 
 ### Session 65 (cont.) - 2026-10-26
 **What happened:**
@@ -292,3 +274,22 @@
 
 **Next session should:**
 - Push, install 2.15.3, re-auth GSC, re-run `/bx:seo` on burakarik.com.
+
+### Session 69 - 2026-11-06
+**What happened:**
+- Researched `/bx:seo` gaps and shipped 2.16.0 (`6a0ef21`): site-profile intake for facts the GSC API cannot give, CrUX field CWV, GEO rescoring against Google's AI-features guide.
+- Shipped 2.17.0 (`90f0ff5`): helper `page-audit` (raw HTML: empty SPA root, JS-only tags, 2 MB limit verified on Google's Googlebot page, back-button hijack heuristic) with optional Playwright rendered pass; `sa-trends` (query×page cannibalization ≥10% share each, 3×28-day decay with visibility/ctr/vanished patterns, 24h cache, token never printed); scanners wired to field CWV, exports and site profile (topic_coverage, market_fit).
+- Scoring: url_health 8 → 5, rendering 3, spam_policy 0 points but forced priority 1; methodology marker `2.17.0`. Removed an unverified "enforced 2026-06" claim (spam-policy page states no date).
+- Verified by running: 8 new tests (29 total) pass; `page-audit` live on burakarik.com and react.dev (example.com hit local SSL → now `error:ssl`, never a site finding); `sa-trends` live found one cannibalized query on burakarik.com. Full `/bx:seo` not yet run.
+- Full sweep: rolled up S65, moved the upstream decision-log entry to docs/known-issues.md (CLAUDE.md 12.4k → 11.9k), README/workflow.md synced to the 5-point cap and 2.17.0 features.
+
+**Files created/modified:**
+- `bx/skills/seo/references/gsc-parse-helper.py` - page-audit, sa-trends
+- `bx/skills/seo/tests/test_page_audit_and_trends.py` - new (8 tests)
+- `bx/skills/seo/SKILL.md`, `references/{scan-technical,scan-content,rubric,gsc-ingestion,gsc-api-queries,gsc-api-schema,report-template,best-practices-sources}.md` - 2.17.0 rules
+- `bx/agents/seo-{technical,content,gsc-insights}.md` - new sub-dims and inputs
+- `CHANGELOG.md`, `bx/.claude-plugin/plugin.json` - 2.16.0, 2.17.0
+
+**Next session should:**
+- Install bx 2.17.0 and run `/bx:seo` end to end on burakarik.com
+- Update site-profile.md effects table and Step 4.5.2 inheritance table for 2.17.0
