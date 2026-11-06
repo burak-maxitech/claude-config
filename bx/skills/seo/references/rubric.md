@@ -39,7 +39,11 @@ Each dimension has a sub-dimension breakdown that the subagent reports in its ou
 | `mobile` | 3 | viewport meta correctness |
 | `hreflang` | 3 | only counted if i18n detected; otherwise redistributes proportionally to other sub-dims |
 | `redirects` | 3 | framework config redirect chains + 301/302 correctness |
-| **`url_health`** | **8** | sitemap URL probe — 4xx/5xx/redirect chains. **Hard cap.** |
+| **`url_health`** | **5** | sitemap URL probe — 4xx/5xx/redirect chains. **Hard cap.** |
+| `rendering` | 3 | content / title / canonical / JSON-LD present in raw HTML (no JS); HTML under Googlebot's 2 MB limit |
+| `spam_policy` | 0 | back-button hijacking — no points; certainty ≥ 0.7 is forced to priority 1 (Step 6.6) |
+
+**Methodology change (2.17.0).** `url_health` was worth 8 points until 2.17.0. 3 of them went to the new `rendering` sub-dimension: a page whose content needs JavaScript is invisible to most AI crawlers, and HTML past 2 MB is not indexed. Technical SEO scores before and after 2.17.0 are not directly comparable, and Performance scores now follow real-user Core Web Vitals when CrUX data or a CWV export exists. The first 2.17.0+ row in `docs/seo-history.md` carries `<!-- methodology:2.17.0 -->`.
 
 ### On-Page SEO — 25 points base
 
@@ -52,6 +56,8 @@ Each dimension has a sub-dimension breakdown that the subagent reports in its ou
 | `og_twitter` (OpenGraph + Twitter Cards) | 4 |
 | `internal_linking` (orphans + broken + anchor quality) | 3 |
 | `content_depth` (thin content nudge) | 1 |
+| `topic_coverage` (profile `target_topics` without a dedicated page) | 0 — info only |
+| `market_fit` (a profile market with no content in its language) | 0 — info only |
 
 ### Structured Data — 20 points base
 
@@ -76,9 +82,9 @@ Each dimension has a sub-dimension breakdown that the subagent reports in its ou
 
 | Sub-dimension | Max points |
 |---|---|
-| `image_perf` (width/height, lazy loading) | 4 |
-| `font_script_perf` (preload, async/defer, inline base64) | 3 |
-| `response_time` (sitemap URL probe response times) | 3 |
+| `image_perf` (width/height, lazy loading; field LCP/CLS when available) | 4 |
+| `font_script_perf` (preload, async/defer, inline base64; field INP when available) | 3 |
+| `response_time` (field TTFB p75 when available, else sitemap URL probe response times) | 3 |
 
 ---
 
@@ -119,7 +125,7 @@ This is **the single point of enforcement**. Subagent files don't need to track 
 
 ### gsc_insights dimension + sub-dim enum
 
-GSC findings use their own `dimension: "gsc_insights"` with **14 sub-dimensions** for structural organization. No score allocation — these are routing labels, not score buckets:
+GSC findings use their own `dimension: "gsc_insights"` with **16 sub-dimensions** for structural organization. No score allocation — these are routing labels, not score buckets:
 
 | Sub-dim | Source | Notes |
 |---|---|---|
@@ -137,6 +143,8 @@ GSC findings use their own `dimension: "gsc_insights"` with **14 sub-dimensions*
 | `traffic_orphan` | Q3 `url_impressions_map` + sitemap | Sitemap URLs with 0 impressions in the data window |
 | `brand_query_anomaly` | Q1 queries digest ∩ Schema/CLAUDE.md brand-name | Brand queries (Person.name / Organization.name / CLAUDE.md first proper noun) ranking >pos 3 OR CTR <10% → entity-recognition deficit. Cross-links to Schema `Person.@id` split + `Person.sameAs` Wikidata findings. **S31 dogfood codification of emergent capability.** |
 | `deindex_regression` | Snapshot diff (`.seo-data/gsc/snapshots/*.json`) — **orchestrator-emitted in SKILL.md Step 1.6.13** | URLs that flipped from `Submitted and indexed` → any non-indexed state since the previous run. The early-warning loop catching Google's "New reason preventing your pages from being indexed" / "Validation failed" emails before they hit the user's inbox. **S34 burakarik6 dogfood codification** — 838-URL `Page with redirect` regression was invisible to the impressions-only sampling pre-S34. Severity escalates to `critical` on Server error (5xx) transitions OR ≥20 URLs OR ≥10% of inspected URLs. Carries `path_clusters` + `git_correlation` evidence to bridge the regression to its likely-causal commit. NOT produced by the seo-gsc-insights subagent — emitted directly by the orchestrator after snapshot diff. |
+| `cannibalization` | `sa-trends` query×page digest (2.17.0) | Non-brand queries ≥100 imps where 2+ URLs each hold ≥10% — pick an owner, merge or retarget |
+| `content_decay` | `sa-trends` three 28-day page windows (2.17.0) | Clicks fell twice and ≥30% overall (oldest ≥30 clicks); pattern `visibility_loss` / `ctr_loss` / `vanished` drives the advice |
 
 ### Per-finding output shape — GSC additions
 
@@ -214,40 +222,42 @@ When i18n is not detected, the `hreflang` sub-dimension (3 points) is redistribu
 | mobile | 4 | 3 |
 | hreflang | 0 | 3 |
 | redirects | 3 | 3 |
-| url_health | 8 | 8 |
+| url_health | 5 | 5 |
+| rendering | 3 | 3 |
 
 Technical SEO total stays at 25 either way. Report notes "hreflang not applicable — points redistributed" in the footer.
 
 ## Probe-skipped case
 
-When sitemap URL probe didn't run (no sitemap, dynamic sitemap.ts handler with no static output, relative URLs without `--url`), the `url_health` sub-dimension is 0/0 — no points deducted, but the maximum is also 0 for this sub-dim. To keep the dimension total at 25, the missing 8 points redistribute proportionally across other Technical SEO sub-dims that ran:
+When sitemap URL probe didn't run (no sitemap, dynamic sitemap.ts handler with no static output, relative URLs without `--url`), the `url_health` sub-dimension is 0/0 — no points deducted, but the maximum is also 0 for this sub-dim. To keep the dimension total at 25, the missing 5 points redistribute across the other Technical SEO sub-dims (`rendering` keeps its 3 — it always runs, from static evidence when no page audit exists):
 
 | Sub-dim | Probe ran | Probe skipped |
 |---|---|---|
-| robots_sitemap | 4 | 6 |
-| canonicals | 4 | 6 |
-| mobile | 3 | 5 |
+| robots_sitemap | 4 | 5 |
+| canonicals | 4 | 5 |
+| mobile | 3 | 4 |
 | hreflang | 3 | 4 |
 | redirects | 3 | 4 |
-| url_health | 8 | 0 |
+| url_health | 5 | 0 |
+| rendering | 3 | 3 |
 
 ### Rendering the redistribution (S31 dogfood fix)
 
-The S31 dogfood showed `url_health: 0/0 (probe skipped)` in the report — correct, but **opaque about where the 8 points went**. Users saw a "good" `url_health: 0/0` and didn't realize the other Technical SEO sub-dims now had elevated caps absorbing the redistribution.
+The S31 dogfood showed `url_health: 0/0 (probe skipped)` in the report — correct, but **opaque about where the url_health points went**. Users saw a "good" `url_health: 0/0` and didn't realize the other Technical SEO sub-dims now had elevated caps absorbing the redistribution.
 
 **Reporting requirement (consumed by `report-template.md` Section 1 — Score breakdown):** When probe is skipped, the Sub-dim breakdown column for Technical SEO MUST render the redistribution explicitly. Two acceptable forms:
 
 **Form A (compact)** — append a redistribution note after the deductions line:
 
 ```
-| Technical SEO | 16 | 25 | canonicals: -5.25; hreflang: -2; robots_sitemap: -1.5; redirects: -0.5; url_health: 0/0 (probe skipped, 8pts redistributed: canonicals +2, robots_sitemap +2, mobile +2, hreflang +1, redirects +1) |
+| Technical SEO | 16 | 25 | canonicals: -5; hreflang: -2; robots_sitemap: -1.5; redirects: -0.5; url_health: 0/0 (probe skipped, 5pts redistributed: canonicals +1, robots_sitemap +1, mobile +1, hreflang +1, redirects +1) |
 ```
 
 **Form B (explicit)** — add a dedicated row above the dimension showing the active caps:
 
 ```
-| Technical SEO (probe skipped — caps redistributed) | — | — | canonicals→6, robots_sitemap→6, mobile→5, hreflang→4, redirects→4, url_health→0 |
-| Technical SEO | 16 | 25 | canonicals: -5.25 (cap 6); robots_sitemap: -1.5 (cap 6); hreflang: -2 (cap 4); ... |
+| Technical SEO (probe skipped — caps redistributed) | — | — | canonicals→5, robots_sitemap→5, mobile→4, hreflang→4, redirects→4, url_health→0, rendering→3 |
+| Technical SEO | 16 | 25 | canonicals: -5 (cap 5); robots_sitemap: -1.5 (cap 5); hreflang: -2 (cap 4); ... |
 ```
 
 Form A is preferred (compact, single row per dimension). Form B is for `--verbose` reporting if added later.
@@ -255,9 +265,9 @@ Form A is preferred (compact, single row per dimension). Form B is for `--verbos
 **Footer note (in addition to per-dim breakdown):**
 
 ```
-URL probe skipped: <reason — e.g., "dynamic sitemap.ts handler with no static output; re-run with --url <base> for live URL health check.">. 8 url_health points redistributed across other Technical SEO sub-dims (per rubric.md "Probe-skipped case").
+URL probe skipped: <reason — e.g., "dynamic sitemap.ts handler with no static output; re-run with --url <base> for live URL health check.">. 5 url_health points redistributed across other Technical SEO sub-dims (per rubric.md "Probe-skipped case").
 ```
 
-Same pattern applies if the hreflang sub-dim is redistributed for non-i18n projects (existing rubric rule). When BOTH conditions hold (no i18n AND probe skipped), the two redistributions stack — 8 url_health pts + 3 hreflang pts = 11 pts redistribute. The probe-ran-with-i18n table above is the baseline; when both adjustments fire, recompute caps by applying both rules in sequence (hreflang to 0 first, then redistribute url_health's 8 pts across the remaining 4 sub-dims proportionally to their probe-ran-without-i18n weights).
+Same pattern applies if the hreflang sub-dim is redistributed for non-i18n projects (existing rubric rule). When BOTH conditions hold (no i18n AND probe skipped), the two redistributions stack — 5 url_health pts + 3 hreflang pts = 8 pts redistribute. The probe-ran-with-i18n table above is the baseline; when both adjustments fire, recompute caps by applying both rules in sequence (hreflang to 0 first, then redistribute url_health's 5 pts across robots_sitemap, canonicals, mobile and redirects proportionally to their probe-ran-without-i18n weights).
 
 Footer notes "URL probe skipped — Technical SEO sub-dim weights redistributed." User can re-run with `--url <base>` to get URL health scored.

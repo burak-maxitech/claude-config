@@ -8,7 +8,7 @@ Loaded by the orchestrator (Step 1.6) when the Search Console API is the active 
 - `coverageState` + `pageFetchState` → 9-reason **lookup table** (full)
 - Quota degradation rules
 
-For endpoint inventory, auth, quota model, and enum reference, see `gsc-api-schema.md`. For digest field translation and integration with the **14 sub-dim catalog**, see `gsc-ingestion.md` "API ingestion" subsection. **For the disk-cache contract (split TTL: 24h on sa-*, 7d on ui-*; atomic write; skip-on-non-200), see `gsc-cache.md`. The Search Analytics curl shapes in this file are the fresh-path body inside that file's bash cache wrapper; the URL Inspection cache logic is helper-resident in `gsc-parse-helper inspect-batch` (same key + TTL contract).**
+For endpoint inventory, auth, quota model, and enum reference, see `gsc-api-schema.md`. For digest field translation and integration with the **16 sub-dim catalog**, see `gsc-ingestion.md` "API ingestion" subsection. **For the disk-cache contract (split TTL: 24h on sa-*, 7d on ui-*; atomic write; skip-on-non-200), see `gsc-cache.md`. The Search Analytics curl shapes in this file are the fresh-path body inside that file's bash cache wrapper; the URL Inspection cache logic is helper-resident in `gsc-parse-helper inspect-batch` (same key + TTL contract).**
 
 
 ---
@@ -469,6 +469,19 @@ If both Performance + Indexing signals are needed, the Step 1.6 dispatcher fires
 
 ---
 
+## Trends — `gsc-parse-helper sa-trends` (2.17.0)
+
+Not curl templates: the helper issues these 4 Search Analytics calls itself (token minted in-process, never printed) and caches each as `sa-trend-<sha1(site_url|body)>.json` (24h, same directory and 7d eviction as `sa-*`). Turn 2a, in parallel with Q1–Q3.
+
+| Call | Body | Feeds |
+|---|---|---|
+| T1 | `dimensions: ["query","page"]`, lookback window ending `<CURRENT_DATE>`, `rowLimit: 25000`, `type: web` | sub-dim 15 `cannibalization` |
+| T2–T4 | `dimensions: ["page"]`, three consecutive 28-day windows ending `<CURRENT_DATE>` (oldest first), `rowLimit: 25000` | sub-dim 16 `content_decay` |
+
+Thresholds (helper constants): cannibalization — query ≥100 impressions, 2+ URLs with ≥10% share each, brand queries (`site_profile.brand_terms`) excluded, URL fragments merged. Decay — clicks fell in both steps, newest ≤70% of oldest, oldest ≥30 clicks. T1 cap-hit at 25k rows truncates the long tail; cannibalization on head queries is unaffected.
+
+---
+
 ## What's NOT done in queries (deferred)
 
 | Capability | Why deferred |
@@ -479,5 +492,5 @@ If both Performance + Indexing signals are needed, the Step 1.6 dispatcher fires
 | Rich-result aggregation queries | URL Inspection's `richResultsResult` block exists but not aggregated. future. |
 | `mobileUsabilityResult` aggregation | Same — new sub-dim category. future. |
 | Custom inspection URL list (user-supplied via config) | Skill uses algorithmic selection only. May add `inspection_urls:` config key later. |
-| Per-day time-series (`dimensions: ["date"]`) | Trend findings need separate digest shape. future. |
+| Per-day time-series (`dimensions: ["date"]`) | Superseded for now by `sa-trends` (three 28-day page windows — 2.17.0); a daily series is still future. |
 | Sitemap submission-status *findings* from `sitemaps.list` (errors/warnings/isPending per submitted sitemap) | `sitemaps.list` IS already called for sitemap *discovery* (Step 1.6.6a via `gsc-parse-helper sitemaps-list`, S39); emitting findings from its submission-status fields is the deferred part. |

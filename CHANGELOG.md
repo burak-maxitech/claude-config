@@ -2,6 +2,29 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.17.0 — 2026-11-06
+
+`/bx:seo`: the data 2.16.0 started collecting now changes findings, and three new checks catch problems the audit could not see before.
+
+### Added
+- **Rendering integrity** (Step 3.4, `gsc-parse-helper page-audit`, new `technical_seo.rendering` sub-dimension, 3 points). Up to 25 pages are fetched without running JavaScript, as most AI crawlers do: missing main content, title, canonical or JSON-LD in the raw HTML is a finding, and so is HTML over Googlebot's 2 MB limit (on the uncompressed size, per Google's Googlebot docs). When a Playwright MCP is available, up to 5 pages are also rendered and compared. Without a base URL, a client-only SPA stack is judged from the source.
+- **Back-button hijacking** (`technical_seo.spam_policy`). This is a Google spam policy ("Malicious practices"). The skill flags `popstate` handlers that navigate away or re-push history, and on-load `pushState` traps, from the source and from inline scripts on live pages. It deducts no points; a finding with certainty ≥ 0.7 is forced to priority 1, like a manual action.
+- **Keyword cannibalization and content decay** (`gsc-parse-helper sa-trends`, GSC sub-dims 15 and 16).
+  - **Cannibalization:** a query×page call finds non-brand queries where 2+ URLs each hold ≥10% of the impressions.
+  - **Decay:** three 28-day page windows find pages whose clicks fell twice and by ≥30% overall. The pattern (`visibility_loss` / `ctr_loss` / `vanished`) decides the advice.
+  - The 4 calls are cached for 24h. A live run on burakarik.com found one real cannibalized query.
+- 8 new stdlib tests (`tests/test_page_audit_and_trends.py`).
+
+### Changed
+- **Field Core Web Vitals now score** (`scan-technical.md` sub-scan 11). Poor or needs-improvement CrUX metrics, and Search Console CWV exports, become `image_perf` / `font_script_perf` / `response_time` findings. Field TTFB replaces the one-location probe timing. Static performance findings whose metric is `good` in the field drop to low.
+- **The site profile reaches the scanners:**
+  - hreflang and `<html lang>` are judged against `markets`.
+  - `seo-content` checks that each `target_topics` entry has a dedicated page (`topic_coverage`, info only) and that each market has content in its language (`market_fit`).
+  - Money pages under 300 words become medium.
+  - `seo-gsc-insights` uses the AI-performance and Links exports.
+- **Technical SEO re-weighted:** `url_health` 8 → 5, new `rendering` 3. Scores before and after are not directly comparable; the first 2.17.0 row in `docs/seo-history.md` carries `<!-- methodology:2.17.0 -->`.
+- The Step 3.1 docs now say that `WebFetch` does not run JavaScript.
+
 ## 2.16.0 — 2026-11-06
 
 `/bx:seo`: the skill now asks the user for the facts no API exposes, and its GEO scoring follows Google's 2026 first-party guidance instead of GEO folklore. Based on a research pass over Search Central (docs, blog, the dated doc-updates log), web.dev/CrUX, and the OpenAI, Anthropic and Perplexity crawler docs.

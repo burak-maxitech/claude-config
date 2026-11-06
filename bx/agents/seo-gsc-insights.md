@@ -27,6 +27,8 @@ Sub-dimensions (structural routing labels only — no max-points table):
 | `ctr_opportunity` | Search Analytics — Q2 pages digest |
 | `position_band_opportunity` | Search Analytics — Q1 queries digest |
 | `traffic_orphan` | Search Analytics — Q3 `url_impressions_map` ∩ sitemap |
+| `cannibalization` | Search Analytics — `sa-trends` query×page digest (2+ URLs split a non-brand query) |
+| `content_decay` | Search Analytics — `sa-trends` three 28-day page windows (clicks fell twice, ≥30% total) |
 
 Total points contributed: 0. You add **information**, not scoring.
 
@@ -43,6 +45,9 @@ The orchestrator-passed **GSC ingestion reference** (`references/gsc-ingestion.m
   - Queries digest: top 50 by impressions desc, fields: query, clicks, impressions, ctr, position
   - Pages digest: top 50 by impressions desc, fields: url, clicks, impressions, ctr, position
   - `url_impressions_map`: full url→impressions map for traffic_weight ranking (used by the orchestrator in Step 6 — you don't apply traffic_weight yourself)
+- **Trend digests** (from `gsc-parse-helper sa-trends`, 2.17.0): `--- cannibalization ---` and `--- content decay ---` lines → sub-dims 15 and 16
+- **Exports** (Step 1.6.15, when the user dropped them): Generative AI performance and Links digests
+- **Site profile**: `money_pages`, `brand_terms`, `markets`, `migration_12mo`, `site_type` (severity and seasonality rules in the catalog)
 - **Indexing clusters** (from up to 200 URL Inspection API calls — 3-slice mix: 80 impressions-top + 20 git-changed + 100 sitemap-orphan; mapped via `coverageState` + `pageFetchState` joint lookup table): up to 9 sub-dim clusters, each with:
   - `total_count` (inspected-URL-count matching this cluster — NOT site-wide truth)
   - `affected_urls`: top 10 by `lastCrawlTime` descending
@@ -54,9 +59,10 @@ The orchestrator-passed **GSC ingestion reference** (`references/gsc-ingestion.m
 
 ## Scans
 
-**The per-sub-dim finding-emission spec lives in `references/gsc-ingestion.md`** section "Finding-type catalog (14 sub-dims)". The orchestrator passes that section in your task prompt (Step 5). **Sub-dims 1-13 are yours to emit; sub-dim 14 (`deindex_regression`) is orchestrator-emitted from snapshot diff — you don't see transition data in your input and shouldn't emit findings for it.** Follow the catalog unaltered:
+**The per-sub-dim finding-emission spec lives in `references/gsc-ingestion.md`** section "Finding-type catalog (16 sub-dims)". The orchestrator passes that section in your task prompt (Step 5). **Sub-dims 1-13, 15 (`cannibalization`) and 16 (`content_decay`) are yours to emit; sub-dim 14 (`deindex_regression`) is orchestrator-emitted from snapshot diff — you don't see transition data in your input and shouldn't emit findings for it.** Follow the catalog unaltered:
 
-- One sub-dim per indexing-cluster signal (sub-dims 2-9) or per Performance digest (sub-dims 10-13).
+- One sub-dim per indexing-cluster signal (sub-dims 2-9) or per Performance digest (sub-dims 10-13, 15-16).
+- **Exports** (no catalog number — they reuse existing sub-dims): a money page missing from the Generative AI pages list → info finding under `ctr_opportunity` titled as an AI-visibility gap; a money page with zero external links in the Links digest → info finding under `traffic_orphan`. Both `score_impact: 0`.
 - Trigger thresholds, severity/certainty defaults, effort estimates, title templates, recommended_action prose — all defined there.
 - Cluster vs per-URL emission rules (e.g., `canonical_conflict` is per-URL up to 5 then clusters).
 - The `not_found_404` **routing-rename match** procedure (cross-reference URL clusters against the git-changes digest's renames; emit `routing_rename_match: true` when matched + rename details in evidence) is in the catalog.
@@ -93,7 +99,7 @@ When the git digest reports `Shallow: true`, set `code_changed_since_gsc_window:
 ```
 {
   "dimension": "gsc_insights",
-  "sub_dimension": "<one of sub-dims 1-13 (sub-dim 14 deindex_regression is orchestrator-emitted, never by this subagent)>",
+  "sub_dimension": "<one of sub-dims 1-13, 15, 16 (sub-dim 14 deindex_regression is orchestrator-emitted, never by this subagent)>",
   "location": "<URL>" | "<URL-cluster-pattern>" | "<source-file-path-when-applicable>",
   "title": "<one-line>",
   "severity": "low" | "medium" | "high",

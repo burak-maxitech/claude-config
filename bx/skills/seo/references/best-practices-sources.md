@@ -30,6 +30,9 @@ If a source disappears or its URL structure changes, edit this file (not embedde
 | `https://developers.google.com/search/docs/crawling-indexing/sitemaps/overview` | Sitemap format + best practices |
 | `https://web.dev/learn/seo` | web.dev SEO course (refreshed regularly) |
 | `https://web.dev/articles/vitals` | Current Core Web Vitals definitions + thresholds |
+| `https://developers.google.com/search/docs/essentials/spam-policies` | Spam policies — back-button hijacking ("Malicious practices") and the rest; drives `spam_policy`. Last verified 2026-11. |
+| `https://developers.google.com/search/docs/crawling-indexing/googlebot` | Googlebot crawls the first 2 MB of uncompressed HTML (other Google crawlers: 15 MB); drives `rendering`. Last verified 2026-11. |
+| `https://developer.chrome.com/docs/crux/api` | CrUX API — field CWV source for Step 3.3 |
 
 ---
 

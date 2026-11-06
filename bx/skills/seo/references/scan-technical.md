@@ -9,6 +9,10 @@ Loaded by the orchestrator and passed to the `seo-technical` subagent. Detailed 
 - `Scope file list` — source files in scope
 - `Sitemap URL probe results` — list of `{url, status, redirect_hops, response_seconds, response_bucket}` records; or skip-reason note
 - `Rendered HTML excerpt` (only if `--url` provided)
+- `Page audit:` — `gsc-parse-helper page-audit` records from Step 3.4 (raw HTML as a non-rendering crawler sees it), plus `Rendered:` records when a browser was available; or a skip-reason note
+- `Field CWV:` — CrUX p75 records from Step 3.3; or a skip-reason note
+- `Exports:` — the Core Web Vitals export digest from Step 1.6.15, when the user dropped one
+- `Site profile:` — `markets`, `money_pages`, `site_type` (Step 0.5)
 - `Weight adjustments` — per-dimension deltas from brief, capped at ±5 each, sum=0
 
 ## Approach
@@ -70,7 +74,7 @@ else:
     skip
 ```
 
-**Aggregation cap:** sum of `score_impact` across all url_health findings MUST NOT exceed 8. If the raw sum exceeds 8, scale all url_health findings proportionally (e.g., raw sum is 16 → multiply each by 0.5).
+**Aggregation cap:** sum of `score_impact` across all url_health findings MUST NOT exceed 5. If the raw sum exceeds 5, scale all url_health findings proportionally (e.g., raw sum is 10 → multiply each by 0.5).
 
 **Output format example:**
 ```json
@@ -128,6 +132,7 @@ Skip entirely if Step 0 detected no i18n.
 - **Missing hreflang entirely** on multi-locale project → `severity: high`, `score_impact: 1.5`.
 - **Self-referencing missing** — each locale's pages must list themselves in hreflang.
 - **Missing `x-default`** → `severity: medium`, `score_impact: 0.5`.
+- **Against `Site profile: markets`** (when not `unknown`): a market whose language has no locale/hreflang → `severity: medium`, `score_impact: 0.5`; a locale outside `markets` → info (`score_impact: 0` — may be deliberate). A single-locale site whose `<html lang>` differs from the only market's language → `severity: low`, `score_impact: 0.25`. When `markets` lists several languages but Step 0 found no i18n, emit one info finding (the hreflang points still redistribute per `rubric.md`).
 
 ---
 
@@ -194,6 +199,71 @@ Findings should clearly note which side (source / rendered) is treated as canoni
 
 ---
 
+## Sub-scan 11: Field Core Web Vitals (Performance dim — consumes `Field CWV:` and the CWV export)
+
+Field data is what users experienced; static signals are guesses about it. When they disagree, field data wins.
+
+**From `Field CWV:` records** (`origin=` or `url=` lines with `lcp_p75=<ms>(<rate>)`, `inp_p75`, `cls_p75`, `ttfb_p75`):
+
+| Field result (PHONE first; DESKTOP only if PHONE has no data) | Sub-dim | Severity | score_impact |
+|---|---|---|---|
+| LCP `poor` | `image_perf` (hero image / render path) — `response_time` instead when TTFB p75 > 1800 ms (the server is the bottleneck) | high | 2 |
+| LCP `needs_improvement` | same routing | medium | 1 |
+| CLS `poor` / `needs_improvement` | `image_perf` (unsized media, late-injected embeds) | high / medium | 1.5 / 0.75 |
+| INP `poor` / `needs_improvement` | `font_script_perf` (long JS tasks, heavy third-party scripts) | high / medium | 1.5 / 0.75 |
+| TTFB p75 > 1800 ms | `response_time` | medium | 1 |
+
+- Emit **one finding per metric**, located at the origin (or the URL when only URL-level data exists). List the URLs that share the rating in `evidence` — no per-URL findings.
+- A `url=` record on a **money page** (`Site profile: money_pages`) rated `poor` gets its own finding, `severity: high`.
+- **When field data exists, it replaces the probe for `response_time`**: score from TTFB p75, and drop the `response_bucket: slow` deductions (one-location lab timing). Keep those probe records as evidence only.
+- **Static findings meet field data:** a static `image_perf` / `font_script_perf` finding that names a likely cause of a `poor` field metric → `certainty` +0.2 (cap 1.0) and cite the field metric in `evidence`. When the matching field metric is `good` on PHONE, cap that static finding at `severity: low` and `score_impact: 0.25` — the page already passes for real users.
+- `status=no_data` → never a finding (too little Chrome traffic, not a defect). If every record is `no_data`, emit one info finding (`score_impact: 0`) saying field data is unavailable and static signals are all the audit has.
+- Sub-dim caps still hold (`image_perf` 4, `font_script_perf` 3, `response_time` 3).
+
+**From the CWV export digest** (`Exports:` block — Search Console's own URL groups): same severity table per Poor / Needs-improvement group, `source: "gsc"`. When CrUX records exist too, merge — one finding per metric, citing both — never deduct twice. The export alone (no CrUX key) scores the same way; it is real-user data too.
+
+---
+
+## Sub-scan 12: Rendering integrity (`rendering` — consumes `Page audit:`)
+
+Most AI crawlers (GPTBot, ClaudeBot, PerplexityBot) do not run JavaScript, and Googlebot renders later than it crawls. Content that exists only after JS is invisible to the first group and delayed for the second.
+
+**From `Page audit:` records** (raw HTML, no JS):
+
+| Signal | Finding | Severity | score_impact |
+|---|---|---|---|
+| `words` < 50 AND (`empty_root=yes` OR a `Rendered:` record for the same URL has ≥ 200 words) | "Main content is rendered client-side only" | high (medium when the page is not a money page and not the homepage) | 1.5 |
+| `Rendered:` words ≥ 3 × raw `words` (and rendered ≥ 200) | "Most of the content needs JavaScript" | medium | 1 |
+| `title=no`, `canonical=none`, or `jsonld=0` in raw while the `Rendered:` record (or the source template) has it | "<tag> is injected by JavaScript" — one finding per tag type, listing URLs | medium | 0.5 each |
+| `over_2mb=yes` | "HTML exceeds Googlebot's 2 MB limit — content past it is not indexed" ([Googlebot docs](https://developers.google.com/search/docs/crawling-indexing/googlebot): first 2 MB of uncompressed HTML) | high | 1.5 |
+| `bytes` between 1.5 MB and 2 MB | "HTML within 25% of the 2 MB limit" | low | 0.25 |
+| `robots` or `x_robots` contains `noindex` on a URL that the sitemap lists or that is a money page | (route to `robots_sitemap`, sub-scan 6 rules) | high | 2 |
+
+- **No `Rendered:` records** (no browser available): judge only from the raw record + source. `empty_root=yes` with `words` < 50 is enough for the first row at `certainty: 0.75`. Without `empty_root` and without rendered data, a low word count alone is not a rendering finding (the page may simply be short — that is `content_depth`, owned by `seo-content`).
+- **No `Page audit:` at all** (no base URL resolvable): static-only check — a client-only SPA stack (CRA, Vite/React or Vue without an SSR/SSG framework, `ssr: false` in Nuxt/SvelteKit config, Angular without `@angular/ssr`) → one finding "Site is client-rendered", `severity: high`, `certainty: 0.7`, `score_impact: 1.5`. SSR/SSG frameworks (Next.js, Nuxt default, Astro, SvelteKit default, Remix, Gatsby, Hugo, Jekyll, Eleventy, Rails/Django templates) → no finding.
+- `status=error:ssl` / `error:network` / `error:timeout` → never a finding about the site (it is usually the local machine's TLS store or network). Footer note only.
+- Cap `rendering` at its sub-dim max (3).
+
+---
+
+## Sub-scan 13: Back-button hijacking (`spam_policy`)
+
+Google's [spam policies](https://developers.google.com/search/docs/essentials/spam-policies) list back-button hijacking under "Malicious practices" — interfering with the browser's back button — sending the user somewhere they did not come from, or trapping them on the page — as spam that can draw a manual action. Detect it in two places:
+
+**Source (always):** `Grep` the scoped files (not `node_modules` / vendored routers) for a `popstate` listener (`addEventListener('popstate'` / `onpopstate =` / `useEffect` that subscribes to `popstate`) whose handler **navigates or re-pushes history** (`location.href =`, `location.replace(`, `location.assign(`, `router.push(`, `history.pushState(`, `window.open(`). Also flag `history.pushState` calls that run **on load with no user action** (module top level, `DOMContentLoaded` / `load` handler, mount-only `useEffect(..., [])`) pushing the current URL or a dummy state — the "extra history entry" trap.
+**Live (`Page audit:`):** `hijack_suspect=yes` means an inline script both listens for `popstate` and navigates / re-pushes.
+
+| Evidence | Severity | certainty |
+|---|---|---|
+| popstate handler that navigates to a **different URL / external domain** or opens an ad / interstitial | high | 0.9 |
+| popstate handler that re-pushes state (user cannot leave) | high | 0.8 |
+| on-load `pushState` of the current URL with no handler evidence | medium | 0.6 |
+| `hijack_suspect=yes` with no matching source (third-party / CMS / tag-manager script) | high | 0.7 — name the inline script's first 80 chars in `evidence` |
+
+`score_impact: 0` — a spam-policy risk is not a points question. **Every `spam_policy` finding with `certainty ≥ 0.7` is forced to priority 1** by Step 6.6 (same rule as a manual action): no on-page work matters if the site is demoted for spam. Legitimate patterns — SPA routers pushing on link clicks, modals closing on back, filter state in the URL — are **not** findings; when unsure, set `certainty` ≤ 0.5 and say what to check.
+
+---
+
 ## Output addendum
 
 After all findings, append:
@@ -202,13 +272,16 @@ After all findings, append:
 technical_seo_score: <int 0-25>
 performance_score: <int 0-10>
 url_health_findings_count: <int>
-url_health_total_score_impact: <float, capped at 8>
+url_health_total_score_impact: <float, capped at 5>
 sub_dimension_breakdown: {
   "robots_sitemap": <points deducted>,
   "canonicals": <points deducted>,
   "mobile": <points deducted>,
+  "rendering": <points deducted>,
   ...
 }
+field_cwv_used: true | false
+spam_policy_findings: <int>
 files_scanned: <int>
 ```
 
@@ -219,6 +292,6 @@ The orchestrator's Step 6 reads these to compute the report's Section 1 breakdow
 ## Hard rules (repeat of agent definition for in-prompt clarity)
 
 - **Never make HTTP requests.** No `Bash(curl:*)`, no `WebFetch`.
-- **URL-health score cap: 8 points.** Scale findings if raw sum exceeds.
+- **URL-health score cap: 5 points.** Scale findings if raw sum exceeds.
 - **Skip vendored / generated dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `.next`, `.nuxt`, `out`, `_site`, `public/build`, `__generated__/`, `*.generated.*`, `*.d.ts`.
 - **Cap output at 30 findings**, ordered by `score_impact × certainty` desc.

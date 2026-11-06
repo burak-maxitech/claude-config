@@ -5,7 +5,7 @@ Loaded by the orchestrator in **Step 1.6** of `SKILL.md`. This file is the sourc
 - API ingestion contract — digest shape consumed by subagents
 - Setup banner (one-time, sentinel-gated)
 - `.gitignore` auto-append rules
-- Finding-type catalog (14 sub-dims) — sub-dims 1-13 populated from Search Console API output; sub-dim 14 (`deindex_regression`) is orchestrator-emitted in Step 1.6.13 from snapshot diff (not produced by the seo-gsc-insights subagent)
+- Finding-type catalog (16 sub-dims) — sub-dims 1-13, 15 and 16 populated from Search Console API output; sub-dim 14 (`deindex_regression`) is orchestrator-emitted in Step 1.6.13 from snapshot diff (not produced by the seo-gsc-insights subagent)
 
 For the **finding output shape**, ranking formulas, and `score_impact: 0` invariant, see `rubric.md` — that file is the contract; this file is the implementation reference. For endpoint inventory + auth setup, see `gsc-api-schema.md`. For SQL-equivalent call templates + URL Inspection selection + `coverageState` → 9-reason lookup table, see `gsc-api-queries.md`.
 
@@ -267,7 +267,7 @@ The orchestrator prints a one-line notice on first append: `Added .seo-data/gsc/
 
 ---
 
-## Finding-type catalog (14 sub-dims)
+## Finding-type catalog (16 sub-dims)
 
 Each ingestion call (Search Analytics + URL Inspection) produces 0+ findings. All findings have `source: "gsc"`, `score_impact: 0` (enforced orchestrator-side in Step 6.0a).
 
@@ -474,7 +474,7 @@ Pass the brand name + 1-2 aliases (e.g., `"Burak Arık"` + `"burakarik"` + `"bur
 
 **Codified after burakarik6 dogfood (Session 34, 2026-05-26):** the trigger that surfaces "URLs deindexed since last run" — the early-warning loop catching Google's "New reason preventing your pages from being indexed" / "Validation failed" emails BEFORE they hit the user's inbox. Distinct from sub-dims 2-9 which surface the *current* state per inspected URL; sub-dim 14 surfaces *state transitions* across runs.
 
-**Source:** orchestrator-emitted in SKILL.md Step 1.6.13 (NOT the seo-gsc-insights subagent — the snapshot diff lives in the orchestrator since it spans runs, and the finding is emitted directly into the findings pool). The subagent's catalog stays at sub-dims 1-13; the catalog total of 14 reflects sub-dim 14 as the orchestrator-emitted addition.
+**Source:** orchestrator-emitted in SKILL.md Step 1.6.13 (NOT the seo-gsc-insights subagent — the snapshot diff lives in the orchestrator since it spans runs, and the finding is emitted directly into the findings pool). The subagent emits sub-dims 1-13, 15 and 16; sub-dim 14 is the orchestrator-emitted addition.
 
 **Mechanism:** every run writes a snapshot of `{url → coverageState}` for all inspected URLs to `.seo-data/gsc/snapshots/<YYYY-MM-DDTHHMMSS>-<commit_sha7>.json` (Step 1.6.13.1). On the next run, the orchestrator finds the most-recent prior snapshot (Step 1.6.13.2), diffs it against the current run's inspections (Step 1.6.13.3 via `gsc-parse-helper regression`), and emits sub-dim 14 findings for URLs whose coverageState flipped from indexed to non-indexed.
 
@@ -534,6 +534,38 @@ Threshold for ⚠ warning: absolute delta ≥ 20 URLs OR relative delta ≥ 10% 
 When previous run was on the same commit (rare — usually means user ran `/bx:seo` twice without code change), suppress the delta line entirely and surface a footer note: `Snapshot delta suppressed: previous run on same commit (<sha>).`
 
 **Why this sub-dim matters more than the per-URL sub-dims 2-9.** Sub-dims 2-9 surface the *current* state; sub-dim 14 surfaces *what just changed*. The change is the actionable signal — pages stable in `Submitted and indexed` for months suddenly flipping is what triggers Google's validation-failure emails. Without sub-dim 14, the user only learns about the regression from Google's email; with it, `/bx:seo` catches the regression at the next run after the breaking commit (typically 24-72 hours before Google emails).
+
+### 15. `cannibalization` (from the `sa-trends` cannibalization digest — 2.17.0)
+
+**Source:** `gsc-parse-helper sa-trends` (SKILL.md Step 1.6.6, Turn 2a) — one Search Analytics call with dimensions `[query, page]` over the lookback window. The helper keeps non-brand queries (brand = `site_profile.brand_terms`) with ≥100 impressions where **2+ URLs each hold ≥10%** of the impressions, fragments stripped. Digest line: `query='<q>' imps=<N> clicks=<C> pages=<k> | <url> (<share>, pos <p>, clicks <c>) ; ...`.
+
+**Emit one finding per query** (cap 5, by impressions):
+
+- `severity`: `medium` when the top two URLs' positions are both worse than 3 **or** the second URL has ≥30% share (Google keeps alternating — neither page consolidates); else `low`. `high` when one of the URLs is a `money_pages` entry and it is **not** the higher-share URL.
+- `certainty`: `0.7` — split rankings can be legitimate (a product page and its guide answer different intents).
+- `effort_estimate`: `medium`
+- `query`, `impressions`, `clicks`, `affected_urls` populated
+- `title`: `"<k> pages split the query '<q>' (<share1>/<share2>) — keyword cannibalization"`
+- `recommended_action`: `"Decide which URL should own '<q>'. If both pages target the same intent: merge the weaker into the stronger and 301 it, or retarget the weaker page's title/H1 to a different query, and link from the weaker to the owner with the query as anchor text. If the intents genuinely differ (e.g. pricing vs. how-to), make that difference explicit in both titles. Never canonicalize two pages with different content to each other."`
+
+**Do not emit** when the URLs are locale variants of one page (hreflang alternates — `/en/x` vs `/de/x`), or a page and its paginated/AMP variant; note them in the footer instead.
+
+### 16. `content_decay` (from the `sa-trends` decay digest — 2.17.0)
+
+**Source:** the same `sa-trends` call — three consecutive 28-day `page` windows ending at the run's `endDate`. A page decays when its clicks fell in **both** steps, the newest window is ≤70% of the oldest, and the oldest had ≥30 clicks. Digest line: `url=<u> clicks=<c1>><c2>><c3> change=<pct> imps=<i1>><i2>><i3> pattern=<p>`.
+
+**Emit one clustered finding** (top 10 by clicks lost), `pattern` driving the advice:
+
+| `pattern` | Meaning | Advice |
+|---|---|---|
+| `visibility_loss` | impressions fell too (≤80% of oldest) — rankings or demand dropped | Refresh: update facts/dates, add what top-ranking pages now cover, check `git_correlation` for a content change; check Search Status Dashboard for a core update in the window |
+| `ctr_loss` | impressions held, clicks fell — something now sits above or beside the result | Check the query in Search: an AI Overview, a SERP feature or a competitor's rich result is taking the click. Improve the title/description; add the structured data that earns a rich result |
+| `vanished` | no impressions in the newest window | Cross-check sub-dims 2-9 / 14 for the URL — this is usually deindexing, not decay |
+
+- `severity`: `medium`; `high` when a `money_pages` entry is in the list or total clicks lost ≥ 30% of the site's Q2 clicks.
+- `certainty`: `0.75` (seasonality can mimic decay — say so when the site_type is seasonal, e.g. travel, events, retail).
+- `affected_urls`, `clicks` (newest window) populated
+- `title`: `"<N> pages lost ≥30% of their clicks over 3 months (content decay)"`
 
 ---
 

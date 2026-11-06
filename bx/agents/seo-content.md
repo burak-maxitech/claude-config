@@ -35,8 +35,15 @@ The **fetched best-practices brief** in your task prompt is the source of truth 
 - **Fetched best-practices brief** — passed verbatim
 - **Scoped file list** — page-template, layout, and content source files
 - **Rendered-HTML excerpt** (only if `--url <base>` was provided)
+- **Page audit** raw word counts per URL (Step 3.4) — prefer them for content depth
+- **Site profile** — `target_topics`, `markets`, `money_pages`, `competitors`, `site_type`
 
 ## Scans
+
+**Site-profile rules (2.17.0; full rules in `references/scan-content.md` sub-scans 7, 7b, 7c):**
+- **Topic coverage** — each `target_topics` entry needs a dedicated, indexable page; missing or only-mentioned topics are info findings (`topic_coverage`, `score_impact: 0`). Never draft the page; competitors are named for `--plan` only and never fetched.
+- **Market fit** — `<html lang>` must match the primary market's language (scored under `titles`); a market with no content in its language is an info finding (`market_fit`).
+- **Money pages** under 300 words → medium (content-depth cap unchanged).
 
 ### Titles
 - `<title>` presence on every page or page-shell template.
@@ -84,7 +91,7 @@ The **fetched best-practices brief** in your task prompt is the source of truth 
 ```
 {
   "dimension": "on_page_seo",
-  "sub_dimension": "titles" | "meta_descriptions" | "headings" | "alt_text" | "og_twitter" | "internal_linking" | "content_depth",
+  "sub_dimension": "titles" | "meta_descriptions" | "headings" | "alt_text" | "og_twitter" | "internal_linking" | "content_depth" | "topic_coverage" | "market_fit",
   "location": "<path>:<line-range>",
   "title": "<one-line>",
   "severity": "low" | "medium" | "high",

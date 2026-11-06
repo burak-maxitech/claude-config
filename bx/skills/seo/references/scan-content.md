@@ -8,6 +8,8 @@ Loaded by the orchestrator and passed to the `seo-content` subagent.
 - `Best-practices brief` — passed verbatim
 - `Scope file list` — page-template / layout / content source files
 - `Rendered HTML excerpt` (only if `--url` provided)
+- `Page audit:` raw word counts per URL (Step 3.4, when a base URL resolved)
+- `Site profile:` — `target_topics`, `markets`, `money_pages`, `site_type`, `competitors` (Step 0.5; `unknown` = skip the rule that needs it)
 - `Weight adjustments`
 
 ## Approach
@@ -135,6 +137,30 @@ For each indexable page (skip 404, login, search):
 
 This sub-dimension caps at 1 point total. It's primarily an informational signal — many short pages exist legitimately (landing pages, hub pages).
 
+When `Page audit:` records exist, prefer their raw `words` for the URLs they cover (it is what crawlers receive). A **money page** under 300 words → `severity: medium` (still within the 1-point cap). Do not report a page whose raw count is low because its content is client-rendered — that is `seo-technical`'s `rendering` finding; say "see rendering" in `evidence` instead.
+
+---
+
+## Sub-scan 7b: Topic coverage (`topic_coverage` — only when `target_topics` is set)
+
+The user named the topics they want to rank for (Step 0.5). For each topic:
+
+1. Build 2–4 match terms from the topic (the phrase, its head noun, an obvious plural/singular, and the market's language if it differs).
+2. Look for a **dedicated, indexable page**: a route slug, `<title>`, H1 or content-file front-matter title that contains a match term. Not `noindex`, not a tag/archive page.
+3. Classify: **covered** (a dedicated page), **partial** (only mentioned inside other pages — count them), **missing** (no page, no mentions).
+
+Emit one finding per `missing` or `partial` topic: `severity: low` (`medium` when the topic is the only one listed or matches a `money_pages` path segment), `certainty: 0.6`, `score_impact: 0` (a content-strategy gap is not an on-page defect), `effort_estimate: large`, `recommended_action`: what kind of page would own the topic (guide / landing / comparison) and which existing pages should link to it. Never draft the page copy. When `competitors` is set, add one line: "Compare with how <competitor> covers it — `/bx:seo --plan` brief only; this audit does not fetch competitor sites."
+
+Covered topics → no finding; list them in the addendum.
+
+---
+
+## Sub-scan 7c: Market fit (`market_fit` — only when `markets` is set)
+
+- `<html lang>` (or the framework's locale config) on the main layout should match the primary market's language. Score these under `titles` (page-level metadata): missing `lang` → `severity: low`, `score_impact: 0.25`; mismatch (e.g. `lang="en"` for a `tr` market) → `severity: medium`, `score_impact: 0.5`.
+- A market whose language has no content at all (all titles/H1s in another language) → info finding, `score_impact: 0`, `sub_dimension: "market_fit"`: the site cannot rank in that market without content in its language.
+- hreflang correctness is `seo-technical`'s, not this scan's.
+
 ---
 
 ## Sub-scan 8: Live Source-vs-Rendered Diff (only when `--url` provided)
@@ -158,6 +184,8 @@ sub_dimension_breakdown: {
 duplicate_titles: <int>
 duplicate_descriptions: <int>
 orphan_pages: <int>
+topics_covered: [<topic>, ...]        # omit when target_topics unset
+topics_missing_or_partial: <int>
 files_scanned: <int>
 ```
 

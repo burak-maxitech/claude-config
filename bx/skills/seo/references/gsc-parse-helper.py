@@ -47,7 +47,21 @@ Subcommands:
                       `origin <url>` / `url <url>` per line (cap 25). Key from
                       CRUX_API_KEY env, never printed; unset → CRUX_ERROR:no_key.
                       404 = not enough Chrome traffic → status=no_data.
-    auth-token        Mint + print credentials for the Search Analytics curl
+    page-audit <targets_file>
+                      Fetch up to 25 URLs (one per line) WITHOUT running JS, as
+                      a non-rendering crawler sees them: uncompressed bytes vs
+                      Googlebot's 2 MB limit, title/canonical/robots/h1/JSON-LD
+                      presence, visible word count, empty SPA root, and inline-
+                      script back-button-hijack signals (popstate listener that
+                      navigates or re-pushes history). No credentials.
+    sa-trends <cache_dir> <site_url> <end_date> <lookback_days> [<brand_csv>]
+                      Keyword cannibalization (query×page over the lookback
+                      window; non-brand queries ≥100 imps where 2+ URLs each
+                      hold ≥10%) + content decay (three 28-day page windows
+                      ending at end_date; clicks fell twice, newest ≤70% of
+                      oldest, oldest ≥30). Mints its own token; 24h cache as
+                      sa-trend-*.json; NO_CACHE=1 bypasses lookup.
+    auth-token       Mint + print credentials for the Search Analytics curl
                       path: two lines (access token, then quota project). Capture
                       into shell vars in the SAME Bash call that runs curl; never
                       run standalone (would leak a live token to the transcript).
@@ -105,6 +119,7 @@ import sys
 import glob
 import gzip
 import hashlib
+import html
 import time
 import subprocess
 import urllib.request
@@ -960,6 +975,353 @@ def cmd_crux(targets_path):
         parts.append(f"ttfb_p75={'n/a' if ttfb is None else f'{ttfb:.0f}'}")
         print(f"  {kind}={target} ff={ff} status=ok " + ' '.join(parts))
     print(f"crux_poor_metrics:{poor}")
+
+
+# ---------------------------------------------------------------------------
+# Raw-HTML page audit — what a crawler that does not run JavaScript receives.
+# Feeds three technical checks: content/metadata present only after JS
+# (rendering), Googlebot's 2 MB HTML limit, and back-button hijacking signals
+# in inline scripts (a Google spam policy).
+# ---------------------------------------------------------------------------
+PAGE_AUDIT_MAX_TARGETS = 25
+PAGE_AUDIT_TIMEOUT_SEC = 30
+PAGE_AUDIT_READ_CAP = 16 * 1024 * 1024      # never buffer more than 16 MB
+GOOGLEBOT_HTML_LIMIT = 2 * 1024 * 1024       # Googlebot indexes the first 2 MB
+PAGE_AUDIT_THIN_WORDS = 50
+PAGE_AUDIT_USER_AGENT = 'bx-seo-audit/1.0'
+
+_BODY_RE = re.compile(r'<body\b[^>]*>(.*)', re.I | re.S)
+_STRIP_BLOCK_RE = re.compile(
+    r'<(script|style|noscript|template|svg)\b.*?</\1\s*>', re.I | re.S)
+_TAG_RE = re.compile(r'<[^>]+>')
+_TITLE_RE = re.compile(r'<title\b[^>]*>(.*?)</title\s*>', re.I | re.S)
+_LINK_TAG_RE = re.compile(r'<link\b[^>]*>', re.I)
+_META_TAG_RE = re.compile(r'<meta\b[^>]*>', re.I)
+_H1_RE = re.compile(r'<h1\b', re.I)
+_JSONLD_RE = re.compile(
+    r'<script\b[^>]*type\s*=\s*["\']application/ld\+json["\']', re.I)
+_SCRIPT_RE = re.compile(r'<script\b([^>]*)>(.*?)</script\s*>', re.I | re.S)
+_EMPTY_ROOT_RE = re.compile(
+    r'<div\b[^>]*\bid\s*=\s*["\'](?:root|app|__next|__nuxt|svelte|main)["\']'
+    r'[^>]*>\s*</div>', re.I)
+_HISTORY_RE = re.compile(r'history\s*\.\s*(?:pushState|replaceState)\s*\(')
+_POPSTATE_RE = re.compile(
+    r'addEventListener\s*\(\s*["\']popstate["\']|onpopstate\s*=')
+_NAVIGATE_RE = re.compile(
+    r'location(?:\s*\.\s*href)?\s*=(?!=)|location\s*\.\s*(?:replace|assign)'
+    r'\s*\(|history\s*\.\s*pushState\s*\(')
+
+
+def _attr(tag, name):
+    m = re.search(r'\b' + name + r'\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+))',
+                  tag, re.I)
+    if not m:
+        return None
+    return next(g for g in m.groups() if g is not None)
+
+
+def analyze_html(text):
+    """Pure function: raw HTML string → facts a non-rendering crawler sees."""
+    title_m = _TITLE_RE.search(text)
+    title = ' '.join(html.unescape(title_m.group(1)).split()) if title_m else ''
+    canonical = None
+    for tag in _LINK_TAG_RE.findall(text):
+        rel = (_attr(tag, 'rel') or '').lower().split()
+        if 'canonical' in rel:
+            canonical = _attr(tag, 'href') or ''
+            break
+    robots = None
+    for tag in _META_TAG_RE.findall(text):
+        if (_attr(tag, 'name') or '').lower() in ('robots', 'googlebot'):
+            robots = (_attr(tag, 'content') or '').replace(' ', '')
+            break
+    body_m = _BODY_RE.search(text)
+    body = body_m.group(1) if body_m else text
+    visible = html.unescape(_TAG_RE.sub(' ', _STRIP_BLOCK_RE.sub(' ', body)))
+    inline = [s for attrs, s in _SCRIPT_RE.findall(text)
+              if not re.search(r'\bsrc\s*=', attrs, re.I)]
+    history_calls = sum(len(_HISTORY_RE.findall(s)) for s in inline)
+    popstate = any(_POPSTATE_RE.search(s) for s in inline)
+    # Suspect = one inline script both listens for popstate AND navigates /
+    # re-pushes history: the back button no longer goes back.
+    hijack = any(_POPSTATE_RE.search(s) and _NAVIGATE_RE.search(s)
+                 for s in inline)
+    return {
+        'title': title,
+        'canonical': canonical,
+        'robots': robots,
+        'h1': len(_H1_RE.findall(body)),
+        'jsonld': len(_JSONLD_RE.findall(text)),
+        'words': len(visible.split()),
+        'empty_root': bool(_EMPTY_ROOT_RE.search(body)),
+        'inline_scripts': len(inline),
+        'history_calls': history_calls,
+        'popstate': popstate,
+        'hijack_suspect': hijack,
+    }
+
+
+def _fetch_raw_page(url):
+    """GET without running JS. Returns (status, final_url, body_bytes,
+    charset, x_robots, truncated)."""
+    req = urllib.request.Request(url, headers={
+        'User-Agent': PAGE_AUDIT_USER_AGENT,
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Encoding': 'identity'})
+    try:
+        with urllib.request.urlopen(req, timeout=PAGE_AUDIT_TIMEOUT_SEC) as resp:
+            raw = resp.read(PAGE_AUDIT_READ_CAP + 1)
+            if (resp.headers.get('Content-Encoding') or '').lower() == 'gzip':
+                try:
+                    raw = gzip.decompress(raw)
+                except OSError:
+                    pass
+            truncated = len(raw) > PAGE_AUDIT_READ_CAP
+            return (resp.status, resp.geturl(), raw[:PAGE_AUDIT_READ_CAP],
+                    resp.headers.get_content_charset() or 'utf-8',
+                    resp.headers.get('X-Robots-Tag') or '', truncated)
+    except urllib.error.HTTPError as e:
+        return e.code, url, b'', 'utf-8', '', False
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        # Name the cause: an `error:ssl` is usually the local Python's CA
+        # store, not the site — the orchestrator must not report it as broken.
+        reason = str(getattr(e, 'reason', e)).lower()
+        kind = ('ssl' if 'ssl' in reason or 'certificate' in reason else
+                'timeout' if 'timed out' in reason else 'network')
+        return f'error:{kind}', url, b'', 'utf-8', '', False
+
+
+def _audit_one(url):
+    status, final, raw, charset, x_robots, truncated = _fetch_raw_page(url)
+    rec = {'url': url, 'status': status, 'final': final,
+           'bytes': len(raw), 'truncated': truncated, 'x_robots': x_robots}
+    if status == 200 and raw:
+        try:
+            text = raw.decode(charset, errors='replace')
+        except LookupError:
+            text = raw.decode('utf-8', errors='replace')
+        rec.update(analyze_html(text))
+    return rec
+
+
+def _yn(v):
+    return 'yes' if v else 'no'
+
+
+def cmd_page_audit(targets_path):
+    """Fetch up to 25 URLs as a non-rendering crawler and print one record
+    per URL. Byte counts are of the uncompressed HTML (the size Googlebot's
+    limit applies to)."""
+    try:
+        with open(targets_path, encoding='utf-8') as f:
+            urls = [ln.strip() for ln in f if ln.strip()]
+    except OSError as e:
+        print(f"ERROR: cannot read {targets_path}: {e}", file=sys.stderr)
+        sys.exit(1)
+    urls = list(dict.fromkeys(urls))[:PAGE_AUDIT_MAX_TARGETS]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        recs = list(pool.map(_audit_one, urls))
+    over = thin = hijack = 0
+    print(f"pages_audited:{len(recs)}")
+    print("--- page audit records ---")
+    for r in recs:
+        if r['status'] != 200 or 'words' not in r:
+            print(f"  url={r['url']} status={r['status']}")
+            continue
+        is_over = r['bytes'] > GOOGLEBOT_HTML_LIMIT or r['truncated']
+        is_thin = r['words'] < PAGE_AUDIT_THIN_WORDS
+        over += is_over
+        thin += is_thin
+        hijack += r['hijack_suspect']
+        size = (f">{PAGE_AUDIT_READ_CAP}" if r['truncated'] else str(r['bytes']))
+        print(f"  url={r['url']} status=200 final={r['final']} bytes={size} "
+              f"over_2mb={_yn(is_over)} title={_yn(r['title'])} "
+              f"canonical={r['canonical'] if r['canonical'] is not None else 'none'} "
+              f"robots={r['robots'] or 'none'} "
+              f"x_robots={r['x_robots'].replace(' ', '') or 'none'} "
+              f"h1={r['h1']} jsonld={r['jsonld']} words={r['words']} "
+              f"empty_root={_yn(r['empty_root'])} "
+              f"inline_scripts={r['inline_scripts']} "
+              f"history_calls={r['history_calls']} "
+              f"popstate={_yn(r['popstate'])} "
+              f"hijack_suspect={_yn(r['hijack_suspect'])}")
+    print(f"over_2mb_count:{over}")
+    print(f"thin_raw_count:{thin}")
+    print(f"hijack_suspect_count:{hijack}")
+
+
+# ---------------------------------------------------------------------------
+# Search Analytics trends — keyword cannibalization + content decay.
+# Two signals Q1-Q3 cannot give: Q1/Q2 have one dimension each, and every
+# query covers a single window.
+# ---------------------------------------------------------------------------
+SA_TREND_TTL_SEC = 24 * 3600
+SA_ROW_LIMIT = 25000
+CANNIBAL_MIN_QUERY_IMPS = 100
+CANNIBAL_MIN_PAGE_SHARE = 0.10
+DECAY_WINDOW_DAYS = 28
+DECAY_MIN_BASE_CLICKS = 30
+DECAY_MAX_RATIO = 0.70        # newest window ≤ 70% of oldest
+TREND_TOP_N = 20
+
+
+def _strip_fragment(u):
+    return u.split('#', 1)[0]
+
+
+def find_cannibalization(rows, brand_terms=()):
+    """rows: Search Analytics rows with keys [query, page]. Returns a list of
+    {query, impressions, clicks, pages:[{url, share, position, clicks}]} for
+    non-brand queries where 2+ URLs each hold ≥10% of the impressions."""
+    brand = [b.strip().lower() for b in brand_terms if b.strip()]
+    by_q = defaultdict(dict)
+    for r in rows:
+        keys = r.get('keys') or []
+        if len(keys) < 2:
+            continue
+        q, page = keys[0], _strip_fragment(keys[1])
+        slot = by_q[q].setdefault(page, {'imps': 0, 'clicks': 0, 'pos_w': 0.0})
+        imps = r.get('impressions', 0) or 0
+        slot['imps'] += imps
+        slot['clicks'] += r.get('clicks', 0) or 0
+        slot['pos_w'] += (r.get('position', 0) or 0) * imps
+    out = []
+    for q, pages in by_q.items():
+        if any(b in q.lower() for b in brand):
+            continue
+        total = sum(p['imps'] for p in pages.values())
+        if total < CANNIBAL_MIN_QUERY_IMPS:
+            continue
+        sig = [(u, p) for u, p in pages.items()
+               if p['imps'] / total >= CANNIBAL_MIN_PAGE_SHARE]
+        if len(sig) < 2:
+            continue
+        sig.sort(key=lambda x: -x[1]['imps'])
+        out.append({
+            'query': q, 'impressions': total,
+            'clicks': sum(p['clicks'] for p in pages.values()),
+            'pages': [{'url': u, 'share': p['imps'] / total,
+                       'position': p['pos_w'] / p['imps'] if p['imps'] else 0,
+                       'clicks': p['clicks']} for u, p in sig]})
+    out.sort(key=lambda x: -x['impressions'])
+    return out
+
+
+def find_decay(windows):
+    """windows: [oldest, middle, newest] — each {page: (clicks, imps)}.
+    Decay = clicks fell in both steps, newest ≤ 70% of oldest, oldest ≥ 30."""
+    w1, w2, w3 = windows
+    out = []
+    for page, (c1, i1) in w1.items():
+        if c1 < DECAY_MIN_BASE_CLICKS:
+            continue
+        c2, i2 = w2.get(page, (0, 0))
+        c3, i3 = w3.get(page, (0, 0))
+        if not (c1 > c2 > c3 or (c1 > c2 and c3 == 0)):
+            continue
+        if c3 > c1 * DECAY_MAX_RATIO:
+            continue
+        if i3 == 0:
+            pattern = 'vanished'
+        elif i3 <= i1 * 0.8:
+            pattern = 'visibility_loss'
+        else:
+            pattern = 'ctr_loss'
+        out.append({'url': page, 'clicks': (c1, c2, c3),
+                    'imps': (i1, i2, i3), 'lost': c1 - c3,
+                    'pattern': pattern})
+    out.sort(key=lambda x: -x['lost'])
+    return out
+
+
+def _sa_rows(site_url, body, cache_dir, no_cache, creds):
+    """One cached Search Analytics call. creds is a 1-slot list filled lazily
+    so a fully cached run never mints a token. Returns (rows, status)."""
+    key = hashlib.sha1(
+        (site_url + '|' + json.dumps(body, sort_keys=True)).encode()).hexdigest()
+    path = os.path.join(cache_dir, f'sa-trend-{key}.json')
+    if not no_cache and _ui_cache_is_fresh(path, SA_TREND_TTL_SEC):
+        data = _load_json_safe(path, None)
+        if isinstance(data, dict):
+            return data.get('rows', []) or [], 'hit'
+    if not creds:
+        creds.append(resolve_credentials())   # raises CredentialError
+    token, quota = creds[0]
+    api = (f'https://www.googleapis.com/webmasters/v3/sites/'
+           f'{quote(site_url, safe="")}/searchAnalytics/query')
+    req = urllib.request.Request(
+        api, data=json.dumps(body).encode(), method='POST', headers={
+            'Authorization': f'Bearer {token}',
+            'x-goog-user-project': quota,
+            'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        return [], f'error:{e.code}'
+    except (urllib.error.URLError, OSError, ValueError):
+        return [], 'error:network'
+    _atomic_write_json(path, data)
+    return data.get('rows', []) or [], 'miss'
+
+
+def cmd_sa_trends(cache_dir, site_url, end_date, lookback_days, brand_csv=''):
+    """Cannibalization (query×page over the lookback window) + decay (three
+    consecutive 28-day page windows ending at end_date)."""
+    end = _parse_date(end_date)
+    if end is None:
+        print(f"ERROR: bad end_date '{end_date}'", file=sys.stderr)
+        sys.exit(3)
+    no_cache = os.environ.get('NO_CACHE') == '1'
+    creds = []
+    statuses = []
+    try:
+        start = end - timedelta(days=int(lookback_days) - 1)
+        rows, st = _sa_rows(site_url, {
+            'startDate': start.isoformat(), 'endDate': end.isoformat(),
+            'dimensions': ['query', 'page'], 'type': 'web',
+            'rowLimit': SA_ROW_LIMIT}, cache_dir, no_cache, creds)
+        statuses.append(st)
+        windows = []
+        for k in (2, 1, 0):  # oldest first
+            w_end = end - timedelta(days=DECAY_WINDOW_DAYS * k)
+            w_start = w_end - timedelta(days=DECAY_WINDOW_DAYS - 1)
+            w_rows, w_st = _sa_rows(site_url, {
+                'startDate': w_start.isoformat(), 'endDate': w_end.isoformat(),
+                'dimensions': ['page'], 'type': 'web',
+                'rowLimit': SA_ROW_LIMIT}, cache_dir, no_cache, creds)
+            statuses.append(w_st)
+            agg = defaultdict(lambda: [0, 0])
+            for r in w_rows:
+                p = _strip_fragment((r.get('keys') or [''])[0])
+                agg[p][0] += r.get('clicks', 0) or 0
+                agg[p][1] += r.get('impressions', 0) or 0
+            windows.append({p: tuple(v) for p, v in agg.items()})
+    except CredentialError as e:
+        print(f"AUTH_ERROR:{e.reason}")
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(4)
+
+    print(f"sa_trend_calls:{' '.join(statuses)}")
+    cannibal = find_cannibalization(rows, brand_csv.split(',') if brand_csv else ())
+    print(f"cannibal_queries:{len(cannibal)}")
+    print("--- cannibalization ---")
+    for c in cannibal[:TREND_TOP_N]:
+        pages = ' ; '.join(
+            f"{p['url']} ({p['share']:.0%}, pos {p['position']:.1f}, "
+            f"clicks {p['clicks']})" for p in c['pages'])
+        q = c['query'].replace("'", "’")
+        print(f"  query='{q}' imps={c['impressions']} clicks={c['clicks']} "
+              f"pages={len(c['pages'])} | {pages}")
+    decay = find_decay(windows) if len(windows) == 3 else []
+    print(f"decay_pages:{len(decay)}")
+    print("--- content decay ---")
+    for d in decay[:TREND_TOP_N]:
+        c1, c2, c3 = d['clicks']
+        i1, i2, i3 = d['imps']
+        print(f"  url={d['url']} clicks={c1}>{c2}>{c3} "
+              f"change={(c3 - c1) / c1:+.0%} imps={i1}>{i2}>{i3} "
+              f"pattern={d['pattern']}")
 
 
 def snapshot_write(cache_dir, run_timestamp, commit_sha, site_url, output_path):
@@ -2078,6 +2440,16 @@ def main():
         watchpoint_check(arg, sys.argv[3], sys.argv[4])
     elif cmd == 'crux':
         cmd_crux(arg)
+    elif cmd == 'page-audit':
+        cmd_page_audit(arg)
+    elif cmd == 'sa-trends':
+        if len(sys.argv) < 6:
+            print("ERROR: sa-trends subcommand needs <cache_dir> <site_url> "
+                  "<end_date> <lookback_days> [<brand_terms_csv>]",
+                  file=sys.stderr)
+            sys.exit(3)
+        cmd_sa_trends(arg, sys.argv[3], sys.argv[4], sys.argv[5],
+                      sys.argv[6] if len(sys.argv) > 6 else '')
     else:
         print(f"ERROR: unknown subcommand '{cmd}'. Run with no args for usage.",
               file=sys.stderr)

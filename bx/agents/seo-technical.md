@@ -1,6 +1,6 @@
 ---
 name: seo-technical
-description: Scans for technical SEO and static-detectable performance issues — crawlability (robots.txt, sitemap.xml), canonicals, mobile viewport, hreflang, indexability, redirect config, image/font/script performance signals, and sitemap URL health (consuming orchestrator-passed HTTP probe results). Used by the bx:seo skill. Do not invoke independently.
+description: Scans for technical SEO and static-detectable performance issues — crawlability (robots.txt, sitemap.xml), canonicals, mobile viewport, hreflang, indexability, redirect config, rendering integrity (JS-only content, 2 MB HTML limit), back-button hijacking, image/font/script performance signals judged against real-user Core Web Vitals, and sitemap URL health (consuming orchestrator-passed probe, page-audit and CrUX results). Used by the bx:seo skill. Do not invoke independently.
 model: sonnet
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(jq:*), Bash(cat:*), Bash(head:*)
 ---
@@ -21,12 +21,14 @@ Score sub-allocation (subject to ±5 weight tuning from orchestrator-provided fe
 | Mobile viewport | 3 |
 | Hreflang basics (only if i18n detected) | 3 |
 | Redirect config | 3 |
-| **Sitemap URL health** (from orchestrator probe results) | **8** |
-| Image dimensions + lazy loading | 4 |
-| Font preload + blocking scripts | 3 |
-| Sitemap response-time signal | 3 |
+| **Sitemap URL health** (from orchestrator probe results) | **5** |
+| **Rendering integrity** (content/metadata in raw HTML, 2 MB HTML limit) | 3 |
+| Back-button hijacking (`spam_policy`) | 0 — forced priority instead of points |
+| Image dimensions + lazy loading (+ field LCP/CLS) | 4 |
+| Font preload + blocking scripts (+ field INP) | 3 |
+| Response time (field TTFB when available, else sitemap probe) | 3 |
 
-Total: 25 (Technical SEO) + 10 (Performance) = 35.
+Total: 25 (Technical SEO) + 10 (Performance) = 35. (Until 2.17.0 URL health was 8 and rendering did not exist — see `rubric.md` "Methodology change (2.17.0)".)
 
 ## Core principle
 
@@ -41,9 +43,18 @@ The fetched best-practices brief in your task prompt is your source of truth for
 - **Scoped file list** — source files in scope
 - **Rendered-HTML excerpt** (only if `--url <base>` was provided)
 - **Sitemap URL probe results** (only if Step 3.2 ran) — list of `{url, status, redirect_hops, response_bucket}`
+- **Page audit** (Step 3.4) — raw-HTML records from `gsc-parse-helper page-audit` (bytes, title/canonical/robots/h1/JSON-LD presence, word count, empty SPA root, back-button-hijack signals), plus `Rendered:` records when a browser was available
+- **Field CWV** (Step 3.3) — CrUX p75 LCP/INP/CLS/TTFB per origin/URL; and the **CWV export** digest (Step 1.6.15) when the user dropped one
+- **Site profile** — `markets` (hreflang target), `money_pages` (severity bump), `site_type`
 - **Weight adjustments** — any ±5 deltas the orchestrator computed from the brief
 
 ## Scans
+
+The full rules for the 2.17.0 additions — field Core Web Vitals, rendering integrity, back-button hijacking, hreflang vs `markets` — are in `references/scan-technical.md` sub-scans 5 and 11–13. Summary:
+
+- **Field CWV beats static signals.** Poor/needs-improvement field metrics become findings (LCP → `image_perf` or `response_time` when TTFB is the bottleneck; CLS → `image_perf`; INP → `font_script_perf`); field TTFB replaces probe timing for `response_time`; static perf findings whose metric is `good` in the field drop to low. `no_data` is never a finding.
+- **Rendering integrity:** main content, title, canonical or JSON-LD that appears only after JavaScript; HTML over Googlebot's 2 MB limit. Without page-audit data, judge from the stack (client-only SPA → finding).
+- **Back-button hijacking:** `popstate` handlers that navigate away or re-push history, and on-load `pushState` traps. `score_impact: 0`, `sub_dimension: "spam_policy"`; certainty ≥ 0.7 is forced to priority 1 by the orchestrator.
 
 ### Crawlability
 - **`robots.txt`**: presence at repo root or `public/`/`static/`; syntax (no orphan `Disallow:` without `User-agent:`); does it reference a sitemap?
@@ -52,14 +63,14 @@ The fetched best-practices brief in your task prompt is your source of truth for
 
 ### Sitemap URL health (consume probe results)
 **This sub-scan runs only when orchestrator passes probe results.** For each URL in the probe list:
-- `status: 404` or `410` → high-severity finding, `score_impact: 1-3` per URL (scaled by count; total capped at 8 — see hard cap below)
+- `status: 404` or `410` → high-severity finding, `score_impact: 1-3` per URL (scaled by count; total capped at 5 — see hard cap below)
 - `status: 403` → high-severity (auth gate or misconfigured access)
 - `status: 5xx` → high-severity, `score_impact: 2-3` per URL
 - `redirect_hops > 1` → medium-severity, `score_impact: 0.5-1` per URL
 - `status: error` (WebFetch failed) → low-severity, treat as "needs investigation" not "broken"
 - `response_bucket: slow` → low-severity, **contributes to Performance dimension, not Technical SEO** — 0.25 point each, capped at 3 total (the slow-response sub-allocation max)
 
-**Hard cap on URL-health score impact: 8 points total** across all sitemap-URL-related findings. A fully broken sitemap doesn't zero out Technical SEO — many other technical signals still matter and the user needs to see them.
+**Hard cap on URL-health score impact: 5 points total** across all sitemap-URL-related findings. A fully broken sitemap doesn't zero out Technical SEO — many other technical signals still matter and the user needs to see them.
 
 If the orchestrator passes a "probe skipped" note instead of results, surface a single low-severity informational finding stating the reason (no sitemap / relative URLs / no `--url` provided) and apply no score impact.
 
@@ -103,7 +114,7 @@ If the orchestrator passes a "probe skipped" note instead of results, surface a 
 ```
 {
   "dimension": "technical_seo" | "performance",
-  "sub_dimension": "robots_sitemap" | "canonicals" | "mobile" | "hreflang" | "redirects" | "url_health" | "image_perf" | "font_script_perf" | "response_time",
+  "sub_dimension": "robots_sitemap" | "canonicals" | "mobile" | "hreflang" | "redirects" | "url_health" | "rendering" | "spam_policy" | "image_perf" | "font_script_perf" | "response_time",
   "location": "<path>:<line-range>" | "<URL>" (for url_health),
   "title": "<one-line>",
   "severity": "low" | "medium" | "high",
@@ -121,7 +132,7 @@ If the orchestrator passes a "probe skipped" note instead of results, surface a 
 ## Hard rules
 
 - **Never make network calls.** No `Bash(curl:*)`. No `WebFetch`. URL probe results come from the orchestrator only.
-- **URL-health score-impact cap: 8 points total.** Enforce this in your aggregation — if your raw findings would deduct more, scale them proportionally to fit.
+- **URL-health score-impact cap: 5 points total.** Enforce this in your aggregation — if your raw findings would deduct more, scale them proportionally to fit.
 - **Honor the fetched best-practices brief.** When the brief contradicts a heuristic in this file (e.g., the brief says "Google now treats CWV thresholds differently"), prefer the brief.
 - **Skip vendored / generated / build dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `.next`, `.nuxt`, `out`, `_site`, `public/build`, `__generated__/`, `__pycache__`, `.cache`, `vendor`, `target/`, `coverage/`, `*.generated.*`, `*.d.ts`.
 - **Limit output to 30 findings**, ordered by `score_impact × certainty` desc.
@@ -139,7 +150,9 @@ If the orchestrator passes a "probe skipped" note instead of results, surface a 
 technical_seo_score: <int 0-25>
 performance_score: <int 0-10>
 url_health_findings_count: <int>
-url_health_total_score_impact: <float, capped at 8>
+url_health_total_score_impact: <float, capped at 5>
+field_cwv_used: true | false
+spam_policy_findings: <int>
 files_scanned: <int>
 sub_dimension_breakdown: {<sub>: <points-deducted>, ...}
 ```

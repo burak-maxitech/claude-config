@@ -3,7 +3,7 @@ name: seo
 description: Audits a web project for SEO and Generative Engine Optimization (GEO). Fetches current best practices every run, probes sitemap URL health, and optionally ingests Google Search Console data via API. Score `/100` headline + top-3 priorities, tracked in `docs/seo-history.md`.
 when_to_use: When user mentions SEO audit, GEO audit, Generative Engine Optimization, AI search optimization, llms.txt, structured data / JSON-LD, sitemap health, Google Search Console, GSC, search performance, AI citability, or "make this site rank better". Web projects only — rejects non-web repos silently. Distinct from generic code-review skills (no SEO awareness) and from `/bx:arch` (code structure, not SEO).
 disable-model-invocation: true
-allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, AskUserQuestion, Bash(printenv:*), Bash(git:*), Bash(find:*), Bash(wc:*), Bash(grep:*), Bash(sed:*), Bash(cat:*), Bash(head:*), Bash(gcloud:*), Bash(curl:*), Bash(gsc-parse-helper:*), Bash(mkdir:*), Bash(ls:*), Bash(mktemp:*), Bash(printf:*), Bash(rm:*), Bash(echo:*), Bash(date:*), Bash(sha1sum:*), Bash(shasum:*), Bash(cut:*), Bash(sort:*), Bash(tail:*), Bash(python:*), Agent
+allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, AskUserQuestion, Bash(printenv:*), Bash(git:*), Bash(find:*), Bash(wc:*), Bash(grep:*), Bash(sed:*), Bash(cat:*), Bash(head:*), Bash(gcloud:*), Bash(curl:*), Bash(gsc-parse-helper:*), Bash(mkdir:*), Bash(ls:*), Bash(mktemp:*), Bash(printf:*), Bash(rm:*), Bash(echo:*), Bash(date:*), Bash(sha1sum:*), Bash(shasum:*), Bash(cut:*), Bash(sort:*), Bash(tail:*), Bash(python:*), Agent, mcp__plugin_playwright_playwright__browser_navigate, mcp__plugin_playwright_playwright__browser_evaluate, mcp__plugin_playwright_playwright__browser_close
 effort: high
 argument-hint: "[path] [--plan] [--fix] [--url <deployed-url>] [--profile] [--no-ask] [--no-cache] [--force-dispatch]"
 ---
@@ -148,7 +148,7 @@ Steps 1.5 (git scan) and 1.6 (GSC API ingestion when configured, else heuristic-
 - `Glob .seo-data/gsc/README.md` (Step 1.6.5 idempotency)
 - `Read .gitignore` (Step 1.6.5 idempotency)
 - `Read references/gsc-setup-readme-template.md` (fire optimistically; discard if README already exists)
-- `Read references/gsc-ingestion.md` (always needed when API is configured — covers API ingestion contract + 14 sub-dim catalog including sub-dim 14 `deindex_regression`)
+- `Read references/gsc-ingestion.md` (always needed when API is configured — covers API ingestion contract + 16 sub-dim catalog including sub-dim 14 `deindex_regression`)
 - `Read .seo-data/gsc/config.yaml` (optimistic; if file doesn't exist the tool errors silently — interpret as `api_configured = false`)
 - `Read references/gsc-api-queries.md` (optimistic; only used when API activates — reading early avoids an extra Read in Turn 2)
 - `Read references/gsc-api-schema.md` (optimistic; reference for API response parsing)
@@ -166,7 +166,7 @@ Steps 1.5 (git scan) and 1.6 (GSC API ingestion when configured, else heuristic-
 Only the **post-tool aggregation** (parsing git log, parsing config.yaml, resolving API or heuristic mode, parsing sites.list response) runs sequentially.
 
 **Turn 2 — Data ingestion** (only fires when API is active; skipped in heuristic-only mode):
-- **Turn 2a — Performance**: 3 parallel `Bash: curl ...` calls for Q1+Q2+Q3 from `gsc-api-queries.md`
+- **Turn 2a — Performance**: 3 parallel `Bash: curl ...` calls for Q1+Q2+Q3 from `gsc-api-queries.md`, plus one parallel `Bash: gsc-parse-helper sa-trends ...` call (cannibalization + content decay — Step 1.6.6)
 - **Turn 2b — Indexing**: a **single `Bash: gsc-parse-helper inspect-batch ...` invocation** inspecting up to 200 URLs (the helper parallelizes internally — see Step 1.6.6 Turn 2b). URL selection algorithm (per `gsc-api-queries.md`): top 80 by impressions from Q3's `url_impressions_map` + 20 git-changed paths from Step 1.5 + the shared 100-slot bucket (user-supplied `known-bad-urls.txt` + sitemap-orphan URLs not in `url_impressions_map`, sorted document order; deterministic for snapshot regression diff). Dedup precedence: impressions > git > user-supplied > sitemap-orphan. Turn 2b runs after Turn 2a since URL selection depends on Q3's `url_impressions_map`.
 
 Without explicit batching, the orchestrator would run ~15+ sequential tool turns for Steps 1.5+1.6. With batching: 3 turns total (Turn 1 detection + Turn 2a Performance + Turn 2b Inspection).
@@ -322,7 +322,7 @@ When shallow: `Git history scan: skipped (shallow clone — change-awareness ann
 GSC data is ingested via the **Search Console API**: `searchanalytics.query` for Performance signal, `urlInspection.index.inspect` per-URL for Indexing signal. Configuration is a single key (`site_url`) in `.seo-data/gsc/config.yaml`. When not configured or unreachable, the skill runs heuristic-only.
 
 Four reference files cover the implementation:
-- `references/gsc-ingestion.md` — digest shapes, **14 sub-dim** finding catalog (incl. sub-dim 14 `deindex_regression` for snapshot-diff early warning), `coverageState` → 9-reason lookup, setup banner, `.gitignore` auto-append rules
+- `references/gsc-ingestion.md` — digest shapes, **16 sub-dim** finding catalog (incl. sub-dim 14 `deindex_regression` for snapshot-diff early warning), `coverageState` → 9-reason lookup, setup banner, `.gitignore` auto-append rules
 - `references/gsc-api-schema.md` — Search Console API endpoint inventory, auth/scope, quota model, `coverageState`/`pageFetchState` enums
 - `references/gsc-api-queries.md` — 3 parametrized `curl` templates (Q1/Q2/Q3) + URL Inspection per-URL template + URL selection algorithm + lookup table
 - `references/gsc-cache.md` — split-TTL response cache for `searchanalytics.query` (24h on `sa-*`) and `urlInspection.index.inspect` (7d on `ui-*` — coverageState is weeks-stable). Cache wrapper bash template (atomic write, skip-cache-on-non-200, stat portability) for Turn 2a Search Analytics; Turn 2b URL Inspection cache is helper-resident in `gsc-parse-helper inspect-batch`. `--no-cache` bypass behavior. Two-tier eviction policy (sa-* at 7d, ui-* at 14d). Footer line format.
@@ -495,6 +495,14 @@ curl -s -w '%{http_code}' -o "$TMP" -X POST \
   "https://www.googleapis.com/webmasters/v3/sites/<SITE_URL_ENCODED>/searchAnalytics/query"
 ```
 
+**Same turn — trends (one helper call, in parallel with Q1–Q3).** Q1–Q3 each have one dimension and one window, so they can't show two pages competing for one query or a page losing clicks over months. The helper makes those 4 Search Analytics calls itself (query×page over the lookback window, plus three 28-day page windows ending at the same `endDate`), mints its own token, and caches each response for 24h as `sa-trend-*.json` in the same cache directory (evicted with the other `sa-*` files):
+
+```bash
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper sa-trends .seo-data/gsc/cache "<SITE_URL_RAW>" "<CURRENT_DATE>" <LOOKBACK_DAYS literal> "<site_profile.brand_terms, comma-separated, or empty>"
+```
+
+`--no-cache` → prefix `NO_CACHE=1`. Output: `sa_trend_calls:` with 4 statuses (`hit` / `miss` / `error:<code>`), then `--- cannibalization ---` and `--- content decay ---` sections (top 20 each). Exit 4 / `AUTH_ERROR:` → footer-note `Trends skipped (<reason>)` and continue; an `error:` status skips only the signal that call fed. These feed sub-dims 15 (`cannibalization`) and 16 (`content_decay`) in `gsc-ingestion.md`. Footer: `Trends: <N> cannibalized queries, <M> decaying pages (sa-trend cache <hits>/4).`
+
 **Turn 2b — URL Inspection (single helper invocation, internally parallel)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (top 80 by impressions from Q3 + 20 git-changed paths from Step 1.5 resolved via `page_type_map` + shared 100-slot bucket of user-supplied URLs from `.seo-data/gsc/known-bad-urls.txt` (up to 100) + **sitemap-orphan URLs from the `--- orphans ---` list emitted by Step 1.6.6a's `sitemap-urls` call** (already filtered to sitemap entries not in `url_impressions_map`, in document order; filling whatever the user-supplied slice doesn't claim); dedup precedence impressions > git > user-supplied > sitemap-orphan; hard cap 200). The orphan list is now computed by the helper from the LIVE sitemap (Step 1.6.6a) — not from a repo-local file — so it is non-empty for generated/dynamic sitemaps.
 
 **Canonical dispatch path: single Bash invocation of `gsc-parse-helper inspect-batch`.** The helper handles parallel HTTP via `ThreadPoolExecutor` (6 workers + 3-retry exponential backoff on 429/5xx — lowered from 20 after the S35 code-review found 20 workers burst well past GSC's per-property rate limit), per-URL cache check (7d TTL on `ui-*.json` files since `coverageState` is weeks-stable — see `gsc-cache.md` "TTL policy" for the split-TTL rationale), atomic write via `.tmp` + `os.replace`, and never-cache-non-200. Per-URL cache files match `gsc-cache.md`'s key strategy exactly (`ui-<sha1(site_url|inspection_url)>.json`) — so partial cache hits across runs interoperate cleanly.
@@ -617,6 +625,7 @@ When gsc_mode == "enabled":
 - Indexing: <up to 9 sub-dim clusters from URL Inspection>, each with total_count + affected_urls + per-URL evidence
 - page_type_map: {<url>: <page_type>, ...}
 - url_impressions_map: {<url>: <impressions>, ...}   ← used for traffic_weight lookups
+- Trends: the `sa-trends` cannibalization + content decay sections verbatim (≤ 40 lines; omit when skipped)
 - URL Inspection: inspected=<N>/<budget>, with diagnostic breakdown
 - API call failures: [{endpoint, http_status, error_status}, ...] (omit when none)
 
@@ -1006,6 +1015,8 @@ Interpret `$ARGUMENTS`:
 
 `WebFetch` the URL with a prompt like "Return the full rendered HTML and document the final URL after any redirects." Capture the rendered HTML excerpt. Pass to `seo-technical` and `seo-content` (skip `geo-generative` — JSON-LD lives in source most reliably).
 
+`WebFetch` does **not** execute JavaScript, so this excerpt is not proof of what a rendering crawler sees — Step 3.4 owns the raw-vs-rendered comparison.
+
 ### 3.2 Sitemap URL Health Probe
 
 Runs whenever a sitemap URL list is available (live-discovered or repo-local) with absolute URLs.
@@ -1034,7 +1045,7 @@ Runs whenever a sitemap URL list is available (live-discovered or repo-local) wi
 | response_bucket: slow | low | 0.25 (Performance dim) |
 | WebFetch error (network failure) | low | 0 — record but don't penalize |
 
-**Total URL-health deduction is capped at 8 points** (out of Technical SEO's 25). A fully broken sitemap doesn't zero out Technical SEO.
+**Total URL-health deduction is capped at 5 points** (out of Technical SEO's 25). A fully broken sitemap doesn't zero out Technical SEO.
 
 ### 3.3 Real-user Core Web Vitals (CrUX API)
 
@@ -1047,6 +1058,23 @@ Runs when Step 0.5 found `CRUX_KEY:set` and a base URL resolves (`--url`, `site_
 3. Pass the `--- crux records ---` lines to `seo-technical` as `Field CWV:`. A record rated `poor` is a **real** performance problem (field data beats every static signal); `no_data` means too little Chrome traffic — not a defect, never penalise it.
 
 When field data exists, `seo-technical` scores `response_time` from TTFB p75 instead of the probe buckets, and adds field LCP/INP/CLS findings under `image_perf` / `font_script_perf` by likely cause. Footer: `Field CWV: origin phone LCP <v>ms (<rate>), INP <v>ms (<rate>), CLS <v> (<rate>); <N> URLs with data.`
+
+### 3.4 Page audit — raw HTML, rendered HTML, size, back-button hijacking
+
+Runs whenever a base URL resolves (same rule as 3.3). It answers three questions the sitemap probe can't: is the content in the HTML a non-rendering crawler receives (most AI crawlers don't run JavaScript), is the HTML under Googlebot's 2 MB limit, and does an inline script hijack the back button (a Google spam policy).
+
+1. **Targets** — write to system temp (never under `.seo-data/gsc/`), one URL per line, 25 max, deduped: the base URL, every `money_pages` entry (absolute), then top URLs by impressions from `url_impressions_map`, then sitemap URLs in document order (one per distinct first path segment, so each template is covered).
+2. **Raw pass** — one call, no credentials, internally parallel:
+   ```bash
+   PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper page-audit "$TARGETS"
+   ```
+   Output: `pages_audited:N`, `--- page audit records ---` (one line per URL: `bytes`, `over_2mb`, `title`, `canonical`, `robots`, `x_robots`, `h1`, `jsonld`, `words`, `empty_root`, `history_calls`, `popstate`, `hijack_suspect`), then `over_2mb_count`, `thin_raw_count`, `hijack_suspect_count`. `status=error:ssl` is almost always the local Python's certificate store, not the site — footer-note it, never report it as a site defect.
+3. **Rendered pass (optional — only when a Playwright MCP is available** in this session, e.g. `mcp__plugin_playwright_playwright__browser_navigate` + `browser_evaluate`; never install one). For the base URL plus up to 4 records where `words` < 200 or `empty_root=yes` (money pages first): navigate, then evaluate
+   ```js
+   () => ({ title: document.title, canonical: document.querySelector('link[rel=canonical]')?.href || '', h1: document.querySelectorAll('h1').length, jsonld: document.querySelectorAll('script[type="application/ld+json"]').length, words: (document.body?.innerText || '').split(/\s+/).filter(Boolean).length })
+   ```
+   and record `Rendered: url=<u> title=<yes|no> canonical=<href|none> h1=<n> jsonld=<n> words=<n>`. No Playwright → skip; `seo-technical` judges from raw records + stack (its sub-scan 12 says how). Close the browser when done.
+4. Pass the records to `seo-technical` as `Page audit:` (raw lines + any `Rendered:` lines). Footer: `Page audit: <N> pages (<R> rendered); <over> over 2 MB; <thin> thin in raw HTML; <hijack> back-button-hijack suspects.` When no base URL resolves: `Page audit: skipped (no base URL — pass --url or set site_base_url).`
 
 ---
 
@@ -1196,8 +1224,9 @@ Return raw findings only — do NOT format a final report.
 
 ### Per-subagent additions (do NOT include these in agents that don't consume them):
 
-- **`seo-technical` only** — also pass the **Sitemap URL probe results** (full record list) AND the **Rendered HTML excerpt** if `--url` was provided.
-- **`seo-content` only** — also pass the **Rendered HTML excerpt** if `--url` was provided. Do NOT pass probe results (it doesn't use them).
+- **`seo-technical` only** — also pass the **Sitemap URL probe results** (full record list), the **Rendered HTML excerpt** if `--url` was provided, `Page audit:` (Step 3.4), `Field CWV:` (Step 3.3) and the CWV digest from `Exports:` (Step 1.6.15) — each, or its skip-reason line.
+- **`seo-content` only** — also pass the **Rendered HTML excerpt** if `--url` was provided, and the `Page audit:` records' `url`/`words` pairs (raw word counts per URL). Do NOT pass probe results (it doesn't use them).
+- **`seo-gsc-insights`** additionally gets the AI-performance and Links digests from `Exports:`.
 - **`geo-generative`** — base block only. No probe results (doesn't use them); no rendered HTML (JSON-LD lives in source most reliably). Keeps geo-generative's prompt smallest of the three.
 - **`seo-gsc-insights`** (only when `gsc_mode: enabled`) — base block only (GSC + git digests are already in the base block). Sitemap URL list from Step 3.2 is passed separately so the agent can compute `traffic_orphan` findings (sitemap URLs not appearing in the Q3 `url_impressions_map`).
 
@@ -1211,7 +1240,7 @@ Read `references/scan-content.md`, dispatch `seo-content` with the file + shared
 Read `references/scan-geo.md`, dispatch `geo-generative` with the file + shared context. Owns Structured Data (20) + Generative Engine (20) = 40 points. Source-only (no rendered HTML).
 
 ### Agent 4: seo-gsc-insights (only when `gsc_mode: enabled`)
-Read `references/gsc-ingestion.md` (the same reference used by the orchestrator in Step 1.6 — the "Finding-type catalog" section is the agent's spec) and dispatch `seo-gsc-insights` with the reference content + shared context + sitemap URL list. Owns `gsc_insights` dimension with **14 sub-dims** and **0 score allocation** (informational only). All findings emit `source: "gsc"` and `score_impact: 0`. **Note:** the subagent only emits sub-dims 1-13 from API output; sub-dim 14 (`deindex_regression`) is orchestrator-emitted in Step 1.6.13 from snapshot diff and added directly to the findings pool — the subagent never sees regression transitions in its input.
+Read `references/gsc-ingestion.md` (the same reference used by the orchestrator in Step 1.6 — the "Finding-type catalog" section is the agent's spec) and dispatch `seo-gsc-insights` with the reference content + shared context + sitemap URL list. Owns `gsc_insights` dimension with **16 sub-dims** and **0 score allocation** (informational only). All findings emit `source: "gsc"` and `score_impact: 0`. **Note:** the subagent emits sub-dims 1-13, 15 and 16 from API output; sub-dim 14 (`deindex_regression`) is orchestrator-emitted in Step 1.6.13 from snapshot diff and added directly to the findings pool — the subagent never sees regression transitions in its input.
 
 When `gsc_mode: disabled`, do not dispatch the 4th agent — only dispatch 3.
 
@@ -1275,6 +1304,8 @@ rank_score = effective_impact × certainty × traffic_weight / effort_weight
 **Business weight (Step 0.5 site profile):** multiply `rank_score` by `1.5` when the finding's resolved URL is in `site_profile.money_pages` (prefix match on path). A money page that is not indexed, `noindex`, missing from the sitemap, or 4xx/5xx in the probe is raised to **high** severity before ranking.
 
 **Forced priority 1:** when `site_profile.manual_actions` or `security_issues` is `yes:<type>`, the first top-3 slot is `Resolve the <type> in Search Console (Security & Manual actions), then request review` regardless of rank scores; the other two slots follow the formula.
+
+**Forced priority 1 — spam policy:** a `technical_seo.spam_policy` finding (back-button hijacking) with `certainty ≥ 0.7` takes the first slot the same way: `Remove the back-button hijack in <location> — a spam-policy violation can demote the whole site`. Manual action / security issue goes first when both apply.
 
 **URL resolution for traffic_weight:**
 - If the finding's `location` IS a URL → look it up directly in `url_impressions_map` from Step 1.6.
@@ -1421,6 +1452,8 @@ Append row (with embedded commit sha):
 The `<!-- commit:abc1234 -->` HTML comment is invisible in the rendered Markdown table but parseable by the next run's dedup check.
 
 **Methodology marker (2.16.0).** If no existing row contains `<!-- methodology:2.16.0 -->`, append ` <!-- methodology:2.16.0 -->` after the commit comment on this run's row, and add `(scoring changed — llms.txt no longer scored)` to the Section 0 delta clause. The marker tells future readers that Generative Engine scores before and after this row aren't comparable (see `rubric.md` "Methodology change").
+
+**Methodology marker (2.17.0).** Same rule with `<!-- methodology:2.17.0 -->` and the delta clause `(scoring changed — rendering check added, URL health 8 → 5, performance follows field data)`. When both markers are missing (the first run since before 2.16.0), append both and join the two clauses with `; `.
 
 **Rules for the history file:**
 - Create if missing — never assume it exists.
