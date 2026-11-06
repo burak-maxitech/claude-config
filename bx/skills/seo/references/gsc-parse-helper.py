@@ -41,6 +41,12 @@ Subcommands:
                       (writes still happen). Replaces the prior "N parallel Bash
                       curl calls" spec — closes the S31cont.²+S34 boundary-
                       violation pattern.
+    crux <targets_file>
+                      Real-user Core Web Vitals (p75 LCP/INP/CLS/TTFB) from the
+                      CrUX API — the GSC API has no CWV endpoint. Targets file:
+                      `origin <url>` / `url <url>` per line (cap 25). Key from
+                      CRUX_API_KEY env, never printed; unset → CRUX_ERROR:no_key.
+                      404 = not enough Chrome traffic → status=no_data.
     auth-token        Mint + print credentials for the Search Analytics curl
                       path: two lines (access token, then quota project). Capture
                       into shell vars in the SAME Bash call that runs curl; never
@@ -832,12 +838,30 @@ def detect_brand_anomaly(q1_path, brand_name):
     deficit. Cross-link to Person @id/sameAs Wikidata findings."""
     data = load_json(q1_path)
     rows = data.get('rows', [])
-    brand_lower = brand_name.lower()
+    # brand_name may be a comma-separated alias list (site-profile.yaml
+    # brand_terms, e.g. "burak arık, burakarik, burak arik").
+    aliases = [a.strip().lower() for a in brand_name.split(',') if a.strip()]
     # Substring match — catches "burak arık" matching "burak arık fotografçı"
-    matches = [r for r in rows if brand_lower in r['keys'][0].lower()]
+    matches = [r for r in rows
+               if any(a in r['keys'][0].lower() for a in aliases)]
 
     print(f"brand_name:{brand_name}")
     print(f"brand_query_matches:{len(matches)}")
+
+    # Brand / non-brand split. The Search Console branded-queries filter is
+    # UI-only, so this approximation from user-supplied terms is the API path.
+    total_clicks = sum(r.get('clicks', 0) for r in rows)
+    total_imps = sum(r.get('impressions', 0) for r in rows)
+    b_clicks = sum(r.get('clicks', 0) for r in matches)
+    b_imps = sum(r.get('impressions', 0) for r in matches)
+    nb_clicks, nb_imps = total_clicks - b_clicks, total_imps - b_imps
+    print(f"brand_clicks:{b_clicks}")
+    print(f"brand_impressions:{b_imps}")
+    print(f"nonbrand_clicks:{nb_clicks}")
+    print(f"nonbrand_impressions:{nb_imps}")
+    print(f"brand_click_share:"
+          f"{(b_clicks / total_clicks) if total_clicks else 0:.4f}")
+    print(f"nonbrand_ctr:{(nb_clicks / nb_imps) if nb_imps else 0:.4f}")
 
     anomalies = [r for r in matches if r['position'] > 3.0 or r['ctr'] < 0.10]
 
@@ -846,6 +870,96 @@ def detect_brand_anomaly(q1_path, brand_name):
     for r in anomalies:
         print(f"  query='{r['keys'][0]}' pos={r['position']:.2f} "
               f"ctr={r['ctr']:.4f} imps={r['impressions']}")
+
+
+CRUX_ENDPOINT = ('https://chromeuxreport.googleapis.com/v1/'
+                 'records:queryRecord')
+# p75 thresholds: (good_max, poor_min) — web.dev/articles/vitals.
+CRUX_THRESHOLDS = {
+    'largest_contentful_paint': ('lcp', 2500, 4000),
+    'interaction_to_next_paint': ('inp', 200, 500),
+    'cumulative_layout_shift': ('cls', 0.1, 0.25),
+}
+
+
+def _crux_rate(value, good, poor):
+    if value is None:
+        return 'n/a'
+    if value <= good:
+        return 'good'
+    return 'poor' if value > poor else 'needs_improvement'
+
+
+def crux_query(kind, target, form_factor, key):
+    """One CrUX queryRecord call. Returns (status, metrics_dict). status is
+    'ok', 'no_data' (404: not enough Chrome traffic), or 'error:<code>'."""
+    body = {kind: target, 'formFactor': form_factor,
+            'metrics': list(CRUX_THRESHOLDS) +
+            ['experimental_time_to_first_byte']}
+    req = urllib.request.Request(
+        CRUX_ENDPOINT + '?' + urlencode({'key': key}),
+        data=json.dumps(body).encode(), method='POST',
+        headers={'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        return ('no_data' if e.code == 404 else f'error:{e.code}'), {}
+    except (urllib.error.URLError, OSError, ValueError):
+        return 'error:network', {}
+    out = {}
+    for name, m in data.get('record', {}).get('metrics', {}).items():
+        p75 = m.get('percentiles', {}).get('p75')
+        try:
+            out[name] = float(p75) if p75 is not None else None
+        except (TypeError, ValueError):
+            out[name] = None
+    return 'ok', out
+
+
+def cmd_crux(targets_path):
+    """Real-user Core Web Vitals from the CrUX API (the GSC API has no CWV
+    endpoint). <targets_path>: one target per line, `origin <url>` or
+    `url <url>`. Origins are queried PHONE + DESKTOP, URLs PHONE only (most
+    URLs lack desktop data). Key read from CRUX_API_KEY env — never printed."""
+    key = os.environ.get('CRUX_API_KEY', '').strip()
+    if not key:
+        print('CRUX_ERROR:no_key')
+        return
+    try:
+        with open(targets_path, encoding='utf-8') as f:
+            lines = [ln.split(None, 1) for ln in f if ln.strip()]
+    except OSError as e:
+        print(f"ERROR: cannot read {targets_path}: {e}", file=sys.stderr)
+        sys.exit(1)
+    jobs = []
+    for parts in lines[:25]:
+        if len(parts) != 2 or parts[0] not in ('origin', 'url'):
+            continue
+        kind, target = parts[0], parts[1].strip()
+        for ff in (('PHONE', 'DESKTOP') if kind == 'origin' else ('PHONE',)):
+            jobs.append((kind, target, ff))
+    print(f"crux_queries:{len(jobs)}")
+    print("--- crux records ---")
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(lambda j: (j, crux_query(*j, key)), jobs))
+    poor = 0
+    for (kind, target, ff), (status, metrics) in results:
+        if status != 'ok':
+            print(f"  {kind}={target} ff={ff} status={status}")
+            continue
+        parts = []
+        for name, (short, good, bad) in CRUX_THRESHOLDS.items():
+            v = metrics.get(name)
+            rate = _crux_rate(v, good, bad)
+            poor += rate == 'poor'
+            shown = 'n/a' if v is None else (f"{v:.3f}" if short == 'cls'
+                                              else f"{v:.0f}")
+            parts.append(f"{short}_p75={shown}({rate})")
+        ttfb = metrics.get('experimental_time_to_first_byte')
+        parts.append(f"ttfb_p75={'n/a' if ttfb is None else f'{ttfb:.0f}'}")
+        print(f"  {kind}={target} ff={ff} status=ok " + ' '.join(parts))
+    print(f"crux_poor_metrics:{poor}")
 
 
 def snapshot_write(cache_dir, run_timestamp, commit_sha, site_url, output_path):
@@ -1962,6 +2076,8 @@ def main():
                   file=sys.stderr)
             sys.exit(3)
         watchpoint_check(arg, sys.argv[3], sys.argv[4])
+    elif cmd == 'crux':
+        cmd_crux(arg)
     else:
         print(f"ERROR: unknown subcommand '{cmd}'. Run with no args for usage.",
               file=sys.stderr)

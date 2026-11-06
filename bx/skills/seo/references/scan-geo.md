@@ -28,13 +28,15 @@ For each page type detected, check for a `<script type="application/ld+json">` b
 | Root `/` page | Homepage | `Organization` or `WebSite` |
 | `pages/blog/*`, `content/blog/*`, `posts/*` | Blog post | `Article` or `BlogPosting` |
 | `pages/products/*`, `app/products/*`, e-com signals (`addToCart`, `price`) | Product | `Product` |
-| Path contains `faq`, `frequently-asked` | FAQ | `FAQPage` |
-| Path contains `how-to`, `tutorial`, `guide` | HowTo | `HowTo` |
 | Path contains `recipe` or cooking-domain signals | Recipe | `Recipe` |
 | Path contains `event` | Event | `Event` |
 | Local business signals (NAP info, address fields) | Local | `LocalBusiness` |
 | Path contains `author`, `team`, `about/<person>` | Person | `Person` |
 | All multi-page sites | Inner pages | `BreadcrumbList` |
+
+`site_profile.site_type` (Step 0.5) overrides detection when set — see the agent definition for the mapping.
+
+**Retired Google rich results** — `FAQPage` (gone from Search 2026-05-07, docs removed 2026-06-15), `HowTo`, sitelinks search box, `ClaimReview`, Course info, Estimated salary, Learning video, Special announcement, Vehicle listing, Book actions, Practice problem: never flag as missing, never treat existing markup as an error (at most one info line). Source: [search gallery](https://developers.google.com/search/docs/appearance/structured-data/search-gallery), [Search Central updates](https://developers.google.com/search/updates).
 
 For each page-type/expected-schema pair:
 
@@ -57,7 +59,6 @@ For each found JSON-LD block:
 |---|---|
 | `Article` / `BlogPosting` | `headline`, `datePublished`, `author` (with `name`), `image` |
 | `Product` | `name`, `image`, `offers` (with `price` and `priceCurrency`) |
-| `FAQPage` | `mainEntity` (non-empty array of `Question` with `acceptedAnswer.text` non-empty) |
 | `Organization` | `name`, `url`, `logo` |
 | `BreadcrumbList` | `itemListElement` array with `position`, `name`, `item` (URL) |
 | `Recipe` | `name`, `recipeIngredient`, `recipeInstructions`, `author`, `datePublished` |
@@ -69,20 +70,20 @@ For each missing required field → `severity: medium`, `score_impact: 0.5-1`.
 **Rich-result blockers** (these prevent rich snippets even when schema validates) — emit under `sub_dimension: "schema_validation"` (the rubric combines rich-result eligibility with schema validation into a single 10-point bucket; do not use a separate `rich_result` sub_dim):
 - `Article` missing `image` → no rich-result eligibility.
 - `Product` with `offers` but no `priceCurrency`.
-- `FAQPage` with placeholder answers (`answer text`, lorem ipsum, single-character answers).
 - `aggregateRating` with `reviewCount: 0` or missing entirely on `Product`.
 
 Each blocker → `severity: medium`, `score_impact: 0.5`.
 
 ---
 
-## Sub-scan 3: llms.txt
+## Sub-scan 3: llms.txt (info only — never scored)
+
+Google says Search does not use llms.txt ([AI optimization guide](https://developers.google.com/search/docs/fundamentals/ai-optimization-guide), 2026-05/06), and no major AI engine documents reading it. Every finding here has `score_impact: 0`.
 
 **Presence check:**
-- `Glob` for `llms.txt`, `public/llms.txt`, `static/llms.txt`, `app/llms.txt`.
-- Missing on a content-rich site (heuristic: site has >10 content pages — blog posts, docs, articles) → `severity: medium`, `score_impact: 3`, `is_fix_eligible: true` (scaffold with TODO sections).
+- `Glob` for `llms.txt`, `public/llms.txt`, `static/llms.txt`, `app/llms.txt`. Record `llms_txt_present` in the addendum. **Missing is not a finding.**
 
-**Format compliance** (when present):
+**Format compliance** (when present — one combined `severity: low`, `score_impact: 0` finding at most):
 
 The llms.txt convention is:
 ```
@@ -100,12 +101,20 @@ The llms.txt convention is:
 - [<Page title>](<URL>): <one-line description>
 ```
 
-Check:
-- First non-empty line starts with `# ` (project title) → if not, `severity: low`, `score_impact: 0.5`.
-- Has a blockquote (`> `) description in the first 10 lines → if not, `severity: low`, `score_impact: 0.5`.
-- Has at least 2 `## ` sections with markdown links → if not, `severity: low`, `score_impact: 1`.
+Check: first non-empty line starts with `# `; a `> ` description in the first 10 lines; at least 2 `## ` sections with markdown links.
 
-When the brief contains updated llms.txt spec details, prefer the brief and mark `brief_divergence`.
+When the brief contains updated llms.txt spec details, prefer the brief and mark `brief_divergence`. Do not re-introduce scoring unless a first-party engine doc says it consumes the file.
+
+---
+
+## Sub-scan 3b: AI-feature eligibility (`ai_eligibility`, 3 points)
+
+Pages are eligible for Google AI Overviews / AI Mode only when indexed and snippet-eligible ([AI features](https://developers.google.com/search/docs/appearance/ai-features)). Grep templates, layouts and header config (`next.config.*`, `vercel.json`, `netlify.toml`, `_headers`, middleware):
+- `nosnippet` / `max-snippet:0` (or tiny values) in robots meta or `X-Robots-Tag` on indexable pages → `severity: medium` (high on a `money_pages` entry), `score_impact: 1-2`; info only when `ai_policy: all_no`.
+- `data-nosnippet` around main content → `severity: low`, `score_impact: 0.5`.
+- Robots meta rendered in `<body>` (Google honors it there, [robots meta doc](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag)) → `severity: high`, `score_impact: 1.5`.
+
+Never recommend content "chunking", "AI schema", or per-query-variation pages — unnecessary per Google's AI guide, and the last risks the scaled content abuse policy.
 
 ---
 
@@ -151,8 +160,7 @@ Cite specific structural signals that increase AI-citation likelihood:
 - If the page contains factual content (definitions, comparisons, instructions) presented as dense paragraphs without lists → `severity: low`, `score_impact: 0.25` informational.
 
 **Question-format headings:**
-- For content pages, count H2s phrased as questions (`How does X work?`, `What is Y?`).
-- If zero question-format H2s on a content-rich page → `severity: low`, `score_impact: 0.25` nudge (these match AI query patterns).
+- Optional nudge only: zero question-format H2s on a content-rich page → `severity: low`, `score_impact: 0.1`. Google's AI guide says no special formatting is needed; never present this as an AI requirement.
 
 **Descriptive subheadings:**
 - Flag generic H2/H3 content: `Section 2`, `Overview`, `Details`, `Information`, `Content`.
@@ -162,25 +170,14 @@ Cite specific structural signals that increase AI-citation likelihood:
 
 ## Sub-scan 6: AI-Bot Crawl Access
 
-Parse `robots.txt`. For each AI bot user-agent listed in the brief OR these defaults, check Disallow rules:
+Parse `robots.txt` (4 points). Classify user-agents into **training**, **AI search indexing** and **user-triggered** groups, and judge them against `site_profile.ai_policy`. The group lists, the policy table and the severity rules are defined once in the `geo-generative` agent definition ("AI-bot crawl access") and in `references/site-profile.md` ("AI crawler groups"). Apply those; the brief may add new user-agents to a group.
 
-**Default user-agent list to check** (brief may add):
-- `GPTBot` (OpenAI training crawler)
-- `ChatGPT-User` (OpenAI on-demand fetch)
-- `OAI-SearchBot` (OpenAI search index)
-- `ClaudeBot` / `anthropic-ai` (Anthropic)
-- `Claude-User` / `Claude-SearchBot` (Anthropic on-demand)
-- `PerplexityBot` (Perplexity)
-- `Google-Extended` (Google AI/Gemini training opt-out)
-- `Applebot-Extended` (Apple AI)
-- `Bytespider` (TikTok)
-- `CCBot` (Common Crawl)
-
-For each bot with `Disallow: /` or `Disallow: <broad pattern>`:
-
-1. Check CLAUDE.md, README, or `docs/` for a documented decision to block AI bots (string search for "AI", "GPT", "Claude", "LLM", "no AI", "opt out").
-2. If documented decision exists → suppress finding entirely.
-3. If no documented decision → `severity: low`, `certainty: 0.5`, `score_impact: 0.25` — surface a "did you mean to block these?" note. User may want AI citation traffic.
+Summary of the rules:
+- Stated policy + mismatch → `medium`, `certainty: 0.9`. The user told us their intent.
+- Policy `unknown` → the old "did you mean to block these?" note (`low`, `certainty: 0.5`, `score_impact: 0.25`), suppressed when a documented decision exists (CLAUDE.md, README, `docs/`, or a robots.txt comment).
+- `Googlebot` blocked as an "AI opt-out" → `high` (removes the site from Search).
+- Legacy tokens (`anthropic-ai`, `Claude-Web`) → info, name the current token.
+- AIPREF `Content-Usage` lines → info presence only.
 
 ---
 
@@ -217,6 +214,6 @@ sub_dimension_breakdown: { ... }
 ## False-positive guards
 
 - **CMS-driven JSON-LD** — if framework injects at runtime, source may be empty. Lower certainty.
-- **Templated llms.txt** — some frameworks generate at build time; check config files before flagging missing.
+- **Templated llms.txt** — some frameworks generate at build time; check config files before reporting presence.
 - **Deliberate AI-bot blocking** — header comment in `robots.txt` mentioning policy → suppress.
 - **SPA shells** — JSON-LD at the route level is weaker for SPA shells. Lower certainty.

@@ -246,7 +246,7 @@ Example for Product:
 
 ### 11. Missing `llms.txt`
 
-**Detection:** content-rich site (heuristic: site has >10 content pages) AND no `llms.txt` found.
+**Detection:** no `llms.txt` found AND the user explicitly asked for one in this run (e.g. "add llms.txt"). Since 2.16.0 a missing llms.txt is **not** a finding — Google says Search doesn't use it, and it carries `score_impact: 0` — so this fix is never offered unprompted. Some developer tools and agents do read it, which is the only reason the scaffold remains.
 
 **Fix:** generate scaffold at `public/llms.txt`:
 ```

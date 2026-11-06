@@ -447,7 +447,8 @@ No score-headline finding emitted (the site-wide rate isn't reliably computable 
 
 **Brand-name resolution** (orchestrator runs at Step 1, passes to subagent):
 
-1. **Primary:** parse `Person.name` / `Organization.name` from any JSON-LD in source files (Grep `"name"` within `<script type="application/ld+json">` blocks).
+0. **Authoritative:** `site_profile.brand_terms` from `.seo-data/site-profile.yaml` (Step 0.5 — the user named them). When present, pass the whole comma-separated list as the helper's brand argument and skip steps 1–3. The helper then also prints the brand / non-brand split (`brand_click_share`, `nonbrand_ctr`), which stands in for Search Console's branded-queries filter (UI-only, not in the API). Judge CTR opportunities (sub-dims 1–2) on non-brand queries only, and report both shares in the GSC section.
+1. **Primary (no profile):** parse `Person.name` / `Organization.name` from any JSON-LD in source files (Grep `"name"` within `<script type="application/ld+json">` blocks).
 2. **Secondary:** parse the `## Project Overview` section of `CLAUDE.md` for first proper-noun phrase (e.g., "**burakarik6** — Photography portfolio site for Burak Arık").
 3. **Tertiary:** infer from `package.json` `name` or repo name as last resort (lowest signal — repo names like `burakarik6` are weak brand matches).
 

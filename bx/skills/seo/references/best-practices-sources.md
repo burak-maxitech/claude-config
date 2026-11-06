@@ -63,8 +63,8 @@ If a source disappears or its URL structure changes, edit this file (not embedde
 
 | Query | Why |
 |---|---|
-| `"llms.txt" specification format 2026` | The convention is young; spec details settle over time |
-| `"generative engine optimization" citation patterns 2026` | What gets AI engines to cite |
+| `"llms.txt" Google OR OpenAI OR Anthropic consumes <current year>` | Watch for a first-party engine *adopting* llms.txt — the only thing that would justify scoring it again (unscored since 2.16.0) |
+| `"generative engine optimization" citation patterns 2026` | What gets AI engines to cite (secondary — lose to first-party docs on conflict) |
 | `"AI Overviews" Google ranking factors 2026` | Google AI search — what gets cited in summaries |
 | `Perplexity citation behavior content patterns` | Perplexity is one of the most-studied AI search engines |
 | `"ChatGPT search" content optimization 2026` | OpenAI's search/citation behavior |
@@ -76,9 +76,15 @@ If a source disappears or its URL structure changes, edit this file (not embedde
 
 | URL | What it covers |
 |---|---|
-| `https://llmstxt.org/` | The llms.txt spec home page |
-| `https://platform.openai.com/docs/bots` | OpenAI's bot user-agents (GPTBot, OAI-SearchBot, ChatGPT-User) |
-| `https://docs.anthropic.com/en/docs/agents-and-tools/computer-use` *(if relevant)* | Anthropic crawler docs when available |
+| `https://developers.google.com/search/docs/fundamentals/ai-optimization-guide` | **Primary.** Google's own AI-search optimization guide (2026-05-15): llms.txt unused by Search, no chunking / AI schema needed, scaled per-query pages are a policy risk. Last verified 2026-11. |
+| `https://developers.google.com/search/docs/appearance/ai-features` | Eligibility for AI Overviews / AI Mode (indexed + snippet-eligible; `nosnippet`/`max-snippet` controls). Last verified 2026-11. |
+| `https://developers.google.com/search/updates` | Dated changelog of every Search Central doc change — fetch every run to catch retirements (FAQ rich results 2026-05/06, etc.). |
+| `https://developers.openai.com/api/docs/bots` | OpenAI's bot user-agents (GPTBot, OAI-SearchBot, ChatGPT-User, OAI-AdsBot) |
+| `https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler` | Anthropic crawlers (ClaudeBot, Claude-SearchBot, Claude-User) and the AI-training opt-out signal. Last verified 2026-11. |
+| `https://docs.perplexity.ai/guides/bots` | PerplexityBot / Perplexity-User |
+| `https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers` | Google-Extended scope (Gemini grounding, not Search ranking) |
+| `https://datatracker.ietf.org/doc/draft-ietf-aipref-attach/` | AIPREF `Content-Usage` draft — cross-provider AI-training preference (Google targets 2027) |
+| `https://llmstxt.org/` | llms.txt spec (info only — format check when the file exists) |
 | `https://www.perplexity.ai/hub/blog` | Perplexity's blog — discusses crawler + citation behavior |
 | `https://www.onely.com/blog/generative-engine-optimization-geo-checklist-optimize/` | GEO checklist with code-detectable patterns: missing/incomplete `Author` schema, FAQ paragraph length, question-format headings, `llms.txt` presence + permissive AI-crawler rules, `FAQPage` schema/front-end alignment, SSR/client-rendering check. Cites Ahrefs (web-mentions 0.664 vs backlinks 0.218 correlation), McKinsey ($750B / 16% tracking). Filter out the agency-case-study claims ("300% in 90 days", "1,561% ROI") at synthesis time — those are unverified. Last verified 2026-05. |
 

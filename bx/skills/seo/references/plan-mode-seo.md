@@ -13,7 +13,7 @@ After the report is built, group findings into 6 phases (indexing & crawl hygien
 3. **Phase 3: Structural improvements** (heading hierarchy, internal linking, redirect chains)
 4. **Phase 4: Content rewrites** (titles, meta descriptions, alt text — human judgment required, GSC-prioritized when API is configured)
 5. **Phase 5: Structured data buildout** (JSON-LD per content type)
-6. **Phase 6: Generative-engine optimization** (llms.txt + E-E-A-T + AI-citability)
+6. **Phase 6: Generative-engine optimization** (E-E-A-T + AI-feature eligibility + AI-crawler policy + AI-citability)
 
 ## Phase 1 — Indexing & Crawl Hygiene
 
@@ -118,7 +118,7 @@ Run `/bx:seo --fix` to walk these with per-finding diff preview:
 - Missing self-referencing canonical — src/app/about/page.tsx, src/app/contact/page.tsx
 - Missing OG/Twitter Card scaffolds — 4 pages
 - Missing JSON-LD Article scaffold — 8 blog posts
-- Missing llms.txt
+- Missing BreadcrumbList on inner pages
 - Missing alt="" on decorative logo images — 3 occurrences
 
 Estimated total score recovery if all applied: +6 points.
@@ -279,12 +279,14 @@ Hand-off:
 ```
 
 ```
-**6.3** Write llms.txt content (populate scaffold from --fix)
+**6.3** Align AI-crawler access with the stated policy (only when `ai_policy_mismatches > 0`)
 
 Hand-off:
 \`\`\`
-/bx:plan "Populate public/llms.txt scaffold (placed by /bx:seo --fix). The site is a [type]. Sections should include: Documentation (link to /docs entries), Guides (link to /guides entries), API Reference (link to /api docs), About (link to /about). Each section has 3-8 markdown links to important pages with one-line descriptions. Reference the llmstxt.org spec. Goal: improve AI-engine discoverability of the site's important content."
+/bx:plan "Update robots.txt so AI crawlers match the site's policy '<ai_policy from .seo-data/site-profile.yaml>': <list each mismatched user-agent and the expected allow/block>. Keep Googlebot and Bingbot untouched. Add a comment at the top of robots.txt recording the policy and date. Goal: AI search engines can cite the site while training use follows the owner's decision."
 \`\`\`
+
+(llms.txt is no longer a plan item: Google says Search doesn't use it. Add it only if the user asks.)
 ```
 
 ## Hand-off contract

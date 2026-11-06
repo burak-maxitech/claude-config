@@ -11,7 +11,7 @@ Render this **first**, before everything else. Format depends on whether `docs/s
 ```
 ## /bx:seo — <project name>
 
-**SEO/GEO score: 72/100 (Δ +8 since 2026-04-30)** — Top 3 opportunities: missing meta descriptions (12 pages); no llms.txt; broken /products/v1 (404).
+**SEO/GEO score: 72/100 (Δ +8 since 2026-04-30)** — Top 3 opportunities: missing meta descriptions (12 pages); no Article JSON-LD on blog posts; broken /products/v1 (404).
 ```
 
 **Without history (first run):**
@@ -19,7 +19,7 @@ Render this **first**, before everything else. Format depends on whether `docs/s
 ```
 ## /bx:seo — <project name>
 
-**SEO/GEO score: 72/100** — Top 3 opportunities: missing meta descriptions (12 pages); no llms.txt; broken /products/v1 (404).
+**SEO/GEO score: 72/100** — Top 3 opportunities: missing meta descriptions (12 pages); no Article JSON-LD on blog posts; broken /products/v1 (404).
 ```
 
 **Top-3 opportunities** are computed in Step 6.6:
@@ -29,7 +29,7 @@ Render this **first**, before everything else. Format depends on whether `docs/s
 When GSC findings land in top-3, prefix the priority string with `[gsc]`:
 
 ```
-**SEO/GEO score: 72/100 (Δ +8 since 2026-04-30)** — Top 3 opportunities: [gsc] CTR opportunity on /pricing (12.4K imps, 0.4% CTR); no llms.txt; [gsc] 775 × 404 at Google's view (matches recent rename).
+**SEO/GEO score: 72/100 (Δ +8 since 2026-04-30)** — Top 3 opportunities: [gsc] CTR opportunity on /pricing (12.4K imps, 0.4% CTR); no Article JSON-LD on blog posts; [gsc] 775 × 404 at Google's view (matches recent rename).
 ```
 
 The headline stays single-line regardless of GSC mode — never render a separate "GSC top-3" line.
@@ -78,7 +78,7 @@ When `gsc_mode == "enabled"`, DO NOT render this banner — the GSC mode line in
 | Technical SEO | 22 | 25 | url_health: -1.5; canonicals: -1; mobile: -0.5 |
 | On-Page SEO | 18 | 25 | meta_descriptions: -3; alt_text: -2; internal_linking: -2 |
 | Structured Data | 14 | 20 | jsonld_coverage: -4; schema_validation: -2 |
-| Generative Engine | 9 | 20 | llms_txt: -6; eeat: -3; semantic_content: -2 |
+| Generative Engine | 9 | 20 | eeat: -5; ai_bot_access: -4; semantic_content: -2 |
 | Performance | 8 | 10 | image_perf: -1; response_time: -1 |
 | **Total** | **72** | **100** | |
 ```
@@ -261,11 +261,11 @@ If `gsc_mode: disabled`, this entire section is omitted. The skill produces scor
 
 | Date       | Score | Δ    | Top-3 priorities |
 |------------|-------|------|------------------|
-| 2026-05-14 | 72    | +8   | [gsc] CTR opp on /pricing (12.4K imps); No llms.txt; [gsc] 1,146 crawled-not-indexed |
+| 2026-05-14 | 72    | +8   | [gsc] CTR opp on /pricing (12.4K imps); No Article JSON-LD on blog; [gsc] 1,146 crawled-not-indexed |
 | 2026-04-30 | 64    | +12  | sitemap.xml; OG tags; canonicals |
 | 2026-04-15 | 52    | -    | starting score |
 
-**Still outstanding from last run:** llms.txt (still missing); meta descriptions (was 18 missing, now 12 — improving).
+**Still outstanding from last run:** Article JSON-LD (still missing); meta descriptions (was 18 missing, now 12 — improving).
 ```
 
 Show last 5 entries. If history has >5 entries, link to the file.
@@ -288,7 +288,7 @@ Show last 5 entries. If history has >5 entries, link to the file.
 **Top strategic improvements (copy-paste into a fresh /bx:plan session):**
 
 \```bash
-/bx:plan "Add llms.txt to public/ following the convention at https://llmstxt.org. Include sections for /docs, /api, /guides with markdown links to top pages. Description + section structure should match the site's purpose. Goal: improve citability in AI search (ChatGPT, Perplexity, Claude)."
+/bx:plan "Add visible author bylines linking to author pages with credentials on the 8 blog posts flagged by /bx:seo (eeat). Use only facts from .seo-data/site-profile.yaml 'authors' — leave TODO where a credential is unknown. Goal: stronger E-E-A-T signals for Google and AI search citations."
 \```
 
 \```bash

@@ -2,6 +2,25 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.16.0 — 2026-11-06
+
+`/bx:seo`: the skill now asks the user for the facts no API exposes, and its GEO scoring follows Google's 2026 first-party guidance instead of GEO folklore. Based on a research pass over Search Central (docs, blog, the dated doc-updates log), web.dev/CrUX, and the OpenAI, Anthropic and Perplexity crawler docs.
+
+### Added
+- **Step 0.5 site-profile intake** (`references/site-profile.md`, `.seo-data/site-profile.yaml`). The Search Console API has only Search Analytics, Sitemaps, Sites and URL Inspection. Manual actions, security issues, the Generative AI performance report, the Search generative AI setting, the branded filter, and the Core Web Vitals and Links reports are UI-only, and business context is in no API. The skill asks via AskUserQuestion (≤3 calls on a first run, options pre-filled from the repo) for: site type, goal, money pages, brand terms, markets, YMYL, AI-crawler policy, migrations, Search Console UI status, exports and a CrUX key. Durable answers are re-asked after 180 days and volatile ones after 28. `--profile` re-runs the interview; `--no-ask` never asks.
+- **The answers change the audit:** money pages ×1.5 rank weight; a manual action or security issue is forced to priority 1; robots.txt is judged against the stated AI policy; hreflang is judged against the stated markets; E-E-A-T is stricter on YMYL; the site type picks the expected schema.
+- **Step 1.6.15**: user-dropped Search Console exports (Generative AI report, Core Web Vitals, Links) in `.seo-data/gsc/exports/` are parsed into info-only digests.
+- **Step 3.3 / `gsc-parse-helper crux`**: real-user p75 LCP/INP/CLS/TTFB from the CrUX API, with the key read from `CRUX_API_KEY` and never printed.
+- **`gsc-parse-helper brand`** accepts comma-separated aliases and prints the brand / non-brand split, standing in for the UI-only branded filter. CTR opportunities are judged on non-brand queries.
+- `ai_eligibility` sub-dimension: flags `nosnippet` / `max-snippet` / `data-nosnippet` on indexable pages and robots meta tags placed in `<body>`.
+- `tests/test_crux_and_brand.py`: 5 stdlib tests, no network.
+
+### Changed
+- **llms.txt is info-only (6 → 0 points).** Google's AI optimization guide says Search doesn't use it, and no major engine documents reading it. The points moved to `eeat` +2, `ai_bot_access` +1 and `ai_eligibility` +3. The first 2.16.0 history row carries `<!-- methodology:2.16.0 -->`. llms.txt is no longer suggested by `--fix` unprompted, or as a `--plan` phase.
+- **Retired rich results are no longer expected:** FAQPage (gone 2026-05-07), HowTo, sitelinks search box and the 2025 retirements. Existing markup is not an error.
+- **AI-crawler access is grouped** into training, AI search and user-triggered crawlers. Legacy `anthropic-ai` / `Claude-Web` tokens are flagged as no-ops, blocking Googlebot "to opt out of AI" is high severity, and AIPREF `Content-Usage` lines are reported.
+- The best-practices fetch puts first-party sources first, always reads the Search Central doc-updates log, and uses the current year instead of a hard-coded one.
+
 ## 2.15.3 — 2026-11-02
 
 `/bx:seo`: a failed run no longer destroys the coverage baseline, and auth failures name their real cause. Found when a burakarik.com run stopped on expired credentials after its Turn-1 prune had already deleted the 31-day-old snapshot the run was meant to compare against.

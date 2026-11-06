@@ -3,9 +3,9 @@ name: seo
 description: Audits a web project for SEO and Generative Engine Optimization (GEO). Fetches current best practices every run, probes sitemap URL health, and optionally ingests Google Search Console data via API. Score `/100` headline + top-3 priorities, tracked in `docs/seo-history.md`.
 when_to_use: When user mentions SEO audit, GEO audit, Generative Engine Optimization, AI search optimization, llms.txt, structured data / JSON-LD, sitemap health, Google Search Console, GSC, search performance, AI citability, or "make this site rank better". Web projects only — rejects non-web repos silently. Distinct from generic code-review skills (no SEO awareness) and from `/bx:arch` (code structure, not SEO).
 disable-model-invocation: true
-allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, Bash(git:*), Bash(find:*), Bash(wc:*), Bash(grep:*), Bash(sed:*), Bash(cat:*), Bash(head:*), Bash(gcloud:*), Bash(curl:*), Bash(gsc-parse-helper:*), Bash(mkdir:*), Bash(ls:*), Bash(mktemp:*), Bash(printf:*), Bash(rm:*), Bash(echo:*), Bash(date:*), Bash(sha1sum:*), Bash(shasum:*), Bash(cut:*), Bash(sort:*), Bash(tail:*), Bash(python:*), Agent
+allowed-tools: Read, Write, Grep, Glob, Edit, WebSearch, WebFetch, AskUserQuestion, Bash(printenv:*), Bash(git:*), Bash(find:*), Bash(wc:*), Bash(grep:*), Bash(sed:*), Bash(cat:*), Bash(head:*), Bash(gcloud:*), Bash(curl:*), Bash(gsc-parse-helper:*), Bash(mkdir:*), Bash(ls:*), Bash(mktemp:*), Bash(printf:*), Bash(rm:*), Bash(echo:*), Bash(date:*), Bash(sha1sum:*), Bash(shasum:*), Bash(cut:*), Bash(sort:*), Bash(tail:*), Bash(python:*), Agent
 effort: high
-argument-hint: "[path] [--plan] [--fix] [--url <deployed-url>] [--no-cache] [--force-dispatch]"
+argument-hint: "[path] [--plan] [--fix] [--url <deployed-url>] [--profile] [--no-ask] [--no-cache] [--force-dispatch]"
 ---
 
 # SEO Review — Repo-Wide SEO + Generative Engine Optimization Audit
@@ -61,6 +61,23 @@ and stop the skill cleanly.
 
 ---
 
+## Step 0.5 — Site Profile Intake (ask the user what no API can tell us)
+
+The Search Console API exposes only Search Analytics, Sitemaps, Sites and URL Inspection. Manual actions, security issues, the Generative AI performance report, the Search generative AI setting, the branded filter, Core Web Vitals and Links reports are **UI-only**, and business context (goals, money pages, brand terms, markets, AI-crawler intent, YMYL status, migrations) is in no API at all. An audit without them ranks by impressions instead of value and judges robots.txt without knowing intent. **Ask; don't guess.**
+
+Read `references/site-profile.md` (schema, interview, effect table) and `.seo-data/site-profile.yaml` in one parallel turn, plus `Bash: printenv CRUX_API_KEY >/dev/null 2>&1 && echo CRUX_KEY:set || echo CRUX_KEY:unset` (never echo the value).
+
+1. **Decide what to ask** per the staleness table in `site-profile.md`: missing durable keys, durable keys past 180 days (one confirmation question), volatile Search Console facts past 28 days.
+2. **Skip asking** when `--no-ask`, `--plan` or `--fix` is in `$ARGUMENTS`, or AskUserQuestion is unavailable/denied. Missing keys become `unknown`; footer: `Site profile: <N> keys unknown — run /bx:seo --profile to answer them.` Never block the audit.
+3. **`--profile`** → run the full interview with current values offered as `(current)` options.
+4. **Interview** with AskUserQuestion (≤4 questions per call, options pre-filled from Step 0 detections and marked `(detected)`), in the call order `site-profile.md` defines: Call 1 audit shape → Call 2 ranking targets → Call 3 Search Console UI facts + exports + CrUX key → optional Call 4.
+5. **Write** `.seo-data/site-profile.yaml` (flat keys, no secrets) and print the one-line save notice. If the user chose `private: yes`, add the file inside the `# /bx:seo managed` `.gitignore` block.
+6. **Stash** `site_profile` for Step 1 (site-type query), Step 3.3 (CrUX), Step 5 (shared context) and Step 6.6 (ranking).
+
+**Blocking facts.** If `manual_actions` or `security_issues` is `yes:<type>`, print immediately: `⚠ Search Console reports a <type>. On-page fixes can't recover traffic Google is suppressing — resolve it in Search Console → Security & Manual actions first, then request review.` The audit still runs; Step 6.6 forces this to priority 1.
+
+---
+
 ## Step 1 — Fetch Current Best Practices
 
 **New pattern not in other skills.** SEO/GEO best practices drift fast (Google adjusts SERP rendering, AI providers shift citation algorithms). Fetch fresh, in-session.
@@ -69,15 +86,20 @@ Run in a **single parallel turn** (multiple WebSearch + WebFetch tool calls toge
 
 **WebSearch queries (4-6, parallel):**
 - `"SEO best practices 2026 Google Search Central updates"`
-- `"generative engine optimization llms.txt content patterns 2026"`
-- `"schema.org rich results JSON-LD changes 2026"`
-- `"Core Web Vitals thresholds 2026"`
-- `"AI search citation patterns ChatGPT Perplexity Claude 2026"`
-- One stack-specific query if applicable, e.g. `"Next.js app router SEO metadata 2026"` or `"Astro SEO best practices 2026"`
+- `"site:developers.google.com/search/blog <current year>"` (Google's own announcements first — core updates, spam policies, rich-result retirements)
+- `"schema.org rich results JSON-LD changes <current year>"`
+- `"Core Web Vitals thresholds <current year>"`
+- `"AI search citation patterns ChatGPT Perplexity Claude <current year>"`
+- One stack-specific query if applicable, e.g. `"Next.js app router SEO metadata <current year>"` or `"Astro SEO best practices <current year>"`
+- One site-type query from `site_profile.site_type` (Step 0.5), e.g. `"ecommerce product structured data Merchant Center <current year>"`, `"local business SEO Google Business Profile <current year>"`. Skip when `unknown`.
+
+Substitute the literal current year — never a hard-coded one.
+
+**Primary sources outrank everything else in the brief.** Google's [AI optimization guide](https://developers.google.com/search/docs/fundamentals/ai-optimization-guide) (2026-05-15) states Search does not use llms.txt, and needs no special schema, "chunking" or AEO/GEO tricks for AI features. When a secondary source (SEO blog, GEO vendor) contradicts a Google, OpenAI, Anthropic or Perplexity doc, the brief keeps the first-party position and notes the conflict. Always fetch the [Search Central documentation updates](https://developers.google.com/search/updates) page — it is the dated changelog of every doc change, and the fastest way to see what was retired since the last run.
 
 **WebFetch (run in the SAME parallel turn as the WebSearch queries — the curated URLs in `references/best-practices-sources.md` are stable and don't need WebSearch results to fire):**
 - Authoritative pages: Google Search Central docs, web.dev/learn/seo, schema.org type definitions for likely page types
-- llms.txt spec page
+- Google's AI optimization guide + "AI features and your website" (first-party AI-search guidance; supersedes GEO folklore)
 - Recent Anthropic/OpenAI/Perplexity guidance on citation behavior
 
 A second round of WebFetch on highest-signal WebSearch results is optional and only worth a follow-up turn when the curated URLs returned thin content.
@@ -135,6 +157,7 @@ Steps 1.5 (git scan) and 1.6 (GSC API ingestion when configured, else heuristic-
 - `Glob **/sitemap.xml` + `Glob **/sitemap_index.xml` (repo-local sitemap detection — the **fallback** source only. Search paths: repo root, `public/`, `static/`, `dist/`, `out/`, `_site/`. The **primary** sitemap source is the LIVE site, resolved in Step 1.6.6a (GSC `sitemaps.list` → robots.txt → `<base>/sitemap.xml`) — that's what catches generated/dynamic sitemaps a repo glob can't see. This glob result is used only when no live source resolves, e.g. a truly static site or an offline run with no base URL.)
 - `Read .seo-data/gsc/known-bad-urls.txt` (optimistic — the file is user-authored and may not exist; Read errors silently on missing file → `user_supplied_urls` stays empty. When present, parsed in Step 1.6.6's Pre-Turn-2 step into the URL Inspection user-supplied slice — see `references/gsc-api-queries.md` "URL Inspection — selection algorithm" 4-slice mix.)
 - `Bash: ls .seo-data/gsc/snapshots 2>/dev/null | sort | tail -1` (find most recent prior snapshot — used by Step 1.6.13.2 regression diff. Empty stdout means "first run for this property", in which case Step 1.6.13 emits no findings and footer-notes the activation.)
+- `Glob .seo-data/gsc/exports/*.csv` (user-dropped Search Console UI exports the API cannot provide — Generative AI report, Core Web Vitals, Links. Parsed in Step 1.6.15. Empty result → nothing to parse.)
 - `Read .seo-data/gsc/finding-history.json` (optimistic — file is skill-auto-managed under Group D finding-lifecycle infra; absent on first run. When present, the orchestrator parses `{<hash>: {run_count, first_seen_date, ...}}` and passes the map to Step 7 report rendering so findings with `run_count >= 3` get an escalation hint appended to their `recommended_action`. See Step 6.8 for the write-back step.)
 - `Read .seo-data/gsc/watchpoints.json` (optimistic — same as above. When present, the orchestrator invokes `gsc-parse-helper watchpoint-check` AFTER Q2 cache lands in Turn 2a (since the check needs the current Q2 pages digest for metric comparison) — see **Step 1.6.14** below for the invocation block. Stash the helper output for Step 7 banner rendering.)
 - `Bash: gcloud --version 2>&1` (gcloud SDK install detection — informational only; the helper mints tokens with Python stdlib, so gcloud is a fallback, not a requirement)
@@ -812,6 +835,22 @@ The helper:
 Watchpoints: 3 active (1 due this run, evaluated against Q2 pages digest); 0 evicted (90-day rotation).
 ```
 
+### 1.6.15 — User-supplied Search Console exports (UI-only reports)
+
+Runs whenever Turn 1's `Glob .seo-data/gsc/exports/*.csv` found files — independent of `gsc_mode` (a user without API access can still export from the UI). Step 0.5 asks for these; this step consumes them.
+
+Identify each CSV by its header row (read only the first 60 lines of each file — exports can be large):
+
+| Export | Recognised by | Digest passed to subagents (≤15 lines each) |
+|---|---|---|
+| Generative AI performance report → Pages | a page/URL column + an impressions column, and the file name or header mentions "AI" / "Generative" | top 15 pages by AI impressions; flag any `money_pages` absent from the list; total AI impressions. Impressions only — the report has no clicks. |
+| Core Web Vitals report (mobile/desktop) | columns naming LCP / INP / CLS and a status (Poor / Needs improvement / Good) | URL groups in Poor and Needs-improvement per metric, with example URL and URL count |
+| Links report (top linked pages / top linking sites) | "Linking sites" or "Incoming links" columns | top 10 linked pages, top 10 linking sites; `money_pages` with zero external links |
+
+Pass the digests to `seo-gsc-insights` (AI + Links) and `seo-technical` (CWV) as an `Exports:` block. Findings derived from them carry `source: "gsc"` and `score_impact: 0`, like all GSC-side signals. A file that matches no recognised header → footer: `Export <name> not recognised — skipped.` Export older than 60 days (file mtime) → use it, and footer-note its age.
+
+Footer line: `Exports: <N> parsed (<kinds>), <M> skipped.` Omit when no exports exist.
+
 ---
 
 ## Ingestion conventions (cross-cutting, applies to Step 1.6 + Step 3.2)
@@ -948,6 +987,9 @@ Interpret `$ARGUMENTS`:
 | `--no-cache` | Bypass the GSC API response cache (24h TTL for sa-* / 7d TTL for ui-*). Forces fresh `searchanalytics.query` + `urlInspection.index.inspect` calls. Fresh responses are still written to cache for next run. Use when iterating on a fix and you need Google's current view, or when you suspect cached data is wrong. See `references/gsc-cache.md` for TTL policy + manual cache management. |
 | `--force-dispatch` | Always run the 3 codebase-scanning subagents even when Step 4.5's gating logic would skip them. Use when validating a refactor, taking a second-opinion run, or after updating subagent reference files. Default is "skip when zero non-doc commits since prior snapshot" — see Step 4.5. |
 
+| `--profile` | Re-run the full site-profile interview (Step 0.5) with current answers pre-selected, save, then audit. Use after a business change (new market, new money pages, AI-policy decision). |
+| `--no-ask` | Never ask questions this run (CI, scripted or unattended runs). Missing profile keys become `unknown`; the footer lists how many. |
+
 `--plan` and `--fix` are mutually exclusive. If both supplied: "Pick one — `--plan` emits a brief, `--fix` applies edits."
 
 `--no-cache` is compatible with all other flags. No-op when `gsc_mode: disabled` (nothing to cache).
@@ -993,6 +1035,18 @@ Runs whenever a sitemap URL list is available (live-discovered or repo-local) wi
 | WebFetch error (network failure) | low | 0 — record but don't penalize |
 
 **Total URL-health deduction is capped at 8 points** (out of Technical SEO's 25). A fully broken sitemap doesn't zero out Technical SEO.
+
+### 3.3 Real-user Core Web Vitals (CrUX API)
+
+The GSC API has no Core Web Vitals endpoint, and the sitemap probe's response time is a lab number from one location. Field data comes from the free [CrUX API](https://developer.chrome.com/docs/crux/api) — p75 LCP, INP, CLS and TTFB over 28 days of real Chrome users.
+
+Runs when Step 0.5 found `CRUX_KEY:set` and a base URL resolves (`--url`, `site_base_url`, or derived from `site_url`). Otherwise skip, and footer: `Field CWV: skipped (no CRUX_API_KEY — see /bx:seo --profile).`
+
+1. Write a targets file to system temp (never under `.seo-data/gsc/`): `origin <base>`, then `url <u>` for each `money_pages` entry (absolute), then the top URLs by impressions from `url_impressions_map` — 25 lines max in total.
+2. One call: `PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper crux "$TARGETS"`. The helper reads the key from the environment and never prints it.
+3. Pass the `--- crux records ---` lines to `seo-technical` as `Field CWV:`. A record rated `poor` is a **real** performance problem (field data beats every static signal); `no_data` means too little Chrome traffic — not a defect, never penalise it.
+
+When field data exists, `seo-technical` scores `response_time` from TTFB p75 instead of the probe buckets, and adds field LCP/INP/CLS findings under `image_perf` / `font_script_perf` by likely cause. Footer: `Field CWV: origin phone LCP <v>ms (<rate>), INP <v>ms (<rate>), CLS <v> (<rate>); <N> URLs with data.`
 
 ---
 
@@ -1118,6 +1172,10 @@ Weight adjustments (validated in Step 1: |each| ≤ 5, sum = 0):
 
 Scope file list: <paths>
 
+# Site profile (Step 0.5 — user-supplied facts no API exposes)
+Site profile: <the flat keys from .seo-data/site-profile.yaml, one per line; `unknown` = use default behaviour, never assume yes>
+Apply per references/site-profile.md "How each answer changes the audit" — e.g. judge ai_bot_access against ai_policy, hreflang against markets, raise eeat severity when ymyl != no.
+
 # GSC + git context
 
 GSC Mode: enabled | disabled
@@ -1213,6 +1271,10 @@ traffic_weight (URL not in map / no GSC)     = 1.0
 
 rank_score = effective_impact × certainty × traffic_weight / effort_weight
 ```
+
+**Business weight (Step 0.5 site profile):** multiply `rank_score` by `1.5` when the finding's resolved URL is in `site_profile.money_pages` (prefix match on path). A money page that is not indexed, `noindex`, missing from the sitemap, or 4xx/5xx in the probe is raised to **high** severity before ranking.
+
+**Forced priority 1:** when `site_profile.manual_actions` or `security_issues` is `yes:<type>`, the first top-3 slot is `Resolve the <type> in Search Console (Security & Manual actions), then request review` regardless of rank scores; the other two slots follow the formula.
 
 **URL resolution for traffic_weight:**
 - If the finding's `location` IS a URL → look it up directly in `url_impressions_map` from Step 1.6.
@@ -1310,7 +1372,7 @@ Read `references/report-template.md` for exact formatting. The shape:
 
 **Section 0 — Single headline** (first line of report):
 
-> **SEO/GEO score: 72/100 (Δ +8 since 2026-04-30)** — Top 3 opportunities: missing meta descriptions (12 pages); no llms.txt; broken /products/v1 (404).
+> **SEO/GEO score: 72/100 (Δ +8 since 2026-04-30)** — Top 3 opportunities: missing meta descriptions (12 pages); no Article JSON-LD on blog posts; broken /products/v1 (404).
 
 If no `docs/seo-history.md` exists yet, drop the delta clause: `**SEO/GEO score: 72/100** — Top 3 opportunities: ...`.
 
@@ -1353,10 +1415,12 @@ If file doesn't exist, create with header:
 
 Append row (with embedded commit sha):
 ```
-| 2026-05-14 | 72 | Missing meta descriptions (12 pages); No llms.txt; Broken URL /products/v1 (404) | <!-- commit:abc1234 -->
+| 2026-05-14 | 72 | Missing meta descriptions (12 pages); No Article JSON-LD on blog; Broken URL /products/v1 (404) | <!-- commit:abc1234 -->
 ```
 
 The `<!-- commit:abc1234 -->` HTML comment is invisible in the rendered Markdown table but parseable by the next run's dedup check.
+
+**Methodology marker (2.16.0).** If no existing row contains `<!-- methodology:2.16.0 -->`, append ` <!-- methodology:2.16.0 -->` after the commit comment on this run's row, and add `(scoring changed — llms.txt no longer scored)` to the Section 0 delta clause. The marker tells future readers that Generative Engine scores before and after this row aren't comparable (see `rubric.md` "Methodology change").
 
 **Rules for the history file:**
 - Create if missing — never assume it exists.
@@ -1431,4 +1495,6 @@ If default mode, end with:
 | Plan a SEO/GEO improvement effort | `/bx:seo --plan` |
 | Apply safe SEO scaffolds | `/bx:seo --fix` |
 | Live HTML diff + sitemap URL probe | `/bx:seo --url <base>` |
+| Update business context (goals, money pages, markets, AI policy) | `/bx:seo --profile` |
+| Unattended run, no questions | `/bx:seo --no-ask` |
 | Not sure where to start | `/bx:health` |

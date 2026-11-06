@@ -64,10 +64,13 @@ Each dimension has a sub-dimension breakdown that the subagent reports in its ou
 
 | Sub-dimension | Max points |
 |---|---|
-| `llms_txt` (presence + format) | 6 |
-| `eeat` (E-E-A-T signals — author bios, dates, citations, About/Contact) | 6 |
-| `semantic_content` (topic sentences, list/table structure, question-headings) | 5 |
-| `ai_bot_access` (robots.txt rules for GPTBot/ClaudeBot/PerplexityBot/etc.) | 3 |
+| `eeat` (E-E-A-T signals — author bios, dates, citations, About/Contact; stricter when `ymyl` ≠ no) | 8 |
+| `semantic_content` (topic sentences, list/table structure, descriptive headings) | 5 |
+| `ai_bot_access` (robots.txt per crawler group, judged against the profile's `ai_policy`) | 4 |
+| `ai_eligibility` (`nosnippet` / `max-snippet` / `data-nosnippet`, body-placed robots meta) | 3 |
+| `llms_txt` (presence + format) | 0 — info only |
+
+**Methodology change (2.16.0).** `llms_txt` was worth 6 points until 2.16.0. Google's [AI optimization guide](https://developers.google.com/search/docs/fundamentals/ai-optimization-guide) (2026-05-15; llms.txt note 2026-06-15) states Search does not use the file, and no major engine documents reading it. Its 6 points went to `eeat` (+2), `ai_bot_access` (+1) and the new `ai_eligibility` (+3). Generative Engine scores before and after 2.16.0 are not directly comparable. The first 2.16.0+ row in `docs/seo-history.md` carries `<!-- methodology:2.16.0 -->` next to its commit comment, and the Section 0 delta clause gains `(scoring changed — llms.txt no longer scored)` on that run only.
 
 ### Performance signals — 10 points base
 
@@ -185,7 +188,7 @@ URL is the join key. Case-insensitive, trailing-slash-normalized.
 When a top-3 priority string in `docs/seo-history.md` comes from a GSC finding, prefix the string with `[gsc]` so readers see at-a-glance why a row's priorities shifted between runs (e.g., user added or removed CSVs):
 
 ```
-| 2026-05-14 | 72 | [gsc] CTR opportunity on /pricing (12.4K imps); No llms.txt; [gsc] 1,146 crawled-not-indexed pages |
+| 2026-05-14 | 72 | [gsc] CTR opportunity on /pricing (12.4K imps); No Article JSON-LD on blog; [gsc] 1,146 crawled-not-indexed pages |
 ```
 
 The `[gsc]` prefix is appended at history-write time in Step 7, after top-3 ranking is finalized.
