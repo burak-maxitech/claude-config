@@ -121,24 +121,22 @@ test_leave_and_off() {
     px "$r" leave s71
     expect_has "leave prints left=s71" "$OUT" "left=s71"
     case "$OUT" in *mode=off*) fail "leave with members remaining must not turn off" ;; *) pass "mode stays on while members remain" ;; esac
+    local before; before="$(wc -l < "$r/.git/bx-parallel/log" | tr -d ' ')"
     px "$r" off
     expect_has "off prints mode=off" "$OUT" "mode=off"
     px "$r" status
     expect_has "status after off" "$OUT" "mode=off"
-    expect_eq "off appends to log" "$([ -s "$r/.git/bx-parallel/log" ] && echo yes || echo no)" yes
+    local after; after="$(wc -l < "$r/.git/bx-parallel/log" | tr -d ' ')"
+    expect_eq "off appends exactly one log line" "$((after - before))" 1
+    expect_eq "last log line is the off entry" "$(tail -n 1 "$r/.git/bx-parallel/log" | cut -d' ' -f2-)" "off"
 }
 
 test_leave_releases_lock_and_last_turns_off() {
     echo "test_leave_releases_lock_and_last_turns_off"
-    # Needs Task 2's `lock`; stays skipped until the script has it.
-    if ! grep -q 'lock)' "$SCRIPT" 2>/dev/null; then
-        skip "needs Task 2 'lock' subcommand"
-        return
-    fi
     local r; r="$(make_repo leave_lock)"
     px "$r" on s70 "$r"
     px "$r" join s71 /x/one s/s71
-    px "$r" lock s71 s70,s71
+    px "$r" lock s71 land
     expect_has "s71 acquired lock" "$OUT" "lock=acquired"
     px "$r" leave s71
     expect_has "leave releases the lock" "$OUT" "lock=released"
@@ -166,8 +164,126 @@ test_leave_hand_written_lock() {
     [ -e "$r/.git/bx-parallel/land.lock" ] && fail "land.lock left behind" || pass "land.lock removed"
 }
 
-# --- Task 1 tests (later tasks append their tests above the runner) ---
-TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock"
+test_join_concurrent_no_lost_rows() {
+    echo "test_join_concurrent_no_lost_rows"
+    local r; r="$(make_repo join_race)"
+    px "$r" on s70 "$r"
+    local i
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        ( cd "$r" && bash "$SCRIPT" join "p$i" "/x/p$i" "s/p$i" >/dev/null 2>&1 ) &
+    done
+    wait
+    px "$r" status
+    expect_eq "10 concurrent joins + on = 11 member rows" "$(printf '%s\n' "$OUT" | grep -c '^member ')" 11
+    expect_eq "no members lock left behind" "$([ -e "$r/.git/bx-parallel/members.lock" ] && echo yes || echo no)" no
+}
+
+# lock_setup <name>: repo with mode on; prints path.
+lock_setup() {
+    local r; r="$(make_repo "$1")"
+    px "$r" on s70 "$r"
+    echo "$r"
+}
+
+test_lock_acquire_and_held() {
+    echo "test_lock_acquire_and_held"
+    local r; r="$(lock_setup lock_held)"
+    BXP_NOW=1000 px "$r" lock s70 land
+    expect_eq "first lock exits 0" "$RC" 0
+    expect_has "first lock acquired" "$OUT" "lock=acquired"
+    expect_eq "owner file has ref/since/step" "$(cat "$r/.git/bx-parallel/land.lock/owner")" "$(printf 'ref=s70\nsince=1000\nstep=land')"
+    BXP_NOW=1042 px "$r" lock s71 land
+    expect_eq "other ref exits 4" "$RC" 4
+    expect_has "held output" "$OUT" "lock=held owner=s70 age=42 step=land"
+    BXP_NOW=1050 px "$r" lock s70 ff-main
+    expect_eq "owner relock exits 0" "$RC" 0
+    expect_has "owner relock acquired" "$OUT" "lock=acquired"
+    expect_eq "owner relock refreshed step" "$(grep '^step=' "$r/.git/bx-parallel/land.lock/owner")" "step=ff-main"
+}
+
+test_lock_stale_broken() {
+    echo "test_lock_stale_broken"
+    local r; r="$(lock_setup lock_stale)"
+    BXP_NOW=1000 px "$r" lock s70 land
+    BXP_NOW=1899 px "$r" lock s71 land
+    expect_eq "since+899 still held (exit 4)" "$RC" 4
+    BXP_NOW=1900 px "$r" lock s71 land
+    expect_eq "since+900 breaks (exit 0)" "$RC" 0
+    expect_has "broken stale output" "$OUT" "lock=broken prev_owner=s70 reason=stale"
+    expect_has "then acquired" "$OUT" "lock=acquired"
+    expect_eq "new owner is s71" "$(grep '^ref=' "$r/.git/bx-parallel/land.lock/owner")" "ref=s71"
+    expect_has "break is logged" "$(cat "$r/.git/bx-parallel/log")" "lock-broken"
+}
+
+test_lock_gone_broken() {
+    echo "test_lock_gone_broken"
+    local r; r="$(lock_setup lock_gone)"
+    BXP_NOW=1000 px "$r" lock s70 land
+    BXP_NOW=1001 px "$r" lock s71 land --live-refs s71,s72
+    expect_eq "owner absent from live refs exits 0" "$RC" 0
+    expect_has "broken gone output" "$OUT" "lock=broken prev_owner=s70 reason=gone"
+    BXP_NOW=1002 px "$r" lock s73 land --live-refs s71,s73
+    expect_eq "owner present in live refs stays held" "$RC" 4
+}
+
+test_touch_extends() {
+    echo "test_touch_extends"
+    local r; r="$(lock_setup lock_touch)"
+    BXP_NOW=1000 px "$r" lock s70 land
+    BXP_NOW=1800 px "$r" touch-lock s70 push
+    expect_eq "touch by owner exits 0" "$RC" 0
+    BXP_NOW=2600 px "$r" lock s71 land
+    expect_eq "still held at +1600 after touch at +800" "$RC" 4
+    expect_has "held shows new step" "$OUT" "step=push"
+    BXP_NOW=1800 px "$r" touch-lock s71 push
+    expect_eq "touch by non-owner exits 4" "$RC" 4
+}
+
+test_unlock_not_owner() {
+    echo "test_unlock_not_owner"
+    local r; r="$(lock_setup lock_unlock)"
+    px "$r" lock s70 land
+    px "$r" unlock s71
+    expect_eq "unlock by non-owner exits 4" "$RC" 4
+    [ -d "$r/.git/bx-parallel/land.lock" ] && pass "lock survives" || fail "lock wrongly removed"
+    px "$r" unlock s70
+    expect_eq "unlock by owner exits 0" "$RC" 0
+    expect_has "released" "$OUT" "lock=released"
+    px "$r" status
+    expect_has "free afterwards" "$OUT" "lock=free"
+}
+
+test_unlock_force() {
+    echo "test_unlock_force"
+    local r; r="$(lock_setup lock_force)"
+    px "$r" lock s70 land
+    px "$r" unlock s71 --force
+    expect_eq "force exits 0" "$RC" 0
+    expect_has "force prints prev_owner" "$OUT" "prev_owner=s70"
+    expect_has "force released" "$OUT" "lock=released"
+    [ -e "$r/.git/bx-parallel/land.lock" ] && fail "lock still there" || pass "lock removed"
+}
+
+test_lock_race() {
+    echo "test_lock_race"
+    local r; r="$(lock_setup lock_race)"
+    local i bad=0 d="$TMP_ROOT/race_out"
+    mkdir -p "$d"
+    for i in $(seq 1 20); do
+        rm -rf "$r/.git/bx-parallel/land.lock"
+        ( cd "$r" && bash "$SCRIPT" lock a land >"$d/a.out" 2>&1; echo $? > "$d/a.rc" ) &
+        ( cd "$r" && bash "$SCRIPT" lock b land >"$d/b.out" 2>&1; echo $? > "$d/b.rc" ) &
+        wait
+        local ra rb; ra="$(cat "$d/a.rc")"; rb="$(cat "$d/b.rc")"
+        if [ "$ra" = 0 ] && [ "$rb" = 4 ] && grep -q 'lock=held' "$d/b.out" && grep -q 'lock=acquired' "$d/a.out"; then :
+        elif [ "$ra" = 4 ] && [ "$rb" = 0 ] && grep -q 'lock=held' "$d/a.out" && grep -q 'lock=acquired' "$d/b.out"; then :
+        else bad=$((bad + 1)); echo "    iteration $i: a=$ra b=$rb"; fi
+    done
+    expect_eq "20 iterations: exactly one winner each time" "$bad" 0
+}
+
+# --- Task 1 + 2 tests (later tasks append their tests above the runner) ---
+TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race"
 
 for t in $TESTS; do "$t"; done
 
