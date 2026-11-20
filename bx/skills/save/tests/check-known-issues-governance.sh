@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # check-known-issues-governance.sh - verify the Known Issues governor's contract
-# strings are present in the bx/ plugin source (doc tiering phase 1, v2.10.0).
+# strings are present in the bx/ plugin source (doc tiering phase 1, v2.10.0),
+# and the file-level size budget's (v2.18.0, checks B01-B14).
 #
 # A meta-lint of the plugin's own instruction files, like
 # check-doc-rule-consistency.sh. It proves the rules are STATED; only a blind
@@ -26,7 +27,10 @@ CHECKLISTS="$REF/verification-checklists.md"
 WRITER="$BX_DIR/agents/save-writer.md"
 RESUME="$BX_DIR/skills/resume/SKILL.md"
 ARCHIVE='docs/known-issues.md'
-ROW='| CLAUDE.md `## Known Issues / Blockers` | 4000 chars |'
+ROW_ISSUES='| CLAUDE.md `## Known Issues / Blockers` — issues |'
+ROW_RULES='| CLAUDE.md `## Known Issues / Blockers` — standing rules |'
+BUDGET_SH="$BX_DIR/skills/save/scripts/size-budget.sh"
+ARCHIVE_SH="$BX_DIR/skills/save/scripts/archive-lines.sh"
 
 FAILURES=0
 pass() { echo "  PASS  $1"; }
@@ -69,11 +73,9 @@ has K15 "$WRITER" '> Session state:' "save-writer exempts the Session state poin
 has K16 "$CHECKLISTS" 'known-issues.md' "change report carries a known-issues.md line"
 
 echo "--- D3: the shrinker row ---"
-has K06 "$FULL" "$ROW" "Part 7.3 has the Known Issues row at 4000 chars"
-if [ -f "$FULL" ] && grep -F -- "$ROW" "$FULL" | grep -qF '2500 chars'; then
-    pass "K07 the row names the 2500-char resolved target"
-else fail "K07 the Known Issues row does not name '2500 chars'"; fi
-has K08 "$FULL" 'covers project-specific sections only' "tolerated-as-is clause is narrowed"
+has K06 "$FULL" "$ROW_ISSUES" "Part 7.3 has the Known Issues row for issues"
+has K07 "$FULL" "$ROW_RULES" "Part 7.3 has the Known Issues row for standing rules"
+has K08 "$FULL" 'covers project-specific sections only' "unshrinkable-by-design clause is narrowed"
 
 echo "--- D7 / D8: derivable content, advisory rung ---"
 has K11 "$RULES" 'Derivable facts are recoverable' "doc-structure-rules.md carries the derivable-content clause"
@@ -92,20 +94,48 @@ has K21 "$FULL" 'no longer live' "7.7 treats an Open entry absent from CLAUDE.md
 has K22 "$UPDATE" 'never the block-replace form' "Known Issues deltas may not block-replace"
 has K22 "$WRITER" 'refuse a block-replace' "save-writer refuses a Known Issues block-replace"
 
-echo "--- drift sweep: Known Issues thresholds ---"
+echo "--- size budget (v2.18.0): file-level, one consent, every section reachable ---"
+has B01 "$SCHEMA" '| CLAUDE.md | ~7k | 9k | 10k |' "doc-schema.md owns the CLAUDE.md budget row"
+has B01 "$SCHEMA" '| docs/STATUS.md | ~10k | 13k | 15k |' "doc-schema.md owns the STATUS.md budget row"
+has B02 "$BUDGET_SH" 'CLAUDE_BUDGET=10000; CLAUDE_STOP=9000' "size-budget.sh codes the CLAUDE.md numbers"
+has B02 "$BUDGET_SH" 'STATUS_BUDGET=15000; STATUS_STOP=13000' "size-budget.sh codes the STATUS.md numbers"
+has B03 "$FULL" '| CLAUDE.md | 10k | 9k |' "Part 7 states the CLAUDE.md budget and stop"
+has B03 "$FULL" '| docs/STATUS.md | 15k | 13k |' "Part 7 states the STATUS.md budget and stop"
+has B04 "$FULL" 'largest first' "relocation walks sections largest first"
+has B04 "$FULL" 'unshrinkable by design' "a section with no move is named, not skipped"
+for row in 'HEADER (both files)' 'CLAUDE.md `## Key Decisions`' 'CLAUDE.md `## Project Overview`' \
+           'CLAUDE.md `## Environment Variables`' 'docs/STATUS.md `## Current Status`' \
+           'docs/STATUS.md `## In Progress`' 'docs/STATUS.md `## Next Steps`' \
+           'docs/STATUS.md `## Session History`' 'docs/STATUS.md `## Completed`'; do
+    has B05 "$FULL" "| $row" "Part 7.3 has a row for $row"
+done
+has B06 "$FULL" 'One consent for the whole run' "7.4 asks once per run"
+has B06 "$FULL" 'bx-size-skips=' "7.4 counts consecutive skips"
+has B06 "$BUDGET_SH" 'bx-size-skips=' "size-budget.sh reads the skip counter"
+has B07 "$FULL" 'A summary is trimmed once' "7.5 protects summary lines, not whole sections"
+lacks B07 "$FULL" 'Part 7 does NOT trim further' "the section-freezing sentinel rule is gone"
+has B08 "$FULL" 'Never archive twice' "7.5 forbids re-archiving"
+has B08 "$ARCHIVE_SH" 'grep -qxF' "archive-lines.sh skips lines the archive already holds"
+region_has B09 "$FULL" '^### 7[.]7 ' '^### 7[.]8 ' 'docs/next-steps-backlog.md' "Part 7.7 rotation covers the backlog"
+lacks B09 "$FULL" 'is NOT rotated' "the backlog's rotation exemption is gone"
+has B10 "$FULL" 'that has no `paths:`' "unscoped rules files are refused as a destination"
+has B10 "$FULL" 'lead stays, reason moves' "global rules keep their lead"
+has B11 "$WRITER" '250 chars at most' "save-writer caps the Last Updated line"
+has B11 "$WRITER" 'Replace the old line whole' "save-writer never carries the old line forward"
+has B11 "$UPDATE" 'are not deltas' "the packet no longer sends Last Updated as a delta"
+has B12 "$RESUME" 'by section, never whole' "/bx:resume reads STATUS.md by section"
+has B12 "$RESUME" 'Size budget:' "/bx:resume prints the size-budget line"
+has B13 "$UPDATE" 'so no content moves' "--silent moves nothing in Part 7"
+
+echo "--- drift sweep: retired caps and thresholds ---"
 drift=0
 while IFS= read -r hit; do
     [ -n "$hit" ] || continue
-    file="${hit%%:*}"; rest="${hit#*:}"; line="${rest%%:*}"; text="${rest#*:}"
-    for num in $(printf '%s\n' "$text" | grep -oE '[0-9]{4,5} chars' | grep -oE '[0-9]+'); do
-        case "$num" in
-            4000|2500) ;;
-            *) fail "K14 threshold drift in ${file#"$BX_DIR"/}:$line -> '$num chars' beside 'Known Issues' (expected 4000 or 2500)"
-               drift=1 ;;
-        esac
-    done
-done < <(cd "$BX_DIR" && grep -rnF 'Known Issues' . --include='*.md' 2>/dev/null)
-[ "$drift" -eq 0 ] && pass "K14 no Known Issues threshold drift under ${BX_DIR##*/}/"
+    fail "B14 retired number in ${hit%%:*}: ${hit#*:}"
+    drift=1
+done < <(cd "$BX_DIR" && grep -rnE 'soft cap|12k soft|20k soft|threshold 4000|\(8000\)|4000 chars|2500 chars' \
+    skills/save/references skills/resume agents/save-writer.md 2>/dev/null | cut -c1-160)
+[ "$drift" -eq 0 ] && pass "B14 no retired cap or per-section threshold under save/, resume/, save-writer"
 
 echo ""
 if [ "$FAILURES" -gt 0 ]; then echo "$FAILURES governance check(s) failed."; exit 1; fi

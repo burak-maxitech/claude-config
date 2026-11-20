@@ -6,8 +6,8 @@ defines the schema. If they ever disagree, `doc-schema.md` wins.
 
 ## CLAUDE.md — instructions only
 
-Always loaded, every session. **Target ~7k chars.** Contains only facts Claude should hold
-all the time.
+Always loaded, every session. **Target ~7k chars, budget 10k** (`doc-schema.md`, Size
+budget). Contains only facts Claude should hold all the time.
 
 1. `## Project Overview` — name, repo, one-line description, key doc links
 2. `## Key Decisions` — condensed table, ~20 rows, + link to `docs/key-decisions.md`
@@ -15,7 +15,11 @@ all the time.
    `docs/known-issues.md` (`mode-update.md` Part 1.7), never deleted
 4. `## Environment Variables` — **only when populated** (see doc-schema.md)
 
-Plus the marker as line 1, a `Last Updated:` line, and the pointer line
+`## Known Issues / Blockers` may hold standing rules as well as issues. A rule is never
+"resolved"; `mode-update-full.md` Part 7.3 has a shrinker for each kind.
+
+Plus the marker as line 1, a `Last Updated:` line (current session only, 250 chars at
+most), and the pointer line
 `> Session state: [docs/STATUS.md](docs/STATUS.md)`.
 
 **Never put session state here.** Current Status, Completed, In Progress, Next Steps and
@@ -24,7 +28,8 @@ session.
 
 ## docs/STATUS.md — session state
 
-Read on demand by `/bx:resume`. **Target ~10k chars.** Sections in this order:
+Read on demand by `/bx:resume`, section by section. **Target ~10k chars, budget 15k.**
+Sections in this order:
 
 1. `## Current Status` — status table
 2. `## Completed` — 1-2 line summary + link to `docs/completed-work.md`

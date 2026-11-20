@@ -12,6 +12,7 @@ Present this summary after completing Steps 0-3. Fill in all bracketed placehold
 - [ ] Commands synced? (`cd ~/Development/projects/claude-config && git pull`)
 - [ ] Uncommitted changes? [Yes: N files / No]
 - Doc schema: [v2 / v1 — migration available via `/bx:save` / partial — interrupted migration, `/bx:save` resumes it]
+- [The one size-budget line from Step 3.0, verbatim — e.g. `Size budget: CLAUDE.md 16.6k / 10k, STATUS.md 21.6k / 15k → run /bx:save --full`]
 
 ### Staleness Warning (if applicable)
 > ⚠ `docs/STATUS.md` (v1: CLAUDE.md) was last updated [date], but there are [N] commits since then. Documentation may be stale. Consider running `/bx:save` after reviewing.
@@ -32,6 +33,10 @@ Present this summary after completing Steps 0-3. Fill in all bracketed placehold
 |-----------|--------|-------|
 | [Key area 1] | Complete/In Progress/Not Started | [Brief note] |
 | [Key area 2] | Complete/In Progress/Not Started | [Brief note] |
+
+*(At most 6 rows, each note under 15 words: the areas the next task touches, not the whole
+status table. Build it from the SessionStart orientation block when that is in context; do
+not re-read `## Current Status` for it.)*
 
 ### Last Session ([Date])
 - [Key accomplishment 1]

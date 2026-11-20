@@ -73,6 +73,11 @@ Based on the detected mode, read **only** the relevant reference file and follow
 
 Execute the instructions in the loaded reference file.
 
+UPDATE mode measures and archives with two scripts in this skill's `scripts/` directory:
+`size-budget.sh` (both live files against their size budget) and `archive-lines.sh` (moves
+lines into an archive without retyping or duplicating them). Run them with `bash`, by a path
+resolved against this skill's base directory.
+
 ---
 
 ## Step 4: Verify

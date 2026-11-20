@@ -54,8 +54,8 @@ behind. Because the repo is on the legacy layout, every link written back into C
 - `## Completed` section contains more than 2 `- [x]` checkbox lines
 - `## Key Decisions` table has more than 25 rows
 - `## Session History` contains more than 1 `### Session` entry
-- The un-split CLAUDE.md is over 32k characters — the v1-layout equivalent of this file's
-  per-file soft caps (CLAUDE.md 12k + `docs/STATUS.md` 20k), which a v1 CLAUDE.md carries
+- The un-split CLAUDE.md is over 25k characters — the v1-layout equivalent of the two
+  size budgets (CLAUDE.md 10k + `docs/STATUS.md` 15k), which a v1 CLAUDE.md carries
   together in one file
 
 **Split steps:**
@@ -116,26 +116,27 @@ behind. Because the repo is on the legacy layout, every link written back into C
 
 ### 1.9 Size Check (early advisory)
 
-Measure both files. CLAUDE.md target ~7k, advisory rung 9k, soft cap 12k. docs/STATUS.md
-target ~10k, soft cap 20k. Warn per file when over its soft cap and name which Part 7
-shrinker will fire.
+Measure both files with `size-budget.sh` (Part 7 describes it). CLAUDE.md target ~7k,
+advisory rung 9k, budget 10k. docs/STATUS.md target ~10k, budget 15k. Warn per file when it
+is over its budget, and say that Part 7 will plan it.
 
-**CLAUDE.md over 9k and at or under 12k — the advisory rung.** No shrinker fires in this
-band, so say so instead of staying silent. Run Part 7.2's `awk` command on CLAUDE.md, name
-the largest section, and take no action:
+**CLAUDE.md over 9k and at or under 10k — the advisory rung.** Nothing fires in this
+band (it is Part 7's stop point), so say so instead of staying silent. Name the largest
+section from the script's `section` records and take no action:
 
-> "CLAUDE.md is [X]k chars — over the 9k advisory rung, under the 12k soft cap. Largest
->  section: `## [name]` ([N] chars). No shrinker fires below 12k."
+> "CLAUDE.md is [X]k chars — over the 9k advisory rung, under the 10k budget. Largest
+>  section: `## [name]` ([N] chars). Nothing is shrunk below 10k."
 
 If `## Project Overview` states derivable facts (`doc-structure-rules.md`, Pruning Is
-Preservation), list them in the same advisory as trim candidates. Do not remove them.
+Preservation), list them in the same advisory as trim candidates. Do not remove them here:
+over budget, Part 7.3's Project Overview shrinker proposes the move, with consent.
 
 Two optional checks the user can run themselves, named here so the advisory can point at
 them: `/doctor`'s trim check (Claude Code 2.1.206+) proposes cuts of derivable content, and
 `/doctor prompt-audit` (2.1.283+) reports stale or contradictory instructions across
 CLAUDE.md, rules, skills and subagents. Both only propose; `/bx:save` runs neither.
 
-This is the early advisory only — active enforcement happens in **Part 7 (Size-Pressure Rollup)** after Parts 5/6 have had a chance to bring the files under threshold via count-based rollups. If the soft-cap warning fires for a file, expect Part 7 to also fire for that file; the 9k advisory rung on its own means Part 7 will not.
+This is the early advisory only — active enforcement happens in **Part 7 (Size Budget)** after Parts 5/6 have had a chance to bring the files under budget via count-based rollups. If the budget warning fires for a file, expect Part 7 to plan that file; the 9k advisory rung on its own means Part 7 will not.
 
 ### 1.10 Cap Enforcement
 
@@ -146,17 +147,17 @@ The biggest source of bloat — CLAUDE.md's Key Decisions table — is handled b
 **If `--skip-caps` is in `$ARGUMENTS`, skip this step entirely.**
 
 #### 1.10.1 Current Status Table
-Target: ≤10 rows. If >10 rows AND ≥3 are `Complete`:
-- Collapse runs of `Complete` rows into a single summary row in the same table:
-  > `| [N] components complete | Complete | See docs/completed-work.md |`
-- Keep all `In Progress` and `Not Started` rows verbatim.
-- Do not collapse if it would lose information (e.g. each `Complete` row has a unique note worth preserving — in that case, move them individually to `docs/completed-work.md` with their notes).
+Target: ≤10 rows. If >10 rows AND more than 3 are finished, run Part 7.3's **Current Status** shrinker on the finished rows beyond the newest 3 — the same definition of a finished row, the same archive step, the same single summary row. There is one collapse procedure, with two triggers: this row count, and Part 7's file budget.
+
+- Every unfinished row stays verbatim.
+- The rows are archived byte for byte before they leave, so a unique note on a row is never a reason to skip the collapse.
+- **Under `--silent`, warn and move nothing:** "Current Status has [N] rows (target ≤10)."
 
 #### 1.10.2 Next Steps
 Target: ≤10 items. If over cap, warn only — do not move:
 > "Next Steps has [N] items (target ≤10). Consider pruning low-priority ones or completing the top few."
 
-Next Steps is short-lived by design — accretion is a signal that items aren't being completed or reprioritized, not a storage problem.
+Next Steps is short-lived by design — accretion is a signal that items aren't being completed or reprioritized, not a storage problem. The count alone moves nothing; when docs/STATUS.md is over its budget, Part 7.3 folds the items past the tenth.
 
 #### 1.10.3 In Progress
 Target: ≤5 items. If over cap, warn only — do not move:
@@ -396,129 +397,181 @@ This note is the gating sentinel: its presence tells future runs that the user h
 
 If 0 rows were moved, skip the report.
 
-## Part 7: Size-Pressure Rollup
+## Part 7: Size Budget
 
-After the count-based rollups in Parts 5 and 6 finish, re-measure CLAUDE.md and docs/STATUS.md, independently. If either is still over its soft cap, this part is the active-enforcement counterpart to Part 1.9's advisory. Where Parts 5/6 trigger on **row count** (≥5 sessions, ≥20 decisions), Part 7 triggers on **char size per section** — closes the gap where each row or item is at-cap-by-count but massive-by-content.
+Parts 5 and 6 trigger on **counts** (sessions, decision rows). Part 7 works from the **file total down**: a file over its budget is brought back under it by moving content out, largest section first, until the file fits. It replaced a table of per-section thresholds that could all be satisfied while the file stayed over its cap (a real project sat at 16.6k / 12k for 40 saves with every shrinker reporting nothing to do).
 
-**If `--skip-size-pressure` is in `$ARGUMENTS`, skip this step entirely.**
+**If `--skip-size-pressure` is in `$ARGUMENTS`, skip this Part entirely** (7.7 included).
 
-### 7.1 Re-measure after Parts 5/6
+The numbers are owned by `doc-schema.md` (Size budget) and coded in `scripts/size-budget.sh`:
 
-Compute `claude_md_size` = char count of CLAUDE.md, and `status_md_size` = char count of docs/STATUS.md, both as they stand post-rollups.
-
-- If `claude_md_size <= 12000` **and** `status_md_size <= 20000` → skip 7.2-7.6 silently (the count-based rollups did the job) and go directly to **7.7 (archive rotation)**, which runs regardless: its trigger is archive size, not live-file size.
-- Otherwise proceed — but **per file, independently**: a file under its own soft cap is neither diagnosed nor shrunk in 7.2-7.3, even when the other file is over.
-
-### 7.2 Section size diagnostic
-
-For each file that is over its own soft cap, compute its per-section char counts (sections delimited by `^## ` headers):
-
-```bash
-awk 'BEGIN{section="HEADER"; size=0} /^## /{if(section)printf "%6d  %s\n", size, section; section=$0; size=0; next} {size+=length($0)+1} END{printf "%6d  %s\n", size, section}' CLAUDE.md | sort -rn
-awk 'BEGIN{section="HEADER"; size=0} /^## /{if(section)printf "%6d  %s\n", size, section; section=$0; size=0; next} {size+=length($0)+1} END{printf "%6d  %s\n", size, section}' docs/STATUS.md | sort -rn
-```
-
-Run only the command for whichever file(s) are over cap. Display the top-5 sections per over-cap file to the user as a single table each:
-
-> CLAUDE.md is [X]k chars after Parts 5/6 rollups (over the 12k soft cap). Top sections:
-> 
-> | Section | Chars | % | Over threshold? |
-> |---|---|---|---|
-> | Key Decisions | 9,750 | 65% | YES (8000) |
->
-> docs/STATUS.md is [Y]k chars after Parts 5/6 rollups (over the 20k soft cap). Top sections:
->
-> | Section | Chars | % | Over threshold? |
-> |---|---|---|---|
-> | In Progress | 6,439 | 27% | YES (3000) |
-> | Next Steps | 5,206 | 22% | YES (3000) |
-> | Session History | 3,896 | 16% | — |
-
-### 7.3 Per-section thresholds + shrinkers
-
-For each section over its threshold, propose a specific shrinker. The thresholds and actions:
-
-| Section | Threshold | Shrinker action |
+| File | Budget — act above this | Stop — shrink to this |
 |---|---|---|
-| CLAUDE.md `## Key Decisions` (any variant: `(condensed)` etc.) | 8000 chars | **Size-based rollup** — move oldest rows (FIFO from top, same anchor rule as Part 6.3) to `docs/key-decisions.md` until section is under 6000 chars. Runs even when row count is ≤20. Adds `Rolled up from CLAUDE.md → docs/key-decisions.md in S<N> by size pressure` suffix to each moved row's rationale. |
-| CLAUDE.md `## Known Issues / Blockers` | 4000 chars | **Resolved-first rollup** — entries and the resolved test are defined under this table. Move resolved entries (topmost first) to `docs/known-issues.md` until the section is under 2500 chars or no resolved entry remains. Only if the section is then still over 4000 chars, move open entries (topmost first) until it is under 4000 chars, leaving in place of each a one-line summary + `→ [docs/known-issues.md](docs/known-issues.md)` link. Never leave an open issue with no trace in CLAUDE.md. |
-| docs/STATUS.md `## In Progress` | 3000 chars | **Per-item collapse** — for each bullet, trim prose to 2-3 sentences + commit hash refs / file paths preserved. Move completed sub-bullets (`✅`, "Done", "Shipped", strikethrough) to `docs/completed-work.md`. Do NOT delete items entirely — collapse text only. |
-| docs/STATUS.md `## Next Steps` | 3000 chars | **Flatten + extract detail** — collapse sub-section headers (`### High Priority`, `### Queued`, `### Nice to Have`) into a flat top-10 priority-ordered list. For items with 3+ sentences of detail, move detail to `docs/next-steps-backlog.md` (create if missing); keep 1-sentence summary + `→ next-steps-backlog.md#<anchor>` link (STATUS.md-relative — it already sits in `docs/`). |
-| docs/STATUS.md `## Session History` (last-session block) | 2000 chars | **Bullet trim** — if the last-session block has >5 bullets, trim to top 3 (most architecturally significant) + append `> Full session detail: session-history.md S<N>` reference. |
-| docs/STATUS.md `## Completed` (foregrounded feature paragraph) | 1500 chars | **Paragraph trim** — replace foregrounded multi-sentence paragraph with a single bullet pointing at `completed-work.md`. Keep the count summary line. |
+| CLAUDE.md | 10k | 9k |
+| docs/STATUS.md | 15k | 13k |
 
-`## Architecture Summary` is not in this table: that section no longer exists in CLAUDE.md under schema v2 — it lives in `docs/architecture.md`, which Part 7 does not size-manage. Sections not in this table (project-specific like `## Quick Commands`, `## Don't Modify`, `## Environment Variables` in CLAUDE.md) are **tolerated as-is** — Part 7 only acts on known shrinkable sections. If a project-specific section is the dominant bloat source, Part 7 reports it but takes no action, deferring to user judgment.
-This clause covers project-specific sections only. Every section `claude-md-sections.md` lists as required has a row above, except `## Project Overview`, which has no threshold (7.2 shows `—`; its only governor is Part 1.9's derivable-facts advisory). A required section reaching this clause any other way is a bug in this table: report it as one.
+The gap between the two is deliberate: a file that has just been shrunk does not trip the budget again on the next small edit.
 
-**Known Issues entries.** Entry boundaries are Part 1.7's; the `> Session state:` pointer line is not an entry. An entry is **resolved** iff its lead carries a resolved **status form**: the whole word `RESOLVED` in capitals; or `is resolved`, `was resolved` or `now resolved` followed by the end of the lead, punctuation, `(`, `by` or `in`; or a checked `[x]` box. The bare word is not enough: `unresolved`, `not resolved`, `partially resolved`, and the technical sense (`paths are resolved against cwd`) are all open, and the word appearing later in the body does not count. Every other entry is **open**. When in doubt, the entry is open: an open entry keeps a trace in CLAUDE.md, a wrongly resolved one leaves none. Topmost = oldest, the same FIFO convention as Part 6.1.
+Two scripts do the mechanical work. Both live in this skill's `scripts/` directory; resolve the path against **this skill's base directory**, not the repo.
 
-Part 7 runs on the orchestrator, so this shrinker edits the two files directly: it builds no packet and dispatches no `save-writer`. It borrows only the append procedure and header format of `save-writer.md` step 8a, with `<title>` being the entry's title as Part 1.7 defines it. A resolved entry takes the **last** session its lead names (`The S5 deadlock is resolved (S6)` → `S6`), or this session when it names none; an open entry takes `Open, moved S<N>` for this session. Handle one entry completely — **archive first, remove second** — before starting the next. A title that repeats the status word (`… is RESOLVED (S3) — Resolved S3`) is fine; do not reword it.
+- `bash <skill-dir>/scripts/size-budget.sh .` — measures both files, every section, both `Last Updated` lines, the five archives and the skip counter.
+- `bash <skill-dir>/scripts/archive-lines.sh . <src> <dest> "<heading>" <line-ranges> [--prefix STR]` — copies source lines into an archive byte for byte and skips every line the archive already holds. It never edits the source.
 
-Entries the packet owns are candidates in neither phase: an entry this session resolved (a `known_issue_moves` item) or one a `claude_md_deltas` pair will reword, both settled at Full Path step 3. The writer moves the first and edits the second after this shrinker has run; moving them here would leave the packet's `entry` text and `old` strings with nothing to match.
+### 7.1 Measure
 
-One consent in 7.4 covers both phases, and for this section the 7.4 prompt lists the titles it will move, under two headings: *resolved — leaves CLAUDE.md entirely* and *open — replaced by a one-line summary*. The user is approving a classification, so they must see it. A third heading, *looks resolved — confirm*, is for an open-classified entry the orchestrator has evidence is fixed (this session's conversation, or a commit the entry names that `git log` shows): the status-form test is not overridden — the user is. On confirmation the entry goes into `known_issue_moves` as resolved with that commit, and the writer moves it; declined, it stays an open candidate.
+Run `size-budget.sh` once, after Parts 5 and 6. Each `file` record ends in a state and a need:
 
-The open phase qualifies an entry by the saving, not by its length. Compose the replacement line (defined below) while planning the move, before the 7.4 prompt, and measure both: the entry qualifies only when it is at least 500 chars longer than its replacement line. The previous rule was a 300-char floor on the entry alone, and S61 showed why that is wrong: the replacement line itself runs 200–280 chars, so a 350-char entry could be moved to save 70 chars and lose its detail for nothing. Skip entries that do not qualify, keeping topmost-first order among the rest; the 7.4 prompt lists only qualifying ones. When the section is still over 4000 and no remaining open entry qualifies, stop and report that the section is over threshold with nothing left worth moving.
+- `ok` or `band` (at or under budget) → that file is left alone: not planned, not shrunk, not mentioned. `band` means over the stop point but under the budget, where nothing fires.
+- `over` → plan that file in 7.2. `need` is the number of chars to remove to reach the stop point.
 
-A verbatim archive body must not break the archive's own structure, which keys on `### `: write any body line that starts with `#` with a leading backslash (`\###`). That is the only change ever made to an archived body.
+Each file is judged on its own. When neither is `over`, Part 7.2–7.6 print nothing and ask nothing: go directly to **7.7 (archive rotation)**, which runs regardless.
 
-Measure the section with 7.2's `awk` count, re-measure after each move, and stop the moment the bound for the current phase is met: under 2500 for the resolved phase, under 4000 for the open phase.
+### 7.2 Plan the moves
 
-The line that replaces a moved open entry is `**<lead>** <one sentence, 25 words at most, saying what is still broken> → [docs/known-issues.md](docs/known-issues.md)`, in the entry's original position. `**<lead>**` is the entry's opening bold phrase exactly as it stood, punctuation included; when the lead was not bold (a bullet or a plain first sentence), bold it here. The sentence is written from the entry's own body and names the specific failure; a generic placeholder ("still broken, see archive") leaves the issue with no real trace and is not allowed. When the body states no failure detail, write the sentence from the lead's own subject. Either way, state only what the entry itself says: no inferred cause, consequence or fix status. Archive entries land in the order they are moved, so resolved entries precede the open ones moved in the same run. That line is the marker 7.5 rule 4 looks for in this section: an entry already in that form is never moved or trimmed again.
+Planning reads and measures; it changes nothing. For each `over` file, build a list of moves from the shrinkers in 7.3, in two passes:
 
-7.5 rule 3 is met in this section by one link, never duplicated: `> Archived issues: [docs/known-issues.md](docs/known-issues.md)` as the last block of the section, with one blank line above it and one blank line between it and the `> Session state:` pointer line. Add it before the first move, so that every measurement, including the ones that decide when to stop, already counts it. It is not an entry and it does not stop this shrinker running again: the section is re-examined whenever it is over threshold.
+1. **Tidy pass — every section, always.** Plan every *tidy* move the section offers. Tidy moves take out only what is finished, duplicated, or scaffolding an earlier trim left behind, so they are proposed whenever the file is over budget, whatever the need.
+2. **Relocation pass — only if the tidy pass does not cover the need.** Walk the sections **largest first** (the `section` records are already in that order) and plan each section's *relocate* move down to its floor. Stop adding moves once the planned savings reach the need. Standing rules in `## Known Issues / Blockers` are planned **last**, after every other section in the file, whatever their size: they are the content CLAUDE.md exists to carry. Among them, path-scoped rules come before global ones. A move is planned whole (one group of rules, one run of rows), so the last move may overshoot the need; that is accepted.
 
-### 7.4 Per-section consent gate
+A move's **saving** is the size of the lines that leave minus the size of the lines that replace them, blank lines included, in the unit `size-budget.sh` reports (it counts what `awk` counts, which is bytes in some locales). Compose the replacement lines while planning, so the saving is measured and not guessed. Drop a relocate move that saves under 200 chars.
 
-**If `--silent` is in `$ARGUMENTS`, treat as `skip-all` without asking** — the 7.2 diagnostic report still prints; the skip-all bullet below covers the rest, including the hand-off to 7.7.
+Every section of an `over` file ends the plan in exactly one of three states: it has at least one move; it has a relocate move that was not needed this run (say so in one line under the table); or it is listed as **unshrinkable by design** with its size and the reason from 7.3. No section is silently skipped. If the planned savings do not reach the need, say so now, with the projected size: the run still applies what it has.
 
-For each over-threshold section, ask via `AskUserQuestion` (or numbered fallback):
+Packet-owned content is planned around, never moved: a Known Issues entry this session resolved or will reword, and the decision rows the packet will append (all settled at Full Path step 3). The writer handles those after Part 7 has run.
 
-> "Section `## [name]` in [file] is [N] chars (threshold [T]). Proposed shrinker: [one-line action description]. Apply? (yes / no / skip-all)"
+### 7.3 Shrinkers
 
-- **yes** → execute the shrinker for this section
-- **no** → leave this section alone this run (re-ask next run if still over)
-- **skip-all** → skip the rest of Part 7's shrinkers — then proceed to 7.7 (archive rotation), which still runs: it carries its own per-file consent. The rest of the run then proceeds to Part 8 unchanged.
+Every shrinker triggers on **what the section contains now**. None is switched off by a link or note an earlier run left behind: a section is re-examined on every run in which its file is over budget.
 
-`AskUserQuestion` cap is 4 questions per turn. If 5+ sections (across both files) are over threshold, batch as: first 4 in one turn, remainder in a second turn after the first batch's actions complete.
+| Section | Tidy move | Relocate move | Floor — never goes below | Destination |
+|---|---|---|---|---|
+| HEADER (both files) | A `Last Updated:` line over 250 chars is cut to one session | — | title, intro notes, one `Last Updated:` line | `docs/completed-work.md` |
+| CLAUDE.md `## Key Decisions` (any variant: `(condensed)` etc.) | — | Oldest rows leave, top first | newest 8 rows + the `> Full decision log:` link | `docs/key-decisions.md` |
+| CLAUDE.md `## Known Issues / Blockers` — issues | Resolved entries leave entirely | Open entries become a one-line summary + link | every open issue keeps a trace | `docs/known-issues.md` |
+| CLAUDE.md `## Known Issues / Blockers` — standing rules | — | Path-scoped rules move to a rules file; global rules keep their lead and lose their reason | every rule keeps its lead sentence or a trace line | `.claude/rules/<topic>.md`, `docs/known-issues.md` |
+| CLAUDE.md `## Project Overview` | — | Derivable facts leave | name, description, Key Documentation links, every constraint | `docs/architecture.md` |
+| CLAUDE.md `## Environment Variables` | — | Descriptions leave, names stay | every variable name | the project's env doc |
+| docs/STATUS.md `## Current Status` | — | Oldest finished rows merge into one summary row | header rows, every unfinished row, newest 3 finished rows | `docs/completed-work.md` |
+| docs/STATUS.md `## In Progress` | Finished items leave; scaffolding folds to one line | Items past the first 5 fold into a count line; long items are trimmed | first 5 items | `docs/completed-work.md`, `docs/next-steps-backlog.md` |
+| docs/STATUS.md `## Next Steps` | Finished items leave; scaffolding folds to one line | Items past the first 10 fold into a count line; long items are trimmed | first 10 items | same |
+| docs/STATUS.md `## Session History` | — | Bullets past the fifth leave | one block, 5 bullets, the `> Full history:` link | `docs/session-history.md` |
+| docs/STATUS.md `## Completed` | — | Everything except the summary line leaves | the count summary line + link | `docs/completed-work.md` |
+| Any other section | — | — | all of it | — |
 
-Default action is `no` if user dismisses without explicit choice (don't apply destructive trims without consent).
+A section in the last row is **unshrinkable by design**: it is project-authored (`## Quick Commands`, `## Working Principles`, `## Don't Modify`) and no archive is its designated home. So is a section already at its floor, HEADER included. Report each by name, with its size and its own reason (`project-authored`, or `at its floor:` plus what the floor holds). This clause covers project-specific sections only: every section `claude-md-sections.md` lists as required has its own row above.
+
+The paragraphs below define each row. S`<N>` is this session's number throughout.
+
+**HEADER — the `Last Updated:` line.** The line states one session: `Last Updated: <date> (Session <N>)`, optionally followed by ` — ` and one clause about that session, 250 chars at most in total. It names no earlier session; earlier sessions are in `docs/session-history.md`. When an existing line is over 250 chars: archive it with `archive-lines.sh . <file> docs/completed-work.md "" <line> --prefix '- [x] Last Updated line of <file> before the S<N> trim (verbatim): '` (`<file>` is `CLAUDE.md` or `docs/STATUS.md`), then replace it with `<label as it stood> <date> (Session <number>)`, keeping the date and the session number **the line already carried** and any bold markers around the label; the writer stamps this session's date and number later in the same save. The header is exempt from 7.5 rule 4: the line carries no link. Other header lines (the title, `>` notes, project-authored lines) are never moved; when the header is still over 400 chars afterwards, report it as project-authored preamble.
+
+**Key Decisions.** Move the oldest rows (FIFO from the top, the Part 6.3 procedure and anchor rule) until the need is met or 8 rows remain; the rows the packet will append count toward the 8. Rows move byte for byte: nothing is appended to a moved row. This move uses Part 6.3's anchored append, not `archive-lines.sh`, because the rows must land inside the archive's table and not at the end of the file.
+
+**Known Issues — entries, and which kind each is.** Entry boundaries are Part 1.7's; the `> Session state:` pointer line is not an entry. A bold-only line that sits above a run of bullet entries is a **group heading**: it is not an entry, and it travels with its group. A group ends at the next bold-only line or the end of the section; blank lines do not end it. A bullet whose link points into `.claude/rules/` is a **trace line** an earlier run wrote: it is not an entry, it is never stripped or moved, and it is not counted as a rule. Classify every entry as one of three kinds:
+
+- **resolved** iff its lead carries a resolved **status form**: the whole word `RESOLVED` in capitals; or `is resolved`, `was resolved` or `now resolved` followed by the end of the lead, punctuation, `(`, `by` or `in`; or a checked `[x]` box. The bare word is not enough: `unresolved`, `not resolved`, `partially resolved`, and the technical sense (`paths are resolved against cwd`) do not count, and the word appearing later in the body does not count.
+- **standing rule** when it tells the reader what to do or not do (`Never…`, `Always…`, `Run … before …`, `Only … may …`, `Keep …`) and reports no defect waiting for a fix. Nothing will ever resolve it. A section whose opening `>` note says `Standing rules` declares every entry a rule.
+- **open** otherwise: a defect, limitation or blocker that a fix would close. When in doubt, the entry is open, never resolved: an open entry keeps a trace in CLAUDE.md, a wrongly resolved one leaves none. When the doubt is between open and standing rule, it is a standing rule: the lead then stays byte for byte.
+
+Topmost = oldest, the same FIFO convention as Part 6.1. Entries the packet owns are candidates in neither phase: an entry this session resolved (a `known_issue_moves` item) or one a `claude_md_deltas` pair will reword. The writer moves the first and edits the second after this shrinker has run; moving them here would leave the packet's `entry` text and `old` strings with nothing to match.
+
+Part 7 runs on the orchestrator, so the Known Issues moves edit the files directly: they build no packet and dispatch no `save-writer`. They borrow only the append procedure and header format of `save-writer.md` step 8a, with `<title>` being the entry's title as Part 1.7 defines it. Handle one entry or group completely — **archive first, remove second** — before starting the next. A verbatim archive body must not break the archive's own structure, which keys on `### `: write any body line that starts with `#` with a leading backslash (`\###`). That is the only change ever made to an archived body.
+
+- *Resolved entries (tidy).* All of them move, topmost first, and leave nothing behind. A resolved entry takes the **last** session its lead names (`The S5 deadlock is resolved (S6)` → `S6`), or this session when it names none. A title that repeats the status word (`… is RESOLVED (S3) — Resolved S3`) is fine; do not reword it. An open-classified entry the orchestrator has evidence is fixed (this session's conversation, or a commit the entry names that `git log` shows) is offered in 7.4 under *looks resolved — confirm*: the status-form test is not overridden — the user is. On confirmation the entry goes into `known_issue_moves` as resolved with that commit, and the writer moves it; declined, it stays an open candidate.
+- *Open entries (relocate).* Topmost first, until the need is met. An entry qualifies only when it is at least 500 chars longer than its replacement line; a shorter one would lose its detail to save almost nothing, so it stays. The replacement, in the entry's original position, is `**<lead>** <one sentence, 25 words at most, saying what is still broken> → [docs/known-issues.md](docs/known-issues.md)`. `**<lead>**` is the entry's opening bold phrase exactly as it stood, punctuation included; when the lead was not bold, bold it here. The sentence is written from the entry's own body and names the specific failure; a generic placeholder ("still broken, see archive") is not allowed. State only what the entry itself says: no inferred cause, consequence or fix status. The archive header is `Open, moved S<N>`. A line already in this replacement form is never moved or trimmed again.
+- *Standing rules, path-scoped (relocate).* A rule is **path-scoped** when its own text, or its group heading, confines it to named directories, globs or file types, and following it matters only while reading or editing those files. A rule about deploys, billing, process or people is global whatever paths it mentions; when in doubt it is global. Path-scoped rules move, byte for byte, to `.claude/rules/<topic>.md`: an existing rules file whose `paths:` already cover them, otherwise a new file. Write the new file's top with the Write tool — `---`, `paths:`, one `  - "<glob>"` line per glob, `---`, a blank line, `# <Topic> rules` — then copy the rule lines with `archive-lines.sh . CLAUDE.md .claude/rules/<topic>.md "## Moved from CLAUDE.md in S<N>" <ranges>`. `<topic>` is the group heading in lower-case kebab form without any parenthetical (`Database migrations (…)` → `database-migrations`). The group heading line itself is not copied: the file's title names it, and it stays in CLAUDE.md above the trace line. Claude Code loads such a file only when a matching file is read, which is the whole saving. In CLAUDE.md the moved rules are replaced by **one trace line per rules file**: `- **<K> rules** load with matching files → [.claude/rules/<topic>.md](.claude/rules/<topic>.md)`, as the only bullet under the group heading. Never move a rule into a rules file that has no `paths:`: such a file loads every session, so the move would lower the CLAUDE.md count and save nothing.
+- *Standing rules, global (relocate, planned last).* The rule stays in CLAUDE.md; only its reason leaves. A rule's **lead** is its opening bold phrase (its first sentence when nothing is bold). Work one group at a time, topmost first (a flat list with no group headings is one group titled `Standing rules`), and only on a group where stripping saves at least 500 chars. Archive the group first: one `docs/known-issues.md` entry headed `### <group heading> — Open, moved S<N> (<today>)` whose body is the heading line, a blank line, and every rule in the group, verbatim (step 8a's Edit append; diff the body against the source lines before removing anything). A group saves what its rule lines lose minus the suffix added to its heading. Then reduce each rule line to its lead alone (`- **<lead>**`, byte for byte) and append ` → [reasons](docs/known-issues.md)` to the group heading line. A rule that is already lead-only has nothing to strip.
+
+For this section the 7.4 table lists the titles it will touch, under headings: *resolved — leaves CLAUDE.md entirely*, *open — replaced by a one-line summary*, *looks resolved — confirm*, *path-scoped rule — moves to a rules file, trace line stays*, *global rule — lead stays, reason moves*. The user is approving a classification, so they must see it.
+
+7.5 rule 3 is met in this section by one link, never duplicated: `> Archived issues: [docs/known-issues.md](docs/known-issues.md)` as the last block of the section, with one blank line above it (and one blank line between it and the `> Session state:` pointer line, where that line follows this section). Add it before the first move, so that every measurement already counts it. A section whose opening note already links `docs/known-issues.md` needs no second link.
+
+**Project Overview.** A line or table row is **derivable** when one command recovers everything it says: the stack from the manifest, the remote from `git remote -v`, the scripts from the package manager, the tree from `ls`. It is not derivable when it states a constraint, a reason, or a fact about something outside the repo (hosting, DNS, accounts), or when any part of it would be lost to that command. When in doubt the line stays. The project name, the one-line description and the Key Documentation list always stay. Archive derivable lines with `archive-lines.sh … docs/architecture.md "## Moved from CLAUDE.md Project Overview (S<N>)" <ranges>`, then remove them. If nothing in the section links `docs/architecture.md` yet, add one line after the table or list they left: `> Moved detail: [docs/architecture.md](docs/architecture.md)`; count it in the saving. The 7.4 table names each line with the command that recovers it.
+
+**Environment Variables.** Only when the move saves at least 500 chars. Archive the section's variable lines (not its header, and not a `>` block such as the `> Session state:` pointer when that sits in this section) with `archive-lines.sh` into the project's environment doc — the one `## Project Overview` links, else `docs/environment-variables.md` — under `## Moved from CLAUDE.md (S<N>)`, then replace those variable lines with one line: every variable name in backticks, comma-separated, then `→ [<doc path>](<doc path>)`. Any `>` block stays where it was. Every name stays, so the section stays populated under `doc-schema.md`'s rule.
+
+**Current Status.** A row is **finished** when its status cell (in a two-column table, the second cell) opens with `✅` or carries the whole word `Complete`, `Completed`, `Done`, `Shipped` or `LIVE`, and carries no `In progress`, `Partial`, `🔧` or `⏳` marker. A row an earlier collapse wrote (its first cell says `collapsed rows`) is finished whatever else it says. When in doubt the row is unfinished and stays. Take finished rows oldest first (topmost) until the need is met, never the newest 3. Archive them with `archive-lines.sh … docs/completed-work.md "### Current Status rows collapsed from STATUS.md (S<N>)" <ranges>`, then replace them all with **one** summary row at the top of the table body, one cell per column: `| **<K> finished rows collapsed (S<N>)** | ✅ | [completed-work.md](completed-work.md) |`. `<K>` counts each moved row once, and an earlier collapse row as the number written directly before the words `collapsed rows` or `finished rows collapsed`. The rows land in the archive as bare table rows under that heading; that is intended. The summary row never lists what it collapsed: the names are in the archive, and listing them is how hand-collapsed rows grew back to 900 chars each.
+
+**In Progress and Next Steps.** An **item** is a top-level bullet or numbered line with its continuation lines.
+
+- *Finished items (tidy).* An item is finished when it is marked done as a whole — `✅`, `DONE`, `Done`, `Shipped`, a checked box, or struck through — and carries no qualifier after the mark (`except`, `left`, `owed`, `remaining`, `still`). `DONE S318 except the label wording` is open. Archive with `archive-lines.sh … docs/completed-work.md "" <ranges> --prefix '- [x] '`, then remove.
+- *Scaffolding (tidy).* Lines an earlier trim wrote and that carry no work of their own: `> Full …:` link lines, `> Items #… moved …` notes, a line made only of links into the archives. Archive every such line with `archive-lines.sh … docs/next-steps-backlog.md "## Rolled off STATUS.md (S<N> --full)" <ranges>` (the notes map old item numbers to archive anchors, so they are kept, just not loaded), then replace them all with one line directly after the section's last item: `> Earlier items and full detail: [next-steps-backlog.md](next-steps-backlog.md) · finished: [completed-work.md](completed-work.md)`. A section that already has exactly that line and no other scaffolding has nothing to fold. Both sections archive under the same `## Rolled off…` heading; the script writes it once. When a removed line had a blank line after it, remove that blank line too.
+- *Items past the cap (relocate).* The first 10 items of Next Steps and the first 5 of In Progress stay, in their listed order: the list is priority-ordered, so the first items are the live ones. Archive the rest with `archive-lines.sh … docs/next-steps-backlog.md "## Rolled off STATUS.md (S<N> --full)" <ranges>`, then replace them with one count line after the last kept item: `- **<M> more items** → [next-steps-backlog.md](next-steps-backlog.md)`. An existing count line is not an item; fold its number into the new one.
+- *Long items (relocate).* A kept item over 400 chars that does not already end in a `→ [...](...)` link: archive it the same way, then trim it to two sentences at most, keeping every commit hash and file path, and end it with `→ [detail](next-steps-backlog.md)`. An item that already ends in such a link is a summary and is never trimmed again.
+
+A project-authored paragraph inside either section that is not an item (a watermark note, an intro sentence) is never moved; when it is over 400 chars, report it by its first words as unshrinkable.
+
+**Session History.** When the last-session block has more than 5 bullets, archive bullets 6 onward with `archive-lines.sh … docs/session-history.md "" <ranges>` (the full entry is normally there already, so most lines report `have`) and remove them.
+
+**Completed.** Archive every line except the count summary line with `archive-lines.sh … docs/completed-work.md "" <ranges>` and remove them.
+
+### 7.4 One consent for the whole run
+
+**If `--silent` is in `$ARGUMENTS`, treat as `skip` without asking**: nothing moves, the plan still prints, the skip counter is left alone, and the run continues to 7.7.
+
+When the plan has no moves, there is nothing to ask: print the 7.6 report (the unshrinkable sections, if a file is still over) and continue to 7.7.
+
+Otherwise print the plan as **one table covering both files**, then ask once:
+
+> | # | File | Section | Move | Leaves the always-loaded tier? | Saves |
+> |---|---|---|---|---|---|
+> | 1 | CLAUDE.md | HEADER | `Last Updated` line cut to S321 | old line → completed-work.md | 630 |
+> | 2 | CLAUDE.md | Key Decisions | 6 oldest rows → key-decisions.md | yes, link stays | 1,610 |
+> | 3 | docs/STATUS.md | Next Steps | 2 finished items → completed-work.md; 5 scaffolding lines folded | n/a (read on demand) | 1,480 |
+>
+> CLAUDE.md 16.4k → about 9.0k (budget 10k). docs/STATUS.md 20.3k → about 12.8k (budget 15k).
+> Unshrinkable by design: `## Working Principles` (916 chars, project-authored).
+
+Known Issues rows are followed by the titles per class (7.3). Then one `AskUserQuestion` (numbered fallback), whose text repeats the two projected sizes and the number of moves, because the dialog may be all the user sees:
+
+- **Apply all** → execute every planned move.
+- **Choose** → ask which moves to apply: `AskUserQuestion` with `multiSelect`, the moves as options, 4 options per question and 4 questions per turn; with more than 16 moves, ask in chat for the row numbers instead. Execute the chosen ones.
+- **Skip** → apply nothing this run.
+
+A dismissed prompt is **Skip**: no move runs without consent. This one prompt replaces the per-section questions of earlier versions; 7.7 keeps its own first-rotation consent, which is asked once per archive, ever.
+
+**Skips are counted.** After **Skip** or a dismissal, write the counter line `<!-- bx-size-skips=<n> -->` directly under docs/STATUS.md's `Last Updated:` line, `<n>` being the old value plus one (`size-budget.sh` reports the old value as `skips`). After **Apply all**, or **Choose** with at least one move, delete that line if there is one. From the third consecutive skip on, the prompt opens with `Skipped <n> runs in a row.`, the 7.6 report leads the Change Report instead of sitting among the rollups, and `size-budget.sh --line` says so on every later save and resume.
 
 ### 7.5 Execution invariants
 
-When executing any shrinker:
-
-1. **Move, never delete.** Every shrinker writes the trimmed content to a reference file before removing from its source file (CLAUDE.md or docs/STATUS.md, per 7.3). The `docs/architecture.md`, `docs/next-steps-backlog.md`, `docs/completed-work.md`, `docs/key-decisions.md`, and `docs/known-issues.md` files are the destinations. If a destination doesn't exist, create it with a standard header.
-2. **Preserve commit refs.** Specific commit hashes (`abc1234`, `commit X`), file paths, and links MUST survive into either the trimmed summary or the extracted detail file — these are search anchors users rely on.
-3. **Surface the destination.** (Known Issues meets rules 3 and 4 its own way — see 7.3.) Every shrinker's output gains a `> Full [thing]: [path.md](path.md)` link (relative to the file the shrinker ran on) so future `/bx:resume` sessions can chase the detail.
-4. **Don't compound losses.** If a section was already shrunk to a summary in a prior run (detectable by the `> Full [thing]:` link), Part 7 does NOT trim further. Re-prompt only fires when the user has manually re-grown the section.
+1. **Move, never delete — archive first, remove second.** Every move writes the content to its destination before it leaves the source, and one move finishes before the next starts. Line moves go through `archive-lines.sh`, which copies by line number: do not retype moved text into an archive. Two destinations keep their own anchored procedures instead, because their entries have structure the script does not know: `docs/key-decisions.md` (Part 6.3) and `docs/known-issues.md` (`save-writer.md` step 8a). In the commands above, `…` stands for the repo and source arguments (`. docs/STATUS.md`, `. CLAUDE.md`). The script skips blank lines, reuses a heading it already wrote, and creates a missing destination with a standard header.
+2. **Never archive twice.** `archive-lines.sh` skips a line the archive already holds, so a trim adds only what is new. Do not work around a `have` result: the earlier copy is the archive copy. Archiving a whole section again on every trim is what grew one project's backlog to 441k.
+3. **Preserve commit refs.** Commit hashes, file paths and links survive in either the line that stays or the line that was archived.
+4. **Surface the destination.** Whatever leaves a section leaves a link to where it went: the replacement line's own link, or one `> Full …:` line per section. One link per destination, never a stack of them.
+5. **A summary is trimmed once.** A line that is already a summary with a link (an open-issue replacement line, a trimmed item, a count line, a collapse row, a lead-only rule) is never shortened again. This protects the line, not its section: everything else in the section is examined on every run.
+6. **A rule or an open blocker never leaves the always-loaded tier without a trace** — its lead, or a one-line trace with a link, stays in CLAUDE.md.
 
 ### 7.6 Report
 
-After all consented shrinkers complete, re-measure each file that was diagnosed:
+Run `size-budget.sh` again and report each file that was planned:
 
-> "CLAUDE.md: [old-size]k → [new-size]k chars. docs/STATUS.md: [old-size]k → [new-size]k chars. (Omit either line for a file that was never over its soft cap.) [N] sections shrunk: [list]. [M] sections still over threshold (skipped per user choice)."
+> "CLAUDE.md: 16.4k → 9.1k (budget 10k). docs/STATUS.md: 20.3k → 12.6k (budget 15k). 11 moves applied: [list]. Archived [N] lines, skipped [M] already archived." (`[N]` and `[M]` are the `archive-lines.sh` totals.)
 
-If a file is still over its soft cap after all consents: log a final warning for that file, do not block the commit.
+When a file is still over its budget, follow that line (or replace it, when no move was applied) with what is left, largest first, each with its reason, instead of a generic warning:
+
+> "CLAUDE.md is 11.2k, 1.2k over budget. What remains is unshrinkable by design: `## Known Issues / Blockers` 4.1k (24 standing rules, leads only); `## Project Overview` 2.7k (Key Documentation links); `## Working Principles` 0.9k (project-authored). Moving more is a decision about the project, not a rollup."
+
+Moves the user declined are listed as declined, with their savings. Never block the commit.
 
 ### 7.7 Archive rotation
 
-The four history archives grow forever by design — `docs/session-history.md` (one line per
+The five archives grow forever by design — `docs/session-history.md` (one line per
 rolled-up session plus 5 full entries), `docs/key-decisions.md` (one row per decision),
 `docs/completed-work.md` (several lines per session), `docs/known-issues.md` (one `### `
-entry per issue that left CLAUDE.md). No automatic path reads them in full
+entry per issue that left CLAUDE.md), `docs/next-steps-backlog.md` (one `## ` block per
+trim, plus whatever the project filed there by hand). No automatic path reads them in full
 (Part 3.0 excludes them; save-writer appends via tail reads), so growth is disk-only — but
 deliberate reads (deep resume, a human opening the file, a 2000-line Read page) get clumsy
 past ~100k chars. Rotation moves the oldest entries, byte-verbatim, into numbered volumes
-under `docs/archive/`. `docs/next-steps-backlog.md` is NOT rotated: it grows only when a
-7.3 shrinker fires and shrinks when items ship — if it exceeds 100k, report that as a
-symptom and take no action.
+under `docs/archive/`. The backlog used to be exempt, on the theory that it shrinks when
+items ship. It does not: nothing ever removes a block from it, and one project's reached
+441k. It rotates like the others.
 
 **If `--skip-rotation` is in `$ARGUMENTS`, skip this step entirely.** (Note `--skip-size-pressure`
 skips all of Part 7, this step included; 7.1's early exit does NOT skip this step.)
 
-Measure the four archives (`wc -c`, omitting any that do not exist). For each file over
-**100k chars**, independently:
+Take the five archives' sizes from `size-budget.sh`'s `archive` records (7.1's run, or a
+fresh one when Part 7 moved anything). For each file marked `rotate` (over **100k chars**),
+independently:
 
 1. **Consent (first rotation of each archive).** The sentinel is the rotation note in
    the live file's header region (the lines before the first entry) — search only that region for the literal substring `Entries are rotated to`. If
@@ -534,7 +587,7 @@ Measure the four archives (`wc -c`, omitting any that do not exist). For each fi
    Declined → skip this file, write no sentinel, re-offer next `--full` run.
 
    When more than one archive needs consent, batch the prompts into a single
-   `AskUserQuestion` turn (7.4's batching cap applies); rotation itself stays one file at a
+   `AskUserQuestion` turn (4 questions per turn at most); rotation itself stays one file at a
    time — step 7 verifies each file before the next is touched.
 
 2. **Ensure `docs/archive/` exists — implicitly.** The Write tool creates the directory
@@ -545,9 +598,10 @@ Measure the four archives (`wc -c`, omitting any that do not exist). For each fi
    1 if none. **Filenames only — never read a volume's contents.**
 
 4. **Choose the cut.** The oldest entries move from the top of the file's entry region
-   (all four archives order oldest-first), cutting only at whole-entry
+   (all five archives order oldest-first), cutting only at whole-entry
    boundaries — a `### Session` header line, a complete `|` table row, a whole checklist
-   line, a `### ` entry header (known-issues) — until the live file would be at or under
+   line, a `### ` entry header (known-issues), a `## ` block header (next-steps-backlog) —
+   until the live file would be at or under
    **50k chars** — the minimum number of
    whole entries needed to reach that target (half the threshold, so rotation
    does not re-fire every run). The protected tail never moves: the 5 most recent sessions
@@ -563,7 +617,15 @@ Measure the four archives (`wc -c`, omitting any that do not exist). For each fi
    line has left CLAUDE.md, the entry is no longer live and rotates like a resolved one; its
    header is never rewritten, because archives are append-only. When a live `Open` entry
    makes 50k unreachable, move every entry before it. If the first entry is a live `Open`
-   one, nothing moves: report that and take no action. Never compress,
+   one, nothing moves: report that and take no action. In next-steps-backlog the
+   protected tail starts at the first `## ` block a link in docs/STATUS.md still lands in,
+   and always includes the block this run appended. Find the live anchors with one Grep on
+   docs/STATUS.md (pattern `next-steps-backlog\.md#[A-Za-z0-9_-]+`, `-o`), then locate each
+   in the backlog with one Grep for `id="<anchor>"` or `{#<anchor>}`; an anchor with no such
+   line is matched against the `## ` headers that contain its last hyphen-separated word
+   (`…-s277` → headers containing `S277`). An anchor found nowhere is a dead link: name it
+   in the report and ignore it for the cut. Links inside the backlog itself protect
+   nothing. Never compress,
    reword, or reorder anything — Part 5 owns compression and has already run. Locate the
    boundaries by line number with Grep (`-n`); call **H** the last line of the live file's
    header region and **L** the last line of the final entry being moved.
@@ -624,7 +686,12 @@ git history.
 
 ### 7.8 Idempotency
 
-Part 7 is safe to re-run. The shrinkers detect already-shrunk state via the `> Full [thing]:` sentinel link and skip those sections. `## Known Issues / Blockers` is the exception (7.3): it is re-examined whenever it is over threshold, and its per-entry summary lines are what is never moved twice. The only way a re-shrunk section grows again is user editing — which is fine, and Part 7 will catch it next run.
+A second `--full` run straight after a first changes nothing. Which of two reasons applies depends on where the first run left the file:
+
+- **A file at or under its budget is not planned at all** (7.1). When the first run brought both files under budget, Part 7 exits before 7.2.
+- **Every shrinker is state-based and leaves a state it does not match.** After a run there are no finished items, no scaffolding beyond the one fold line, no items past the cap, no finished rows beyond the summary row and the newest 3, no rule with a reason left in a stripped group, no `Last Updated:` line over 250 chars, and `archive-lines.sh` re-archives nothing. So a file that is still over budget because what remains is unshrinkable plans zero moves, asks nothing, and prints the same remainder report.
+
+No shrinker keys on a sentinel link. Earlier versions skipped any section that carried a `> Full …:` link, which froze a section the first time it was trimmed while it kept growing new pointer lines; 7.5 rule 5 now protects single summary lines only.
 
 ---
 

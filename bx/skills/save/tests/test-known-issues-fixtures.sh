@@ -2,6 +2,12 @@
 # test-known-issues-fixtures.sh - build the Known Issues fixtures and assert
 # their sizes make the rehearsal cases valid. A fixture that drifts under a
 # threshold silently turns its rehearsal into a no-op.
+#
+# Since v2.18.0 Part 7 acts on the file's size budget, not on a per-section
+# threshold, and these three CLAUDE.md files are under budget: on them a --full
+# run moves nothing. They remain the classification fixtures (resolved status
+# forms and their three traps) and the rotation fixture. The over-budget path
+# is fx-size-budget, checked by test-size-budget-fixture.sh.
 # Usage: test-known-issues-fixtures.sh
 # bash 3.2 compatible.
 

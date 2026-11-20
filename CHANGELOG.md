@@ -2,6 +2,42 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.18.0 — 2026-11-20
+
+`/bx:save --full` and `/bx:resume`: size control now works from the file total down. On a project with 40+ full saves (Horowell, S1–S321) both live files sat over their caps on every run — CLAUDE.md 16.6k against 12k, docs/STATUS.md 21.6k against 20k — while every shrinker reported nothing to do.
+
+### Why it never shrank
+- The per-section thresholds did not add up to the file cap, so a file could be over while every section was under.
+- The Known Issues shrinker only moved resolved bugs or entries that saved 500 chars. A section of one-line standing rules has neither.
+- A `> Full …:` link marked a whole section as shrunk for good, while it kept growing pointer lines and "moved verbatim" notes.
+- Current Status (the largest STATUS section), Project Overview and the header had no size shrinker. The `Last Updated:` line had no length rule and reached 900 chars.
+- Each trim archived the whole section again, and `docs/next-steps-backlog.md` was exempt from rotation: 441k.
+- Consent was one question per section, with nothing counting the skips.
+
+### Changed
+- **Part 7 is a file-level budget.** CLAUDE.md: act above 10k, shrink to 9k. docs/STATUS.md: act above 15k, shrink to 13k. A file over budget gets every tidy move (finished items, duplicates, scaffolding), then relocation moves largest section first until it fits. Every section either has a move or is named as unshrinkable by design, with its size and the reason.
+- **Every required section has a shrinker,** and each triggers on what the section contains, never on a sentinel link:
+  - Current Status: oldest finished rows (including hand-collapsed ones) merge into one short summary row.
+  - In Progress / Next Steps: finished items leave, scaffolding folds to one line, items past the first 5 / 10 fold into a count line.
+  - Known Issues: a third entry kind, the standing rule. A path-scoped rule moves to `.claude/rules/<topic>.md` with `paths:` and leaves a trace line. A global rule keeps its lead sentence and its reason moves to `docs/known-issues.md`.
+  - Project Overview: derivable facts move to `docs/architecture.md`.
+  - Environment Variables: descriptions move to the env doc, names stay.
+- **One consent per run:** a single table of every planned move, then apply all / choose / skip. Skips are counted in docs/STATUS.md; from the third in a row the warning leads the save report and the resume summary.
+- **The `Last Updated:` line holds the current session only, 250 chars at most.** `save-writer` composes it from the packet (`session`, `last_updated_note`) and no longer accepts it as a delta. An over-long old line is archived before it is replaced.
+- **`docs/next-steps-backlog.md` rotates** like the other four archives (Part 7.7).
+- **`/bx:resume` reads docs/STATUS.md by section,** skips what the SessionStart hook already injected, and prints one size-budget line.
+- Part 1.10.1 uses the same Current Status collapse and moves nothing under `--silent`.
+- Moved Key Decisions rows are no longer suffixed with a "rolled up by size pressure" note: rows move byte for byte.
+
+### Added
+- `bx/skills/save/scripts/size-budget.sh` — measures both files, every section, both `Last Updated:` lines, the five archives and the skip counter. The one place the budget numbers are code.
+- `bx/skills/save/scripts/archive-lines.sh` — copies lines into an archive by source line number and skips any line the archive already holds, so no text is retyped and nothing is archived twice.
+- Fixture `fx-size-budget`, shaped like the evidence, with `test-size-budget-fixture.sh` and `assert-size-budget.sh` (within budget, nothing lost, nothing archived twice, second run a no-op). Governance lint checks B01–B14.
+
+### Not changed
+- The SessionStart hook still injects 12 rows of Current Status. It lives in `bx/scripts/`, outside this change.
+- A global standing rule is never moved to a rules file without `paths:`. Such a file loads every session, so the move would lower the CLAUDE.md count and save nothing.
+
 ## 2.17.0 — 2026-11-06
 
 `/bx:seo`: the data 2.16.0 started collecting now changes findings, and three new checks catch problems the audit could not see before.

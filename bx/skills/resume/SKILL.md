@@ -3,7 +3,7 @@ name: resume
 description: "Resumes development on a project after a break. Reads docs, scans git state, identifies next task, and hydrates live task tracker. Use at the start of every coding session."
 disable-model-invocation: true
 effort: low
-allowed-tools: Read, Grep, Glob, Bash(git:*), Bash(ls:*), Bash(head:*), Bash(echo:*), Bash(npm:*), Bash(npx:*), Bash(python:*), Bash(make:*), Bash(cargo:*), TaskCreate, TaskGet, TaskList
+allowed-tools: Read, Grep, Glob, Bash(git:*), Bash(ls:*), Bash(head:*), Bash(echo:*), Bash(wc:*), Bash(npm:*), Bash(npx:*), Bash(python:*), Bash(make:*), Bash(cargo:*), TaskCreate, TaskGet, TaskList
 argument-hint: "[deep]"
 ---
 
@@ -36,8 +36,13 @@ Claude Code loads two things into your context automatically, **before this skil
 duplicates roughly 7k tokens per resume for zero new information. Read them explicitly only
 if they are genuinely absent from your context.
 
+A third thing may already be there: the **SessionStart orientation block** (`## Project
+orientation: <repo>`, written by the plugin's hook). When it is in your context it already
+carries the branch, the recent commits, the state file's `Last Updated:` line and the top of
+`## Current Status`. Use that copy. Do not read or fetch any of it again.
+
 What is NOT auto-loaded, and is therefore this skill's actual job to read:
-`docs/STATUS.md`, the `docs/` reference archives, and README.md.
+the rest of `docs/STATUS.md`, the `docs/` reference archives, and README.md.
 
 ---
 
@@ -47,9 +52,31 @@ First determine the layout using the detection predicate in
 `../save/references/doc-schema.md` (resolve against this skill's base directory, not a
 repo-rooted path).
 
-**Schema v2** — read in a single parallel turn:
-- `docs/STATUS.md` — the session state. This is the primary read.
-- `docs/` folder listing.
+**Schema v2** — read `docs/STATUS.md` **by section, never whole.** On an old project the
+file runs past 20k chars, most of it a status table and scaffolding this skill does not
+need. Two turns:
+
+1. One Grep on `docs/STATUS.md` (pattern `^## |bx-size-skips=`, `output_mode: content`,
+   `-n: true`) for the section line numbers and the size-budget skip counter, in parallel
+   with the `docs/` folder listing. The header lines it returns are also Step 6's evidence
+   that the required sections exist.
+2. Offset-Reads of only these ranges, all in one turn:
+
+   | Range | Read | Cap |
+   |---|---|---|
+   | Line 1 to the first `## ` header | only when the orientation block is NOT in context (it already holds the `Last Updated:` line) | 12 lines |
+   | `## Current Status` | only when the orientation block is NOT in context | 14 lines |
+   | `## In Progress` | always | 30 lines |
+   | `## Next Steps` | always | through the 10th item, 40 lines at most |
+   | `## Session History` | always | the whole section |
+
+   `## Completed` is never read: it is one summary line pointing at an archive.
+
+A cap that cuts a section short is fine — say so in one line (`Next Steps: showing the first
+10 of 16 items`) and read further only if the user's chosen task needs it. Individual lines
+can still be long; that is what the size-budget line in Step 3.0 reports.
+
+In `deep` mode, read the file whole.
 
 **Schema v1** — the state sections are still inside CLAUDE.md, which is already in your
 context. Read nothing extra; use what you have, and surface the migration notice in Step 4.
@@ -95,6 +122,11 @@ git status --short 2>/dev/null || echo "(not a git repo)"
 ls -1 2>/dev/null | head -30
 ```
 
+**State-file sizes (bytes):**
+```!
+wc -c CLAUDE.md docs/STATUS.md 2>/dev/null || echo "(no state files)"
+```
+
 ### After reading the snapshots above:
 Based on the state file's "In Progress" and "Next Steps" (`docs/STATUS.md` in v2, CLAUDE.md
 in v1), identify and briefly review:
@@ -136,9 +168,24 @@ in schema v2, `CLAUDE.md` in v1. After the split CLAUDE.md may legitimately sit 
 for weeks while state churns daily, so comparing against CLAUDE.md reports false freshness.
 
 - Run `git log -1 --format=%ci` for the latest commit date
-- Parse `Last Updated` from the state file
+- Parse `Last Updated` from the state file — from the orientation block's copy when that is
+  in context, otherwise from the header range read in Step 1
 - If commits are newer, warn: "docs/STATUS.md was last updated [date], but there are [N]
   commits since then."
+
+**Size budget — one line, always.** From the pre-injected state-file sizes in Step 2, print
+exactly one line in the summary. The budgets are CLAUDE.md 10k and docs/STATUS.md 15k
+(owner: `../save/references/doc-schema.md`, Size budget):
+
+- Either file over its budget →
+  `Size budget: CLAUDE.md 16.6k / 10k, STATUS.md 21.6k / 15k → run /bx:save --full`
+- Both within → `Size budget: CLAUDE.md 8.2k / 10k, STATUS.md 11.0k / 15k — within budget`
+
+`wc -c` counts bytes, which runs a few percent over the char count on a file with many
+non-ASCII characters; close enough for this line. If Step 1's Grep returned a
+`bx-size-skips=<n>` line with `n` of 3 or more, word the line as
+`… → OVER BUDGET, shrink skipped <n> runs in a row: run /bx:save --full and apply`.
+Print no other size commentary: this line replaces any per-section breakdown.
 
 ### 3.1 What Was Last Worked On
 From the state file's last session summary (3-5 bullet points) — `## Session History` in
@@ -276,7 +323,9 @@ Once you've presented the summary and user confirms direction:
 
 | If... | Then... |
 |-------|---------|
-| Doc schema v2 (marker present) | State lives in `docs/STATUS.md`; CLAUDE.md is already in context, don't re-read it |
+| Doc schema v2 (marker present) | State lives in `docs/STATUS.md`, read by section; CLAUDE.md is already in context, don't re-read it |
+| SessionStart orientation block in context | Don't re-read the `Last Updated:` line or `## Current Status`; build the summary table from that copy |
+| A state file is over its size budget | One `Size budget:` line in the summary; `/bx:save --full` is the fix |
 | Doc schema v1 (no marker) | State is still inside CLAUDE.md, already in context; note migration is available via `/bx:save` |
 | CLAUDE.md missing | Suggest running `/bx:save` first |
 | Last session was recent | Focus on the state file's "In Progress" and "Next Steps" |

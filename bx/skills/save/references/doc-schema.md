@@ -50,7 +50,30 @@ companion check for stale or contradictory instructions; same rule applies.
 
 Size is measured in **chars, not lines**. Anthropic's memory docs suggest under 200 lines
 per CLAUDE.md, but bx-managed files carry long table rows and paragraphs: a 62-line CLAUDE.md
-has measured 13.6k chars, passing the line test while over the 12k soft cap.
+has measured 13.6k chars, passing the line test while well over the size budget below.
+
+## Size budget
+
+This section owns the numbers. `scripts/size-budget.sh` codes them, `/bx:save` Part 7 acts on
+them, and `/bx:resume` prints them; nothing else restates the arithmetic.
+
+| File | Target | Stop | Budget |
+|---|---|---|---|
+| CLAUDE.md | ~7k | 9k | 10k |
+| docs/STATUS.md | ~10k | 13k | 15k |
+
+- **Budget** — over this, `/bx:save --full` plans moves for the file (Part 7), from the file
+  total down: tidy moves first, then relocation, largest section first.
+- **Stop** — what a shrink run aims for. The gap below the budget is hysteresis: a file that
+  was just shrunk does not trip the budget on the next small edit.
+- **Target** — what a healthy file looks like. Nothing enforces it.
+
+A file can stay over its budget when what remains is unshrinkable by design (standing rules,
+doc links, project-authored sections). Part 7 then names those sections with their sizes; it
+never forces them out.
+
+The `Last Updated:` line states the current session only, 250 chars at most. Earlier sessions
+belong in `docs/session-history.md`.
 
 `Last Updated:` is deliberately present in BOTH files. After the split CLAUDE.md may sit
 untouched for weeks while state churns daily; the staleness signal must follow the state or
@@ -70,12 +93,16 @@ consent prompt, and quoted verbatim again in the run's report.
 The canonical set of **auto-managed archives**: `docs/session-history.md`,
 `docs/key-decisions.md`, `docs/completed-work.md`, `docs/known-issues.md` (created on
 demand, the first time an issue leaves CLAUDE.md), plus `docs/next-steps-backlog.md`
-(created on demand by a size-pressure shrinker). Exclusion lists elsewhere — `mode-update-full.md`
+(created on demand, the first time Part 7 moves an item out of docs/STATUS.md). All five
+rotate. Exclusion lists elsewhere — `mode-update-full.md`
 Steps 0.3/3.0, the resume skill's do-not-read list — follow this set; extend it here first.
 
 Access rule: archives are append-only outputs, never sync inputs. Writers append via
 anchored tail reads (Grep the anchor's line number, then offset-Read a window); **no
-automatic path reads an archive in full**, so growth is disk-only. Rotation — procedure and
+automatic path reads an archive in full**, so growth is disk-only. Part 7's line moves go
+through `scripts/archive-lines.sh`, which appends by source line number and skips any line
+the archive already holds, so a repeated trim never archives the same content twice.
+Rotation — procedure and
 thresholds owned by `mode-update-full.md` Part 7.7 — moves the oldest entries of an oversized
 archive byte-verbatim into numbered volumes under `docs/archive/`; volumes are read by
 nothing automatic, ever — they are grep-on-demand history.
@@ -84,11 +111,17 @@ nothing automatic, ever — they are grep-on-demand history.
 `## Known Issues / Blockers`, oldest first, one `### ` entry each. The entry header carries
 the status: `### <title> — Resolved S<N> (<date>)`, optionally `, commit <hash>`, or
 `### <title> — Open, moved S<N> (<date>)`. The entry body is the issue's text, verbatim. A
+group of standing rules whose reasons Part 7.3 moved out is an `Open` entry titled with the
+group's heading: it is live for as long as that heading stays in CLAUDE.md. A
 `Resolved` entry leaves nothing behind in CLAUDE.md; an `Open` entry leaves a one-line
 summary + link there for as long as the issue is open. Headers are never rewritten: when an
 `Open` issue is later fixed, its summary line is archived as a new `Resolved` entry and the
 older `Open` entry simply stops being live. This section owns the file's existence and format. Its lifecycle is
-owned by `mode-update.md` Part 1.7 (relocation) and `mode-update-full.md` Part 7.3 (size threshold).
+owned by `mode-update.md` Part 1.7 (relocation) and `mode-update-full.md` Part 7.3 (size budget).
+
+Part 7.3 can also create `.claude/rules/<topic>.md` files for path-scoped standing rules.
+Those are not archives: Claude Code loads each one when a file matching its `paths:` is
+read, so they are instructions that load later, not history.
 
 ## v1 layout (legacy)
 

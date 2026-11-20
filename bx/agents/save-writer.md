@@ -12,8 +12,10 @@ You are the writer half of the `/bx:save` skill. The orchestrator — which has 
 The packet contains:
 - `project_root` — absolute path to the repo.
 - `today` — the date string to stamp into the `Last Updated:` line and the session header.
-- `claude_md_deltas` — an ordered list of CLAUDE.md edits. Each is either an exact `old → new` string pair, or an explicit "replace the block under `## <Section>` with: …" instruction. **Instructions only** — covers the `Last Updated:` line, `## Key Decisions`, and `## Known Issues / Blockers`. No state sections.
-- `status_md_deltas` — the same shape, but for `docs/STATUS.md`: its `Last Updated:` line, Current Status rows, the `## Completed` summary line, In Progress, and Next Steps. This is where the task drain (Part 0) and the Current-Status/In-Progress/Next-Steps edits land under schema v2 — they used to be part of `claude_md_deltas` before the CLAUDE.md/STATUS.md split.
+- `session` — this session's number as the docs write it (e.g. `322`).
+- `last_updated_note` — optional: one clause about this session, for the `Last Updated:` lines.
+- `claude_md_deltas` — an ordered list of CLAUDE.md edits. Each is either an exact `old → new` string pair, or an explicit "replace the block under `## <Section>` with: …" instruction. **Instructions only** — covers `## Key Decisions` and `## Known Issues / Blockers`. No state sections, and not the `Last Updated:` line (you compose that — see "The `Last Updated:` line").
+- `status_md_deltas` — the same shape, but for `docs/STATUS.md`: Current Status rows, the `## Completed` summary line, In Progress, and Next Steps. This is where the task drain (Part 0) and the Current-Status/In-Progress/Next-Steps edits land under schema v2 — they used to be part of `claude_md_deltas` before the CLAUDE.md/STATUS.md split.
 - `status_md_session_block` — the exact replacement text for `docs/STATUS.md`'s `## Session History` last-session block (already capped to ≤5 bullets). `docs/STATUS.md` must end up with exactly ONE session block. New field name under schema v2 — the block lives in STATUS.md, not CLAUDE.md.
 - `session_history_entry` — the full detailed entry to append to `docs/session-history.md` (already capped per the density rules below).
 - `completed_items` — list of `- [x] …` lines to append to `docs/completed-work.md` (may be empty).
@@ -25,7 +27,7 @@ You do NOT call `TaskList` — the orchestrator already drained it (or skipped t
 ## What you do
 
 1. **Read** `<project_root>/CLAUDE.md`, and `<project_root>/docs/STATUS.md` if it exists. Its absence signals the schema-v1 fallback used in steps 2 and 3 below.
-2. **Apply `claude_md_deltas`** to CLAUDE.md (one exception: refuse a block-replace delta aimed at `## Known Issues / Blockers` — skip it and record it under `warnings:`, because replacing that block here could remove an issue before step 8 archives it), and **apply `status_md_deltas`** to `docs/STATUS.md` — both as non-overlapping exact-string Edits. Always update each file's own `Last Updated:` line to `today`. If a delta's `old_string` is not found verbatim (stale read, paraphrase, or whitespace mismatch), do NOT fuzzy-match or guess — skip that one delta, leave its section unchanged, apply the rest normally, and record the unmatched delta under `warnings:` (quote its `old_string` and name which file it targeted) so the orchestrator can re-source and re-dispatch it.
+2. **Apply `claude_md_deltas`** to CLAUDE.md (one exception: refuse a block-replace delta aimed at `## Known Issues / Blockers` — skip it and record it under `warnings:`, because replacing that block here could remove an issue before step 8 archives it), and **apply `status_md_deltas`** to `docs/STATUS.md` — both as non-overlapping exact-string Edits. Always rewrite each file's own `Last Updated:` line, by the rule in "The `Last Updated:` line" below. If a delta's `old_string` is not found verbatim (stale read, paraphrase, or whitespace mismatch), do NOT fuzzy-match or guess — skip that one delta, leave its section unchanged, apply the rest normally, and record the unmatched delta under `warnings:` (quote its `old_string` and name which file it targeted) so the orchestrator can re-source and re-dispatch it.
 3. **Replace the `## Session History` last-session block** with `status_md_session_block`, in `docs/STATUS.md`. Derive the `old_string` from the `docs/STATUS.md` you read in step 1: the existing `### Last Session …` block under `## Session History` — everything after the `> Full history:` link line, up to the next `## ` header or EOF. **Preserve the `> Full history:` link line.** `docs/STATUS.md` must end up with exactly one session block; all older sessions live only in `docs/session-history.md`.
 
 **Fallback (schema v1 only):** if `docs/STATUS.md` does not exist, the repo is still on schema v1 — apply `status_md_deltas` and `status_md_session_block` to CLAUDE.md instead throughout steps 2 and 3 (CLAUDE.md still carries all state sections on v1, exactly as it did before schema v2), and note the fallback under `warnings:` so the orchestrator can confirm the routing was expected.
@@ -73,6 +75,16 @@ You do NOT call `TaskList` — the orchestrator already drained it (or skipped t
 
 (Steps 4-10 are unaffected by the schema-v1 fallback: `decision_rows` always targets CLAUDE.md and `docs/key-decisions.md`, `session_history_entry` always targets `docs/session-history.md`, `completed_items` always targets `docs/completed-work.md`, and `known_issue_moves` always targets CLAUDE.md and `docs/known-issues.md`, regardless of which schema version steps 2-3 wrote to.)
 
+## The `Last Updated:` line
+
+This is the one line you compose instead of splicing. It is injected into every session by the SessionStart hook, so it holds the current session and nothing else.
+
+- **Form:** `<label> <today> (Session <session>)`, then ` — <last_updated_note>` when the packet carries a note. `<label>` is the label exactly as the file already writes it (`Last Updated:`, or `**Last Updated:**` with its bold markers). The whole line is **250 chars at most**.
+- **Replace the old line whole.** Never keep any of its text: no `Earlier, Session …` clause, no previous session's summary. Earlier sessions are in `docs/session-history.md`.
+- **A note that does not fit is dropped, not trimmed:** if the composed line would exceed 250 chars, or the note names another session, write the line without the note and say so under `notes:`.
+- **A delta that targets a `Last Updated:` line is ignored.** Apply this rule instead and record the ignored delta under `notes:`. (Packets from before this rule sent the line as a delta, and that is how lines grew to 900 chars.)
+- **An old line over 250 chars is archived before it is replaced.** Append it to `docs/completed-work.md`, using step 6's tail-read approach, as one line: `- [x] Last Updated line of <file> before the S<session> trim (verbatim): <old line>`. Then replace it. Report it under `notes:` as `Last Updated line in <file> was <N> chars`, so the orchestrator can show the drift line. An old line at or under 250 chars is simply replaced.
+
 ## Anchor rule for `docs/key-decisions.md`
 
 Find the table's end without a full read: one Grep tool call (pattern `^\|`, `output_mode: content`, `-n: true`, `-o: true`, `head_limit: 0`) lists every table row's line number without echoing the rows themselves (each row's full text would otherwise re-import nearly the whole archive); take the last line of the first consecutive run of line numbers (the main table), then offset-Read a window around it as your Edit anchor. This file grows one row per decision forever — reading it whole makes every save pay for the project's entire history.
@@ -94,7 +106,7 @@ The packet content arrives already capped. Do NOT rewrite or expand it. If `sess
 ## Output — change report ONLY
 
 Two channels, do not conflate them — matching `doc-migrator.md`'s convention:
-- **`notes:` is advisory.** A density-cap overage (above). The orchestrator reports it and tightens next run; it never blocks or re-dispatches anything.
+- **`notes:` is advisory.** A density-cap overage (above), or anything the `Last Updated:` rule tells you to note (a dropped note, an ignored delta, an archived over-long line). The orchestrator reports it and tightens next run; it never blocks or re-dispatches anything.
 - **`warnings:` compels the orchestrator to act.** An unmatched delta (steps 2-3 above — the orchestrator re-sources the exact string and re-dispatches just that delta), an unmatched known-issue removal (step 8b — the entry is archived but still in CLAUDE.md), or the schema-v1 `docs/STATUS.md`-absent fallback (steps 2-3 above — the orchestrator confirms the v1 routing was expected).
 
 Use the literal string `none` for each when there is nothing to report.
@@ -108,7 +120,7 @@ files:
   docs/completed-work.md: +<M> items     # omit line if completed_items empty
   docs/key-decisions.md: +<K> rows        # omit line if decision_rows empty
   docs/known-issues.md: +<J> entries      # omit line if known_issue_moves empty
-notes: <density-cap overages, or "none">
+notes: <density-cap overages and Last Updated notes, or "none">
 warnings: <unmatched deltas, unmatched known-issue removals, a refused Known Issues block-replace, or the v1 STATUS.md-absent fallback note, or "none">
 ```
 On the schema-v1 fallback, omit the `docs/STATUS.md` line entirely and fold its content into

@@ -32,13 +32,13 @@ From the gathered context:
 - **Filtered commit list** — the `@` lines above the save anchor in the 20-commit log (the anchor itself and everything older belong to earlier saves). Feeds the session entry + drift probes. Filter by commit, never by the `Last Updated` date: a date cutoff re-counts the earlier saves' commits whenever a day has more than one save (S65 saved three times on 2026-10-26). If the anchor is not among the 20 commits, run one more `git log --name-only --pretty=format:'@%h %ad %s' --date=short <anchor>..HEAD`; if there is no anchor (the state file was never committed), take all 20.
 - **Diff file list** — the file names under those commits, plus `git status`'s uncommitted files → tells you whether README/`docs/` changed (drift signal; drives the `--full` recommendation).
 - **TaskList state** → drives the task drain (Part 0) and the In Progress / Next Steps deltas.
-- **CLAUDE.md size + docs/STATUS.md size + Key Decisions row count + session count** — cheap: `wc -c CLAUDE.md docs/STATUS.md docs/session-history.md docs/key-decisions.md docs/completed-work.md docs/known-issues.md` for size (omit docs/STATUS.md — and any archive — from the command when the file does not exist); count the Key Decisions table rows with the **Grep tool** (`output_mode: count`, pattern `^\| `); and (for the drift probe only) count sessions with the **Grep tool** (`output_mode: count`, pattern `^### Session`) on `docs/session-history.md` — not a full read. Use the Grep tool (not shell `grep`) for the two counts so no extra Bash permission is needed; `wc`/`awk`/`sort` are declared in `allowed-tools`. These drive the drift warnings and the `--full` rollup gates. Also measure CLAUDE.md's per-section sizes with this `awk` command (Part 7.2's, minus the `sort`):
+- **Sizes + Key Decisions row count + session count** — cheap. Sizes come from one call to this skill's measuring script (resolve the path against **this skill's base directory**):
 
   ```bash
-  awk 'BEGIN{section="HEADER"; size=0} /^## /{if(section)printf "%6d  %s\n", size, section; section=$0; size=0; next} {size+=length($0)+1} END{printf "%6d  %s\n", size, section}' CLAUDE.md
+  bash <skill-dir>/scripts/size-budget.sh .
   ```
 
-   the `## Known Issues / Blockers` figure and the largest section's name feed two drift lines below.
+  It prints each live file against its size budget (`file` records: size, budget, stop point, state, need), every section's size largest first, both `Last Updated:` line lengths, the five archives against the rotation threshold, and the consecutive-skip counter. It skips files that do not exist and writes nothing. Count the Key Decisions table rows with the **Grep tool** (`output_mode: count`, pattern `^\| `); and (for the drift probe only) count sessions with the **Grep tool** (`output_mode: count`, pattern `^### Session`) on `docs/session-history.md` — not a full read. Use the Grep tool (not shell `grep`) for the two counts so no extra Bash permission is needed. These drive the drift warnings and the `--full` rollup gates.
 
 ## Step 0.1: Path Routing
 
@@ -49,7 +49,7 @@ After Step 0:
 
 The old behavior (full sweep by default) is inverted: the daily save is fast; the heavy sweep is opt-in. Drift warnings (emitted at the end of the Save Path) tell the user when a `--full` is due.
 
-**`--silent` (combinable with any path):** zero user prompts for the entire run. **The binding rule: every consent prompt anywhere in this skill — present or future — resolves to its safe default (declined / skip) with no sentinel written, so the next interactive run asks as usual. The Part 8 commit is the sole exception:** it auto-commits with the suggested message, the one prompt the flag exists to bypass. Concretely today: first-run rollup consent (5.2, 6.2) → declined; the Part 7.4 consent gate → skip-all; the Part 7.7 per-file rotation consent → declined. A consent gate added to any Part later inherits this rule without needing its own clause.
+**`--silent` (combinable with any path):** zero user prompts for the entire run. **The binding rule: every consent prompt anywhere in this skill — present or future — resolves to its safe default (declined / skip) with no sentinel written, so the next interactive run asks as usual. The Part 8 commit is the sole exception:** it auto-commits with the suggested message, the one prompt the flag exists to bypass. Concretely today: first-run rollup consent (5.2, 6.2) → declined; the Part 7.4 size-budget consent → skip, so no content moves (the plan still prints, and the skip is not counted); the Part 1.10.1 row collapse → warn only; the Part 7.7 per-file rotation consent → declined. A consent gate added to any Part later inherits this rule without needing its own clause.
 
 ## Prose Caps (apply when composing any new entry)
 
@@ -59,6 +59,7 @@ New entries are capped — this keeps writing fast and keeps `/bx:resume` lean. 
 - **docs/STATUS.md last-session block:** ≤5 bullets, the most architecturally significant.
 - **Key Decision rationale:** ≤2–3 sentences. Longer context goes only into `docs/key-decisions.md`, referenced by commit hash.
 - **In Progress / Next Steps items:** one line each + file paths; no multi-paragraph narration.
+- **The `Last Updated:` line:** this session only — `Last Updated: <today> (Session <N>)`, optionally ` — ` plus one clause about this session, **250 chars at most**. Never carry the previous line forward and never add an `Earlier, Session …` clause: earlier sessions are in `docs/session-history.md`, and this line is injected into every session by the SessionStart hook. Unlike the caps above, this one applies to the existing line too: it is replaced whole on every save.
 
 ## Save Path (default)
 
@@ -81,8 +82,10 @@ Compose this structure and pass it to `save-writer` as the task prompt (fill eve
 
 - `project_root` — absolute repo path.
 - `today` — current date (e.g. `2026-05-29`). Resolve it from the session's current date supplied by the environment; if that's unavailable, fall back to the most recent commit date from the Step 0.1 `git log` (`git log -1 --date=short`). Do not invoke a bare `date` command — it isn't in `allowed-tools`.
-- `claude_md_deltas` — exact `old → new` string pairs (or "replace block under `## Section` with: …") for CLAUDE.md sections the session changed: the `Last Updated:` line, `## Key Decisions` (Part 1.6) and `## Known Issues / Blockers` (Part 1.7 — a blocker added or reworded this session; a blocker **resolved** this session goes in `known_issue_moves`, not here). For `## Known Issues / Blockers` use exact `old → new` pairs only, never the block-replace form, and never a pair that touches an entry listed in `known_issue_moves`: deltas are applied before the archive step, so either would remove an issue before it is archived. **Instructions only** — no state sections. Source the *old* strings verbatim from the CLAUDE.md you read in Step 0.
-- `status_md_deltas` — the same, for `docs/STATUS.md`: its `Last Updated:` line, Current Status rows (Part 1.2), the `## Completed` summary line if the drain changed the completed count (Part 0 / Part 1.3), In Progress (Part 1.4) and Next Steps (Part 1.5). Source the *old* strings verbatim from the docs/STATUS.md you read in Step 0 (or, on a v1 repo where STATUS.md is absent, from CLAUDE.md's state sections, per Step 0.1).
+- `session` — this session's number as the docs write it (e.g. `322`, or `321 cont.`). The writer stamps it into both `Last Updated:` lines.
+- `last_updated_note` — optional: one clause about this session to follow the session number, 160 chars at most, naming no other session. Omit it when the session block says it well enough. **The `Last Updated:` lines are not deltas:** do not put either line in `claude_md_deltas` or `status_md_deltas`. The writer composes both from `today`, `session` and this note (Prose Caps above).
+- `claude_md_deltas` — exact `old → new` string pairs (or "replace block under `## Section` with: …") for CLAUDE.md sections the session changed: `## Key Decisions` (Part 1.6) and `## Known Issues / Blockers` (Part 1.7 — a blocker added or reworded this session; a blocker **resolved** this session goes in `known_issue_moves`, not here). For `## Known Issues / Blockers` use exact `old → new` pairs only, never the block-replace form, and never a pair that touches an entry listed in `known_issue_moves`: deltas are applied before the archive step, so either would remove an issue before it is archived. **Instructions only** — no state sections. Source the *old* strings verbatim from the CLAUDE.md you read in Step 0.
+- `status_md_deltas` — the same, for `docs/STATUS.md`: Current Status rows (Part 1.2), the `## Completed` summary line if the drain changed the completed count (Part 0 / Part 1.3), In Progress (Part 1.4) and Next Steps (Part 1.5). Source the *old* strings verbatim from the docs/STATUS.md you read in Step 0 (or, on a v1 repo where STATUS.md is absent, from CLAUDE.md's state sections, per Step 0.1).
 - `status_md_session_block` — the full replacement text for STATUS.md's `## Session History` last-session block (Part 1.8 format, ≤5 bullets). New field name under schema v2 — the block lives in STATUS.md now, not CLAUDE.md.
 - `session_history_entry` — the detailed entry for `docs/session-history.md` (Part 1.8 format, capped).
 - `completed_items` — `- [x] …` lines from the task drain (may be empty).
@@ -106,13 +109,12 @@ Dispatch one `save-writer` subagent via the Agent tool with `subagent_type: "bx:
 >  - [N] sessions in `docs/session-history.md` ready for rollup (count > 5)
 >  - Key Decisions table in CLAUDE.md at [M] rows (cap 20)
 >  - README.md or `docs/*.md` touched in [K] commits since last full sweep
->  - CLAUDE.md at [X]k chars (target ~7k, soft cap 12k) — Part 7 size-pressure rollup will fire on `--full`
->  - CLAUDE.md at [X]k chars — over the 9k advisory rung; largest section `## [name]` ([N] chars); no shrinker fires below 12k
->  - `## Known Issues / Blockers` at [N] chars (threshold 4000) — the resolved-first rollup fires on `--full` once CLAUDE.md is over its soft cap
->  - docs/STATUS.md at [Y]k chars (target ~10k, soft cap 20k) — Part 7 size-pressure rollup will fire on `--full`
+>  - Size budget: CLAUDE.md [X]k / 10k, STATUS.md [Y]k / 15k → run /bx:save --full
+>  - CLAUDE.md at [X]k chars — over the 9k advisory rung; largest section `## [name]` ([N] chars); nothing is shrunk below 10k
+>  - `Last Updated:` line in [file] was [N] chars (cap 250) — replaced with this session's line; the old line is in docs/completed-work.md
 >  - docs/[archive].md at [Z]k chars — rotation fires at 100k on `--full` (Part 7.7)"
 
-Show the archive line only for an archive at ≥90k chars (approaching or over the 100k rotation threshold). Show the soft-cap line when CLAUDE.md is over 12k and the advisory-rung line when it is over 9k and at or under 12k — never both. Show the Known Issues line when that section is over 4000 chars, whatever the file size.
+The size-budget line is the output of `bash <skill-dir>/scripts/size-budget.sh . --line`, printed verbatim, and shown only when a file is over its budget. From the third consecutive `--full` run in which the shrink was skipped, the script words that line as an escalation; then it is the **first** line of the Change Report, above the per-file lines, not a drift bullet. Show the advisory-rung line when CLAUDE.md is over 9k and at or under 10k — never together with the budget line for CLAUDE.md. Show the `Last Updated:` line when the writer reported replacing an over-long one. Show the archive line only for an archive at ≥90k chars (approaching or over the 100k rotation threshold); `docs/next-steps-backlog.md` is one of the five.
 
 If no probe fires, omit the warning entirely.
 
@@ -178,8 +180,9 @@ Project Overview, which schema v2 still carries there; the pointer line only nam
 ### 1.0 Update Timestamp
 **Always update the "Last Updated" field at the top of BOTH files** — CLAUDE.md and docs/STATUS.md carry independent `Last Updated:` lines (doc-schema.md), and the staleness signal must follow the state:
 ```markdown
-**Last Updated:** [CURRENT DATE AND TIME]
+Last Updated: [TODAY] (Session [N]) — [optional: one clause about this session]
 ```
+The line holds the current session only and is 250 chars at most (Prose Caps). `save-writer` composes it from the packet's `today`, `session` and `last_updated_note`, keeps whatever label form the file already uses (`**Last Updated:**` stays bold), and replaces the old line whole. A line that grew past the cap under earlier versions is archived to `docs/completed-work.md` before it is replaced.
 
 ### 1.1 Documentation Links
 Update the "Key Documentation" section with actual files:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# make-fixtures.sh - build the thirteen doc-schema fixture repos.
+# make-fixtures.sh - build the fourteen doc-schema fixture repos.
 # Usage: make-fixtures.sh <dest-dir>
 # Each fixture is a real git repo so the clean-tree guard can be exercised.
 # bash 3.2 compatible.
@@ -503,6 +503,156 @@ MD
     done
 }
 
+pad() {  # <count> <phrase> -- <phrase> repeated <count> times on one line, no trailing newline
+    _i=1; _out=""
+    while [ "$_i" -le "$1" ]; do _out="${_out}$2"; _i=$((_i + 1)); done
+    printf '%s' "$_out"
+}
+
+write_size_budget_fixture() {  # <path>
+    # Shaped like a real 300-session project measured over budget after a --full
+    # save (the 2.18.0 evidence): standing-rule Known Issues, a Current Status
+    # table of finished rows, scaffolded In Progress / Next Steps, and a
+    # Last Updated line that strings three sessions together. Every string the
+    # verifier greps for (R01..R24, FIXVAR_01.., "Item 1NN", "Owed NN") is
+    # stable: test-size-budget-fixture.sh depends on them.
+    _d="$1"; mkdir -p "$_d/docs"
+    _c="$_d/CLAUDE.md"; _s="$_d/docs/STATUS.md"; _b="$_d/docs/next-steps-backlog.md"
+
+    # ---------------- CLAUDE.md ----------------
+    {
+        printf '%s\n' '<!-- bx-doc-schema: 2 -->' '# Sizefix — CLAUDE.md' ''
+        printf '%s' '**Last Updated:** 2026-11-19 (Session 321 — **an invite link assigns a username (`04448b2b`); the About page is rewritten (`3262427d`); no migration.** '
+        printf '%s' "Earlier, Session 320 — $(pad 5 'accepting an invite assigns a username; wrist size moved to Settings; ')"
+        printf '%s\n' "Earlier, Session 319 — $(pad 5 'friends and three visibility levels went live behind the switch; '))"
+        printf '%s\n' '' '> This file holds instructions and standing rules only. Session state lives in [docs/STATUS.md](docs/STATUS.md).' ''
+        printf '%s\n' '## Project Overview' '' '| Field | Value |' '|-------|-------|' \
+            '| **Name** | Sizefix |' \
+            '| **Description** | Fixture project shaped like a long-running product repo, for the size-budget shrinkers |' \
+            '| **Stack** | Next.js 16, React 19, TypeScript 5.9, Drizzle ORM, Postgres, vitest, Playwright (all pinned in `package.json`) |' \
+            '| **Repository** | github.com/example/sizefix, default branch `main` (`git remote -v`) |' \
+            '| **Package manager** | npm 11; scripts are `dev`, `build`, `test`, `lint`, `e2e` (`npm run` lists them) |' \
+            '| **Hosting** | One region, one database; a deploy is a push to `main` and nothing else triggers one |' ''
+        printf '%s\n' '**Key Documentation** (a flow map must change in the same commit as the code it describes):'
+        _n=1
+        while [ "$_n" -le 11 ]; do
+            _k="$(printf '%02d' "$_n")"
+            printf '%s\n' "- [docs/flow-$_k.md](docs/flow-$_k.md) — flow map $_k: $(pad 3 'entrances, guards and the rollback switch; ')"
+            _n=$((_n + 1))
+        done
+        printf '%s\n' '' '## Key Decisions' '' '| Decision | Rationale |' '|----------|-----------|'
+        _n=1
+        while [ "$_n" -le 14 ]; do
+            _k="$(printf '%02d' "$_n")"
+            printf '%s\n' "| Decision D$_k: the widget pipeline uses approach $_k | $(pad 3 'It measured better on the real catalog than the alternative. ')(S3$_k, \`d0c0de$_k\`) |"
+            _n=$((_n + 1))
+        done
+        printf '%s\n' '' '> Full decision log: [docs/key-decisions.md](docs/key-decisions.md)' ''
+        printf '%s\n' '## Known Issues / Blockers' '' \
+            '> Standing rules only, one line each. The detail behind every line is in [docs/known-issues.md](docs/known-issues.md).' ''
+        _n=1
+        for _g in 'Deploys and rollbacks' 'Before pushing or running anything billed' 'Do not re-open, re-run or override' 'Database migrations (`src/db/migrations/`)'; do
+            printf '%s\n' "**$_g**" ''
+            _j=1
+            while [ "$_j" -le 6 ]; do
+                _k="$(printf '%02d' "$_n")"
+                if [ "$_g" = 'Database migrations (`src/db/migrations/`)' ]; then
+                    _lead="In \`src/db/migrations/\`, never edit an applied migration (R$_k)."
+                else
+                    _lead="Never skip check R$_k before the step it guards."
+                fi
+                printf '%s\n' "- **$_lead** $(pad 4 'Skipping it broke production once and cost a day. ')"
+                _n=$((_n + 1)); _j=$((_j + 1))
+            done
+            printf '\n'
+        done
+        printf '%s\n' '## Environment Variables' ''
+        _n=1
+        while [ "$_n" -le 12 ]; do
+            _k="$(printf '%02d' "$_n")"
+            printf '%s\n' "- \`FIXVAR_$_k\` — $(pad 3 'read at boot; a wrong value fails closed and logs once. ')"
+            _n=$((_n + 1))
+        done
+        printf '%s\n' '' '> Session state: [docs/STATUS.md](docs/STATUS.md)'
+    } > "$_c"
+
+    # ---------------- docs/STATUS.md ----------------
+    {
+        printf '%s\n' '# Project Status' '' '> Session state for `/bx:resume`. Instructions live in [CLAUDE.md](../CLAUDE.md).' ''
+        printf '%s' 'Last Updated: 2026-11-19 (Session 321 — **an invite link assigns a username instead of asking (`04448b2b`); the About page is rewritten in three languages (`3262427d`); no migration.** '
+        printf '%s' "Earlier, Session 320 — $(pad 5 'accepting an invite assigns a username; wrist size moved to Settings; ')"
+        printf '%s\n' "Earlier, Session 319 — $(pad 5 'friends and three visibility levels went live behind the switch; '))"
+        printf '%s\n' '' '## Current Status' '' '| Component | Status | Notes |' '|-----------|--------|-------|'
+        printf '%s\n' "| **Everything through S291: 10 collapsed rows** ($(pad 9 'the core platform, the finder, the gallery, the add flow; ')) | ✅ | see [completed-work.md](completed-work.md) |"
+        printf '%s\n' "| **S295–S308: 7 collapsed rows** ($(pad 9 'release detection, two languages, lug width, page recomposition; ')) | ✅ | see [completed-work.md](completed-work.md) |"
+        _n=1
+        while [ "$_n" -le 12 ]; do
+            _k="$(printf '%02d' "$_n")"
+            printf '%s\n' "| Feature F$_k ($(pad 7 'messages, label tables, sentence builders, the alert email; ')) | ✅ LIVE 2026-11-$_k (S3$_k, \`feed00$_k\`) | $(pad 2 'Walked signed in and signed out by the owner. ') |"
+            _n=$((_n + 1))
+        done
+        printf '%s\n' '| Personal release email | 🔧 In progress | the next build |' '| Photo AI | 🔲 Not started | Phase 2+ |' ''
+        printf '%s\n' '## Completed' '' '412 tasks completed across the platform. See [completed-work.md](completed-work.md) for full checklist.' ''
+        printf '%s\n' '## In Progress' ''
+        _n=1
+        while [ "$_n" -le 14 ]; do
+            _k="$(printf '%02d' "$_n")"
+            printf '%s\n' "- **Workstream W$_k LIVE (S3$_k, \`c0ffee$_k\`, deployment \`dpl_fixture$_k\`).** Owed $_k: one read of production data and one owner walk. Owed items → [detail](next-steps-backlog.md#ip-s319-full)"
+            _n=$((_n + 1))
+        done
+        printf '%s\n' '' '> Full detail of finished items: [completed-work.md](completed-work.md)'
+        printf '%s\n' '> Full In Progress detail (verbatim, by trim): [S319](next-steps-backlog.md#ip-s319-full) · [S317](next-steps-backlog.md#ip-s317-full) · [S315](next-steps-backlog.md#ip-s315-full) · [S312](next-steps-backlog.md#ip-s312-full) · [S308](next-steps-backlog.md#ip-s308-full) · [S307](next-steps-backlog.md#ip-s307-full)'
+        printf '%s\n' '' "_**Watermarks:** \`/simplify\` S317 (\`92d1ebc7\`); $(pad 20 'skipped by the owner: a shared wrapper and a rename; ')_" ''
+        printf '%s\n' '## Next Steps' '' 'Flat priority order — one line each; detail lives in [next-steps-backlog.md](next-steps-backlog.md).' ''
+        _n=138
+        while [ "$_n" -ge 123 ]; do
+            case "$_n" in
+                134) _t="**Item 134: catalog price fill — DONE S311 (\`d947e5f2\`).** $(pad 3 'Every listed brand now has a store price. ')" ;;
+                131) _t="**Item 131: harden the public-message guard — DONE S315 (\`fe8383d9\`).** $(pad 3 'An alias or a re-export now fails the pin. ')" ;;
+                135) _t="**Item 135: /simplify skips — DONE S318 (\`a9b3cd01\`)** except the label wording for failed reads (owner). $(pad 2 'The wording call is still open. ')" ;;
+                *)   _t="**Item $_n: follow-up $_n** — $(pad 4 'confirm the copy call, then read the result in production; ')" ;;
+            esac
+            printf '%s\n' "$_n. $_t → [detail](next-steps-backlog.md#ns-s317-full)" ''
+            _n=$((_n - 1))
+        done
+        printf '%s\n' '> Items #122, #121, #120, #119, #118, #117, #116, #115, #114, #111, #112, #113, #110, #108, #109, #107, #106, #105, #104, #103, #100, #99, #97 moved **verbatim** to [next-steps-backlog.md](next-steps-backlog.md#ns-s308-full) in the S308 `--full` sweep.' ''
+        printf '%s\n' '> Items #102, #101, #98, #95, #96, #89, #90, #91, #92, #93, #94, #88, #86, #87, #85, #84, #83, #82, #78, #79, #80, #81, #77, #76, #75 moved **verbatim** to [next-steps-backlog.md](next-steps-backlog.md#ns-s299-full) in the S299 `--full` sweep.' ''
+        printf '%s\n' '> Full Next Steps detail (S317 trim, verbatim): [next-steps-backlog.md](next-steps-backlog.md#ns-s317-full)' ''
+        printf '%s\n' '> Full Next Steps detail (S307 trim, verbatim): [next-steps-backlog.md](next-steps-backlog.md#ns-s307-full)' ''
+        printf '%s\n' '> Full Next Steps detail (S299 trim, verbatim): [next-steps-backlog.md](next-steps-backlog.md#ns-s299-full)' ''
+        printf '%s\n' '## Session History' '' '> Full history: [session-history.md](session-history.md)' '' '### Last Session (Session 321) - 2026-11-19'
+        _n=1
+        while [ "$_n" -le 5 ]; do
+            printf '%s\n' "- Shipped part $_n of the invite work: $(pad 2 'a username is assigned on confirm; ')"
+            _n=$((_n + 1))
+        done
+    } > "$_s"
+
+    # ---------------- archives ----------------
+    printf '%s\n' '# Completed Work' '' '> Full checklist of completed tasks. Referenced from [STATUS.md](STATUS.md).' '' '---' '' '- [x] Built the first widget - `src/widget.ts`' > "$_d/docs/completed-work.md"
+    printf '%s\n' '# Key Decisions' '' '> Full decision log. Referenced from [CLAUDE.md](../CLAUDE.md).' '' '| Decision | Rationale |' '|----------|-----------|' '| Use widgets | They compose better than gadgets. |' > "$_d/docs/key-decisions.md"
+    printf '%s\n' '# Session History Archive' '' '> Auto-managed by `/bx:save`. Last session summary is in [STATUS.md](STATUS.md).' '' '---' '' '### Session 320 - 2026-11-18: accepting an invite assigns a username (commit: 8262e120)' '' '### Session 321 - 2026-11-19' '**What happened:**' '- An invite link assigns a username' > "$_d/docs/session-history.md"
+    printf '%s\n' '# Known Issues Archive' '' '> Issues moved out of [CLAUDE.md](../CLAUDE.md) by `/bx:save`. `Resolved` entries are' '> history; `Open` entries are still live and linked from CLAUDE.md.' '' '---' '' '### Widget cache corruption is RESOLVED (S3) — Resolved S3 (2026-01-01)' '' '**Widget cache corruption is RESOLVED (S3).** Fixed by a rebuild.' > "$_d/docs/known-issues.md"
+
+    # The backlog already holds, byte for byte, some of the lines a trim would
+    # archive: Next Steps items 124 and 123, and In Progress items W10..W14.
+    # A de-duplicating trim appends none of them a second time.
+    {
+        printf '%s\n' '# Next Steps — Backlog Detail' '' '> Detail rolled off [STATUS.md](STATUS.md) by `/bx:save --full`.' '' '---' ''
+        printf '%s\n' '## Next Steps detail rolled off STATUS.md (S317 --full)' '' '<a id="ns-s317-full"></a>' ''
+        for _n in 124 123; do
+            printf '%s\n' "$_n. **Item $_n: follow-up $_n** — $(pad 4 'confirm the copy call, then read the result in production; ') → [detail](next-steps-backlog.md#ns-s317-full)" ''
+        done
+        printf '%s\n' '## In Progress detail rolled off STATUS.md (S319 --full)' '' '<a id="ip-s319-full"></a>' ''
+        _n=10
+        while [ "$_n" -le 14 ]; do
+            _k="$(printf '%02d' "$_n")"
+            printf '%s\n' "- **Workstream W$_k LIVE (S3$_k, \`c0ffee$_k\`, deployment \`dpl_fixture$_k\`).** Owed $_k: one read of production data and one owner walk. Owed items → [detail](next-steps-backlog.md#ip-s319-full)"
+            _n=$((_n + 1))
+        done
+    } > "$_b"
+}
+
 # fx-v0: a git repo with no CLAUDE.md at all
 init_repo "$DEST/fx-v0"
 echo "# Readme" > "$DEST/fx-v0/README.md"
@@ -633,6 +783,14 @@ write_v2_pair "$DEST/fx-ki-rotate"
 write_ki_rotate_archive "$DEST/fx-ki-rotate"
 commit_all "$DEST/fx-ki-rotate" "init"
 echo "fx-ki-rotate   (v2, docs/known-issues.md >100k, Open entry at #60)"
+
+# fx-size-budget: v2, both live files over their size budget in the shape a
+# long-running project reaches (Part 7). One --full run with "apply all" must
+# bring both under budget; a second run must change nothing.
+init_repo "$DEST/fx-size-budget"
+write_size_budget_fixture "$DEST/fx-size-budget"
+commit_all "$DEST/fx-size-budget" "init"
+echo "fx-size-budget (v2, CLAUDE.md ~16k and STATUS.md ~21k, standing rules + scaffolding)"
 
 echo ""
 echo "Fixtures built in $DEST"
