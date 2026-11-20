@@ -5,7 +5,8 @@ Loaded by the orchestrator in **Step 1.6** of `SKILL.md`. This file is the sourc
 - API ingestion contract — digest shape consumed by subagents
 - Setup banner (one-time, sentinel-gated)
 - `.gitignore` auto-append rules
-- Finding-type catalog (16 sub-dims) — sub-dims 1-13, 15 and 16 populated from Search Console API output; sub-dim 14 (`deindex_regression`) is orchestrator-emitted in Step 1.6.13 from snapshot diff (not produced by the seo-gsc-insights subagent)
+- Finding-type catalog (18 sub-dims) — sub-dims 1-13 and 15-17 populated from Search Console API output, sub-dim 18 from user-dropped Bing Webmaster Tools exports; sub-dim 14 (`deindex_regression`) is orchestrator-emitted in Step 1.6.13 from snapshot diff (not produced by the seo-gsc-insights subagent)
+- The `update_overlap` annotation (2.20.0) — Google ranking-update windows laid over time-windowed findings and watchpoints
 
 For the **finding output shape**, ranking formulas, and `score_impact: 0` invariant, see `rubric.md` — that file is the contract; this file is the implementation reference. For endpoint inventory + auth setup, see `gsc-api-schema.md`. For SQL-equivalent call templates + URL Inspection selection + `coverageState` → 9-reason lookup table, see `gsc-api-queries.md`.
 
@@ -267,9 +268,9 @@ The orchestrator prints a one-line notice on first append: `Added .seo-data/gsc/
 
 ---
 
-## Finding-type catalog (16 sub-dims)
+## Finding-type catalog (18 sub-dims)
 
-Each ingestion call (Search Analytics + URL Inspection) produces 0+ findings. All findings have `source: "gsc"`, `score_impact: 0` (enforced orchestrator-side in Step 6.0a).
+Each ingestion call (Search Analytics + URL Inspection, plus the user's Bing exports for sub-dim 18) produces 0+ findings. All findings have `source: "gsc"`, `score_impact: 0` (enforced orchestrator-side in Step 6.0a). Sub-dims 17 (`ai_overview_compression`) and 18 (`bing_ai_citations`) are 2.20.0 additions and are info-only like the rest.
 
 ### 1. `indexing_coverage` (site-wide non-index rate)
 
@@ -414,6 +415,7 @@ No score-headline finding emitted (the site-wide rate isn't reliably computable 
   - Standard: `"CTR opportunity on <URL> (<X>K impressions, <Y>% CTR vs <Z>% median, pos <P>)"`
   - High-volume-override: `"⚠ CTR CATASTROPHE on <URL> (<X>K impressions, <Y>% CTR @ pos <P> — title/meta misaligned with query intent)"`
 - `recommended_action`: `"Rewrite <title> + <meta name='description'> to be more compelling. Audit top GSC queries for the page (Search Analytics → Queries tab filtered by Page) — front-load query intent in the title, mirror query phrasing in the meta description's first 110 chars (mobile SERP truncation). Target CTR: at least median (<Z>%) for standard-band; >1% for high-volume-override cases."`
+- **AI Overview guard (2.20.0):** when the URL is also in this run's `ai_overview_compression` list (sub-dim 17), or ≥60% of its impressions come from AIO-prone queries, low CTR may be the AI Overview taking the click rather than a weak title. Lower `certainty` by 0.2, add `cross_link_findings` to the sub-dim 17 finding, and prepend to `recommended_action`: `"Most impressions for this page come from question-form or long queries, where Google often shows an AI Overview. Check the top queries in Search first; if an AI Overview answers them, a title rewrite will not restore the old CTR."`
 
 ### 11. `position_band_opportunity` (from Q1 queries digest)
 
@@ -463,6 +465,7 @@ Pass the brand name + 1-2 aliases (e.g., `"Burak Arık"` + `"burakarik"` + `"bur
 - `effort_estimate`: `medium`
 - `impressions`, `position`, `clicks`, `ctr`, `query`, `matched_alias` populated
 - `cross_link_findings`: array of related finding IDs from this run — populate with any `schema_validation` finding referencing `Person.@id` AND any `eeat` finding referencing `Person.sameAs` Wikidata. Surfaces the causal chain to the user.
+- `update_overlap`: per "Update-window overlap annotation" below, over the Q1 lookback window. A brand-position drop that coincides with a core or spam update still points at entity signals, but say in `evidence` that the update may share the cause.
 - `title`: `"⚠ Brand query '<query>' ranks at pos <P> with <C>% CTR — entity-recognition deficit (Google can't unambiguously identify <brand>)"`
 - `recommended_action`: `"Brand queries should rank at position 1 with CTR >30%. Three root causes, in order of impact: (1) Add Wikidata entity to Person.sameAs[] across ALL Person Schema blocks (homepage / about / article / guide / contact — same @id everywhere). Create a Wikidata Q-item if one doesn't exist yet. (2) Unify Person @id across all templates — split #photographer vs #author creates two distinct entity nodes Google can't stitch. (3) Add Organization Schema with logo + sameAs[] to the homepage publisher slot. Cross-link to findings: <cross_link_findings>."`
 
@@ -474,7 +477,7 @@ Pass the brand name + 1-2 aliases (e.g., `"Burak Arık"` + `"burakarik"` + `"bur
 
 **Codified after burakarik6 dogfood (Session 34, 2026-05-26):** the trigger that surfaces "URLs deindexed since last run" — the early-warning loop catching Google's "New reason preventing your pages from being indexed" / "Validation failed" emails BEFORE they hit the user's inbox. Distinct from sub-dims 2-9 which surface the *current* state per inspected URL; sub-dim 14 surfaces *state transitions* across runs.
 
-**Source:** orchestrator-emitted in SKILL.md Step 1.6.13 (NOT the seo-gsc-insights subagent — the snapshot diff lives in the orchestrator since it spans runs, and the finding is emitted directly into the findings pool). The subagent emits sub-dims 1-13, 15 and 16; sub-dim 14 is the orchestrator-emitted addition.
+**Source:** orchestrator-emitted in SKILL.md Step 1.6.13 (NOT the seo-gsc-insights subagent — the snapshot diff lives in the orchestrator since it spans runs, and the finding is emitted directly into the findings pool). The subagent emits sub-dims 1-13 and 15-18 (17 from `sa-trends` segments, 18 from the Bing digest; when `gsc_mode` is disabled the orchestrator emits 18 itself); sub-dim 14 is the orchestrator-emitted addition.
 
 **Mechanism:** every run writes a snapshot of `{url → coverageState}` for all inspected URLs to `.seo-data/gsc/snapshots/<YYYY-MM-DDTHHMMSS>-<commit_sha7>.json` (Step 1.6.13.1). On the next run, the orchestrator finds the most-recent prior snapshot (Step 1.6.13.2), diffs it against the current run's inspections (Step 1.6.13.3 via `gsc-parse-helper regression`), and emits sub-dim 14 findings for URLs whose coverageState flipped from indexed to non-indexed.
 
@@ -509,6 +512,7 @@ Pass the brand name + 1-2 aliases (e.g., `"Burak Arık"` + `"burakarik"` + `"bur
   - `path_clusters`: when ≥3 transitions share a path prefix (split on `/` after domain; group by 1-3 leading segments), surface as `{prefix: count}` map — high-signal for routing-change root cause (S30 lesson: when transitions cluster, the cause is usually one commit)
   - `git_correlation`: when `path_clusters` prefixes match touched paths in Step 1.5's 35-day git digest, append the matching commits (max 3) with short subjects + dates. Bridges the regression to the likely-causal code change.
   - `recovery_count`: count of URLs that improved (any non-indexed → `Submitted and indexed`) since previous run — surfaces in the footer info line, not in the finding's main evidence
+  - `update_overlap`: orchestrator-computed per "Update-window overlap annotation" below, over the window from the previous snapshot's date to this run. When non-empty and the transitions are quality-class (crawled/discovered not indexed), add to `recommended_action`: `"Google's <name> rolled out in this window. Quality-class deindexing during a core or spam update can be the update's reassessment, not a code regression — weigh git_correlation evidence before reverting anything."` Never soften 5xx, 404 or redirect transitions on this ground: those are mechanical and the update does not explain them.
 - `cross_link_findings`: array of related finding IDs from this run — populate with sub-dim 5 (`redirect_hygiene`) when `Page with redirect` transitions present, sub-dim 4 (`not_found_404`) when `Not found (404)` transitions present, sub-dim 9 (`server_errors`) when `Server error (5xx)` transitions present
 - `recommended_action`: tiered by transition class (orchestrator picks the most severe applicable tier; multiple tiers can chain):
   - **Always include the framing line:** `"If you've seen a Google Search Console 'New reason preventing your pages from being indexed' or 'Validation failed' email recently, this is the corresponding signal. The snapshot diff shows what flipped state since <previous-run-date>."`
@@ -558,14 +562,91 @@ When previous run was on the same commit (rare — usually means user ran `/bx:s
 
 | `pattern` | Meaning | Advice |
 |---|---|---|
-| `visibility_loss` | impressions fell too (≤80% of oldest) — rankings or demand dropped | Refresh: update facts/dates, add what top-ranking pages now cover, check `git_correlation` for a content change; check Search Status Dashboard for a core update in the window |
-| `ctr_loss` | impressions held, clicks fell — something now sits above or beside the result | Check the query in Search: an AI Overview, a SERP feature or a competitor's rich result is taking the click. Improve the title/description; add the structured data that earns a rich result |
+| `visibility_loss` | impressions fell too (≤80% of oldest) — rankings or demand dropped | Refresh: update facts/dates, add what top-ranking pages now cover, check `git_correlation` for a content change. When `update_overlap` is non-empty, say which Google update overlapped and that the drop may be the update, not the page (see the annotation section below) |
+| `ctr_loss` | impressions held, clicks fell — something now sits above or beside the result | **First route:** a URL that is also in the `sa-trends` `ai_overview_compression` list leaves this finding and is reported under sub-dim 17 instead (expected, not a title defect). **Remaining URLs:** check the page's top queries in Search. If an AI Overview answers them, it is the same compression the segmentation missed (say so; no title advice). If a SERP feature or a competitor's rich result sits above the result, improve the title/description and add the structured data that earns an eligible rich result |
 | `vanished` | no impressions in the newest window | Cross-check sub-dims 2-9 / 14 for the URL — this is usually deindexing, not decay |
 
 - `severity`: `medium`; `high` when a `money_pages` entry is in the list or total clicks lost ≥ 30% of the site's Q2 clicks.
-- `certainty`: `0.75` (seasonality can mimic decay — say so when the site_type is seasonal, e.g. travel, events, retail).
+- `certainty`: `0.75` (seasonality can mimic decay — say so when the site_type is seasonal, e.g. travel, events, retail). Lower by 0.15 when `update_overlap` is non-empty.
 - `affected_urls`, `clicks` (newest window) populated
+- `update_overlap`: per "Update-window overlap annotation" below, over the decay span (the oldest window's start to `endDate`)
+- `cross_link_findings`: the sub-dim 17 finding when any `ctr_loss` URL was routed there
 - `title`: `"<N> pages lost ≥30% of their clicks over 3 months (content decay)"`
+- If routing to sub-dim 17 leaves no URLs, do not emit this finding.
+
+### 17. `ai_overview_compression` (from the `sa-trends` CTR segmentation — 2.20.0)
+
+**Why it exists.** When an AI Overview appears, users click a traditional result far less: Pew Research's browsing panel measured clicks on traditional results on **8% of visits with an AI summary vs 15% without** ([Pew, 2025-07-22](https://www.pewresearch.org/short-reads/2025/07/22/google-users-are-less-likely-to-click-on-links-when-an-ai-summary-appears-in-the-results/)), and AI summaries appeared far more often on long and question-form queries. A page can lose half its CTR at an unchanged position with nothing wrong on the page. Until 2.20.0 that pattern reached the user as `ctr_loss` / `ctr_opportunity` with "rewrite the title" advice, which costs a rewrite cycle and fixes nothing. Vendor studies (Ahrefs, Seer) agree on direction; treat their exact percentages as vendor numbers and do not quote them as expectations.
+
+**Source:** `gsc-parse-helper sa-trends` (SKILL.md Step 1.6.6). The helper splits queries into **AIO-prone** (question-form — who/what/when/where/why/how/which/can/does/is/are/should/vs/best/difference, English by default, configurable with `--question-words` — or ≥6 words) and **other**, and emits:
+- `ctr_segments: {aio_prone: {clicks, impressions, ctr_now, ctr_prev, pos_now, pos_prev}, other: {...}}` — site-level CTR per segment, current vs previous window
+- `ai_overview_compression: [{page, aio_share, ctr_delta, pos_delta}]` — pages whose CTR fell ≥20% (relative) while |`pos_delta`| ≤ 1.0 and ≥60% of their impressions are AIO-prone
+
+The segmentation is a proxy: the API does not say which impressions carried an AI Overview. The **Generative AI performance report** CSV (Step 1.6.15 `Exports:`, impressions only, no API, AI Overviews and AI Mode not separated) is the only first-party confirmation, so cross-reference it whenever it is present.
+
+**Trigger:** `ai_overview_compression` is non-empty. **Emit one clustered finding** (top 10 pages by impressions):
+
+- `severity`: `low`; `medium` when a `money_pages` entry is in the list. Never `high` — the site cannot fix it on-page.
+- `certainty`, by evidence:
+  - `0.75` — the Generative AI export is present and lists the page with AI impressions (`gen_ai_confirmed: true` per page)
+  - `0.6` — no export (`gen_ai_confirmed: null`)
+  - `0.45` — the export is present but omits the page (`gen_ai_confirmed: false`); say that another SERP feature or a competitor may be the cause and the page also belongs in content_decay's `ctr_loss` reading
+- `effort_estimate`: `small`
+- `impressions`, `clicks`, `ctr`, `avg_position` (cluster totals), `affected_urls` populated
+- `evidence`: per page `aio_share`, `ctr_delta`, `pos_delta`, `gen_ai_confirmed`; plus the site-level `ctr_segments` line — `"AIO-prone CTR <prev>% → <now>% at pos <p_prev> → <p_now>; other queries <prev>% → <now>%"`. When the AIO-prone segment fell and the other segment held (relative change within ±10%), say that the pattern is segment-wide, which is the strongest sign it is the SERP and not the pages.
+- `update_overlap`: per the annotation section below, over the sa-trends comparison windows
+- `title`: `"<N> pages lost CTR at a steady position on AI-Overview-prone queries — AI Overview compression (expected, not a title defect)"`
+- `recommended_action`: `"These pages kept their position while CTR fell, and most of their impressions come from question-form or long queries, where Google often shows an AI Overview. That is expected and not a title defect: Pew's independent panel measured clicks on traditional results falling from 15% to 8% of visits when an AI summary appears. Do not rewrite these titles for CTR. Instead: (1) judge these pages on clicks and conversions per visit, not CTR; (2) keep the facts the AI Overview could cite from you visible in the raw HTML — figures with sources, prices, dates; (3) watch the Generative AI report (Search Console → Performance) for AI impressions on these URLs; (4) re-baseline any CTR watchpoint on these pages instead of reading the drop as a failed fix."`
+
+**Do not emit** when the AIO-prone segment's position fell by more than 1.0 site-wide — that is ranking loss (`content_decay` `visibility_loss` territory), not compression.
+
+### 18. `bing_ai_citations` (from Bing Webmaster Tools AI Performance exports — 2.20.0)
+
+**Why it exists.** Bing Webmaster Tools' **AI Performance** report (public preview since February 2026; intent, topic and citation-share views added June 2026) is, as of 2026-11, the only first-party dashboard that counts **citations** — how often Copilot, Bing AI summaries and select partner integrations cited the site's pages, and for which grounding queries ([Bing Webmaster blog](https://blogs.bing.com/webmaster/February-2026/Introducing-AI-Performance-in-Bing-Webmaster-Tools-Public-Preview)). It is UI-only (no documented API), shows no clicks, keeps about 3 months, and does not split surfaces or name partners. Google's Generative AI report counts impressions only. Neither measures ChatGPT, Claude or Perplexity.
+
+**Source:** `gsc-parse-helper bing-exports --dir .seo-data/bing/exports` (SKILL.md Step 1.6.15), which the user fills the same way as `.seo-data/gsc/exports/`. Output `{status, files, pages: [{url, citations}], queries: [{query, citations}], total_citations, period}`. `status: "absent"` (no folder or no CSVs) → no finding. The step runs whether or not `gsc_mode` is enabled: with GSC enabled, seo-gsc-insights emits the finding; with GSC disabled (the subagent is not dispatched), the orchestrator emits the same finding itself from the digest in Step 6, by the rules below, and the report renders it in the Section 3 Bing sub-block alone.
+
+**Emit one digest finding** when `total_citations` is known (even when it is 0):
+
+- `severity`: `low`; `medium` when one or more `money_pages` entries have no citations while other pages do
+- `certainty`: `0.9` (first-party counts; the cross-reference below is the judgment part)
+- `effort_estimate`: `small`
+- `location`: the site root
+- `evidence`: `period`, `total_citations`, top 5 cited pages with counts, top 5 grounding queries with counts, and the cross-reference:
+  - **Money pages** (`Site profile: money_pages`): which are cited, which are absent. A money page absent while blog or help pages collect citations is the main signal.
+  - **Branded share:** the share of grounding-query citations whose query contains a `brand_terms` entry. High branded share means AI answers cite the site when asked about it by name, not when asked about the topic.
+  - **Same-run cross-links (orchestrator, Step 6 consolidation):** the subagent cannot see geo-generative's output, so the orchestrator appends to `cross_link_findings` any `geo_raw_html_gap`, `schema_visible_mismatch` or `cdn_waf_block` finding whose location is a cited page or a money page — those defects decide what an AI answer can repeat.
+- `title`: `"Bing AI citations: <total> over <period> — <k> of <m> money pages cited"`
+- `recommended_action`: `"Info only — counts from Bing's AI Performance export (Copilot and Bing AI summaries; no clicks, about 3 months kept). Re-export each run and compare totals run over run; a single export is a snapshot, not a trend. For money pages with no citations: confirm Bingbot can fetch them, that their key facts are in the raw HTML, and that IndexNow (or a fresh sitemap lastmod) tells Bing when they change. Do not change content to chase a single run's count."`
+
+**Fields:** `source: "gsc"` (keeps the orchestrator's `score_impact: 0` enforcement in force) plus `origin: "bing_webmaster"`, so the report can label the row honestly.
+
+---
+
+## Update-window overlap annotation (`update_overlap`, 2.20.0)
+
+Replaces "check the Search Status Dashboard by hand". A Google core or spam update can move rankings, CTR and indexing with no change on the site; a finding or watchpoint verdict whose data window overlaps a rollout must say so, or git attribution and "your fix failed" verdicts become dishonest.
+
+**Source:** `gsc-parse-helper update-windows` (SKILL.md Step 1) — `{status, source, updates: [{name, kind: core|spam|other, start, end}]}` from the Google Search Status Dashboard ranking-update history, cached under `.seo-data/cache/ranking-updates.json`. `end: null` means the rollout is still in progress; treat it as ending on the run date. The orchestrator passes the updates inside the lookback window as a `Ranking updates:` block (one line each: `<name> | <kind> | <start> → <end|ongoing>`), or `unavailable (<reason>)` when `status` is `unavailable`. `update-windows --overlap START,END` returns the overlapping updates for one window (the orchestrator uses it for findings it emits itself).
+
+**Rule.** For each finding below, `update_overlap` is the list of update names whose `[start, end]` intersects the finding's data window. Only `core` and `spam` kinds count for the softening rules; `other` incidents are listed but change nothing.
+
+| Finding | Data window | Who computes |
+|---|---|---|
+| `content_decay` (16) | oldest decay window's start → `endDate` | seo-gsc-insights |
+| `ai_overview_compression` (17) | sa-trends previous window start → current window end | seo-gsc-insights |
+| `brand_query_anomaly` (13) | Q1 lookback window | seo-gsc-insights |
+| `deindex_regression` (14) | previous snapshot date → this run | orchestrator (Step 1.6.13, `--overlap`) |
+| Watchpoint verdicts | watchpoint's applied date → this run | orchestrator (Step 1.6.14 / 6.8, `--overlap`) |
+
+**Effects when non-empty (core or spam):**
+- `evidence` gains `"Window overlaps Google <name> (<start> – <end or 'ongoing'>)"`.
+- The advice says the change may be the update rather than the site, and quotes Google's guidance to let a rollout finish and wait at least a week before comparing performance.
+- `content_decay` certainty −0.15; `deindex_regression` quality-class transitions get the note in sub-dim 14 (mechanical transitions are never softened).
+- Watchpoints (SKILL.md Step 1.6.14 owns the exact rule): a `regressed` or `unchanged` verdict becomes `inconclusive — overlaps <names>`, never "fix failed"; `improved` stays, noting that part of the gain may be the update. The watchpoint itself is not rewritten.
+- `code_changed_since_gsc_window` and `update_overlap` can both hold; report both — neither cancels the other.
+
+**When unavailable** (`status: unavailable`, offline and no cache): set `update_overlap: null` (unknown), never `[]`, and the footer says `Ranking-update overlay unavailable: <reason>`. An empty list means "checked, nothing overlapped".
 
 ---
 

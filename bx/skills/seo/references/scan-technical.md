@@ -10,9 +10,12 @@ Loaded by the orchestrator and passed to the `seo-technical` subagent. Detailed 
 - `Sitemap URL probe results` — list of `{url, status, redirect_hops, response_seconds, response_bucket}` records; or skip-reason note
 - `Rendered HTML excerpt` (only if `--url` provided)
 - `Page audit:` — `gsc-parse-helper page-audit` records from Step 3.4 (raw HTML as a non-rendering crawler sees it), plus `Rendered:` records when a browser was available; or a skip-reason note
+- `Render compare:` — `gsc-parse-helper render-compare` results from Step 3.4 (2.20.0), one per page that had both a raw and a rendered copy: `{url, raw:{robots_meta, canonical, jsonld_count, main_text_chars}, rendered:{...}, rendered_only_directive, directive_changes, raw_html_gap}`; or a skip-reason note
+- `UTM survival:` — `bot-probe` `utm_survival: {tested_url, final_url, kept, hops}` from Step 3.5 (2.20.0); or a skip-reason note
+- `IndexNow:` — `bot-probe` `indexnow: {key_candidates, key_file_ok}` from Step 3.5 (2.20.0); `key_file_ok: null` when no key was known to check
 - `Field CWV:` — CrUX p75 records from Step 3.3; or a skip-reason note
 - `Exports:` — the Core Web Vitals export digest from Step 1.6.15, when the user dropped one
-- `Site profile:` — `markets`, `money_pages`, `site_type` (Step 0.5)
+- `Site profile:` — `markets`, `money_pages`, `site_type` (Step 0.5); since 2.20.0 also `cdn` and `bing_verified` when known
 - `Weight adjustments` — per-dimension deltas from brief, capped at ±5 each, sum=0
 
 ## Approach
@@ -197,6 +200,8 @@ If shared context includes rendered HTML excerpt:
 
 Findings should clearly note which side (source / rendered) is treated as canonical.
 
+**When `Render compare:` covers the same URL** (2.20.0), skip this sub-scan's canonical comparison for it — sub-scan 14 judges canonicals from the raw-vs-rendered pair, which is the comparison that matters to crawlers. Title and description drift stay here.
+
 ---
 
 ## Sub-scan 11: Field Core Web Vitals (Performance dim — consumes `Field CWV:` and the CWV export)
@@ -243,6 +248,7 @@ Most AI crawlers (GPTBot, ClaudeBot, PerplexityBot) do not run JavaScript, and G
 - **No `Page audit:` at all** (no base URL resolvable): static-only check — a client-only SPA stack (CRA, Vite/React or Vue without an SSR/SSG framework, `ssr: false` in Nuxt/SvelteKit config, Angular without `@angular/ssr`) → one finding "Site is client-rendered", `severity: high`, `certainty: 0.7`, `score_impact: 1.5`. SSR/SSG frameworks (Next.js, Nuxt default, Astro, SvelteKit default, Remix, Gatsby, Hugo, Jekyll, Eleventy, Rails/Django templates) → no finding.
 - `status=error:ssl` / `error:network` / `error:timeout` → never a finding about the site (it is usually the local machine's TLS store or network). Footer note only.
 - Cap `rendering` at its sub-dim max (3).
+- **Boundary with sub-scan 14 (2.20.0):** this sub-scan owns *missing in raw, present after JS* (content, title, a canonical absent from raw HTML, JSON-LD). Sub-scan 14 owns *directives whose value differs* between raw and rendered (robots `noindex`/`nofollow` added, removed or changed; a canonical that points somewhere else after JS). One URL × tag is judged by one sub-scan only. Main-content and JSON-LD gaps for AI crawlers are geo-generative's `geo_raw_html_gap` — do not emit a GEO finding here; the `rendering` finding above still stands for search crawlers.
 
 ---
 
@@ -264,6 +270,88 @@ Google's [spam policies](https://developers.google.com/search/docs/essentials/sp
 
 ---
 
+## Sub-scan 14: Rendered-only directives (`rendered_only_directive` — consumes `Render compare:`)
+
+Google renders JavaScript but may not render a page whose raw HTML says `noindex`, and it documented noindex and canonical behaviour on JS-rendered pages in December 2025 ([Search Central changelog](https://developers.google.com/search/updates); [JavaScript SEO basics](https://developers.google.com/search/docs/crawling-indexing/javascript/javascript-seo-basics)). Non-Google AI crawlers do not run JavaScript at all (Vercel/MERJ, December 2024). A robots or canonical directive that JS adds or changes therefore means different crawlers obey different instructions. Screaming Frog flags the same class as "rendered-only" issues.
+
+**From each `Render compare:` record with `rendered_only_directive: true`**, read `directive_changes` (each names the directive and its raw and rendered values):
+
+| Change | Why it matters | sub_dimension | Severity | score_impact | certainty |
+|---|---|---|---|---|---|
+| raw has `noindex`, rendered removes it | Google may skip rendering, so the page stays out of the index; the JS "fix" never runs for it | `robots_sitemap` | high | 2 | 0.85 |
+| raw indexable, rendered adds `noindex` | Google drops the page after rendering while non-rendering crawlers index it — usually an accidental client-side default | `robots_sitemap` | high (medium when the URL is not a money page, not the homepage and not in the sitemap) | 2 (1 for medium) | 0.85 |
+| `nofollow` added or removed by JS | link discovery differs by crawler | `robots_sitemap` | low | 0.25 | 0.8 |
+| raw canonical A, rendered canonical B (both present, different after normalising trailing slash and scheme) | crawlers receive conflicting canonical signals; Google may pick either | `canonicals` | medium (high on a money page) | 1 | 0.8 |
+
+- Emit **one finding per change type**, listing the URLs in `evidence` with both values (`raw: <v> → rendered: <v>`); `location` is the first URL, or the source file that sets the directive client-side when a `Grep` for the rendered value (e.g. `noindex` inside a `useEffect`, `document.head`, `next/head` in a client component, `react-helmet`, `vue-meta`) finds it — then `location` is that file and `certainty` +0.05.
+- Mark each finding with `"finding_id": "rendered_only_directive"`.
+- `recommended_action`: put the final directive in the server-sent HTML (SSR/SSG metadata API, server template, or an `X-Robots-Tag` header) and remove the client-side override. Never fix it by adding a second directive in JS.
+- `rendered_only_directive: false` or no `Render compare:` → nothing here. A Playwright render is not Googlebot's renderer: say "as rendered by a headless browser" in `evidence`, never "as Google sees it".
+- Points count against the existing `robots_sitemap` (4) and `canonicals` (4) caps; sub-scan 6's noindex findings and these never deduct twice for one URL — keep the one with the higher `score_impact`.
+
+---
+
+## Sub-scan 15: ChatGPT attribution survival (`utm_stripped` — consumes `UTM survival:` + source)
+
+ChatGPT adds `utm_source=chatgpt.com` to the links it cites ([OpenAI publishers FAQ](https://help.openai.com/en/articles/12627856-publishers-and-developers-faq)). A redirect or middleware that rebuilds the URL from its path alone drops that parameter, so AI referrals land in analytics as Direct. This is an **attribution** defect, not a ranking one: `score_impact: 0`, `sub_dimension: "redirects"`, `"finding_id": "utm_stripped"`.
+
+**Live (`UTM survival:`):** `kept: false` → finding, `severity: medium`, `certainty: 0.9`, evidence `tested_url → final_url` and `hops`. `kept: true` → no live finding (only the base URL was tested; static suspects below still apply to other routes). Skip-reason note → static only.
+
+**Source (always):** `Grep` the scope (not vendored dirs) for redirect code that rebuilds the target without the query string:
+
+| Pattern (examples, not exhaustive) | Keeps the query? |
+|---|---|
+| Next.js middleware / proxy: `NextResponse.redirect(new URL(<pathname>, req.url))` or a target built from `nextUrl.pathname` with no `.search` / `searchParams` | no — flag |
+| `url.search = ''`, `searchParams.delete(` over all keys, "strip query params" helpers applied before a redirect or canonical rewrite | no — flag |
+| Express/Koa: `res.redirect(req.path)` / `ctx.redirect(ctx.path)` (`req.originalUrl` / `ctx.url` keep it) | no — flag |
+| nginx `return 301 https://$host$uri;` or `rewrite ... ?` with a trailing `?` (`$request_uri` / `$is_args$args` keep it) | no — flag |
+| Apache `RewriteRule ... [QSD]` | no — flag |
+| Framework config redirects (Next.js `redirects()`, `vercel.json`, Netlify `_redirects`) without an explicit query-dropping option | yes by default — do not flag |
+
+- Static match only → `severity: low` (medium when the redirect sits on every request, e.g. trailing-slash, locale or www normalisation middleware), `certainty: 0.6`; `0.4` when the live check reported `kept: true`. One finding per file, `location` = `<path>:<line>`.
+- Live `kept: false` + a static match → one finding at the static location, `certainty: 0.95`, citing both.
+- `recommended_action`: carry `search` (or `request_uri`) into the redirect target; never strip `utm_*` parameters in middleware. If analytics should not store them, remove them client-side after the analytics tag reads them. Plan item (not this agent's finding): a GA4 custom channel for AI referrers, noting the October 2026 reports of ChatGPT traffic arriving with no referrer or UTM.
+
+---
+
+## Sub-scan 16: IndexNow readiness (`indexnow_missing` — consumes `IndexNow:` + source)
+
+IndexNow lets a site tell participating engines (Bing, Yandex, Seznam, Naver and others; **not Google**) that a URL changed. Bing positions it, as of 2026-02, as the way to keep AI answers referencing the current version of a page ([Bing Webmaster blog](https://blogs.bing.com/webmaster/February-2026/Introducing-AI-Performance-in-Bing-Webmaster-Tools-Public-Preview)). It is near-free for sites that publish often and adds little for a site that rarely changes. Every finding here is `score_impact: 0`, `sub_dimension: "robots_sitemap"`, `"finding_id": "indexnow_missing"`.
+
+**What to look for in source:**
+1. **Key file** — `Glob {public,static,_site,dist,out}/*.txt` (and the repo root for plain static sites): a file named `<key>.txt` where `<key>` is 8–128 characters of letters, digits or dashes and the file's only content equals `<key>`. A route that serves the key (e.g. `app/[key].txt/route.ts`, an `indexnow` API route reading an env var) also counts.
+2. **Ping on publish** — `Grep -i` for `indexnow`, `api.indexnow.org`, `bing.com/indexnow` in source, CI workflows (`.github/workflows/`, `.gitlab-ci.yml`), deploy scripts, sitemap generators, CMS webhooks, and `package.json` dependencies (IndexNow plugins for the framework or CMS).
+
+**`IndexNow:` (live, only when the orchestrator knew a key):** `key_file_ok: true` — the key file is served; `false` — it is not served or its content differs; `null` — not checked.
+
+| State | Severity | certainty | is_fix_eligible |
+|---|---|---|---|
+| no key file and no ping | low | 0.8 | true — key-file scaffold only (`fix-allowlist.md` #12); the ping is `--plan` work |
+| key file present, no ping found | low | 0.6 (a CMS or hosting integration may ping outside the repo — say so) | false |
+| ping found, no key file or key route | medium (pings fail verification) | 0.6 | false |
+| live `key_file_ok: false` while a key is known | medium | 0.85 | false |
+| key served (`key_file_ok: true` or file present) and ping found | no finding | — | — |
+| the `--fix` placeholder (`indexnow-key.txt` still containing `TODO-replace-this-line-with-your-IndexNow-key`) | low — "IndexNow key placeholder not filled in" | 0.9 | false |
+
+The placeholder file is neither a key nor a ping: exclude it from the ping `Grep`.
+
+- `site_type` that rarely changes (portfolio, brochure) → cap at `low` and say "optional".
+- `Site profile: bing_verified: no` → add to the advice that Bing Webmaster Tools verification is what shows whether submissions arrive.
+- `recommended_action`: generate a key yourself (Bing's IndexNow page, or 32+ random hex characters from your own tooling — the skill never writes a real key), serve it as `<key>.txt` at the site root, and submit changed URLs to `https://api.indexnow.org/indexnow` from the deploy step or sitemap regeneration. Keep sitemaps with accurate `lastmod` as well — IndexNow complements them.
+
+---
+
+## Sub-scan 17: Soft-navigation Core Web Vitals note (info — client-routed sites)
+
+As of 2026-11, CrUX publishes **experimental** LCP, INP and CLS variants that include soft navigations (client-side route changes), and its release notes say soft navigations are planned to be included in the standard metrics **from May 2027** ([CrUX release notes](https://developer.chrome.com/docs/crux/release-notes); [web.dev](https://web.dev/blog/crux-experimental-soft-navs/)). Today's standard metrics count only hard navigations as page views: a client-side route change gets no LCP of its own, and its interactions and shifts are attributed to the landing URL. Sites that navigate client-side may see their field numbers shift when the change lands.
+
+- **Trigger:** the detected stack routes client-side after the first load — a client-only SPA (sub-scan 12's list), or Next.js / Nuxt / SvelteKit / Remix / Gatsby / Astro with view transitions or a client router — **and** `Field CWV:` has data for the origin (with `no_data` or no CrUX at all there is nothing to shift; skip). Plain MPAs → nothing.
+- **One finding**, `dimension: "performance"`, `sub_dimension: "font_script_perf"`, `severity: low`, `certainty: 0.5`, `score_impact: 0`, `"finding_id": "soft_nav_cwv_note"`, `location` = the router or root layout file.
+- `recommended_action`: "Info only. Look up the site's experimental soft-navigation metrics in CrUX Vis or the CrUX API and compare them with the standard ones; if the soft-navigation INP or CLS is worse, fix route-change work (heavy client transitions, layout shift on navigation) before the planned change. No score impact until the metrics become standard."
+- Never deduct and never re-rate a field CWV finding on this basis. If the brief reports the plan has changed, follow the brief.
+
+---
+
 ## Output addendum
 
 After all findings, append:
@@ -282,6 +370,12 @@ sub_dimension_breakdown: {
 }
 field_cwv_used: true | false
 spam_policy_findings: <int>
+rendered_only_directives: <int — URLs with a directive changed by JS; 0 when Render compare was skipped>
+render_compare_used: true | false
+utm_source_survives: true | false | null   // live result; null when not probed
+utm_static_suspects: <int>
+indexnow_state: "ok" | "key_only" | "ping_only" | "missing" | "key_not_served"
+soft_nav_note: true | false
 files_scanned: <int>
 ```
 
@@ -294,4 +388,5 @@ The orchestrator's Step 6 reads these to compute the report's Section 1 breakdow
 - **Never make HTTP requests.** No `Bash(curl:*)`, no `WebFetch`.
 - **URL-health score cap: 5 points.** Scale findings if raw sum exceeds.
 - **Skip vendored / generated dirs**: `node_modules`, `venv`, `.git`, `dist`, `build`, `.next`, `.nuxt`, `out`, `_site`, `public/build`, `__generated__/`, `*.generated.*`, `*.d.ts`.
-- **Cap output at 30 findings**, ordered by `score_impact × certainty` desc.
+- **Cap output at 30 findings**, ordered by `score_impact × certainty` desc. The 2.20.0 info findings (`utm_stripped`, `indexnow_missing`, `soft_nav_cwv_note`) have `score_impact: 0`; when the cap bites, they go before other zero-impact info notes but after every deducting finding.
+- **Never write or guess an IndexNow key** — keys are user-generated. Findings may cite a key the repo already serves (it is public by design), never propose one.

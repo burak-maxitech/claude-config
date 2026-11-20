@@ -78,7 +78,7 @@ When `gsc_mode == "enabled"`, DO NOT render this banner — the GSC mode line in
 | Technical SEO | 22 | 25 | url_health: -1.5; canonicals: -1; mobile: -0.5 |
 | On-Page SEO | 18 | 25 | meta_descriptions: -3; alt_text: -2; internal_linking: -2 |
 | Structured Data | 14 | 20 | jsonld_coverage: -4; schema_validation: -2 |
-| Generative Engine | 9 | 20 | eeat: -5; ai_bot_access: -4; semantic_content: -2 |
+| Generative Engine | 9 | 20 | eeat: -5; ai_bot_access_declared: -2; ai_bot_access_delivered: -2; semantic_content: -2 |
 | Performance | 8 | 10 | image_perf: -1; response_time: -1 |
 | **Total** | **72** | **100** | |
 ```
@@ -126,11 +126,54 @@ Fix mode: not eligible (requires judgment about whether to restore or remove).
 
 Repeat per dimension. Don't render detail blocks for every finding — only #1 per dimension; the table covers the rest.
 
+### Dimension add-on blocks (2.20.0)
+
+Some checks are easier to read as a table than as finding rows. Render each block **below its dimension's findings table and #1 detail block**, only when its data exists; the findings themselves still appear in the table as usual.
+
+**Generative Engine → AI crawler delivery** (from Step 3.5 `bot-probe`; omit when the probe was skipped — the footer says why):
+
+```
+#### AI crawler delivery (live probe — what each bot was served, not what robots.txt says)
+
+| Bot              | Group    | robots.txt   | Served (base URL)              | Verdict      |
+|------------------|----------|--------------|--------------------------------|--------------|
+| (browser control)| —        | —            | 200, 48 KB                     | —            |
+| OAI-SearchBot    | search   | allow        | 403 · cf-mitigated: challenge  | challenged ⚠ |
+| Claude-SearchBot | search   | allow        | 200, 47 KB                     | ok           |
+| PerplexityBot    | search   | allow        | 200, 9 KB                      | differs ⚠    |
+| ChatGPT-User     | user     | unspecified  | 200, 48 KB                     | ok           |
+| GPTBot           | training | disallow     | 403                            | blocked (matches policy) |
+| Google-Extended  | training | disallow     | robots-only token — not fetched | —           |
+
+Pages probed: /, /pricing, /blog/guide (worst verdict per bot shown; per-page detail in the finding evidence).
+Policy (site profile): search_yes_training_no. CDN/WAF suspects: OAI-SearchBot.
+Policy conflicts: Content-Signal `ai-input=no` while search bots are allowed.
+
+A blocked or challenged spoofed user agent is not proof the real crawler is blocked — a WAF that verifies bot IPs rejects a spoofed UA too. Confirm in your CDN dashboard against the vendor's published IP list.
+```
+
+Mark a verdict with ⚠ only when it contradicts the declared `ai_policy` (a blocked training bot under `search_yes_training_no` is the policy working). `differs` = 200 but under half the control's bytes.
+
+**Structured Data → Schema vs visible text** (from geo-generative's `schema_visible_mismatch`, built on page-audit `schema_visible_checks`; omit when no page had a mismatch or page-audit was skipped):
+
+```
+#### Schema vs visible text (raw HTML as crawlers receive it)
+
+| URL       | Type         | Field     | JSON-LD value        | Visible text            |
+|-----------|--------------|-----------|----------------------|-------------------------|
+| /pricing  | Product      | price     | 49.00 USD            | not found               |
+| /contact  | LocalBusiness| telephone | +1 555 0100          | not found               |
+
+Only mismatches are listed; "not found" means the value does not appear in the normalised visible raw text — check whether the page shows a different value or none. Markup that contradicts the page can be repeated by AI answers, and Google requires structured data to match visible content.
+```
+
+**Technical SEO → rendered-only directives** need no add-on block: `rendered_only_directive` findings sit in the Technical table, and their evidence shows `raw: <value> → rendered: <value>` per URL. `utm_stripped`, `indexnow_missing` and the soft-navigation note are info rows (`Impact 0`) in the Technical and Performance tables.
+
 ---
 
 ## Section 3 — GSC Insights (only when `gsc_mode: enabled`)
 
-Render this section between Findings (Section 2) and Score History (Section 4) **only when GSC API ingestion produced findings in Step 1.6**. Skip entirely otherwise — no banner, no placeholder. The section has 7 sub-blocks (Indexing coverage / **Index Coverage regression** / Top-impact GSC findings / CTR opportunities / Position-band query opportunities / Traffic orphans / Code-already-fixed annotations); render only those that have data.
+Render this section between Findings (Section 2) and Score History (Section 4) **only when GSC API ingestion produced findings in Step 1.6**, or when Bing exports produced a `bing_ai_citations` finding (then render the heading, the info line and the Bing sub-block only). Skip entirely otherwise — no banner, no placeholder. The section has 10 sub-blocks (Indexing coverage / **Index Coverage regression** / Top-impact GSC findings / CTR opportunities / **AI Overview compression** / Position-band query opportunities / Traffic orphans / **Ranking-update windows** / **Bing AI citations** / Code-already-fixed annotations); render only those that have data.
 
 ```
 ## GSC Insights
@@ -229,6 +272,21 @@ When this is the first run for the property (no prior snapshot), omit this sub-b
 
 Title + meta rewrites on these 5 pages alone could recover an estimated 200-400 clicks/month.
 
+(Pages that also appear under "AI Overview compression" below carry `AIO?` in an extra column and are excluded from the rewrite estimate.)
+
+### AI Overview compression (sub-dim 17 — CTR fell at a steady position on AI-Overview-prone queries)
+
+Render only when the `ai_overview_compression` finding exists.
+
+AI-Overview-prone queries (question-form or 6+ words): CTR 3.1% → 1.7% at pos 4.2 → 4.0. Other queries: CTR 2.4% → 2.3%. The drop is concentrated where Google often shows an AI Overview.
+
+| URL                       | AIO-prone share | CTR change | Position change | In Generative AI report? |
+|---------------------------|-----------------|------------|-----------------|--------------------------|
+| /blog/how-to-pick-widgets | 82%             | −41%       | +0.3            | yes                      |
+| /guides/widget-vs-gadget  | 74%             | −28%       | −0.6            | no export                |
+
+**Expected, not a title defect.** Pew's independent panel found users clicked a traditional result on 8% of visits with an AI summary vs 15% without. Judge these pages on clicks and conversions, not CTR; do not rewrite their titles for CTR. "In Generative AI report?" is `yes` / `no` (export present, page absent — weaker evidence) / `no export`.
+
 ### Position-band query opportunities (positions 5-20 with ≥100 imps — top 5 from Q1 queries digest)
 
 | Query                        | Impressions | Clicks | CTR  | Position |
@@ -244,6 +302,34 @@ Moving any of these from position 8-14 to position 3-5 typically 3-5x's clicks. 
 ### Traffic orphans (sitemap URLs with 0 impressions in window)
 
 23 URLs in sitemap.xml received 0 impressions across GSC's data window. Sample: /archive/2019/jan, /author/legacy-contributor, /tag/deprecated-feature, … Audit: improve content + internal links, remove from sitemap if they shouldn't rank, or accept as legitimate low-traffic pages.
+
+### Ranking-update windows (Google Search Status Dashboard overlay)
+
+Render when any finding or due watchpoint has a non-empty `update_overlap`. When the overlay was unavailable, render one line instead: `Ranking-update overlay unavailable (<reason>) — time-windowed findings below were not checked against Google updates.`
+
+| Finding / watchpoint                 | Data window             | Overlapping update (kind, dates)              | Effect |
+|--------------------------------------|-------------------------|-----------------------------------------------|--------|
+| content_decay (6 pages)              | 2026-08-14 → 2026-11-05 | November 2026 core update (core, 11-10 → ongoing) | certainty −0.15; "may be the update" |
+| deindex_regression (7 quality-class) | 2026-10-30 → 2026-11-20 | November 2026 core update (core, 11-10 → ongoing) | advice notes possible reassessment |
+| watchpoint /pricing (CTR)            | 2026-10-22 → 2026-11-20 | November 2026 core update (core, 11-10 → ongoing) | verdict → inconclusive |
+
+A Google core or spam update can move rankings and clicks with no change on the site. Let a rollout finish and wait at least a week before comparing; until then, treat these findings as "possibly the update", not as site regressions or failed fixes. (Dates above are illustrative.)
+
+### Bing AI citations (sub-dim 18 — from Bing Webmaster Tools AI Performance exports)
+
+Render when the `bing_ai_citations` finding exists (with or without GSC).
+
+Bing AI citations, <period>: **<total>** (Copilot and Bing AI summaries; no clicks; Bing keeps about 3 months).
+
+| Cited page          | Citations | Money page? |
+|---------------------|-----------|-------------|
+| /blog/widget-guide  | 212       | no          |
+| /pricing            | 31        | yes         |
+
+Top grounding queries: "best widget for small teams" (44), "widget vs gadget" (29), … Branded share: 12%.
+Money pages with no citations: /enterprise, /integrations. Same-run cross-links: /enterprise — `geo_raw_html_gap`.
+
+Info only — a single export is a snapshot; compare totals run over run. Counts are Bing's surfaces only, not ChatGPT, Claude or Perplexity.
 
 ### Code-already-fixed annotations
 
@@ -349,6 +435,13 @@ Other footer notes:
 - `Page-type map: <N> URLs classified (<distribution>).`
 - `URL impressions map: <N> URLs with traffic data.`
 - `API call failures: <N> (<endpoint, http_status, error_status per line>).` — only when any API call failed.
+- `Ranking-update overlay: <N> Google updates on record (source: <status-dashboard | cache, age Nd>); <M> findings and <W> watchpoints overlap.` — or `Ranking-update overlay unavailable: <reason>.`
+- `AIO segmentation: AIO-prone CTR <prev>% → <now>%, other <prev>% → <now>%; <P> pages in ai_overview_compression, <R> content_decay ctr_loss URLs routed there.`
+
+**2.20.0 footer lines** (any mode; each omitted when its step did not run and printed with its skip reason when it was skipped). The exact strings are owned by SKILL.md:
+- `AI-crawler probe: …` (Step 3.5) — bots × pages, verdict counts, CDN/WAF suspects, policy conflicts, `utm_source` kept/stripped, IndexNow key state.
+- `Page audit: …` (Step 3.4) — now also `<D> rendered-only directives; <G> raw-HTML gaps`, or `render-compare skipped (<reason>)`.
+- `Bing exports: <N> files parsed, <total> citations over <period>.` — or `Bing exports: none (drop Bing Webmaster Tools AI Performance CSVs into .seo-data/bing/exports/ to track AI citations).` only when `site_profile.bing_verified: yes`.
 
 **GSC-mode subtotal-check addendum:** append `| gsc_findings: <count> (info-only, 0 score impact)` to the subtotal_check line so reviewers can confirm GSC ran without affecting the score.
 

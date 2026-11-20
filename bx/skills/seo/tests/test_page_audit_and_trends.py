@@ -55,7 +55,8 @@ class AnalyzeHtml(unittest.TestCase):
         self.assertEqual(r['title'], 'Pricing & Plans')
         self.assertEqual(r['canonical'], 'https://ex.com/pricing')
         self.assertEqual(r['robots'], 'index,follow')
-        self.assertEqual((r['h1'], r['jsonld']), (1, 1))
+        self.assertEqual((r['h1'], r['jsonld_count']), (1, 1))
+        self.assertEqual(r['jsonld'], [{'type': 'Product', 'fields': {}}])
         self.assertGreaterEqual(r['words'], 120)
         self.assertFalse(r['empty_root'])
         self.assertEqual(r['history_calls'], 1)
@@ -154,12 +155,12 @@ class SaTrendsCmd(unittest.TestCase):
                 mock.patch.object(h, 'resolve_credentials') as rc:
             out = run(h.cmd_sa_trends, 'c', 'sc-domain:ex.com', '2026-11-03', '90')
         rc.assert_not_called()
-        self.assertIn('sa_trend_calls:hit hit hit hit', out)
+        self.assertIn('sa_trend_calls:hit hit hit hit hit hit', out)
         self.assertIn('cannibal_queries:1', out)
         self.assertIn('decay_pages:1', out)
         self.assertIn('pattern=ctr_loss', out)
         # windows: oldest first, contiguous, 28 days each, ending at end_date
-        w = [(b['startDate'], b['endDate']) for b in calls[1:]]
+        w = [(b['startDate'], b['endDate']) for b in calls[1:4]]
         self.assertEqual(w, [('2026-08-12', '2026-09-08'),
                              ('2026-09-09', '2026-10-06'),
                              ('2026-10-07', '2026-11-03')])

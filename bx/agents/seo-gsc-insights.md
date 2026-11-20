@@ -29,6 +29,10 @@ Sub-dimensions (structural routing labels only — no max-points table):
 | `traffic_orphan` | Search Analytics — Q3 `url_impressions_map` ∩ sitemap |
 | `cannibalization` | Search Analytics — `sa-trends` query×page digest (2+ URLs split a non-brand query) |
 | `content_decay` | Search Analytics — `sa-trends` three 28-day page windows (clicks fell twice, ≥30% total) |
+| `ai_overview_compression` | Search Analytics — `sa-trends` `ctr_segments` + `ai_overview_compression` (CTR fell at a steady position on AIO-prone queries), cross-checked with the Generative AI export (2.20.0) |
+| `bing_ai_citations` | Bing Webmaster Tools AI Performance exports — `bing-exports` digest, cross-referenced with money pages (2.20.0) |
+
+Annotation (not a sub-dim): `update_overlap: [names]` on `content_decay`, `ai_overview_compression` and `brand_query_anomaly`, from the `Ranking updates:` block.
 
 Total points contributed: 0. You add **information**, not scoring.
 
@@ -45,8 +49,9 @@ The orchestrator-passed **GSC ingestion reference** (`references/gsc-ingestion.m
   - Queries digest: top 50 by impressions desc, fields: query, clicks, impressions, ctr, position
   - Pages digest: top 50 by impressions desc, fields: url, clicks, impressions, ctr, position
   - `url_impressions_map`: full url→impressions map for traffic_weight ranking (used by the orchestrator in Step 6 — you don't apply traffic_weight yourself)
-- **Trend digests** (from `gsc-parse-helper sa-trends`, 2.17.0): `--- cannibalization ---` and `--- content decay ---` lines → sub-dims 15 and 16
-- **Exports** (Step 1.6.15, when the user dropped them): Generative AI performance and Links digests
+- **Trend digests** (from `gsc-parse-helper sa-trends`, 2.17.0): `--- cannibalization ---` and `--- content decay ---` lines → sub-dims 15 and 16; since 2.20.0 also the `CTR segments:` block — `ctr_segments` (site-level CTR for AIO-prone vs other queries) and `ai_overview_compression` (per-page list) → sub-dim 17
+- **Exports** (Step 1.6.15, when the user dropped them): Generative AI performance and Links digests; and the **`Bing AI:`** digest (from `bing-exports`: period, total citations, top cited pages, top grounding queries, money pages with zero citations) → sub-dim 18
+- **`Ranking updates:`** (Step 1, `update-windows`, 2.20.0): Google ranking updates inside the lookback window, one line each `<name> | <kind> | <start> → <end|ongoing>`, or `unavailable (<reason>)` → the `update_overlap` annotation
 - **Site profile**: `money_pages`, `brand_terms`, `markets`, `migration_12mo`, `site_type` (severity and seasonality rules in the catalog)
 - **Indexing clusters** (from up to 200 URL Inspection API calls — 3-slice mix: 80 impressions-top + 20 git-changed + 100 sitemap-orphan; mapped via `coverageState` + `pageFetchState` joint lookup table): up to 9 sub-dim clusters, each with:
   - `total_count` (inspected-URL-count matching this cluster — NOT site-wide truth)
@@ -59,9 +64,11 @@ The orchestrator-passed **GSC ingestion reference** (`references/gsc-ingestion.m
 
 ## Scans
 
-**The per-sub-dim finding-emission spec lives in `references/gsc-ingestion.md`** section "Finding-type catalog (16 sub-dims)". The orchestrator passes that section in your task prompt (Step 5). **Sub-dims 1-13, 15 (`cannibalization`) and 16 (`content_decay`) are yours to emit; sub-dim 14 (`deindex_regression`) is orchestrator-emitted from snapshot diff — you don't see transition data in your input and shouldn't emit findings for it.** Follow the catalog unaltered:
+**The per-sub-dim finding-emission spec lives in `references/gsc-ingestion.md`** section "Finding-type catalog (18 sub-dims)" plus its "Update-window overlap annotation" section. The orchestrator passes both in your task prompt (Step 5). **Sub-dims 1-13, 15 (`cannibalization`), 16 (`content_decay`), 17 (`ai_overview_compression`) and 18 (`bing_ai_citations`) are yours to emit; sub-dim 14 (`deindex_regression`) is orchestrator-emitted from snapshot diff — you don't see transition data in your input and shouldn't emit findings for it.** Follow the catalog unaltered:
 
-- One sub-dim per indexing-cluster signal (sub-dims 2-9) or per Performance digest (sub-dims 10-13, 15-16).
+- One sub-dim per indexing-cluster signal (sub-dims 2-9) or per Performance digest (sub-dims 10-13, 15-17); sub-dim 18 from the `Bing AI:` digest.
+- **AI Overview routing (2.20.0):** emit sub-dim 17 before sub-dims 10 and 16. A `content_decay` URL with pattern `ctr_loss` that is in the `ai_overview_compression` list moves to sub-dim 17 — never give it title-rewrite advice. A `ctr_opportunity` URL in that list keeps its finding at certainty −0.2 with the catalog's AI Overview guard prepended. Never quote a CTR loss "expected" for a page as a number; cite Pew's 15% → 8% only as the reason the pattern is expected.
+- **Bing citations are info-only and run-over-run.** One digest finding; cross-reference money pages and branded share as the catalog says (the orchestrator adds the GEO cross-links — you never see geo-generative's findings). A single export is a snapshot — never advise content changes to chase one run's count.
 - **Exports** (no catalog number — they reuse existing sub-dims): a money page missing from the Generative AI pages list → info finding under `ctr_opportunity` titled as an AI-visibility gap; a money page with zero external links in the Links digest → info finding under `traffic_orphan`. Both `score_impact: 0`.
 - Trigger thresholds, severity/certainty defaults, effort estimates, title templates, recommended_action prose — all defined there.
 - Cluster vs per-URL emission rules (e.g., `canonical_conflict` is per-URL up to 5 then clusters).
@@ -94,12 +101,21 @@ After emitting each finding, scan the orchestrator-passed git-changes digest. Fo
 
 When the git digest reports `Shallow: true`, set `code_changed_since_gsc_window: null` (unknown) for all findings — do not lower certainty, do not prepend the note.
 
+## update_overlap annotation (2.20.0)
+
+For `content_decay`, `ai_overview_compression` and `brand_query_anomaly`, compare the finding's data window (table in `gsc-ingestion.md` "Update-window overlap annotation") with each entry in the `Ranking updates:` block — plain date-interval intersection, `ongoing` (helper `end: null`) = still rolling out, ends on the run date. Set `update_overlap` to the overlapping update names and apply the effects listed there (evidence line, advice note, `content_decay` certainty −0.15). Only `core` and `spam` kinds change advice or certainty.
+
+- `Ranking updates:` block is a skip line (unavailable) → `update_overlap: null` on those three sub-dims. Never write `[]` unless you actually checked.
+- Other sub-dims → omit the field (point-in-time inspection states, not windows).
+- Never drop a finding because of an overlap: the update is a possible cause, not a proof.
+- Do not search the web or guess update dates — only the passed list counts.
+
 ## Per-finding output shape
 
 ```
 {
   "dimension": "gsc_insights",
-  "sub_dimension": "<one of sub-dims 1-13, 15, 16 (sub-dim 14 deindex_regression is orchestrator-emitted, never by this subagent)>",
+  "sub_dimension": "<one of sub-dims 1-13, 15-18 (sub-dim 14 deindex_regression is orchestrator-emitted, never by this subagent)>",
   "location": "<URL>" | "<URL-cluster-pattern>" | "<source-file-path-when-applicable>",
   "title": "<one-line>",
   "severity": "low" | "medium" | "high",
@@ -119,7 +135,11 @@ When the git digest reports `Shallow: true`, set `code_changed_since_gsc_window:
   "affected_urls": [<url>, ...],
   "code_changed_since_gsc_window": true | false | null,
   "recent_commits": [<short subject>, ...],
-  "routing_rename_match": true | false   // optional, only for not_found_404 cluster findings
+  "routing_rename_match": true | false,  // optional, only for not_found_404 cluster findings
+  "update_overlap": [<update name>, ...] | null,   // content_decay, ai_overview_compression, brand_query_anomaly only
+  "gen_ai_confirmed": {<url>: true | false | null},   // ai_overview_compression only
+  "origin": "bing_webmaster",   // bing_ai_citations only
+  "cross_link_findings": [<finding title or sub_dim>, ...]   // optional
 }
 ```
 
@@ -158,6 +178,12 @@ top_position_band_queries: [<query>, ...]   // max 5
 findings_with_code_changed: <int>
 findings_with_shallow_history: <int>   // when git was shallow; usually 0 or all
 sub_dimension_breakdown: {<sub_dim>: <count of findings>, ...}
+aio_compression_pages: <int — pages in the sub-dim 17 finding; 0 when none>
+ctr_loss_routed_to_aio: <int — content_decay ctr_loss URLs moved to sub-dim 17>
+ctr_segments: "<AIO-prone ctr_prev→ctr_now, other ctr_prev→ctr_now>" | null
+bing_total_citations: <int> | null   // null when no Bing exports
+findings_with_update_overlap: <int>
+update_windows_status: "ok" | "unavailable" | "not_passed"
 api_calls_made: { searchanalytics: <int>, urlInspection: <int> }
 ```
 

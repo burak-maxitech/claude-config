@@ -2,6 +2,37 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.20.0 — 2026-11-20
+
+`/bx:seo`: the audit checks what crawlers are actually served, not only what the repo declares, and its GEO advice now follows the 2026 evidence base. Source: the S71 research report (Google Search Central, Bing, OpenAI/Anthropic/Perplexity crawler docs, the CrUX release notes, the arXiv 2607.14035 GEO survey, Pew).
+
+### Why
+- Google, OpenAI and Anthropic all tell sites to allow AI crawlers at the CDN/WAF layer as well as in robots.txt, and Cloudflare default-denies AI training bots on ad pages from 2026-09-15. The skill judged robots.txt text only.
+- No major non-Google AI crawler runs JavaScript (Vercel/MERJ), but `geo-generative` saw no live HTML.
+- Controlled GEO replications (C-SEO Bench, SAGEO Arena) mostly failed; relevance and attributed, extractable facts hold up, rewrites of ranking pages can lower citation, and llms.txt/schema show no citation lift.
+- AI Overviews roughly halve clicks where they appear (Pew, 15% → 8%), so `ctr_loss` was sending users to rewrite titles that were not the problem.
+
+### Added
+- **AI-crawler delivery probe** (Step 3.5, `gsc-parse-helper bot-probe`): fetches up to 6 pages as 10 AI bots plus a browser control; `cdn_waf_block` (certainty ≤ 0.6, never "confirmed"; verify against vendor IP files), `ai_policy_conflict` across `Content-Signal`, `__usage_ai-training` groups, `Content-Usage` and per-bot rules; ChatGPT `utm_source` survival; IndexNow key check. Meta-ExternalAgent and OAI-AdsBot join the bot groups.
+- **Raw-HTML GEO checks**: `page-audit --out` emits parsed JSON-LD, visible dates, robots meta, main-text size and schema-vs-visible checks; `geo-generative` now receives them → `schema_visible_mismatch`, `geo_raw_html_gap`. `render-compare` compares raw vs rendered HTML → `rendered_only_directive` (seo-technical sub-scan 14).
+- **AI-aware Search Console reading**: `sa-trends` segments AIO-prone queries (question-form or ≥ 6 words) → info-only `ai_overview_compression`; `ctr_loss` routes those pages there. `update-windows` reads the Search Status Dashboard feed (`incidents.json`, cached) and annotates `content_decay`, `deindex_regression`, `brand_query_anomaly` and watchpoints with `update_overlap`; a failed watchpoint inside an update window is **inconclusive**, not "fix failed".
+- **Bing**: `.seo-data/bing/exports/` AI Performance CSVs → info-only `bing_ai_citations`; seo-technical `indexnow_missing`, `utm_stripped`, a soft-navigation CWV note for SPAs; `--fix` allowlist #12 IndexNow key-file scaffold (placeholder only, never a real key).
+- Site-profile keys `bing_verified`, `analytics_ai_channel`, `cdn`; `--plan` items for CDN-block verification, GA4 AI channel, IndexNow, Bing verification.
+- 29 new helper tests (58 total, `python -m unittest discover -s bx/skills/seo/tests -p "test_*.py"`).
+
+### Changed
+- Rubric: GEO `ai_bot_access` 4 → `ai_bot_access_declared` 2 + `ai_bot_access_delivered` 2 (declared takes all 4 when no probe ran). `semantic_content` keeps its id but scores extractable, attributed facts, with a `keyword_stuffing` negative. Schema is scored for rich-result eligibility and truthfulness, never AI citation. GSC catalog 16 → 18 info-only sub-dims.
+- `page-audit` JSON: `jsonld` is the parsed list, the count is `jsonld_count`. `sa-trends` makes 6 Search Analytics calls (was 4).
+- A "Refused tactics" list: llms.txt scoring, FAQPage/HowTo for rich results, chunk-length rules, question-heading quotas, date bumping, wholesale rewrites of ranking pages, lift-percentage promises, treating Content-Signal/aipref as enforcement.
+
+### Fixed
+- `--plan` no longer prescribes "30%+ question headings" (contradicted the scanner); additive-edit guard for pages already ranking.
+- `best-practices-sources.md`: removed the nonexistent "answer-first" check reference and the Onely checklist target; query count aligned with Step 1 (4–6); no hard-coded year. SKILL Step 1's hard-coded "2026" query removed.
+- `site-profile.md`: Preferred Sources, Discover image, GBP and Merchant Center marked "reminder only — no scanner check"; effects table and Step 4.5.2 inheritance table updated for 2.17.0 + 2.20.0.
+
+### Not verified by running
+- Helper subcommands are unit-tested and `bot-probe` / `update-windows` / `page-audit --out` were smoke-run live on burakarik.com; the full skill (agents, scoring, report blocks, watchpoint relabel, `--plan` items) has not run end-to-end. Whether the Playwright MCP `filename` parameter accepts a system-temp path on Windows is unverified (render-compare is skipped with a footer note if not).
+
 ## 2.19.0 — 2026-11-20
 
 `/bx:save` and the SessionStart hook: the size budgets are refined against what Anthropic documents and what studies measured, and the budget now counts everything loaded at session start, not CLAUDE.md alone.

@@ -1,6 +1,6 @@
 ---
 name: seo-technical
-description: Scans for technical SEO and static-detectable performance issues — crawlability (robots.txt, sitemap.xml), canonicals, mobile viewport, hreflang, indexability, redirect config, rendering integrity (JS-only content, 2 MB HTML limit), back-button hijacking, image/font/script performance signals judged against real-user Core Web Vitals, and sitemap URL health (consuming orchestrator-passed probe, page-audit and CrUX results). Used by the bx:seo skill. Do not invoke independently.
+description: Scans for technical SEO and static-detectable performance issues — crawlability (robots.txt, sitemap.xml), canonicals, mobile viewport, hreflang, indexability, redirect config, rendering integrity (JS-only content, rendered-only robots/canonical directives, 2 MB HTML limit), back-button hijacking, ChatGPT UTM survival, IndexNow readiness, image/font/script performance signals judged against real-user Core Web Vitals, and sitemap URL health (consuming orchestrator-passed probe, page-audit, render-compare, bot-probe and CrUX results). Used by the bx:seo skill. Do not invoke independently.
 model: sonnet
 tools: Read, Grep, Glob, Bash(find:*), Bash(grep:*), Bash(wc:*), Bash(git:*), Bash(jq:*), Bash(cat:*), Bash(head:*)
 ---
@@ -24,6 +24,8 @@ Score sub-allocation (subject to ±5 weight tuning from orchestrator-provided fe
 | **Sitemap URL health** (from orchestrator probe results) | **5** |
 | **Rendering integrity** (content/metadata in raw HTML, 2 MB HTML limit) | 3 |
 | Back-button hijacking (`spam_policy`) | 0 — forced priority instead of points |
+| Rendered-only directives (`rendered_only_directive`, 2.20.0) | counts against robots.txt+sitemap (4) / Canonicals (4) — no new points |
+| ChatGPT UTM survival (`utm_stripped`), IndexNow readiness (`indexnow_missing`), soft-navigation CWV note (2.20.0) | 0 — info only |
 | Image dimensions + lazy loading (+ field LCP/CLS) | 4 |
 | Font preload + blocking scripts (+ field INP) | 3 |
 | Response time (field TTFB when available, else sitemap probe) | 3 |
@@ -44,8 +46,10 @@ The fetched best-practices brief in your task prompt is your source of truth for
 - **Rendered-HTML excerpt** (only if `--url <base>` was provided)
 - **Sitemap URL probe results** (only if Step 3.2 ran) — list of `{url, status, redirect_hops, response_bucket}`
 - **Page audit** (Step 3.4) — raw-HTML records from `gsc-parse-helper page-audit` (bytes, title/canonical/robots/h1/JSON-LD presence, word count, empty SPA root, back-button-hijack signals), plus `Rendered:` records when a browser was available
+- **Render compare** (Step 3.4, 2.20.0) — per-URL raw-vs-rendered robots meta, canonical, JSON-LD count and main-text size from `gsc-parse-helper render-compare`, with `rendered_only_directive` and `directive_changes`
+- **UTM survival** and **IndexNow** (Step 3.5, 2.20.0) — the `utm_survival` and `indexnow` parts of the orchestrator's `bot-probe` (the per-bot results go to geo-generative, not to you)
 - **Field CWV** (Step 3.3) — CrUX p75 LCP/INP/CLS/TTFB per origin/URL; and the **CWV export** digest (Step 1.6.15) when the user dropped one
-- **Site profile** — `markets` (hreflang target), `money_pages` (severity bump), `site_type`
+- **Site profile** — `markets` (hreflang target), `money_pages` (severity bump), `site_type`; since 2.20.0 `cdn` and `bing_verified` when known
 - **Weight adjustments** — any ±5 deltas the orchestrator computed from the brief
 
 ## Scans
@@ -55,6 +59,13 @@ The full rules for the 2.17.0 additions — field Core Web Vitals, rendering int
 - **Field CWV beats static signals.** Poor/needs-improvement field metrics become findings (LCP → `image_perf` or `response_time` when TTFB is the bottleneck; CLS → `image_perf`; INP → `font_script_perf`); field TTFB replaces probe timing for `response_time`; static perf findings whose metric is `good` in the field drop to low. `no_data` is never a finding.
 - **Rendering integrity:** main content, title, canonical or JSON-LD that appears only after JavaScript; HTML over Googlebot's 2 MB limit. Without page-audit data, judge from the stack (client-only SPA → finding).
 - **Back-button hijacking:** `popstate` handlers that navigate away or re-push history, and on-load `pushState` traps. `score_impact: 0`, `sub_dimension: "spam_policy"`; certainty ≥ 0.7 is forced to priority 1 by the orchestrator.
+
+The 2.20.0 additions are sub-scans 14–17 of the same file:
+
+- **Rendered-only directives** (`rendered_only_directive`, sub-scan 14): a robots `noindex`/`nofollow` or a canonical whose value JS adds, removes or changes between raw and rendered HTML. Routed to `robots_sitemap` or `canonicals`. Sub-scan 12 keeps "missing in raw, present after JS"; sub-scan 14 takes "value differs" — never both for one URL × tag. A headless render is not Googlebot: say "as rendered by a headless browser".
+- **ChatGPT UTM survival** (`utm_stripped`, sub-scan 15): live `kept: false`, or redirect/middleware code that rebuilds targets from the path alone and drops `utm_source=chatgpt.com`. Attribution, not ranking: `score_impact: 0`.
+- **IndexNow readiness** (`indexnow_missing`, sub-scan 16): key file `<key>.txt` (content == name) in the public/static dir and a ping on deploy or sitemap regeneration; live `key_file_ok` when a key was known. `score_impact: 0`, low unless pings would fail verification. Google does not use IndexNow — say so.
+- **Soft-navigation CWV note** (sub-scan 17): client-routed sites with field data get one info note about CrUX's experimental soft-navigation metrics, planned to join the standard metrics from May 2027 per the CrUX release notes. `score_impact: 0`.
 
 ### Crawlability
 - **`robots.txt`**: presence at repo root or `public/`/`static/`; syntax (no orphan `Disallow:` without `User-agent:`); does it reference a sitemap?
@@ -123,11 +134,12 @@ If the orchestrator passes a "probe skipped" note instead of results, surface a 
   "score_impact": <float — points lost from the dimension's max>,
   "is_fix_eligible": true | false,
   "recommended_action": "<prose>",
-  "evidence": "<one or two lines naming what was observed>"
+  "evidence": "<one or two lines naming what was observed>",
+  "finding_id": "rendered_only_directive" | "utm_stripped" | "indexnow_missing" | "soft_nav_cwv_note"   // 2.20.0 checks only; omit otherwise
 }
 ```
 
-`is_fix_eligible: true` only for allowlist patterns: missing viewport meta, missing canonical (self-referencing), missing robots.txt, missing sitemap.xml stub, missing `width`/`height` on `<img>` (when adjacent context gives confidence), missing `loading="lazy"` on below-fold images. Everything else routes to `--plan`.
+`is_fix_eligible: true` only for allowlist patterns: missing viewport meta, missing canonical (self-referencing), missing robots.txt, missing sitemap.xml stub, missing `width`/`height` on `<img>` (when adjacent context gives confidence), missing `loading="lazy"` on below-fold images, and the IndexNow key-file scaffold (`indexnow_missing` with neither key file nor ping — placeholder key only). Everything else routes to `--plan`.
 
 ## Hard rules
 
@@ -153,6 +165,12 @@ url_health_findings_count: <int>
 url_health_total_score_impact: <float, capped at 5>
 field_cwv_used: true | false
 spam_policy_findings: <int>
+rendered_only_directives: <int>
+render_compare_used: true | false
+utm_source_survives: true | false | null
+utm_static_suspects: <int>
+indexnow_state: "ok" | "key_only" | "ping_only" | "missing" | "key_not_served"
+soft_nav_note: true | false
 files_scanned: <int>
 sub_dimension_breakdown: {<sub>: <points-deducted>, ...}
 ```

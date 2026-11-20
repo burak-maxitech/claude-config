@@ -64,17 +64,24 @@ Each dimension has a sub-dimension breakdown that the subagent reports in its ou
 | Sub-dimension | Max points |
 |---|---|
 | `jsonld_coverage` (Organization on root, Article on blog, Product on e-com, BreadcrumbList everywhere) | 10 |
-| `schema_validation` + `rich_result` (required fields, common rich-result blockers) | 10 |
+| `schema_validation` + `rich_result` (valid JSON, required fields, common rich-result blockers, `schema_visible_mismatch` — markup the visible page does not back up) | 10 |
+
+Structured data is scored for **rich-result eligibility and truthfulness only — never for "AI citation"**. Controlled and observational studies show no AI-citation lift from adding JSON-LD, and Google says AI Overviews / AI Mode need no special markup ([AI features](https://developers.google.com/search/docs/appearance/ai-features)). Retired rich results (FAQPage, HowTo, …) earn and lose nothing.
 
 ### Generative Engine readiness — 20 points base
 
 | Sub-dimension | Max points |
 |---|---|
-| `eeat` (E-E-A-T signals — author bios, dates, citations, About/Contact; stricter when `ymyl` ≠ no) | 8 |
-| `semantic_content` (topic sentences, list/table structure, descriptive headings) | 5 |
-| `ai_bot_access` (robots.txt per crawler group, judged against the profile's `ai_policy`) | 4 |
+| `eeat` (E-E-A-T signals — author bios, visible dates, sourced claims, About/Contact; stricter when `ymyl` ≠ no) | 8 |
+| `semantic_content` — **extractable facts** (sourced statistics, attributed quotes, definitions, comparison tables, explicit prices/dates on commercial or time-sensitive pages; `keyword_stuffing` deducts) | 5 |
+| `ai_bot_access_declared` (robots.txt per crawler group + `Content-Signal` / `__usage_ai-training` / `Content-Usage` consistency, judged against the profile's `ai_policy`; `ai_policy_conflict`) | 2 |
+| `ai_bot_access_delivered` (live per-bot probe from Step 3.5: `cdn_waf_block`, challenged or truncated responses) | 2 |
 | `ai_eligibility` (`nosnippet` / `max-snippet` / `data-nosnippet`, body-placed robots meta) | 3 |
 | `llms_txt` (presence + format) | 0 — info only |
+
+**Bot-probe-skipped case.** When the bot probe did not run (no resolvable base URL) or returned `unavailable`, `ai_bot_access_delivered` is 0/0 and its 2 points move to `ai_bot_access_declared` (cap 4) — the pre-2.20.0 allocation, so a source-only run stays comparable with older rows. Footer: `Bot probe skipped: <reason> — ai_bot_access judged from robots.txt only (4 pts).` `geo_raw_html_gap` findings carry `score_impact: 0` (`technical_seo.rendering` owns those points) and never consume `ai_bot_access_delivered`.
+
+**Methodology change (2.20.0).** `ai_bot_access` (4) split into `ai_bot_access_declared` (2) and `ai_bot_access_delivered` (2): robots.txt text cannot show the CDN/WAF rules that now decide AI-crawler access as often as robots.txt does. `semantic_content` keeps its id and its 5 points but now scores extractable, attributed facts (graded by [arXiv 2607.14035](https://arxiv.org/html/2607.14035v1)) instead of topic sentences and list/table ratio; question headings stay an optional ≤ 0.1 nudge. The E-E-A-T "1 external link per 500 words" ratio became "claims carry a source". Generative Engine scores before and after 2.20.0 are not directly comparable. The first 2.20.0+ row in `docs/seo-history.md` carries `<!-- methodology:2.20.0 -->`. Because the finding-history hash keys on `sub_dim + location`, existing `ai_bot_access` findings restart their `run_count` once under the new ids; `semantic_content` findings keep theirs.
 
 **Methodology change (2.16.0).** `llms_txt` was worth 6 points until 2.16.0. Google's [AI optimization guide](https://developers.google.com/search/docs/fundamentals/ai-optimization-guide) (2026-05-15; llms.txt note 2026-06-15) states Search does not use the file, and no major engine documents reading it. Its 6 points went to `eeat` (+2), `ai_bot_access` (+1) and the new `ai_eligibility` (+3). Generative Engine scores before and after 2.16.0 are not directly comparable. The first 2.16.0+ row in `docs/seo-history.md` carries `<!-- methodology:2.16.0 -->` next to its commit comment, and the Section 0 delta clause gains `(scoring changed — llms.txt no longer scored)` on that run only.
 
@@ -125,7 +132,7 @@ This is **the single point of enforcement**. Subagent files don't need to track 
 
 ### gsc_insights dimension + sub-dim enum
 
-GSC findings use their own `dimension: "gsc_insights"` with **16 sub-dimensions** for structural organization. No score allocation — these are routing labels, not score buckets:
+GSC findings use their own `dimension: "gsc_insights"` with **18 sub-dimensions** for structural organization. No score allocation — these are routing labels, not score buckets:
 
 | Sub-dim | Source | Notes |
 |---|---|---|
@@ -144,7 +151,13 @@ GSC findings use their own `dimension: "gsc_insights"` with **16 sub-dimensions*
 | `brand_query_anomaly` | Q1 queries digest ∩ Schema/CLAUDE.md brand-name | Brand queries (Person.name / Organization.name / CLAUDE.md first proper noun) ranking >pos 3 OR CTR <10% → entity-recognition deficit. Cross-links to Schema `Person.@id` split + `Person.sameAs` Wikidata findings. **S31 dogfood codification of emergent capability.** |
 | `deindex_regression` | Snapshot diff (`.seo-data/gsc/snapshots/*.json`) — **orchestrator-emitted in SKILL.md Step 1.6.13** | URLs that flipped from `Submitted and indexed` → any non-indexed state since the previous run. The early-warning loop catching Google's "New reason preventing your pages from being indexed" / "Validation failed" emails before they hit the user's inbox. **S34 burakarik6 dogfood codification** — 838-URL `Page with redirect` regression was invisible to the impressions-only sampling pre-S34. Severity escalates to `critical` on Server error (5xx) transitions OR ≥20 URLs OR ≥10% of inspected URLs. Carries `path_clusters` + `git_correlation` evidence to bridge the regression to its likely-causal commit. NOT produced by the seo-gsc-insights subagent — emitted directly by the orchestrator after snapshot diff. |
 | `cannibalization` | `sa-trends` query×page digest (2.17.0) | Non-brand queries ≥100 imps where 2+ URLs each hold ≥10% — pick an owner, merge or retarget |
-| `content_decay` | `sa-trends` three 28-day page windows (2.17.0) | Clicks fell twice and ≥30% overall (oldest ≥30 clicks); pattern `visibility_loss` / `ctr_loss` / `vanished` drives the advice |
+| `content_decay` | `sa-trends` three 28-day page windows (2.17.0) | Clicks fell twice and ≥30% overall (oldest ≥30 clicks); pattern `visibility_loss` / `ctr_loss` / `vanished` drives the advice. A `ctr_loss` concentrated in AIO-prone queries routes to `ai_overview_compression` instead (2.20.0) |
+| `ai_overview_compression` | `sa-trends` `ctr_segments` + `ai_overview_compression` (2.20.0) | CTR fell ≥20% relative while position held (\|Δpos\| ≤ 1.0) and ≥60% of impressions are AIO-prone (question-form or ≥6-word) queries. Expected AI Overview click compression, not an on-page defect — no title-rewrite advice |
+| `bing_ai_citations` | `bing-exports` digest of `.seo-data/bing/exports/` (2.20.0) | Bing Webmaster Tools AI Performance citations, cited pages and grounding queries, cross-referenced with money pages and target topics. Measurement only |
+
+**Update-window annotation (2.20.0).** `content_decay`, `deindex_regression`, `brand_query_anomaly` and watchpoint results gain `update_overlap: [<update names>]` when their window overlaps a Google core or spam update from `update-windows`. It is an annotation field, not a sub-dimension, and changes no score.
+
+Every sub-dim in this table stays at `score_impact: 0`. AI-visibility data (Generative AI report CSV, Bing AI Performance CSV, AIO compression) stays out of the /100 until the sources stabilise.
 
 ### Per-finding output shape — GSC additions
 

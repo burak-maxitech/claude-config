@@ -61,6 +61,30 @@ Subcommands:
                       ending at end_date; clicks fell twice, newest ≤70% of
                       oldest, oldest ≥30). Mints its own token; 24h cache as
                       sa-trend-*.json; NO_CACHE=1 bypasses lookup.
+                      2.20.0: also query×page for the newest and previous
+                      28-day windows → ctr_segments (aio_prone vs other) +
+                      ai_overview_compression. Optional flags:
+                      --out FILE (full JSON) --question-words a,b,c
+    page-audit <targets_file> [--out FILE]
+                      2.20.0: --out writes JSON records incl. jsonld [{type,
+                      fields}], jsonld_count, jsonld_parse_errors, robots_meta,
+                      visible_dates, main_text_chars, schema_visible_checks.
+    bot-probe --base-url URL [--pages URL,URL] [--robots-file PATH]
+              [--indexnow-key KEY] --out FILE
+                      Fetch base + ≤5 pages as each AI bot UA (AI_BOTS) and a
+                      browser control; challenge markers, per-bot verdicts,
+                      cdn_waf_suspect, robots Content-Signal / Content-Usage /
+                      __usage_ groups, policy_conflicts, utm survival, IndexNow.
+    render-compare --raw FILE --rendered FILE --url URL --out FILE
+                      Raw vs rendered robots/canonical/JSON-LD/main text.
+                      --rendered may be raw HTML or a JSON string literal.
+    update-windows [--cache PATH] [--max-age-days 7] [--overlap START,END]
+                   --out FILE
+                      Google ranking updates from status.search.google.com
+                      incidents.json (cache-first; offline → cache →
+                      unavailable).
+    bing-exports [--dir .seo-data/bing/exports] --out FILE
+                      Tolerant parser for Bing AI Performance CSV exports.
     auth-token       Mint + print credentials for the Search Analytics curl
                       path: two lines (access token, then quota project). Capture
                       into shell vars in the SAME Bash call that runs curl; never
@@ -1020,6 +1044,239 @@ def _attr(tag, name):
     return next(g for g in m.groups() if g is not None)
 
 
+# --- 2.20.0: JSON-LD fields, visible dates, main text, schema-vs-visible ----
+_JSONLD_BLOCK_RE = re.compile(
+    r'<script\b[^>]*type\s*=\s*["\']?application/ld\+json["\']?[^>]*>'
+    r'(.*?)</script\s*>', re.I | re.S)
+_MAIN_RE = re.compile(r'<(main|article)\b[^>]*>(.*)</\1\s*>', re.I | re.S)
+_CHROME_BLOCK_RE = re.compile(
+    r'<(nav|header|footer|aside)\b.*?</\1\s*>', re.I | re.S)
+_TIME_DT_RE = re.compile(
+    r'<time\b[^>]*\bdatetime\s*=\s*["\']?(\d{4}-\d{2}-\d{2})', re.I)
+_ISO_DATE_RE = re.compile(r'\b((?:19|20)\d\d)-(\d\d)-(\d\d)\b')
+_MONTHS = {m: i + 1 for i, m in enumerate(
+    ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct',
+     'nov', 'dec'])}
+_MONTH_WORD = (r'(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|'
+               r'june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|'
+               r'nov(?:ember)?|dec(?:ember)?)\.?')
+_MDY_RE = re.compile(_MONTH_WORD + r'\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+'
+                     r'((?:19|20)\d\d)\b', re.I)
+_DMY_RE = re.compile(r'\b(\d{1,2})(?:st|nd|rd|th)?\s+' + _MONTH_WORD +
+                     r',?\s+((?:19|20)\d\d)\b', re.I)
+JSONLD_FIELDS = ('name', 'headline', 'author', 'datePublished',
+                 'dateModified', 'price', 'priceCurrency', 'address',
+                 'telephone')
+SCHEMA_CHECK_FIELDS = ('name', 'headline', 'price', 'address', 'telephone',
+                       'author', 'datePublished')
+SCHEMA_CHECK_CAP = 40
+# Wrapper types whose `name` mirrors <title>/site name, not body copy: not
+# checked against visible text (they would be noise, not truthfulness).
+SCHEMA_CHECK_SKIP_TYPES = {'website', 'webpage', 'collectionpage', 'itempage',
+                           'aboutpage', 'contactpage', 'profilepage',
+                           'searchresultspage', 'breadcrumblist', 'itemlist',
+                           'listitem', 'imageobject', 'searchaction',
+                           'sitenavigationelement'}
+VISIBLE_DATES_CAP = 20
+
+
+def _visible_text(fragment):
+    return ' '.join(html.unescape(
+        _TAG_RE.sub(' ', _STRIP_BLOCK_RE.sub(' ', fragment))).split())
+
+
+def main_text_chars(body):
+    """Characters of visible text in <main>/<article> if present, else in the
+    body minus nav/header/footer/aside chrome."""
+    m = _MAIN_RE.search(body)
+    frag = m.group(2) if m else _CHROME_BLOCK_RE.sub(' ', body)
+    return len(_visible_text(frag))
+
+
+def _mk_date(y, mo, d):
+    try:
+        return date(int(y), int(mo), int(d)).isoformat()
+    except (ValueError, TypeError):
+        return None
+
+
+def find_visible_dates(body, visible):
+    """ISO dates a reader can see: <time datetime>, ISO text, and 'March 5,
+    2026' / '5 March 2026' forms. Sorted, de-duplicated, capped."""
+    found = set()
+    for d in _TIME_DT_RE.findall(body):
+        iso = _mk_date(*d.split('-'))
+        if iso:
+            found.add(iso)
+    for y, mo, d in _ISO_DATE_RE.findall(visible):
+        iso = _mk_date(y, mo, d)
+        if iso:
+            found.add(iso)
+    for mon, d, y in _MDY_RE.findall(visible):
+        iso = _mk_date(y, _MONTHS[mon[:3].lower()], d)
+        if iso:
+            found.add(iso)
+    for d, mon, y in _DMY_RE.findall(visible):
+        iso = _mk_date(y, _MONTHS[mon[:3].lower()], d)
+        if iso:
+            found.add(iso)
+    return sorted(found)[:VISIBLE_DATES_CAP]
+
+
+def _ld_text(v):
+    """Flatten a JSON-LD value (string / Person / list / PostalAddress) to a
+    display string, or None."""
+    if v is None or v == '' or v == []:
+        return None
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return str(v)
+    if isinstance(v, str):
+        return ' '.join(v.split())
+    if isinstance(v, list):
+        parts = [p for p in (_ld_text(x) for x in v) if p]
+        return ', '.join(parts) or None
+    if isinstance(v, dict):
+        if v.get('name'):
+            return _ld_text(v['name'])
+        parts = [_ld_text(v.get(k)) for k in (
+            'streetAddress', 'addressLocality', 'addressRegion', 'postalCode',
+            'addressCountry')]
+        parts = [p for p in parts if p]
+        return ', '.join(parts) or None
+    return None
+
+
+def _ld_offer_field(node, key):
+    offers = node.get('offers')
+    if isinstance(offers, list):
+        offers = offers[0] if offers else None
+    if isinstance(offers, dict):
+        v = offers.get(key)
+        if v is None and key == 'price':
+            v = offers.get('lowPrice')
+        return v
+    return None
+
+
+def _ld_nodes(data):
+    """Top-level nodes: a list, an @graph, or a single object."""
+    if isinstance(data, list):
+        out = []
+        for x in data:
+            out.extend(_ld_nodes(x))
+        return out
+    if isinstance(data, dict):
+        if isinstance(data.get('@graph'), list):
+            return [n for n in data['@graph'] if isinstance(n, dict)]
+        return [data]
+    return []
+
+
+def extract_jsonld(text):
+    """Parse every JSON-LD block. Returns ([{type, fields}], parse_errors).
+    `fields` holds only the JSONLD_FIELDS present on the node (price and
+    priceCurrency may come from `offers`)."""
+    nodes, errors = [], 0
+    for raw in _JSONLD_BLOCK_RE.findall(text):
+        s = raw.strip()
+        s = re.sub(r'^\s*(?:<!--|<!\[CDATA\[)', '', s)
+        s = re.sub(r'(?:-->|\]\]>)\s*$', '', s).strip()
+        if not s:
+            continue
+        try:
+            data = json.loads(s)
+        except ValueError:
+            errors += 1
+            continue
+        for n in _ld_nodes(data):
+            t = n.get('@type')
+            t = ','.join(str(x) for x in t) if isinstance(t, list) else t
+            fields = {}
+            for k in JSONLD_FIELDS:
+                v = n.get(k)
+                if v is None and k in ('price', 'priceCurrency'):
+                    v = _ld_offer_field(n, k)
+                v = _ld_text(v)
+                if v:
+                    fields[k] = v
+            nodes.append({'type': t, 'fields': fields})
+    return nodes, errors
+
+
+def _norm_words(s):
+    return ' '.join(re.sub(r'[^\w]+', ' ', s.casefold()).split())
+
+
+def _numbers_in(s):
+    out = set()
+    for tok in re.findall(r'\d[\d.,\s]*\d|\d', s):
+        tok = tok.replace(' ', '')
+        # 1,299.00 / 1.299,00 / 49,00 → float
+        if ',' in tok and '.' in tok:
+            tok = (tok.replace('.', '').replace(',', '.')
+                   if tok.rfind(',') > tok.rfind('.') else tok.replace(',', ''))
+        elif ',' in tok:
+            head, _, tail = tok.rpartition(',')
+            tok = (head.replace(',', '') + '.' + tail if len(tail) == 2
+                   else tok.replace(',', ''))
+        try:
+            out.add(round(float(tok), 2))
+        except ValueError:
+            pass
+    return out
+
+
+def _phrase_in(value, visible_norm):
+    n = _norm_words(value)
+    return bool(n) and (' ' + n + ' ') in visible_norm
+
+
+def _value_in_visible(field, value, visible_norm, visible_raw, dates):
+    if field == 'price':
+        try:
+            want = round(float(str(value).replace(',', '')), 2)
+        except ValueError:
+            return _phrase_in(value, visible_norm)
+        return want in _numbers_in(visible_raw)
+    if field == 'telephone':
+        digits = re.sub(r'\D', '', value)
+        if len(digits) < 6:
+            return False
+        tail = digits[-9:]
+        runs = re.findall(r'[+\d][\d\s().\-/]{5,}\d', visible_raw)
+        return any(re.sub(r'\D', '', r).endswith(tail) for r in runs)
+    if field in ('datePublished', 'dateModified'):
+        return str(value)[:10] in dates
+    if field == 'address':
+        return _phrase_in(value.split(',')[0], visible_norm)
+    if field == 'author':
+        names = [n for n in (x.strip() for x in value.split(',')) if n]
+        return bool(names) and all(_phrase_in(n, visible_norm) for n in names)
+    return _phrase_in(value, visible_norm)
+
+
+def schema_visible_checks(nodes, visible, dates):
+    """Each checked JSON-LD value vs the page's visible raw text (normalised:
+    case-folded, punctuation-insensitive; prices numeric; phones by digits;
+    dates by ISO day against visible_dates)."""
+    visible_norm = ' ' + _norm_words(visible) + ' '
+    out = []
+    for node in nodes:
+        types = {t.strip().lower() for t in str(node['type'] or '').split(',')}
+        if types and types <= SCHEMA_CHECK_SKIP_TYPES:
+            continue
+        for f in SCHEMA_CHECK_FIELDS:
+            v = node['fields'].get(f)
+            if not v:
+                continue
+            out.append({'type': node['type'], 'field': f, 'value': v,
+                        'in_visible_text': _value_in_visible(
+                            f, v, visible_norm, visible, set(dates))})
+            if len(out) >= SCHEMA_CHECK_CAP:
+                return out
+    return out
+
+
 def analyze_html(text):
     """Pure function: raw HTML string → facts a non-rendering crawler sees."""
     title_m = _TITLE_RE.search(text)
@@ -1046,12 +1303,23 @@ def analyze_html(text):
     # re-pushes history: the back button no longer goes back.
     hijack = any(_POPSTATE_RE.search(s) and _NAVIGATE_RE.search(s)
                  for s in inline)
+    jsonld_nodes, jsonld_errors = extract_jsonld(text)
+    visible_dates = find_visible_dates(body, visible)
     return {
         'title': title,
         'canonical': canonical,
         'robots': robots,
+        'robots_meta': robots,
         'h1': len(_H1_RE.findall(body)),
-        'jsonld': len(_JSONLD_RE.findall(text)),
+        # 2.20.0: `jsonld` is the parsed node list; the count moved to
+        # `jsonld_count` (the text record still prints `jsonld=<count>`).
+        'jsonld_count': len(_JSONLD_RE.findall(text)),
+        'jsonld': jsonld_nodes,
+        'jsonld_parse_errors': jsonld_errors,
+        'visible_dates': visible_dates,
+        'main_text_chars': main_text_chars(body),
+        'schema_visible_checks': schema_visible_checks(
+            jsonld_nodes, visible, visible_dates),
         'words': len(visible.split()),
         'empty_root': bool(_EMPTY_ROOT_RE.search(body)),
         'inline_scripts': len(inline),
@@ -1108,7 +1376,7 @@ def _yn(v):
     return 'yes' if v else 'no'
 
 
-def cmd_page_audit(targets_path):
+def cmd_page_audit(targets_path, out_path=None):
     """Fetch up to 25 URLs as a non-rendering crawler and print one record
     per URL. Byte counts are of the uncompressed HTML (the size Googlebot's
     limit applies to)."""
@@ -1139,15 +1407,23 @@ def cmd_page_audit(targets_path):
               f"canonical={r['canonical'] if r['canonical'] is not None else 'none'} "
               f"robots={r['robots'] or 'none'} "
               f"x_robots={r['x_robots'].replace(' ', '') or 'none'} "
-              f"h1={r['h1']} jsonld={r['jsonld']} words={r['words']} "
+              f"h1={r['h1']} jsonld={r['jsonld_count']} words={r['words']} "
               f"empty_root={_yn(r['empty_root'])} "
               f"inline_scripts={r['inline_scripts']} "
               f"history_calls={r['history_calls']} "
               f"popstate={_yn(r['popstate'])} "
-              f"hijack_suspect={_yn(r['hijack_suspect'])}")
+              f"hijack_suspect={_yn(r['hijack_suspect'])} "
+              f"jsonld_types={','.join(str(n['type']) for n in r['jsonld']) or 'none'} "
+              f"jsonld_parse_errors={r['jsonld_parse_errors']} "
+              f"main_text_chars={r['main_text_chars']} "
+              f"schema_visible_mismatch="
+              f"{sum(1 for c in r['schema_visible_checks'] if not c['in_visible_text'])}")
     print(f"over_2mb_count:{over}")
     print(f"thin_raw_count:{thin}")
     print(f"hijack_suspect_count:{hijack}")
+    if out_path:
+        _write_json_out(out_path, {'status': 'ok', 'pages': recs})
+        print(f"page_audit_json:{out_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -1234,6 +1510,96 @@ def find_decay(windows):
     return out
 
 
+# --- 2.20.0: AI-Overview-prone query segmentation -------------------------
+AIO_QUESTION_WORDS = ('who', 'what', 'when', 'where', 'why', 'how', 'which',
+                      'can', 'does', 'is', 'are', 'should', 'vs', 'best',
+                      'difference')
+AIO_MIN_WORDS = 6
+AIO_CTR_DROP = 0.20          # CTR fell ≥ 20% relative
+AIO_MAX_POS_DELTA = 1.0      # while position moved ≤ 1.0
+AIO_MIN_SHARE = 0.60         # and ≥ 60% of impressions are aio_prone
+AIO_MIN_PAGE_IMPS = 100      # noise floor, both windows
+AIO_TOP_N = 50
+
+
+def aio_prone(query, question_words=AIO_QUESTION_WORDS):
+    """Question-form (a question word anywhere as a whole word) or long-tail
+    (≥ 6 words). English by default; --question-words overrides."""
+    words = re.findall(r"[\w'’-]+", (query or '').casefold())
+    if len(words) >= AIO_MIN_WORDS:
+        return True
+    qw = {w.casefold() for w in question_words}
+    return any(w in qw for w in words)
+
+
+def _seg_stats(rows, question_words):
+    """rows: query×page rows → {aio_prone|other: [clicks, imps, pos_w]} and
+    per page {page: {'aio': imps, 'all': [clicks, imps, pos_w]}}."""
+    seg = {'aio_prone': [0, 0, 0.0], 'other': [0, 0, 0.0]}
+    pages = defaultdict(lambda: {'aio': 0, 'all': [0, 0, 0.0]})
+    for r in rows:
+        keys = r.get('keys') or []
+        if len(keys) < 2:
+            continue
+        c = r.get('clicks', 0) or 0
+        i = r.get('impressions', 0) or 0
+        pw = (r.get('position', 0) or 0) * i
+        name = 'aio_prone' if aio_prone(keys[0], question_words) else 'other'
+        for slot in (seg[name], pages[_strip_fragment(keys[1])]['all']):
+            slot[0] += c
+            slot[1] += i
+            slot[2] += pw
+        if name == 'aio_prone':
+            pages[_strip_fragment(keys[1])]['aio'] += i
+    return seg, pages
+
+
+def _ratio(a, b):
+    return a / b if b else None
+
+
+def ctr_segments(rows_now, rows_prev, question_words=AIO_QUESTION_WORDS):
+    """CTR/position now vs previous window, split aio_prone vs other, plus
+    ai_overview_compression pages: CTR fell ≥ 20% relative, |Δpos| ≤ 1.0,
+    ≥ 60% of current impressions aio_prone, ≥ 100 impressions both windows.
+    ctr_delta is the relative change ((now − prev) / prev)."""
+    seg_now, pages_now = _seg_stats(rows_now, question_words)
+    seg_prev, pages_prev = _seg_stats(rows_prev, question_words)
+    segments = {}
+    for name in ('aio_prone', 'other'):
+        cn, inow, pwn = seg_now[name]
+        cp, iprev, pwp = seg_prev[name]
+        segments[name] = {
+            'clicks': cn, 'impressions': inow,
+            'clicks_prev': cp, 'impressions_prev': iprev,
+            'ctr_now': _ratio(cn, inow), 'ctr_prev': _ratio(cp, iprev),
+            'pos_now': _ratio(pwn, inow), 'pos_prev': _ratio(pwp, iprev)}
+    comp = []
+    for page, now in pages_now.items():
+        prev = pages_prev.get(page)
+        if not prev:
+            continue
+        cn, inow, pwn = now['all']
+        cp, iprev, pwp = prev['all']
+        if inow < AIO_MIN_PAGE_IMPS or iprev < AIO_MIN_PAGE_IMPS or cp == 0:
+            continue
+        ctr_now, ctr_prev = cn / inow, cp / iprev
+        rel = (ctr_now - ctr_prev) / ctr_prev
+        pos_delta = pwn / inow - pwp / iprev
+        share = now['aio'] / inow
+        if (rel <= -AIO_CTR_DROP and abs(pos_delta) <= AIO_MAX_POS_DELTA
+                and share >= AIO_MIN_SHARE):
+            comp.append({'page': page, 'aio_share': round(share, 4),
+                         'ctr_delta': round(rel, 4),
+                         'pos_delta': round(pos_delta, 2),
+                         'ctr_now': round(ctr_now, 4),
+                         'ctr_prev': round(ctr_prev, 4),
+                         'impressions': inow, 'clicks': cn,
+                         'clicks_prev': cp})
+    comp.sort(key=lambda x: (x['ctr_delta'], -x['impressions']))
+    return segments, comp[:AIO_TOP_N]
+
+
 def _sa_rows(site_url, body, cache_dir, no_cache, creds):
     """One cached Search Analytics call. creds is a 1-slot list filled lazily
     so a fully cached run never mints a token. Returns (rows, status)."""
@@ -1265,9 +1631,11 @@ def _sa_rows(site_url, body, cache_dir, no_cache, creds):
     return data.get('rows', []) or [], 'miss'
 
 
-def cmd_sa_trends(cache_dir, site_url, end_date, lookback_days, brand_csv=''):
+def cmd_sa_trends(cache_dir, site_url, end_date, lookback_days, brand_csv='',
+                  out_path=None, question_words=AIO_QUESTION_WORDS):
     """Cannibalization (query×page over the lookback window) + decay (three
-    consecutive 28-day page windows ending at end_date)."""
+    consecutive 28-day page windows ending at end_date) + 2.20.0 CTR
+    segmentation (query×page for the newest and previous 28-day windows)."""
     end = _parse_date(end_date)
     if end is None:
         print(f"ERROR: bad end_date '{end_date}'", file=sys.stderr)
@@ -1297,7 +1665,20 @@ def cmd_sa_trends(cache_dir, site_url, end_date, lookback_days, brand_csv=''):
                 agg[p][0] += r.get('clicks', 0) or 0
                 agg[p][1] += r.get('impressions', 0) or 0
             windows.append({p: tuple(v) for p, v in agg.items()})
+        seg_rows = []
+        for k in (1, 0):  # previous, then newest 28-day window
+            w_end = end - timedelta(days=DECAY_WINDOW_DAYS * k)
+            w_start = w_end - timedelta(days=DECAY_WINDOW_DAYS - 1)
+            q_rows, q_st = _sa_rows(site_url, {
+                'startDate': w_start.isoformat(), 'endDate': w_end.isoformat(),
+                'dimensions': ['query', 'page'], 'type': 'web',
+                'rowLimit': SA_ROW_LIMIT}, cache_dir, no_cache, creds)
+            statuses.append(q_st)
+            seg_rows.append(q_rows)
     except CredentialError as e:
+        if out_path:
+            _write_json_out(out_path, {'status': 'unavailable',
+                                       'reason': f'auth:{e.reason}'})
         print(f"AUTH_ERROR:{e.reason}")
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(4)
@@ -1322,6 +1703,35 @@ def cmd_sa_trends(cache_dir, site_url, end_date, lookback_days, brand_csv=''):
         print(f"  url={d['url']} clicks={c1}>{c2}>{c3} "
               f"change={(c3 - c1) / c1:+.0%} imps={i1}>{i2}>{i3} "
               f"pattern={d['pattern']}")
+    segments, compression = ctr_segments(seg_rows[1], seg_rows[0],
+                                         question_words)
+    print("--- ctr segments (newest vs previous 28 days) ---")
+    for name in ('aio_prone', 'other'):
+        g = segments[name]
+        print(f"  segment={name} clicks={g['clicks']} "
+              f"imps={g['impressions']} ctr={_fmt_pct(g['ctr_prev'])}>"
+              f"{_fmt_pct(g['ctr_now'])} pos={_fmt_num(g['pos_prev'])}>"
+              f"{_fmt_num(g['pos_now'])}")
+    print(f"ai_overview_compression:{len(compression)}")
+    for c in compression[:TREND_TOP_N]:
+        print(f"  url={c['page']} aio_share={c['aio_share']:.0%} "
+              f"ctr_delta={c['ctr_delta']:+.0%} pos_delta={c['pos_delta']:+.1f}")
+    if out_path:
+        _write_json_out(out_path, {
+            'status': 'ok', 'calls': statuses,
+            'cannibalization': cannibal, 'decay': decay,
+            'question_words': list(question_words),
+            'ctr_segments': segments,
+            'ai_overview_compression': compression})
+        print(f"sa_trends_json:{out_path}")
+
+
+def _fmt_pct(v):
+    return 'n/a' if v is None else f"{v:.2%}"
+
+
+def _fmt_num(v):
+    return 'n/a' if v is None else f"{v:.1f}"
 
 
 def snapshot_write(cache_dir, run_timestamp, commit_sha, site_url, output_path):
@@ -2356,7 +2766,879 @@ def _watchpoint_status(baseline, current):
     return 'unchanged'
 
 
+# ---------------------------------------------------------------------------
+# 2.20.0 — JSON-out subcommands: bot-probe, render-compare, update-windows,
+# bing-exports. Each writes JSON to --out and prints one summary line; a
+# network failure degrades to {"status":"unavailable","reason":...}.
+# ---------------------------------------------------------------------------
+def _write_json_out(path, data):
+    d = os.path.dirname(os.path.abspath(path))
+    os.makedirs(d, exist_ok=True)
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, path)
+
+
+def _net_reason(e):
+    if isinstance(e, urllib.error.HTTPError):
+        return f'http:{e.code}'
+    reason = str(getattr(e, 'reason', e)).lower()
+    if 'ssl' in reason or 'certificate' in reason:
+        return 'ssl'
+    if 'timed out' in reason:
+        return 'timeout'
+    return 'network'
+
+
+class _HopCounter(urllib.request.HTTPRedirectHandler):
+    """Follows redirects like the default handler, recording each hop."""
+
+    def __init__(self):
+        super().__init__()
+        self.hops = []
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        self.hops.append({'status': code, 'location': newurl})
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+BOT_PROBE_TIMEOUT_SEC = 10
+BOT_PROBE_MAX_PAGES = 5
+BOT_PROBE_WORKERS = 8
+BOT_PROBE_READ_CAP = 4 * 1024 * 1024
+BOT_PROBE_TINY_BODY = 2048          # a 403/429/503 under this is a stub page
+BOT_PROBE_DIFFERS_RATIO = 0.5
+
+# AI crawler table (as of 2026-11). `fetch`: probed over HTTP; robots-only
+# tokens (Google-Extended, Applebot-Extended) are never fetched — they are not
+# real crawlers, only robots.txt product tokens. CCBot is robots-only here too.
+_MOZ = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; '
+AI_BOTS = [
+    {'name': 'OAI-SearchBot', 'vendor': 'OpenAI', 'group': 'search',
+     'fetch': True, 'ua': _MOZ + 'OAI-SearchBot/1.3; +https://openai.com/searchbot)'},
+    {'name': 'Claude-SearchBot', 'vendor': 'Anthropic', 'group': 'search',
+     'fetch': True, 'ua': _MOZ + 'Claude-SearchBot/1.0; +Claude-SearchBot@anthropic.com)'},
+    {'name': 'PerplexityBot', 'vendor': 'Perplexity', 'group': 'search',
+     'fetch': True, 'ua': _MOZ + 'PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)'},
+    {'name': 'ChatGPT-User', 'vendor': 'OpenAI', 'group': 'user',
+     'fetch': True, 'ua': _MOZ + 'ChatGPT-User/1.0; +https://openai.com/bot)'},
+    {'name': 'Claude-User', 'vendor': 'Anthropic', 'group': 'user',
+     'fetch': True, 'ua': _MOZ + 'Claude-User/1.0; +Claude-User@anthropic.com)'},
+    {'name': 'Perplexity-User', 'vendor': 'Perplexity', 'group': 'user',
+     'fetch': True, 'ua': _MOZ + 'Perplexity-User/1.0; +https://perplexity.ai/perplexity-user)'},
+    {'name': 'GPTBot', 'vendor': 'OpenAI', 'group': 'training',
+     'fetch': True, 'ua': _MOZ + 'GPTBot/1.3; +https://openai.com/gptbot)'},
+    {'name': 'ClaudeBot', 'vendor': 'Anthropic', 'group': 'training',
+     'fetch': True, 'ua': _MOZ + 'ClaudeBot/1.0; +claudebot@anthropic.com)'},
+    {'name': 'Google-Extended', 'vendor': 'Google', 'group': 'training',
+     'fetch': False, 'ua': None},
+    {'name': 'Applebot-Extended', 'vendor': 'Apple', 'group': 'training',
+     'fetch': False, 'ua': None},
+    {'name': 'Meta-ExternalAgent', 'vendor': 'Meta', 'group': 'training',
+     'fetch': True, 'ua': 'meta-externalagent/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)'},
+    {'name': 'CCBot', 'vendor': 'Common Crawl', 'group': 'training',
+     'fetch': False, 'ua': None},
+    {'name': 'OAI-AdsBot', 'vendor': 'OpenAI', 'group': 'ads',
+     'fetch': True, 'ua': _MOZ + 'OAI-AdsBot/1.0; +https://openai.com/adsbot)'},
+]
+CONTROL_UA = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+              '(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36')
+CONTROL_NAME = 'control'
+
+_CHALLENGE_BODY_ANY = [   # checked on any status
+    ('cloudflare:challenge-title', re.compile(r'<title>\s*Just a moment', re.I)),
+    ('cloudflare:cf-chl', re.compile(r'cf-chl|/cdn-cgi/challenge-platform/', re.I)),
+    ('vercel:checkpoint', re.compile(r'Vercel Security Checkpoint', re.I)),
+    ('imperva:incapsula', re.compile(r'_Incapsula_Resource|Incapsula incident', re.I)),
+]
+_CHALLENGE_BODY_ERR = [   # checked only on a 4xx/5xx response
+    ('cloudflare:just-a-moment', re.compile(r'Just a moment', re.I)),
+    ('akamai:access-denied', re.compile(r'Access Denied', re.I)),
+    ('imperva:incapsula', re.compile(r'Incapsula', re.I)),
+    ('vercel:checkpoint', re.compile(r'checkpoint', re.I)),
+]
+
+
+def detect_challenge(status, headers, body):
+    """Return a challenge marker string, or None. headers: dict with
+    lower-case keys; body: bytes (only the first 64 KB is inspected)."""
+    if headers.get('cf-mitigated'):
+        return 'cloudflare:cf-mitigated'
+    if headers.get('x-vercel-mitigated'):
+        return 'vercel:x-vercel-mitigated'
+    text = body[:65536].decode('utf-8', errors='replace')
+    for marker, rx in _CHALLENGE_BODY_ANY:
+        if rx.search(text):
+            return marker
+    if isinstance(status, int) and status >= 400:
+        for marker, rx in _CHALLENGE_BODY_ERR:
+            if rx.search(text):
+                return marker
+        if status in (403, 429, 503) and len(body) < BOT_PROBE_TINY_BODY:
+            return f'generic:{status}-tiny-body'
+    return None
+
+
+def _probe_get(url, ua, timeout=BOT_PROBE_TIMEOUT_SEC, count_hops=False):
+    """One GET, redirects followed, no retries. Never raises."""
+    hop = _HopCounter()
+    opener = urllib.request.build_opener(hop)
+    req = urllib.request.Request(url, headers={
+        'User-Agent': ua, 'Accept': 'text/html,application/xhtml+xml,*/*',
+        'Accept-Encoding': 'identity'})
+    try:
+        with opener.open(req, timeout=timeout) as resp:
+            body = resp.read(BOT_PROBE_READ_CAP)
+            hdrs = {k.lower(): v for k, v in resp.headers.items()}
+            status, final = resp.status, resp.geturl()
+    except urllib.error.HTTPError as e:
+        try:
+            body = e.read(BOT_PROBE_READ_CAP) or b''
+        except OSError:
+            body = b''
+        hdrs = {k.lower(): v for k, v in (e.headers or {}).items()}
+        status, final = e.code, e.geturl() or url
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        return {'status': f'error:{_net_reason(e)}', 'bytes': 0,
+                'final_url': url, 'headers': {}, 'body': b'',
+                'hops': hop.hops}
+    return {'status': status, 'bytes': len(body), 'final_url': final,
+            'headers': hdrs, 'body': body, 'hops': hop.hops}
+
+
+# --- robots.txt: groups, Content-Signal, Content-Usage, __usage_ groups ----
+def parse_robots(text):
+    """RFC 9309 grouping plus the AI-preference extensions. Returns
+    {'groups': [{agents, rules:[{directive, path}], content_signals:[...],
+    content_usage:[...]}], 'global_signals': [...], 'global_usage': [...]}."""
+    groups, cur, last_was_agent = [], None, False
+    global_signals, global_usage = [], []
+    for line in (text or '').splitlines():
+        line = line.split('#', 1)[0].strip()
+        if ':' not in line:
+            continue
+        key, _, val = line.partition(':')
+        key, val = key.strip().lower(), val.strip()
+        if key == 'user-agent':
+            if cur is None or not last_was_agent:
+                cur = {'agents': [], 'rules': [], 'content_signals': [],
+                       'content_usage': []}
+                groups.append(cur)
+            cur['agents'].append(val)
+            last_was_agent = True
+            continue
+        last_was_agent = False
+        if key in ('allow', 'disallow'):
+            if cur is not None:
+                cur['rules'].append({'directive': key, 'path': val})
+        elif key == 'content-signal':
+            (cur['content_signals'] if cur is not None
+             else global_signals).append(val)
+        elif key == 'content-usage':
+            (cur['content_usage'] if cur is not None
+             else global_usage).append(val)
+    return {'groups': groups, 'global_signals': global_signals,
+            'global_usage': global_usage}
+
+
+def _parse_prefs(val):
+    """'search=yes, ai-train=no' or '/path train-ai=n' → (path, {k: v})."""
+    path, prefs = None, {}
+    for tok in re.split(r'[,\s]+', val):
+        if not tok:
+            continue
+        if '=' in tok:
+            k, _, v = tok.partition('=')
+            prefs[k.strip().lower()] = v.strip().lower()
+        elif tok.startswith('/') and path is None:
+            path = tok
+    return path, prefs
+
+
+def _group_for(parsed, bot):
+    """The group whose user-agent matches the bot token (case-insensitive),
+    else the '*' group, else None. Returns (group, 'named'|'wildcard'|None)."""
+    b = bot.lower()
+    star = None
+    for g in parsed['groups']:
+        agents = [a.lower() for a in g['agents']]
+        if b in agents:
+            return g, 'named'
+        if '*' in agents and star is None:
+            star = g
+    return (star, 'wildcard') if star else (None, None)
+
+
+def _root_allowed(group):
+    """RFC 9309 longest match for path '/' (allow wins a tie)."""
+    best_len, verdict = -1, 'allow'
+    for r in group['rules']:
+        p = r['path']
+        if r['directive'] == 'disallow' and p == '':
+            continue  # empty Disallow = allow all
+        pat = re.escape(p).replace(r'\*', '.*')
+        if pat.endswith(r'\$'):
+            pat = pat[:-2] + '$'
+        if re.match(pat, '/'):
+            ln = len(p)
+            if ln > best_len or (ln == best_len and r['directive'] == 'allow'):
+                best_len, verdict = ln, r['directive']
+    return verdict
+
+
+def _effective_prefs(parsed, field, bot):
+    """Preferences declared for a bot: its named group's lines, else the '*'
+    group's (the site-wide declaration), else lines outside any group."""
+    g, _src = _group_for(parsed, bot)
+    star, _ = _group_for(parsed, '*')
+    vals = ((g[field] if g else []) or (star[field] if star else [])
+            or parsed['global_signals' if field == 'content_signals'
+                      else 'global_usage'])
+    prefs = {}
+    for v in vals:
+        path, p = _parse_prefs(v)
+        if path in (None, '/'):
+            prefs.update(p)
+    return prefs
+
+
+def robots_report(text):
+    """Contract shape: content_signals, usage_groups, content_usage,
+    per_bot_allowed (+ per_bot_source), and policy_conflicts."""
+    parsed = parse_robots(text)
+    signals, usage = [], []
+    for g in [{'agents': ['*(global)'],
+               'content_signals': parsed['global_signals'],
+               'content_usage': parsed['global_usage']}] + parsed['groups']:
+        scope = ','.join(g['agents'])
+        for v in g['content_signals']:
+            _path, p = _parse_prefs(v)
+            signals.append({'scope_user_agent': scope,
+                            'search': p.get('search'),
+                            'ai_input': p.get('ai-input'),
+                            'ai_train': p.get('ai-train'), 'raw': v})
+        for v in g['content_usage']:
+            path, p = _parse_prefs(v)
+            usage.append({'scope_user_agent': scope, 'path': path,
+                          'prefs': p, 'raw': v})
+    usage_groups = []
+    for g in parsed['groups']:
+        for a in g['agents']:
+            if a.lower().startswith('__usage_'):
+                usage_groups.append({'token': a, 'rules': g['rules'],
+                                     'root': _root_allowed(g)})
+    per_bot, per_src = {}, {}
+    for b in AI_BOTS:
+        g, src = _group_for(parsed, b['name'])
+        per_bot[b['name']] = _root_allowed(g) if g else 'unspecified'
+        per_src[b['name']] = src or 'none'
+    conflicts = []
+    by_group = defaultdict(list)
+    for b in AI_BOTS:
+        by_group[b['group']].append(b['name'])
+
+    def allowed(names):
+        return [n for n in names if per_bot[n] != 'disallow']
+
+    def disallowed(names):
+        return [n for n in names if per_bot[n] == 'disallow']
+
+    for b in by_group['search'] + by_group['user']:
+        p = _effective_prefs(parsed, 'content_signals', b)
+        if p.get('ai-input') == 'no' and per_bot[b] != 'disallow':
+            conflicts.append({'kind': 'ai_input_no_but_bot_allowed',
+                              'detail': f'Content-Signal ai-input=no applies '
+                                        f'to {b}, which robots.txt allows'})
+        if p.get('search') == 'no' and per_bot[b] != 'disallow' \
+                and b in by_group['search']:
+            conflicts.append({'kind': 'search_no_but_bot_allowed',
+                              'detail': f'Content-Signal search=no applies '
+                                        f'to {b}, which robots.txt allows'})
+    for b in by_group['training']:
+        p = _effective_prefs(parsed, 'content_signals', b)
+        u = _effective_prefs(parsed, 'content_usage', b)
+        if p.get('ai-train') == 'yes' and per_bot[b] == 'disallow':
+            conflicts.append({'kind': 'ai_train_yes_but_bot_disallowed',
+                              'detail': f'Content-Signal ai-train=yes but '
+                                        f'robots.txt disallows {b}'})
+        if p.get('ai-train') == 'no' and per_bot[b] != 'disallow' \
+                and per_src[b] == 'named':
+            conflicts.append({'kind': 'ai_train_no_but_bot_allowed',
+                              'detail': f'Content-Signal ai-train=no but a '
+                                        f'named robots.txt group allows {b}'})
+        if u.get('train-ai') in ('n', 'no') and per_bot[b] != 'disallow' \
+                and per_src[b] == 'named':
+            conflicts.append({'kind': 'content_usage_vs_bot_rules',
+                              'detail': f'Content-Usage train-ai=n but a '
+                                        f'named robots.txt group allows {b}'})
+    for ug in usage_groups:
+        if ug['token'].lower() != '__usage_ai-training':
+            continue
+        named = [n for n in ('GPTBot', 'ClaudeBot')
+                 if per_src[n] == 'named']
+        if ug['root'] == 'disallow' and allowed(named):
+            conflicts.append({'kind': 'usage_group_vs_bot_rules',
+                              'detail': '__usage_ai-training disallows / but '
+                                        f'robots.txt allows {", ".join(allowed(named))}'})
+        if ug['root'] == 'allow' and disallowed(named):
+            conflicts.append({'kind': 'usage_group_vs_bot_rules',
+                              'detail': '__usage_ai-training allows / but '
+                                        f'robots.txt disallows {", ".join(disallowed(named))}'})
+    return {'content_signals': signals, 'usage_groups': usage_groups,
+            'content_usage': usage, 'per_bot_allowed': per_bot,
+            'per_bot_source': per_src}, conflicts
+
+
+_VERDICT_RANK = {'challenged': 4, 'blocked': 3, 'differs': 2,
+                 'unreachable': 1, 'ok': 0}
+
+
+def _fetch_verdict(f, ctrl):
+    st = f['status']
+    if f['challenge']:
+        return 'challenged'
+    if not isinstance(st, int):
+        return 'unreachable'
+    if st >= 400:
+        return 'blocked'
+    if (st == 200 and ctrl and ctrl['status'] == 200 and ctrl['bytes']
+            and f['bytes'] < ctrl['bytes'] * BOT_PROBE_DIFFERS_RATIO):
+        return 'differs'
+    return 'ok'
+
+
+def _with_query(url, key, value):
+    pu = urlparse(url)
+    q = (pu.query + '&' if pu.query else '') + urlencode({key: value})
+    return pu._replace(path=pu.path or '/', query=q).geturl()
+
+
+def cmd_bot_probe(base_url, pages=(), robots_file=None, indexnow_key=None):
+    """Returns the bot-probe JSON dict (see contract)."""
+    pu = urlparse(base_url)
+    if not pu.scheme or not pu.netloc:
+        return {'status': 'unavailable', 'reason': f'bad base url {base_url}'}
+    origin = f'{pu.scheme}://{pu.netloc}'
+    urls = [base_url]
+    for p in pages:
+        p = p.strip()
+        if p:
+            urls.append(urljoin(origin + '/', p))
+    urls = list(dict.fromkeys(urls))[:1 + BOT_PROBE_MAX_PAGES]
+    agents = [(CONTROL_NAME, 'control', CONTROL_UA)] + [
+        (b['name'], b['group'], b['ua']) for b in AI_BOTS if b['fetch']]
+    jobs = [(u, n, g, ua) for u in urls for n, g, ua in agents]
+
+    def run_one(job):
+        u, n, g, ua = job
+        r = _probe_get(u, ua)
+        marker = detect_challenge(r['status'], r['headers'], r['body'])
+        return {'url': u, 'bot': n, 'group': g, 'status': r['status'],
+                'bytes': r['bytes'], 'final_url': r['final_url'],
+                'challenge': marker is not None, 'challenge_marker': marker}
+
+    with ThreadPoolExecutor(max_workers=BOT_PROBE_WORKERS) as pool:
+        fetches = list(pool.map(run_one, jobs))
+    control = {f['url']: f for f in fetches if f['bot'] == CONTROL_NAME}
+    if all(not isinstance(c['status'], int) for c in control.values()):
+        return {'status': 'unavailable',
+                'reason': f"control fetch failed: {control[base_url]['status']}",
+                'fetches': fetches}
+    per_bot, suspects = [], []
+    for n, g, _ua in agents[1:]:
+        worst, evidence, suspect = 'ok', [], False
+        for f in (x for x in fetches if x['bot'] == n):
+            ctrl = control.get(f['url'])
+            v = _fetch_verdict(f, ctrl)
+            if v != 'ok':
+                evidence.append(
+                    f"{f['url']} {f['status']} {f['bytes']}B "
+                    f"(control {ctrl['status'] if ctrl else '?'} "
+                    f"{ctrl['bytes'] if ctrl else '?'}B)"
+                    + (f" marker={f['challenge_marker']}"
+                       if f['challenge_marker'] else ''))
+            if v in ('blocked', 'challenged') and ctrl and ctrl['status'] == 200:
+                suspect = True
+            if _VERDICT_RANK[v] > _VERDICT_RANK[worst]:
+                worst = v
+        per_bot.append({'bot': n, 'group': g, 'verdict': worst,
+                        'evidence': '; '.join(evidence) or 'all fetches ok'})
+        if suspect:
+            suspects.append(n)
+    # robots.txt
+    robots_src = robots_file or f'{origin}/robots.txt'
+    robots_text, robots_status = None, None
+    if robots_file:
+        try:
+            with open(robots_file, encoding='utf-8', errors='replace') as f:
+                robots_text, robots_status = f.read(), 'file'
+        except OSError as e:
+            robots_status = f'error:{e.__class__.__name__}'
+    else:
+        r = _probe_get(robots_src, CONTROL_UA)
+        robots_status = r['status']
+        if r['status'] == 200:
+            robots_text = r['body'].decode('utf-8', errors='replace')
+    robots, conflicts = robots_report(robots_text or '')
+    robots.update({'source': robots_src, 'fetch_status': robots_status,
+                   'present': robots_text is not None})
+    # utm survival
+    tested = _with_query(base_url, 'utm_source', 'chatgpt.com')
+    r = _probe_get(tested, CONTROL_UA)
+    utm = {'tested_url': tested, 'final_url': r['final_url'],
+           'status': r['status'],
+           'kept': 'utm_source=chatgpt.com' in urlparse(r['final_url']).query,
+           'hops': len(r['hops'])}
+    if not isinstance(r['status'], int):
+        utm['kept'] = None
+    # IndexNow key file
+    indexnow = {'key_candidates': [], 'key_file_ok': None}
+    if indexnow_key:
+        k = indexnow_key.strip()
+        r = _probe_get(f'{origin}/{quote(k)}.txt', CONTROL_UA)
+        indexnow = {'key_candidates': [k], 'key_file_status': r['status'],
+                    'key_file_ok': (r['status'] == 200 and r['body'].decode(
+                        'utf-8', errors='replace').strip() == k)}
+    return {'status': 'ok', 'base_url': base_url, 'urls': urls,
+            'bots': [{k: b[k] for k in ('name', 'vendor', 'group', 'fetch')}
+                     for b in AI_BOTS],
+            'fetches': fetches, 'per_bot': per_bot,
+            'cdn_waf_suspect': suspects, 'robots': robots,
+            'policy_conflicts': conflicts, 'utm_survival': utm,
+            'indexnow': indexnow}
+
+
+# --- render-compare --------------------------------------------------------
+_RESTRICTIVE = ('noindex', 'nofollow', 'none', 'nosnippet', 'noarchive',
+                'noimageindex', 'notranslate', 'max-snippet:0')
+
+
+def _render_facts(text):
+    a = analyze_html(text)
+    return {'robots_meta': a['robots_meta'], 'canonical': a['canonical'],
+            'jsonld_count': a['jsonld_count'],
+            'main_text_chars': a['main_text_chars']}
+
+
+def _tokens(robots):
+    return {t for t in (robots or '').lower().split(',') if t}
+
+
+def _read_html_input(path):
+    """Raw HTML, or a file holding the HTML as a JSON string literal (what
+    Playwright's browser_evaluate writes via its `filename` param), or a JSON
+    object whose only/`result` value is that string."""
+    with open(path, encoding='utf-8-sig', errors='replace') as f:
+        text = f.read()
+    s = text.strip()
+    if s[:1] in ('"', '{', '['):
+        try:
+            v = json.loads(s)
+        except ValueError:
+            return text
+        if isinstance(v, dict):
+            strs = [x for x in v.values() if isinstance(x, str)]
+            v = v.get('result') if isinstance(v.get('result'), str) else (
+                strs[0] if len(strs) == 1 else None)
+        if isinstance(v, str):
+            return v
+    return text
+
+
+def cmd_render_compare(raw_path, rendered_path, url):
+    try:
+        raw_html = _read_html_input(raw_path)
+        rendered_html = _read_html_input(rendered_path)
+    except OSError as e:
+        return {'status': 'unavailable', 'url': url,
+                'reason': f'cannot read input: {e}'}
+    raw, ren = _render_facts(raw_html), _render_facts(rendered_html)
+    changes = []
+    rt, nt = _tokens(raw['robots_meta']), _tokens(ren['robots_meta'])
+    added = sorted(t for t in nt - rt if t in _RESTRICTIVE
+                   or t.startswith('max-snippet'))
+    removed = sorted(t for t in rt - nt if t in _RESTRICTIVE
+                     or t.startswith('max-snippet'))
+    if added:
+        changes.append({'kind': 'robots_added', 'raw': raw['robots_meta'],
+                        'rendered': ren['robots_meta'], 'tokens': added})
+    if removed:
+        changes.append({'kind': 'robots_removed', 'raw': raw['robots_meta'],
+                        'rendered': ren['robots_meta'], 'tokens': removed})
+    if raw['canonical'] != ren['canonical']:
+        kind = ('canonical_added' if raw['canonical'] is None else
+                'canonical_removed' if ren['canonical'] is None else
+                'canonical_changed')
+        changes.append({'kind': kind, 'raw': raw['canonical'],
+                        'rendered': ren['canonical']})
+    rendered_only = any(c['kind'] in ('robots_added', 'canonical_added',
+                                      'canonical_changed') for c in changes)
+    gap_main = (ren['main_text_chars'] >= 3 * raw['main_text_chars']
+                and raw['main_text_chars'] < 500)
+    return {'status': 'ok', 'url': url, 'raw': raw, 'rendered': ren,
+            'rendered_only_directive': rendered_only,
+            'directive_changes': changes,
+            'raw_html_gap': {'jsonld': ren['jsonld_count'] > raw['jsonld_count'],
+                             'main_content': gap_main}}
+
+
+# --- update-windows (Google Search Status Dashboard) -----------------------
+# Verified 2026-11-20: https://status.search.google.com/incidents.json is a
+# JSON array of incidents ({id, begin, end?, external_desc, service_name,
+# affected_products:[{title,id}], ...}); ranking updates carry
+# service_name "Ranking". It holds roughly the last 12 months, so the cache
+# merges fetched entries into what it already has.
+UPDATE_WINDOWS_URL = 'https://status.search.google.com/incidents.json'
+UPDATE_WINDOWS_CACHE = os.path.join('.seo-data', 'cache', 'ranking-updates.json')
+UPDATE_WINDOWS_TIMEOUT_SEC = 20
+
+
+def _update_kind(name):
+    n = (name or '').lower()
+    if 'core update' in n:
+        return 'core'
+    if 'spam' in n:
+        return 'spam'
+    return 'other'
+
+
+def parse_status_incidents(data):
+    """incidents.json → [{name, kind, start, end, id}] for the Ranking
+    product, newest first."""
+    out = []
+    for inc in data if isinstance(data, list) else []:
+        if not isinstance(inc, dict):
+            continue
+        prods = [p.get('title') for p in inc.get('affected_products') or []
+                 if isinstance(p, dict)]
+        if inc.get('service_name') != 'Ranking' and 'Ranking' not in prods:
+            continue
+        begin = (inc.get('begin') or '')[:10]
+        if not _parse_date(begin):
+            continue
+        end = (inc.get('end') or '')[:10] or None
+        name = ' '.join((inc.get('external_desc') or '').split())
+        out.append({'name': name, 'kind': _update_kind(name), 'start': begin,
+                    'end': end if end and _parse_date(end) else None,
+                    'id': inc.get('id')})
+    out.sort(key=lambda u: u['start'], reverse=True)
+    return out
+
+
+def _merge_updates(old, new):
+    by_key = {}
+    for u in old + new:          # new wins (an end date may have appeared)
+        by_key[u.get('id') or (u['name'], u['start'])] = u
+    return sorted(by_key.values(), key=lambda u: u['start'], reverse=True)
+
+
+def updates_overlapping(updates, start, end, today=None):
+    """Updates whose [start, end-or-today] window intersects [start, end]."""
+    s, e = _parse_date(start), _parse_date(end)
+    if s is None or e is None:
+        return []
+    today = today or date.today()
+    out = []
+    for u in updates:
+        us = _parse_date(u['start'])
+        ue = _parse_date(u['end']) if u.get('end') else today
+        if us and ue and us <= e and ue >= s:
+            out.append(u)
+    return out
+
+
+def cmd_update_windows(cache_path=UPDATE_WINDOWS_CACHE, max_age_days=7,
+                       overlap=None, today=None):
+    cached = _load_json_safe(cache_path, None) if os.path.exists(cache_path) \
+        else None
+    cached_updates = (cached or {}).get('updates') or []
+    age_days = None
+    if cached is not None:
+        age_days = (time.time() - os.path.getmtime(cache_path)) / 86400
+    result = None
+    if cached is not None and age_days <= max_age_days:
+        result = {'status': 'ok', 'source': 'cache',
+                  'cache_age_days': round(age_days, 2),
+                  'updates': cached_updates}
+    else:
+        try:
+            req = urllib.request.Request(UPDATE_WINDOWS_URL, headers={
+                'User-Agent': 'bx-seo-update-windows/1.0',
+                'Accept': 'application/json'})
+            with urllib.request.urlopen(
+                    req, timeout=UPDATE_WINDOWS_TIMEOUT_SEC) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+            fresh = parse_status_incidents(data)
+            if not fresh and data:
+                raise ValueError('no Ranking incidents parsed')
+            updates = _merge_updates(cached_updates, fresh)
+            try:
+                _write_json_out(cache_path, {'source': UPDATE_WINDOWS_URL,
+                                             'updates': updates})
+            except OSError:
+                pass
+            result = {'status': 'ok', 'source': UPDATE_WINDOWS_URL,
+                      'updates': updates}
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            reason = (_net_reason(e) if not isinstance(e, ValueError)
+                      else f'parse:{e}')
+            if cached is not None:
+                result = {'status': 'ok', 'source': 'cache', 'stale': True,
+                          'cache_age_days': round(age_days, 2),
+                          'fetch_error': reason, 'updates': cached_updates}
+            else:
+                result = {'status': 'unavailable', 'source': None,
+                          'reason': reason, 'updates': []}
+    if overlap:
+        s, _, e = overlap.partition(',')
+        hits = updates_overlapping(result['updates'], s.strip(), e.strip(),
+                                   today)
+        result['overlap'] = {'start': s.strip(), 'end': e.strip(),
+                             'update_overlap': [u['name'] for u in hits],
+                             'updates': hits}
+    return result
+
+
+# --- bing-exports (Bing Webmaster Tools AI Performance CSVs) ---------------
+BING_EXPORTS_DIR = os.path.join('.seo-data', 'bing', 'exports')
+BING_TOP_N = 200
+_BING_DATE_FORMATS = ('%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%Y/%m/%d',
+                      '%d.%m.%Y', '%m/%d/%y', '%b %d, %Y', '%d %b %Y')
+
+
+def _read_csv_text(path):
+    with open(path, 'rb') as f:
+        raw = f.read()
+    for enc in ('utf-8-sig', 'utf-16', 'cp1252'):
+        try:
+            text = raw.decode(enc)
+            if enc == 'utf-16' and not raw[:2] in (b'\xff\xfe', b'\xfe\xff'):
+                continue
+            return text
+        except UnicodeDecodeError:
+            continue
+    return raw.decode('latin-1')
+
+
+def _bing_date(s):
+    from datetime import datetime
+    s = (s or '').strip()
+    if not s:
+        return None
+    s = re.split(r'[T ]\d{1,2}:\d{2}', s)[0].strip()
+    for fmt in _BING_DATE_FORMATS:
+        try:
+            return datetime.strptime(s, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
+
+
+def _bing_int(s):
+    s = re.sub(r'[,\s]', '', s or '')
+    try:
+        return int(float(s))
+    except ValueError:
+        return None
+
+
+def _classify_columns(header):
+    cols = {'citations': None, 'url': None, 'query': None, 'date': None}
+    for i, h in enumerate(header):
+        k = (h or '').strip().lower()
+        if cols['citations'] is None and 'citation' in k:
+            cols['citations'] = i
+        elif cols['query'] is None and ('grounding' in k or 'query' in k):
+            cols['query'] = i
+        elif cols['url'] is None and ('url' in k or 'page' in k or 'cited' in k):
+            cols['url'] = i
+        elif cols['date'] is None and 'date' in k:
+            cols['date'] = i
+    return cols
+
+
+def cmd_bing_exports(dir_path=BING_EXPORTS_DIR):
+    import csv
+    if not os.path.isdir(dir_path):
+        return {'status': 'absent', 'reason': f'no directory {dir_path}'}
+    paths = sorted(glob.glob(os.path.join(dir_path, '**', '*.csv'),
+                             recursive=True))
+    if not paths:
+        return {'status': 'absent', 'reason': f'no .csv files in {dir_path}'}
+    pages, queries = defaultdict(int), defaultdict(int)
+    series_total, dates, files = 0, [], []
+    has_series = False
+    for p in paths:
+        info = {'name': os.path.relpath(p, dir_path), 'kind': 'unknown',
+                'rows': 0, 'columns': []}
+        files.append(info)
+        try:
+            text = _read_csv_text(p)
+        except OSError as e:
+            info['error'] = str(e)
+            continue
+        sample = text[:4096]
+        try:
+            dialect = csv.Sniffer().sniff(sample, delimiters=',;\t')
+        except csv.Error:
+            dialect = csv.excel
+        rows = [r for r in csv.reader(text.splitlines(), dialect) if any(
+            c.strip() for c in r)]
+        if not rows:
+            continue
+        header, body = rows[0], rows[1:]
+        info['columns'] = [h.strip() for h in header]
+        cols = _classify_columns(header)
+        kind = ('pages' if cols['url'] is not None else
+                'queries' if cols['query'] is not None else
+                'timeseries' if cols['date'] is not None
+                and cols['citations'] is not None else 'unknown')
+        info['kind'] = kind
+        for r in body:
+            def cell(key):
+                i = cols[key]
+                return r[i].strip() if i is not None and i < len(r) else ''
+            n = _bing_int(cell('citations')) if cols['citations'] is not None \
+                else 1
+            if n is None:
+                continue
+            info['rows'] += 1
+            d = _bing_date(cell('date')) if cols['date'] is not None else None
+            if d:
+                dates.append(d)
+            if kind == 'pages' and cell('url'):
+                pages[cell('url')] += n
+            elif kind == 'queries' and cell('query'):
+                queries[cell('query')] += n
+            elif kind == 'timeseries':
+                series_total += n
+                has_series = True
+    page_list = [{'url': u, 'citations': c} for u, c in
+                 sorted(pages.items(), key=lambda x: -x[1])][:BING_TOP_N]
+    query_list = [{'query': q, 'citations': c} for q, c in
+                  sorted(queries.items(), key=lambda x: -x[1])][:BING_TOP_N]
+    total = (series_total if has_series else sum(pages.values()) if pages
+             else sum(queries.values()))
+    return {'status': 'ok', 'files': files, 'pages': page_list,
+            'queries': query_list, 'total_citations': total,
+            'period': ({'start': min(dates), 'end': max(dates)} if dates
+                       else None)}
+
+
+def _json_cmd_main(cmd, argv):
+    """argparse front-end for the 2.20.0 JSON subcommands (and the --out /
+    --question-words flags on page-audit and sa-trends)."""
+    import argparse
+    ap = argparse.ArgumentParser(prog=f'gsc-parse-helper {cmd}')
+    if cmd == 'bot-probe':
+        ap.add_argument('--base-url', required=True)
+        ap.add_argument('--pages', default='')
+        ap.add_argument('--robots-file')
+        ap.add_argument('--indexnow-key')
+        ap.add_argument('--out', required=True)
+        a = ap.parse_args(argv)
+        res = cmd_bot_probe(a.base_url, [p for p in a.pages.split(',') if p],
+                            a.robots_file, a.indexnow_key)
+        _write_json_out(a.out, res)
+        if res['status'] != 'ok':
+            print(f"bot_probe:unavailable reason={res.get('reason')} -> {a.out}")
+            return
+        counts = defaultdict(int)
+        for b in res['per_bot']:
+            counts[b['verdict']] += 1
+        print(f"bot_probe:ok fetches={len(res['fetches'])} "
+              + ' '.join(f"{k}={counts[k]}" for k in
+                         ('ok', 'blocked', 'challenged', 'differs',
+                          'unreachable'))
+              + f" cdn_waf_suspect={len(res['cdn_waf_suspect'])} "
+              f"policy_conflicts={len(res['policy_conflicts'])} "
+              f"content_signals={len(res['robots']['content_signals'])} "
+              f"utm_kept={res['utm_survival']['kept']} "
+              f"indexnow_ok={res['indexnow']['key_file_ok']} -> {a.out}")
+    elif cmd == 'render-compare':
+        ap.add_argument('--raw', required=True)
+        ap.add_argument('--rendered', required=True)
+        ap.add_argument('--url', required=True)
+        ap.add_argument('--out', required=True)
+        a = ap.parse_args(argv)
+        res = cmd_render_compare(a.raw, a.rendered, a.url)
+        _write_json_out(a.out, res)
+        if res['status'] != 'ok':
+            print(f"render_compare:unavailable reason={res['reason']} -> {a.out}")
+            return
+        print(f"render_compare:ok url={a.url} "
+              f"rendered_only_directive={res['rendered_only_directive']} "
+              f"changes={len(res['directive_changes'])} "
+              f"gap_jsonld={res['raw_html_gap']['jsonld']} "
+              f"gap_main={res['raw_html_gap']['main_content']} -> {a.out}")
+    elif cmd == 'update-windows':
+        ap.add_argument('--cache', default=UPDATE_WINDOWS_CACHE)
+        ap.add_argument('--max-age-days', type=float, default=7)
+        ap.add_argument('--overlap', help='START,END (YYYY-MM-DD)')
+        ap.add_argument('--out', required=True)
+        a = ap.parse_args(argv)
+        res = cmd_update_windows(a.cache, a.max_age_days, a.overlap)
+        _write_json_out(a.out, res)
+        line = (f"update_windows:{res['status']} source={res.get('source')} "
+                f"updates={len(res['updates'])}")
+        if res.get('stale'):
+            line += ' stale=yes'
+        if res.get('reason'):
+            line += f" reason={res['reason']}"
+        if 'overlap' in res:
+            line += (' overlap=' + (';'.join(res['overlap']['update_overlap'])
+                                    or 'none'))
+        print(line + f' -> {a.out}')
+    elif cmd == 'bing-exports':
+        ap.add_argument('--dir', default=BING_EXPORTS_DIR)
+        ap.add_argument('--out', required=True)
+        a = ap.parse_args(argv)
+        res = cmd_bing_exports(a.dir)
+        _write_json_out(a.out, res)
+        if res['status'] != 'ok':
+            print(f"bing_exports:{res['status']} -> {a.out}")
+            return
+        print(f"bing_exports:ok files={len(res['files'])} "
+              f"pages={len(res['pages'])} queries={len(res['queries'])} "
+              f"total_citations={res['total_citations']} -> {a.out}")
+    elif cmd == 'page-audit':
+        ap.add_argument('targets')
+        ap.add_argument('--out')
+        a = ap.parse_args(argv)
+        cmd_page_audit(a.targets, a.out)
+    elif cmd == 'sa-trends':
+        ap.add_argument('cache_dir')
+        ap.add_argument('site_url')
+        ap.add_argument('end_date')
+        ap.add_argument('lookback_days')
+        ap.add_argument('brand_csv', nargs='?', default='')
+        ap.add_argument('--out')
+        ap.add_argument('--question-words',
+                        help='comma-separated; default English list')
+        a = ap.parse_args(argv)
+        qw = (tuple(w.strip() for w in a.question_words.split(',') if w.strip())
+              if a.question_words else AIO_QUESTION_WORDS)
+        cmd_sa_trends(a.cache_dir, a.site_url, a.end_date, a.lookback_days,
+                      a.brand_csv, a.out, qw)
+
+
+_JSON_CMDS = ('bot-probe', 'render-compare', 'update-windows', 'bing-exports')
+
+
 def main():
+    if len(sys.argv) >= 2 and (
+            sys.argv[1] in _JSON_CMDS or (
+                sys.argv[1] in ('page-audit', 'sa-trends')
+                and any(a.startswith('--') for a in sys.argv[2:]))):
+        try:
+            _json_cmd_main(sys.argv[1], sys.argv[2:])
+        except SystemExit as e:
+            # argparse usage errors exit 2; the helper's convention is 3
+            if e.code == 2:
+                sys.exit(3)
+            raise
+        return
     if len(sys.argv) < 2:
         print(__doc__, file=sys.stderr)
         sys.exit(3)

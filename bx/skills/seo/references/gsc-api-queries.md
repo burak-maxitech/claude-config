@@ -8,7 +8,7 @@ Loaded by the orchestrator (Step 1.6) when the Search Console API is the active 
 - `coverageState` + `pageFetchState` → 9-reason **lookup table** (full)
 - Quota degradation rules
 
-For endpoint inventory, auth, quota model, and enum reference, see `gsc-api-schema.md`. For digest field translation and integration with the **16 sub-dim catalog**, see `gsc-ingestion.md` "API ingestion" subsection. **For the disk-cache contract (split TTL: 24h on sa-*, 7d on ui-*; atomic write; skip-on-non-200), see `gsc-cache.md`. The Search Analytics curl shapes in this file are the fresh-path body inside that file's bash cache wrapper; the URL Inspection cache logic is helper-resident in `gsc-parse-helper inspect-batch` (same key + TTL contract).**
+For endpoint inventory, auth, quota model, and enum reference, see `gsc-api-schema.md`. For digest field translation and integration with the **18 sub-dim catalog**, see `gsc-ingestion.md` "API ingestion" subsection. **For the disk-cache contract (split TTL: 24h on sa-*, 7d on ui-*; atomic write; skip-on-non-200), see `gsc-cache.md`. The Search Analytics curl shapes in this file are the fresh-path body inside that file's bash cache wrapper; the URL Inspection cache logic is helper-resident in `gsc-parse-helper inspect-batch` (same key + TTL contract).**
 
 
 ---
@@ -477,6 +477,9 @@ Not curl templates: the helper issues these 4 Search Analytics calls itself (tok
 |---|---|---|
 | T1 | `dimensions: ["query","page"]`, lookback window ending `<CURRENT_DATE>`, `rowLimit: 25000`, `type: web` | sub-dim 15 `cannibalization` |
 | T2–T4 | `dimensions: ["page"]`, three consecutive 28-day windows ending `<CURRENT_DATE>` (oldest first), `rowLimit: 25000` | sub-dim 16 `content_decay` |
+| T5–T6 (2.20.0) | `dimensions: ["query","page"]`, the previous and the newest 28-day windows (same bounds as T3/T4), `rowLimit: 25000` | `ctr_segments` (aio_prone vs other) + `ai_overview_compression` |
+
+2.20.0 segmentation: a query is `aio_prone` when it contains a question word as a whole word (who/what/when/where/why/how/which/can/does/is/are/should/vs/best/difference — English; `--question-words a,b,c` overrides) or has ≥ 6 words. `ai_overview_compression` pages: CTR fell ≥ 20% relative, |position Δ| ≤ 1.0, ≥ 60% of the newest window's impressions aio_prone, ≥ 100 impressions in both windows (noise floor); `ctr_delta` is the relative change. `--out FILE` writes all sections as JSON; the text output gains `--- ctr segments ---` and `ai_overview_compression:<n>`.
 
 Thresholds (helper constants): cannibalization — query ≥100 impressions, 2+ URLs with ≥10% share each, brand queries (`site_profile.brand_terms`) excluded, URL fragments merged. Decay — clicks fell in both steps, newest ≤70% of oldest, oldest ≥30 clicks. T1 cap-hit at 25k rows truncates the long tail; cannibalization on head queries is unaffected.
 

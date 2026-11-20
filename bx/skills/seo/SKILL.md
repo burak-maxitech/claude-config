@@ -70,7 +70,7 @@ Read `references/site-profile.md` (schema, interview, effect table) and `.seo-da
 1. **Decide what to ask** per the staleness table in `site-profile.md`: missing durable keys, durable keys past 180 days (one confirmation question), volatile Search Console facts past 28 days.
 2. **Skip asking** when `--no-ask`, `--plan` or `--fix` is in `$ARGUMENTS`, or AskUserQuestion is unavailable/denied. Missing keys become `unknown`; footer: `Site profile: <N> keys unknown — run /bx:seo --profile to answer them.` Never block the audit.
 3. **`--profile`** → run the full interview with current values offered as `(current)` options.
-4. **Interview** with AskUserQuestion (≤4 questions per call, options pre-filled from Step 0 detections and marked `(detected)`), in the call order `site-profile.md` defines: Call 1 audit shape → Call 2 ranking targets → Call 3 Search Console UI facts + exports + CrUX key → optional Call 4.
+4. **Interview** with AskUserQuestion (≤4 questions per call, options pre-filled from Step 0 detections and marked `(detected)`), in the call order `site-profile.md` defines: Call 1 audit shape → Call 2 ranking targets → Call 3 Search Console UI facts + exports + CrUX key → Call 3b AI delivery and measurement (2.20.0: `cdn` with the detected provider pre-filled, `bing_verified`, `analytics_ai_channel` — asked only for missing or stale keys, skipped when none are) → optional Call 4. These three are **volatile** keys (28-day staleness like the Search Console facts). A profile written before 2.20.0 lacks them: treat them as **missing** (asked once in Call 3b), not stale.
 5. **Write** `.seo-data/site-profile.yaml` (flat keys, no secrets) and print the one-line save notice. If the user chose `private: yes`, add the file inside the `# /bx:seo managed` `.gitignore` block.
 6. **Stash** `site_profile` for Step 1 (site-type query), Step 3.3 (CrUX), Step 5 (shared context) and Step 6.6 (ranking).
 
@@ -85,7 +85,7 @@ Read `references/site-profile.md` (schema, interview, effect table) and `.seo-da
 Run in a **single parallel turn** (multiple WebSearch + WebFetch tool calls together):
 
 **WebSearch queries (4-6, parallel):**
-- `"SEO best practices 2026 Google Search Central updates"`
+- `"SEO best practices <current year> Google Search Central updates"`
 - `"site:developers.google.com/search/blog <current year>"` (Google's own announcements first — core updates, spam policies, rich-result retirements)
 - `"schema.org rich results JSON-LD changes <current year>"`
 - `"Core Web Vitals thresholds <current year>"`
@@ -93,7 +93,7 @@ Run in a **single parallel turn** (multiple WebSearch + WebFetch tool calls toge
 - One stack-specific query if applicable, e.g. `"Next.js app router SEO metadata <current year>"` or `"Astro SEO best practices <current year>"`
 - One site-type query from `site_profile.site_type` (Step 0.5), e.g. `"ecommerce product structured data Merchant Center <current year>"`, `"local business SEO Google Business Profile <current year>"`. Skip when `unknown`.
 
-Substitute the literal current year — never a hard-coded one.
+Substitute the literal current year — never a hard-coded one. `<current year>` is the year of the brief's fetch date (`<YYYY-MM-DD>` below), so every query in one run uses the same year.
 
 **Primary sources outrank everything else in the brief.** Google's [AI optimization guide](https://developers.google.com/search/docs/fundamentals/ai-optimization-guide) (2026-05-15) states Search does not use llms.txt, and needs no special schema, "chunking" or AEO/GEO tricks for AI features. When a secondary source (SEO blog, GEO vendor) contradicts a Google, OpenAI, Anthropic or Perplexity doc, the brief keeps the first-party position and notes the conflict. Always fetch the [Search Central documentation updates](https://developers.google.com/search/updates) page — it is the dated changelog of every doc change, and the fastest way to see what was retired since the last run.
 
@@ -103,6 +103,16 @@ Substitute the literal current year — never a hard-coded one.
 - Recent Anthropic/OpenAI/Perplexity guidance on citation behavior
 
 A second round of WebFetch on highest-signal WebSearch results is optional and only worth a follow-up turn when the curated URLs returned thin content.
+
+**Ranking-update windows (one Bash call in the SAME parallel turn — 2.20.0).** Google core and spam updates move traffic on sites that changed nothing, so GSC trends and watchpoint verdicts must know when one was rolling out. The helper fetches the Google Search Status Dashboard incident feed (`https://status.search.google.com/incidents.json`, Ranking entries, about 12 months), merges it into a 7-day cache that keeps older history (site-independent), and falls back to the cache when offline:
+
+```bash
+mkdir -p .seo-data/cache 2>/dev/null; UW_OUT=$(mktemp -t seo-update-windows-XXXXXX.json); PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper update-windows --cache .seo-data/cache/ranking-updates.json --max-age-days 7 --out "$UW_OUT"; echo "UPDATE_WINDOWS_OUT:$UW_OUT"; cat "$UW_OUT"; rm -f "$UW_OUT"
+```
+
+Stash the JSON as `update_windows` (`{status, source, updates:[{name, kind, start, end}]}`). Consumers: `seo-gsc-insights` (Step 5 — annotates `content_decay`, `ai_overview_compression` and `brand_query_anomaly` with `update_overlap`), the orchestrator-emitted `deindex_regression` (Step 1.6.13.4) and the watchpoint verdicts (Step 1.6.14). All exist only when `gsc_mode: enabled`; in heuristic-only mode the result is discarded and gets no footer line. `status: unavailable` (offline, no cache) → `update_overlap: null` (unknown — never `[]`) everywhere, footer: `Ranking-update overlay unavailable: <reason>.` Otherwise footer (per `references/report-template.md`): `Ranking-update overlay: <N> Google updates on record (source: <status-dashboard | cache, age Nd>); <M> findings and <W> watchpoints overlap.`
+
+**Crawler table changes (2.20.0).** When `site_profile.ai_policy` is set (not `unknown`) or Step 3.5 will run (a base URL resolves), also WebFetch the vendor crawler pages listed in `references/best-practices-sources.md` (OpenAI, Anthropic, Perplexity, Google common crawlers, Meta, and any others listed there) in this same turn. Compare their user-agent tokens and purposes with the bot groups in `references/site-profile.md` and record differences — new tokens, renamed tokens, a bot moved between search / user / training / ads — in the brief's "Crawler table changes" subsection. `geo-generative` and the Step 3.5 reading use it; an unlisted new token is reported, never silently added to the probe.
 
 **Summarize into a structured in-session "best-practices brief" (~50 lines max):**
 
@@ -122,6 +132,9 @@ A second round of WebFetch on highest-signal WebSearch results is optional and o
 
 ### Stack-specific (<framework>)
 - <bullet>
+
+### Crawler table changes (vendor crawler pages; omit when not fetched)
+- <vendor>: <token> <added | renamed from X | moved search → training | unchanged> (<URL>)
 
 ### Weight adjustments suggested
 - Generative Engine readiness: +3 (this week's guidance emphasizes AI citation)
@@ -148,7 +161,7 @@ Steps 1.5 (git scan) and 1.6 (GSC API ingestion when configured, else heuristic-
 - `Glob .seo-data/gsc/README.md` (Step 1.6.5 idempotency)
 - `Read .gitignore` (Step 1.6.5 idempotency)
 - `Read references/gsc-setup-readme-template.md` (fire optimistically; discard if README already exists)
-- `Read references/gsc-ingestion.md` (always needed when API is configured — covers API ingestion contract + 16 sub-dim catalog including sub-dim 14 `deindex_regression`)
+- `Read references/gsc-ingestion.md` (always needed when API is configured — covers API ingestion contract + 18 sub-dim catalog including sub-dim 14 `deindex_regression`, sub-dims 17–18 and the `update_overlap` annotation)
 - `Read .seo-data/gsc/config.yaml` (optimistic; if file doesn't exist the tool errors silently — interpret as `api_configured = false`)
 - `Read references/gsc-api-queries.md` (optimistic; only used when API activates — reading early avoids an extra Read in Turn 2)
 - `Read references/gsc-api-schema.md` (optimistic; reference for API response parsing)
@@ -158,6 +171,7 @@ Steps 1.5 (git scan) and 1.6 (GSC API ingestion when configured, else heuristic-
 - `Read .seo-data/gsc/known-bad-urls.txt` (optimistic — the file is user-authored and may not exist; Read errors silently on missing file → `user_supplied_urls` stays empty. When present, parsed in Step 1.6.6's Pre-Turn-2 step into the URL Inspection user-supplied slice — see `references/gsc-api-queries.md` "URL Inspection — selection algorithm" 4-slice mix.)
 - `Bash: ls .seo-data/gsc/snapshots 2>/dev/null | sort | tail -1` (find most recent prior snapshot — used by Step 1.6.13.2 regression diff. Empty stdout means "first run for this property", in which case Step 1.6.13 emits no findings and footer-notes the activation.)
 - `Glob .seo-data/gsc/exports/*.csv` (user-dropped Search Console UI exports the API cannot provide — Generative AI report, Core Web Vitals, Links. Parsed in Step 1.6.15. Empty result → nothing to parse.)
+- `Glob .seo-data/bing/exports/*.csv` (user-dropped Bing Webmaster Tools AI Performance exports — citations, cited pages, grounding queries. Parsed in Step 1.6.15 via `gsc-parse-helper bing-exports`. Empty result → nothing to parse.)
 - `Read .seo-data/gsc/finding-history.json` (optimistic — file is skill-auto-managed under Group D finding-lifecycle infra; absent on first run. When present, the orchestrator parses `{<hash>: {run_count, first_seen_date, ...}}` and passes the map to Step 7 report rendering so findings with `run_count >= 3` get an escalation hint appended to their `recommended_action`. See Step 6.8 for the write-back step.)
 - `Read .seo-data/gsc/watchpoints.json` (optimistic — same as above. When present, the orchestrator invokes `gsc-parse-helper watchpoint-check` AFTER Q2 cache lands in Turn 2a (since the check needs the current Q2 pages digest for metric comparison) — see **Step 1.6.14** below for the invocation block. Stash the helper output for Step 7 banner rendering.)
 - `Bash: gcloud --version 2>&1` (gcloud SDK install detection — informational only; the helper mints tokens with Python stdlib, so gcloud is a fallback, not a requirement)
@@ -322,7 +336,7 @@ When shallow: `Git history scan: skipped (shallow clone — change-awareness ann
 GSC data is ingested via the **Search Console API**: `searchanalytics.query` for Performance signal, `urlInspection.index.inspect` per-URL for Indexing signal. Configuration is a single key (`site_url`) in `.seo-data/gsc/config.yaml`. When not configured or unreachable, the skill runs heuristic-only.
 
 Four reference files cover the implementation:
-- `references/gsc-ingestion.md` — digest shapes, **16 sub-dim** finding catalog (incl. sub-dim 14 `deindex_regression` for snapshot-diff early warning), `coverageState` → 9-reason lookup, setup banner, `.gitignore` auto-append rules
+- `references/gsc-ingestion.md` — digest shapes, **18 sub-dim** finding catalog (incl. sub-dim 14 `deindex_regression` for snapshot-diff early warning), `coverageState` → 9-reason lookup, setup banner, `.gitignore` auto-append rules
 - `references/gsc-api-schema.md` — Search Console API endpoint inventory, auth/scope, quota model, `coverageState`/`pageFetchState` enums
 - `references/gsc-api-queries.md` — 3 parametrized `curl` templates (Q1/Q2/Q3) + URL Inspection per-URL template + URL selection algorithm + lookup table
 - `references/gsc-cache.md` — split-TTL response cache for `searchanalytics.query` (24h on `sa-*`) and `urlInspection.index.inspect` (7d on `ui-*` — coverageState is weeks-stable). Cache wrapper bash template (atomic write, skip-cache-on-non-200, stat portability) for Turn 2a Search Analytics; Turn 2b URL Inspection cache is helper-resident in `gsc-parse-helper inspect-batch`. `--no-cache` bypass behavior. Two-tier eviction policy (sa-* at 7d, ui-* at 14d). Footer line format.
@@ -419,11 +433,17 @@ If `.seo-data/gsc/config.yaml` exists (`api_configured == true` OR partial confi
 ```
 # /bx:seo managed — do not edit between markers
 .seo-data/gsc/
+.seo-data/bing/
+.seo-data/cache/
 .seo-data/.gsc-banner-shown
 # /end /bx:seo managed
 ```
 
-The block covers `config.yaml` (which contains `site_url` — non-secret but property-identifying). If `.gitignore` doesn't exist, create it with the sentinel block. Print `Added .seo-data/gsc/ to .gitignore (sentinel-marked block).` on first append; silent thereafter.
+The block covers `config.yaml` (which contains `site_url` — non-secret but property-identifying), the Bing exports (`.seo-data/bing/exports/` — same privacy class as the GSC exports) and the site-independent ranking-update cache (`.seo-data/cache/`). If `.gitignore` doesn't exist, create it with the sentinel block. Print `Added .seo-data/gsc/ to .gitignore (sentinel-marked block).` on first append; silent thereafter.
+
+**Existing block missing a 2.20.0 line.** If the start marker is present but the block lacks `.seo-data/bing/` or `.seo-data/cache/`, insert the missing line(s) directly above `# /end /bx:seo managed` (Edit, never rewrite the block) and print `Added <path> to the /bx:seo block in .gitignore.` once.
+
+**Bing exports without a GSC config.** This sub-step otherwise runs only when `config.yaml` exists; it also runs when Turn 1's `Glob .seo-data/bing/exports/*.csv` found files, so a Bing-only user's exports are ignored by git too. No README is written for `.seo-data/bing/` — like `.seo-data/gsc/exports/`, the folder is user-created and explained by the Step 0.5 interview (`references/site-profile.md`).
 
 ### 1.6.6 — Data ingestion (Turn 2)
 
@@ -495,13 +515,13 @@ curl -s -w '%{http_code}' -o "$TMP" -X POST \
   "https://www.googleapis.com/webmasters/v3/sites/<SITE_URL_ENCODED>/searchAnalytics/query"
 ```
 
-**Same turn — trends (one helper call, in parallel with Q1–Q3).** Q1–Q3 each have one dimension and one window, so they can't show two pages competing for one query or a page losing clicks over months. The helper makes those 4 Search Analytics calls itself (query×page over the lookback window, plus three 28-day page windows ending at the same `endDate`), mints its own token, and caches each response for 24h as `sa-trend-*.json` in the same cache directory (evicted with the other `sa-*` files):
+**Same turn — trends (one helper call, in parallel with Q1–Q3).** Q1–Q3 each have one dimension and one window, so they can't show two pages competing for one query or a page losing clicks over months. The helper makes those 6 Search Analytics calls itself (query×page over the lookback window, three 28-day page windows ending at the same `endDate`, and — 2.20.0 — query×page for the newest and previous 28-day windows, for the AI-Overview segmentation), mints its own token, and caches each response for 24h as `sa-trend-*.json` in the same cache directory (evicted with the other `sa-*` files):
 
 ```bash
-PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper sa-trends .seo-data/gsc/cache "<SITE_URL_RAW>" "<CURRENT_DATE>" <LOOKBACK_DAYS literal> "<site_profile.brand_terms, comma-separated, or empty>"
+ST=$(mktemp -t seo-sa-trends-XXXXXX.json); PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper sa-trends .seo-data/gsc/cache "<SITE_URL_RAW>" "<CURRENT_DATE>" <LOOKBACK_DAYS literal> "<site_profile.brand_terms, comma-separated, or empty>" --out "$ST"; echo "--- sa-trends json ---"; cat "$ST"; rm -f "$ST"
 ```
 
-`--no-cache` → prefix `NO_CACHE=1`. Output: `sa_trend_calls:` with 4 statuses (`hit` / `miss` / `error:<code>`), then `--- cannibalization ---` and `--- content decay ---` sections (top 20 each). Exit 4 / `AUTH_ERROR:` → footer-note `Trends skipped (<reason>)` and continue; an `error:` status skips only the signal that call fed. These feed sub-dims 15 (`cannibalization`) and 16 (`content_decay`) in `gsc-ingestion.md`. Footer: `Trends: <N> cannibalized queries, <M> decaying pages (sa-trend cache <hits>/4).`
+`--no-cache` → prefix `NO_CACHE=1`. Output: `sa_trend_calls:` with 6 statuses (`hit` / `miss` / `error:<code>`), then `--- cannibalization ---` and `--- content decay ---` sections (top 20 each), plus (2.20.0, in the `--out` JSON) `ctr_segments` (CTR and position now vs previous for AI-Overview-prone queries — question-form or ≥ 6 words — vs the rest) and `ai_overview_compression` (pages whose CTR fell ≥ 20% while position held and most impressions are AIO-prone). Both go to `seo-gsc-insights` in Step 5; they turn what would read as `ctr_loss` into the info-only `ai_overview_compression` finding instead of "rewrite the title" advice. Exit 4 / `AUTH_ERROR:` → footer-note `Trends skipped (<reason>)` and continue; an `error:` status skips only the signal that call fed. These feed sub-dims 15 (`cannibalization`) and 16 (`content_decay`) in `gsc-ingestion.md`. Footer: `Trends: <N> cannibalized queries, <M> decaying pages (sa-trend cache <hits>/6).`
 
 **Turn 2b — URL Inspection (single helper invocation, internally parallel)** — fires after Turn 2a since URL selection uses Q3's output. Compute the URL inspection budget per `gsc-api-queries.md` "URL Inspection — selection algorithm" (top 80 by impressions from Q3 + 20 git-changed paths from Step 1.5 resolved via `page_type_map` + shared 100-slot bucket of user-supplied URLs from `.seo-data/gsc/known-bad-urls.txt` (up to 100) + **sitemap-orphan URLs from the `--- orphans ---` list emitted by Step 1.6.6a's `sitemap-urls` call** (already filtered to sitemap entries not in `url_impressions_map`, in document order; filling whatever the user-supplied slice doesn't claim); dedup precedence impressions > git > user-supplied > sitemap-orphan; hard cap 200). The orphan list is now computed by the helper from the LIVE sitemap (Step 1.6.6a) — not from a repo-local file — so it is non-empty for generated/dynamic sitemaps.
 
@@ -759,6 +779,14 @@ When `transitions_total > 0`, the orchestrator constructs a sub-dim 14 finding p
 
 Path-cluster evidence: when `path_clusters` output has ≥1 entry, include in evidence + run git-correlation against Step 1.5's digest (for each cluster prefix, scan touched-files list for paths matching the prefix when resolved via `page_type_map`; attach matching commits as `git_correlation` evidence, max 3 commits per cluster).
 
+**Update overlap (2.20.0).** The orchestrator computes `update_overlap` for this finding itself (the subagent never sees it), over the window from `previous_run_date` to today, with the cached history Step 1 refreshed:
+
+```bash
+UO=$(mktemp -t seo-uw-overlap-XXXXXX.json); PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper update-windows --cache .seo-data/cache/ranking-updates.json --overlap "<previous_run_date>,<RUN_DATE>" --out "$UO"; cat "$UO"; rm -f "$UO"
+```
+
+Set `update_overlap` from the result's `overlap.update_overlap` list (`null` when Step 1's `update_windows` was unavailable — unknown, not `[]`). When it holds a `core` or `spam` update **and** the transitions are quality-class (to crawled/discovered – currently not indexed), add the sub-dim 14 note from `gsc-ingestion.md` to `recommended_action` (the update may be Google's reassessment — weigh `git_correlation` before reverting anything). **Never soften 5xx, 404 or redirect transitions on this ground** — they are mechanical, and an update does not explain them. `evidence` gains `Window overlaps Google <name> (<start> – <end|ongoing>)` either way.
+
 The finding is added directly to the findings pool used by Step 6 ranking. Source: `"gsc"`. `score_impact: 0` (Step 6.0a enforcement applies as for all GSC findings).
 
 #### 1.6.13.5 — Inflection-point footer lines (independent of finding emission)
@@ -836,6 +864,22 @@ The helper:
 - Stash `due` records for Step 7 banner rendering (one banner per `due` watchpoint in Suggested Next Actions — see Step 7 "Watchpoint banner format").
 - When `watchpoints_due == 0`, no banners; footer-line still emits the active count.
 
+**Update-window annotation (2.20.0).** A core or spam update can move a watched URL with no change on the site, so a verdict measured across a rollout says nothing about the fix. When `watchpoints_due > 0` and Step 1's `update_windows.status` is not `unavailable`, run one Bash call that checks every due watchpoint's measurement window — from its apply date to `RUN_DATE` — against the cached update history (Step 1 just refreshed it, so this is offline):
+
+```bash
+# One line per due watchpoint, literal dates substituted (no shell loop — keep every
+# command a plain allowed-tools match). Repeat the line for watchpoint 2, 3, ...
+UO=$(mktemp -t seo-uw-overlap-XXXXXX.json); PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper update-windows --cache .seo-data/cache/ranking-updates.json --overlap "<apply_date_1>,<RUN_DATE>" --out "$UO"; echo "OVERLAP_WINDOW:<apply_date_1>,<RUN_DATE>"; cat "$UO"; rm -f "$UO"
+```
+
+Set `update_overlap` on each due record from the result's `overlap.update_overlap` list (empty list when none overlap). Verdict rule:
+- `regressed` or `unchanged` with a non-empty `update_overlap` → the verdict becomes **`inconclusive`** and the banner says `inconclusive — overlaps <update names>`, never "fix failed" or "backfired". The metric moved (or didn't) during a rollout; re-check on a run whose window is clear of it.
+- `improved` with a non-empty `update_overlap` → keep `improved`, add `(overlaps <update names> — part of the gain may be the update)`.
+- `no_data` is unchanged; append the overlap names when present.
+- `update_windows` unavailable → verdicts stand as the helper returned them; the footer line below adds `update overlap not checked`.
+
+The watchpoint itself is not evicted or rewritten by this — the annotation lives only in this run's banners and footer.
+
 **No-prior-watchpoints case**: file absent or empty `watchpoints` array. Helper emits `watchpoints_active:0 / watchpoints_due:0 / watchpoints_evicted:0` and exits cleanly. Orchestrator skips Step 7 banner rendering for watchpoints.
 
 **Footer line** (always rendered when api_active):
@@ -843,6 +887,8 @@ The helper:
 ```
 Watchpoints: 3 active (1 due this run, evaluated against Q2 pages digest); 0 evicted (90-day rotation).
 ```
+
+With an overlap: `Watchpoints: 3 active (2 due this run; 1 inconclusive — overlaps <update name>); 0 evicted (90-day rotation).`
 
 ### 1.6.15 — User-supplied Search Console exports (UI-only reports)
 
@@ -859,6 +905,16 @@ Identify each CSV by its header row (read only the first 60 lines of each file �
 Pass the digests to `seo-gsc-insights` (AI + Links) and `seo-technical` (CWV) as an `Exports:` block. Findings derived from them carry `source: "gsc"` and `score_impact: 0`, like all GSC-side signals. A file that matches no recognised header → footer: `Export <name> not recognised — skipped.` Export older than 60 days (file mtime) → use it, and footer-note its age.
 
 Footer line: `Exports: <N> parsed (<kinds>), <M> skipped.` Omit when no exports exist.
+
+**Bing Webmaster Tools AI Performance exports (2.20.0).** Bing's AI Performance report is the only first-party dashboard that counts citations (as of 2026-11; public preview), so it is the first real "were we cited" number the audit can track run over run. Runs whenever Turn 1's `Glob .seo-data/bing/exports/*.csv` found files — independent of `gsc_mode`. Header names vary between export versions, so parsing goes through the helper, not a header-row Read:
+
+```bash
+BX=$(mktemp -t seo-bing-exports-XXXXXX.json); PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper bing-exports --dir .seo-data/bing/exports --out "$BX"; cat "$BX"; rm -f "$BX"
+```
+
+Output `{status, files, pages:[{url, citations}], queries:[{query, citations}], total_citations, period}`. Build a **Bing digest** (≤ 15 lines): period, total citations, top 10 cited pages, top 5 grounding queries, and any `money_pages` with zero citations. With `gsc_mode: enabled`, pass it to `seo-gsc-insights` (Step 5), which emits the info-only `bing_ai_citations` finding (sub-dim 18; `source: "gsc"`, `score_impact: 0`). With `gsc_mode: disabled`, the orchestrator emits that finding itself in Step 6.0.5. `status: "absent"` or no rows → no digest. Same 60-day age rule as the GSC exports. The folder's `.gitignore` coverage is handled in Step 1.6.5.
+
+Footer line: `Bing exports: <N> files parsed, <total> citations over <period>.` Omit when the folder is empty or absent. When `site_profile.bing_verified` is `yes` but no exports exist, add instead: `Bing exports: none (drop Bing Webmaster Tools AI Performance CSVs into .seo-data/bing/exports/ to track AI citations).`
 
 ---
 
@@ -878,6 +934,8 @@ Three rules the orchestrator must follow when ingesting external data. Surfaced 
 - `finding-history.json` (skill-auto-managed; **per-finding run_count tracker** for Group D stale-finding escalation — written by `gsc-parse-helper history-update` after Step 6 score consolidation. When a finding's `run_count >= 3` and the underlying location/sub_dim hasn't changed, the orchestrator appends an escalation hint to `recommended_action` urging external action or severity reassessment. See Step 6.8 for the integration. Auto-evicted entries: none — the file grows slowly (~1 entry per persistent finding) and stable findings ARE the signal worth keeping.)
 - `watchpoints.json` (skill-auto-managed; **phase-applied watchpoints** auto-emitted when a finding has `code_changed_since_gsc_window=true` — see `gsc-parse-helper watchpoint-emit`. At Step 1.6 Turn 1, watchpoints past their `expected_recheck_date` (applied + 21 days, typical GSC pipeline lag) are checked via `watchpoint-check`; status delta surfaces as a top-level banner in Suggested Next Actions. Auto-evicted after 90 days to prevent unbounded growth.)
 - `.gsc-banner-shown` (sentinel — sits in `.seo-data/` not `.seo-data/gsc/`)
+
+Two siblings of `.seo-data/gsc/` follow the same rules (2.20.0): `.seo-data/bing/exports/` is user-supplied CSVs only (read, never written), and `.seo-data/cache/ranking-updates.json` is the one file `gsc-parse-helper update-windows` writes there (site-independent, 7-day refresh, safe to delete). Nothing else is written under either.
 
 The `cache/` subdirectory is the only sanctioned location for persisted API responses. The orchestrator owns its lifecycle (creates on Turn 1, writes via atomic mv in Turn 2, prunes entries >7d at the start of each run). Cache content is reproducible from the API on demand — safe to delete manually.
 
@@ -992,7 +1050,7 @@ Interpret `$ARGUMENTS`:
 | path (e.g. `src/pages/`) | Scope to that path |
 | `--plan` | After report, emit phased rewrite brief (read `references/plan-mode-seo.md`) |
 | `--fix` | After report, apply strict-allowlist mechanical fixes with per-finding diff preview (read `references/fix-allowlist.md`) |
-| `--url <deployed-url>` | Live HTML fetch for SSR/SSG checks AND synthesizes sitemap URL probe bases when sitemap URLs are relative |
+| `--url <deployed-url>` | Live HTML fetch for SSR/SSG checks, the page audit (Step 3.4) and the AI-crawler delivery probe (Step 3.5), AND synthesizes sitemap URL probe bases when sitemap URLs are relative |
 | `--no-cache` | Bypass the GSC API response cache (24h TTL for sa-* / 7d TTL for ui-*). Forces fresh `searchanalytics.query` + `urlInspection.index.inspect` calls. Fresh responses are still written to cache for next run. Use when iterating on a fix and you need Google's current view, or when you suspect cached data is wrong. See `references/gsc-cache.md` for TTL policy + manual cache management. |
 | `--force-dispatch` | Always run the 3 codebase-scanning subagents even when Step 4.5's gating logic would skip them. Use when validating a refactor, taking a second-opinion run, or after updating subagent reference files. Default is "skip when zero non-doc commits since prior snapshot" — see Step 4.5. |
 
@@ -1013,7 +1071,7 @@ Interpret `$ARGUMENTS`:
 
 ### 3.1 Single deployed URL (if `--url <base>` provided)
 
-`WebFetch` the URL with a prompt like "Return the full rendered HTML and document the final URL after any redirects." Capture the rendered HTML excerpt. Pass to `seo-technical` and `seo-content` (skip `geo-generative` — JSON-LD lives in source most reliably).
+`WebFetch` the URL with a prompt like "Return the full rendered HTML and document the final URL after any redirects." Capture the rendered HTML excerpt. Pass to `seo-technical` and `seo-content` (skip `geo-generative` — it gets the structured raw-HTML records from Step 3.4 instead of an excerpt).
 
 `WebFetch` does **not** execute JavaScript, so this excerpt is not proof of what a rendering crawler sees — Step 3.4 owns the raw-vs-rendered comparison.
 
@@ -1064,17 +1122,51 @@ When field data exists, `seo-technical` scores `response_time` from TTFB p75 ins
 Runs whenever a base URL resolves (same rule as 3.3). It answers three questions the sitemap probe can't: is the content in the HTML a non-rendering crawler receives (most AI crawlers don't run JavaScript), is the HTML under Googlebot's 2 MB limit, and does an inline script hijack the back button (a Google spam policy).
 
 1. **Targets** — write to system temp (never under `.seo-data/gsc/`), one URL per line, 25 max, deduped: the base URL, every `money_pages` entry (absolute), then top URLs by impressions from `url_impressions_map`, then sitemap URLs in document order (one per distinct first path segment, so each template is covered).
-2. **Raw pass** — one call, no credentials, internally parallel:
+2. **Raw pass** — one call, no credentials, internally parallel. `--out` (2.20.0) also writes the full records as JSON (`{"status":"ok","pages":[...]}`) for `geo-generative`; the text output is unchanged:
    ```bash
-   PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper page-audit "$TARGETS"
+   PA=$(mktemp -t seo-page-audit-XXXXXX.json); PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper page-audit "$TARGETS" --out "$PA"; echo "--- page audit json ---"; cat "$PA"; rm -f "$PA"
    ```
    Output: `pages_audited:N`, `--- page audit records ---` (one line per URL: `bytes`, `over_2mb`, `title`, `canonical`, `robots`, `x_robots`, `h1`, `jsonld`, `words`, `empty_root`, `history_calls`, `popstate`, `hijack_suspect`), then `over_2mb_count`, `thin_raw_count`, `hijack_suspect_count`. `status=error:ssl` is almost always the local Python's certificate store, not the site — footer-note it, never report it as a site defect.
+
+   **2.20.0 fields** (per page, in the JSON records; the text line keeps `jsonld=<n>`, which is `jsonld_count` in JSON): `jsonld` — the parsed blocks with their type and key fields (`name`, `headline`, `author`, `datePublished`, `dateModified`, `price`, `priceCurrency`, `address`, `telephone`), `jsonld_parse_errors`, `robots_meta`, `canonical`, `visible_dates`, `main_text_chars`, and `schema_visible_checks` (each schema value tested against the visible raw text). These are what a non-rendering AI crawler receives, so they go to `geo-generative` too (Step 5) — the input for `schema_visible_mismatch` and `geo_raw_html_gap`.
 3. **Rendered pass (optional — only when a Playwright MCP is available** in this session, e.g. `mcp__plugin_playwright_playwright__browser_navigate` + `browser_evaluate`; never install one). For the base URL plus up to 4 records where `words` < 200 or `empty_root=yes` (money pages first): navigate, then evaluate
    ```js
    () => ({ title: document.title, canonical: document.querySelector('link[rel=canonical]')?.href || '', h1: document.querySelectorAll('h1').length, jsonld: document.querySelectorAll('script[type="application/ld+json"]').length, words: (document.body?.innerText || '').split(/\s+/).filter(Boolean).length })
    ```
-   and record `Rendered: url=<u> title=<yes|no> canonical=<href|none> h1=<n> jsonld=<n> words=<n>`. No Playwright → skip; `seo-technical` judges from raw records + stack (its sub-scan 12 says how). Close the browser when done.
-4. Pass the records to `seo-technical` as `Page audit:` (raw lines + any `Rendered:` lines). Footer: `Page audit: <N> pages (<R> rendered); <over> over 2 MB; <thin> thin in raw HTML; <hijack> back-button-hijack suspects.` When no base URL resolves: `Page audit: skipped (no base URL — pass --url or set site_base_url).`
+   and record `Rendered: url=<u> title=<yes|no> canonical=<href|none> h1=<n> jsonld=<n> words=<n>`. No Playwright → skip; `seo-technical` judges from raw records + stack (its sub-scan 12 says how).
+
+   **Raw-vs-rendered comparison (2.20.0).** Google documents that a `noindex` or canonical added or changed by JavaScript is unreliable, and non-Google AI crawlers never see rendered-only content. For each page rendered above, save both versions to system temp and let the helper diff them — never compare the HTML in context:
+   - First, one Bash call: `mktemp -d -t seo-render-XXXXXX` → note the literal directory path `<RDIR>` (shell state does not persist, so later calls use the literal).
+   - Raw copy, one Bash call for all pages: `curl -sL --max-time 15 -o "<RDIR>/raw-<i>.html" "<url_i>"` per page.
+   - Rendered copy, per page after its navigate: `browser_evaluate` with `function: () => document.documentElement.outerHTML` and `filename: "<RDIR>/rendered-<i>.html"` (the result is written to the file, not returned into context). On Windows the Playwright MCP is a native process and does not understand git-bash paths like `/tmp/seo-render-x`: pass `filename` the Windows form of `<RDIR>` (git-bash `/tmp/...` is `%TEMP%\...`) and keep the git-bash form for the curl and helper calls. If the MCP rejects an absolute `filename`, skip render-compare for the run and footer-note `render-compare skipped (Playwright could not save to temp)` — never save the HTML inside the repo.
+   - Compare, one Bash call for all pages:
+     ```bash
+     PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper render-compare --raw "<RDIR>/raw-<i>.html" --rendered "<RDIR>/rendered-<i>.html" --url "<url_i>" --out "<RDIR>/cmp-<i>.json"; cat "<RDIR>/cmp-<i>.json"
+     ```
+     (repeat per page in the same call), then `rm -rf "<RDIR>"`.
+   - Each result: `{url, raw:{robots_meta, canonical, jsonld_count, main_text_chars}, rendered:{...}, rendered_only_directive, directive_changes, raw_html_gap:{jsonld, main_content}}`. Stash the list as `render_compare`.
+
+   Close the browser when done.
+4. Pass the records to `seo-technical` as `Page audit:` (raw text lines + any `Rendered:` lines) and to `geo-generative` as `Page audit:` (the JSON `pages` records verbatim, with the 2.20.0 fields). Pass `render_compare` to both as `Render compare:` — `seo-technical` owns `rendered_only_directive`, `geo-generative` owns `geo_raw_html_gap`. Footer: `Page audit: <N> pages (<R> rendered, <C> compared); <over> over 2 MB; <thin> thin in raw HTML; <hijack> back-button-hijack suspects; <D> rendered-only directives; <G> raw-HTML gaps.` When no base URL resolves: `Page audit: skipped (no base URL — pass --url or set site_base_url).`
+
+### 3.5 AI-crawler delivery probe
+
+robots.txt says what a site *declares*; a CDN or WAF in front of it decides what each AI crawler is *served*. Google tells sites to allow crawling "in robots.txt and at the CDN or hosting layer", and OpenAI asks for its IP ranges to be allowed as well. A bot challenged by Cloudflare or Vercel while robots.txt allows it is invisible to that engine. This step fetches as each AI user agent and compares against a browser control. Like all Step 3 work it is orchestrator-only HTTP — subagents stay offline and receive the result.
+
+Runs whenever a base URL resolves (same rule as 3.3). No base URL → skip, pass `Bot probe: skipped (no base URL)` to `geo-generative`, footer: `AI-crawler probe: skipped (no base URL — pass --url or set site_base_url).` (plus the Step 6.0.5 `Bot probe skipped:` line).
+
+1. **Pages** — at most 5, absolute, deduped: `money_pages` first, then top URLs by impressions from `url_impressions_map`, then the Step 3.4 targets in their order. The base URL is always probed in addition.
+2. **IndexNow key (optional)** — look for a key file the site already ships: `Glob {public,static,dist,out,_site}/*.txt`, keep names matching 8–128 letters, digits or dashes, `Read` each (one line) and keep the one whose content equals its file name without `.txt`. No match → `Grep -i indexnow` across the scope for a key literal. Still none → omit `--indexnow-key`; `seo-technical` then judges `indexnow_missing` from source alone.
+3. **Probe** — one call, internally parallel (single GET per URL × UA, 10 s timeout, no retries):
+   ```bash
+   BP=$(mktemp -t seo-bot-probe-XXXXXX.json); PYTHONIOENCODING=utf-8 PYTHONUTF8=1 gsc-parse-helper bot-probe --base-url "<base>" --pages "<url1>,<url2>,..." [--indexnow-key "<K>"] --out "$BP"; cat "$BP"; rm -f "$BP"
+   ```
+   Output: `fetches`, `per_bot` (`ok | blocked | challenged | differs | unreachable` with evidence), `cdn_waf_suspect`, `robots` (Content-Signal lines, `__usage_ai-training` groups, Content-Usage, per-bot allow/disallow from the live robots.txt), `policy_conflicts`, `utm_survival` (does `?utm_source=chatgpt.com` survive the site's redirects) and `indexnow` (only with a key). `status: "unavailable"` → pass `Bot probe: skipped (<reason>)`; Step 6.0.5 applies the rubric's bot-probe-skipped redistribution (delivered 0/0, declared cap 4) and prints its footer line — delivery is never inferred from robots.txt.
+4. **Pass on** (Step 5): the whole JSON to `geo-generative` as `Bot probe:` (it owns `cdn_waf_block`, `ai_policy_conflict` and both `ai_bot_access_*` sub-dims, judged against `site_profile.ai_policy` and `site_profile.cdn`). If the JSON is over ~200 lines, drop the `fetches` rows of bots whose `per_bot` verdict is `ok` — `per_bot` keeps the evidence. `utm_survival` and `indexnow` go to `seo-technical` as `UTM survival:` and `IndexNow:` (it owns `utm_stripped` and `indexnow_missing`).
+
+A blocked or challenged spoofed user agent is not proof that the real crawler is blocked: a WAF that verifies bot IPs rejects a spoofed UA the same way. Hence the certainty cap on `cdn_waf_block` in Step 6.0 and the instruction in its recommended action to confirm in the CDN dashboard against the vendor's published IP list.
+
+Footer: `AI-crawler probe: <B> bots × <P> pages; <k> ok, <b> blocked, <c> challenged, <d> differs; CDN/WAF suspects: <list|none>; policy conflicts: <n>; utm_source <kept|stripped>; IndexNow key <ok|missing|not checked>.`
 
 ---
 
@@ -1121,6 +1213,12 @@ When ALL 4 conditions hold → set `dispatch_mode = "skip_codebase_subagents"` a
 | Sitemap URL probe (Step 3.2) | **RUNS** | Cheap and freshness-sensitive |
 | URL Inspection (Step 1.6.6) | **RUNS** | Cache-protected; covered by Step 1.6.6 anyway |
 | Best-practices brief (Step 1) | **RUNS** | Spec drift is independent of code changes |
+| `sa-trends` incl. `ctr_segments` + `ai_overview_compression` (Step 1.6.6, 2.17.0 / 2.20.0) | **RUNS** | GSC data; feeds `seo-gsc-insights`, which always runs |
+| Ranking-update windows (Step 1, 2.20.0) | **RUNS** | Cached 7 days; feeds `seo-gsc-insights` and the watchpoint `update_overlap` annotation |
+| Bing AI exports digest (Step 1.6.15, 2.20.0) | **RUNS** | Local CSVs; feeds `seo-gsc-insights` |
+| Field CWV (Step 3.3) | **SKIPPED** | Its only consumer is `seo-technical`; performance deductions are inherited. Footer: `Field CWV: inherited (subagent dispatch skipped)` |
+| Page audit raw pass + rendered pass + render-compare (Step 3.4, 2.17.0 / 2.20.0) | **SKIPPED** | Consumers are `seo-technical`, `seo-content` and `geo-generative` — all skipped; their rendering, spam-policy and raw-HTML-gap deductions are inherited. A hijack or rendered-only directive that reaches production without a repo commit (CMS, tag manager) is caught only by a `--force-dispatch` run, which the footer recommends. |
+| AI-crawler delivery probe (Step 3.5, 2.20.0) | **RUNS, reported only** | A CDN/WAF toggle changes without any repo commit, so the probe is the one live check worth running fresh. Its result is not scored this run (`ai_bot_access_delivered` is inherited with the rest of Generative Engine); when `per_bot` shows a `blocked` / `challenged` bot or `cdn_waf_suspect` is non-empty, print it in Suggested Next Actions as `⚠ AI-crawler probe: <bots> <blocked|challenged> at the CDN/WAF — score inherited; run /bx:seo --force-dispatch to re-score.` |
 
 **Inheritance source: `docs/seo-history.md`.** Read the row matching `<PRIOR_SHA>` (via the embedded `<!-- commit:abc1234 -->` comment) — it carries the score + top-3 priorities. Those two pieces drive the inherited render. Per-dimension deductions are NOT line-by-line preserved across runs; the inherited report shows totals plus the inheritance markers (see 4.5.3) without re-quoting prior breakdown text. To see prior breakdowns verbatim, the user either consults the saved prior report or re-runs with `--force-dispatch`.
 
@@ -1143,7 +1241,7 @@ Each inherited row's per-dim breakdown text begins with `(inherited from <sha7> 
 **Footer line** (always when `dispatch_mode == "skip_codebase_subagents"`):
 
 ```
-Subagent dispatch: skipped (zero code commits affecting scope since 76cdef9 [2026-05-24, 3 days ago]). Per-dim breakdowns + heuristic findings inherited from that run; GSC + sub-dim 14 + URL probe refreshed this run. Run /bx:seo --force-dispatch to re-scan the codebase.
+Subagent dispatch: skipped (zero code commits affecting scope since 76cdef9 [2026-05-24, 3 days ago]). Per-dim breakdowns + heuristic findings inherited from that run; GSC + sub-dim 14 + URL probe + AI-crawler probe (reported, not scored) refreshed this run; page audit + field CWV not run. Run /bx:seo --force-dispatch to re-scan the codebase.
 ```
 
 **`docs/seo-history.md` row:** append `[inherited]` suffix to the priorities column so the history is auditable:
@@ -1202,7 +1300,7 @@ Scope file list: <paths>
 
 # Site profile (Step 0.5 — user-supplied facts no API exposes)
 Site profile: <the flat keys from .seo-data/site-profile.yaml, one per line; `unknown` = use default behaviour, never assume yes>
-Apply per references/site-profile.md "How each answer changes the audit" — e.g. judge ai_bot_access against ai_policy, hreflang against markets, raise eeat severity when ymyl != no.
+Apply per references/site-profile.md "How each answer changes the audit" — e.g. judge ai_bot_access_declared (robots.txt, Content-Signal, Content-Usage) and ai_bot_access_delivered (Step 3.5 bot probe) against ai_policy, hreflang against markets, raise eeat severity when ymyl != no.
 
 # GSC + git context
 
@@ -1224,11 +1322,10 @@ Return raw findings only — do NOT format a final report.
 
 ### Per-subagent additions (do NOT include these in agents that don't consume them):
 
-- **`seo-technical` only** — also pass the **Sitemap URL probe results** (full record list), the **Rendered HTML excerpt** if `--url` was provided, `Page audit:` (Step 3.4), `Field CWV:` (Step 3.3) and the CWV digest from `Exports:` (Step 1.6.15) — each, or its skip-reason line.
+- **`seo-technical` only** — also pass the **Sitemap URL probe results** (full record list), the **Rendered HTML excerpt** if `--url` was provided, `Page audit:` (Step 3.4), `Render compare:` (Step 3.4 — for `rendered_only_directive`), `UTM survival:` and `IndexNow:` (Step 3.5 — for `utm_stripped` and `indexnow_missing`), `Field CWV:` (Step 3.3) and the CWV digest from `Exports:` (Step 1.6.15) — each, or its skip-reason line.
 - **`seo-content` only** — also pass the **Rendered HTML excerpt** if `--url` was provided, and the `Page audit:` records' `url`/`words` pairs (raw word counts per URL). Do NOT pass probe results (it doesn't use them).
-- **`seo-gsc-insights`** additionally gets the AI-performance and Links digests from `Exports:`.
-- **`geo-generative`** — base block only. No probe results (doesn't use them); no rendered HTML (JSON-LD lives in source most reliably). Keeps geo-generative's prompt smallest of the three.
-- **`seo-gsc-insights`** (only when `gsc_mode: enabled`) — base block only (GSC + git digests are already in the base block). Sitemap URL list from Step 3.2 is passed separately so the agent can compute `traffic_orphan` findings (sitemap URLs not appearing in the Q3 `url_impressions_map`).
+- **`geo-generative`** (2.20.0 — no longer base-block-only) — also pass `Page audit:` as the **full per-page records** (not counts — Step 3.4 raw records with the 2.20.0 fields: JSON-LD blocks and key fields, `jsonld_parse_errors`, `schema_visible_checks`, `robots_meta`, `canonical`, `visible_dates`, `main_text_chars`), `Render compare:` (Step 3.4 — for `geo_raw_html_gap`) and `Bot probe:` (Step 3.5 JSON — for `ai_bot_access_declared` / `ai_bot_access_delivered`, `cdn_waf_block`, `ai_policy_conflict`). Each, or its skip-reason line. Still no sitemap probe results and no WebFetch HTML excerpt (it doesn't use them). These are what non-Google AI crawlers actually receive; without them geo-generative judges templates only, at lowered certainty.
+- **`seo-gsc-insights`** (only when `gsc_mode: enabled`) — the base block (GSC + git digests are already in it), plus: the AI-performance and Links digests from `Exports:`; the Sitemap URL list from Step 3.2 (so the agent can compute `traffic_orphan` findings — sitemap URLs not appearing in the Q3 `url_impressions_map`); `CTR segments:` (`sa-trends` `ctr_segments` + `ai_overview_compression`, ≤ 15 lines — for `ai_overview_compression` and the AIO caveat on `ctr_loss`); `Ranking updates:` (Step 1 `update_windows.updates` whose `[start, end]` falls inside the widest finding window — the larger of `lookback_days` and the content-decay span, which reaches back about 84 days (three 28-day windows) — one line each `<name> | <kind> | <start> → <end|ongoing>`, or `unavailable (<reason>)`; for the `update_overlap` field on `content_decay`, `ai_overview_compression` and `brand_query_anomaly`); and `Bing AI:` (Step 1.6.15 Bing digest, when present — for `bing_ai_citations`).
 
 ### Agent 1: seo-technical
 Read `references/scan-technical.md`, dispatch `seo-technical` with the file + shared context. Owns Technical SEO (25) + Performance signals (10) = 35 points. Consumes sitemap probe results.
@@ -1237,10 +1334,10 @@ Read `references/scan-technical.md`, dispatch `seo-technical` with the file + sh
 Read `references/scan-content.md`, dispatch `seo-content` with the file + shared context. Owns On-Page SEO (25 points). Uses rendered HTML if provided.
 
 ### Agent 3: geo-generative
-Read `references/scan-geo.md`, dispatch `geo-generative` with the file + shared context. Owns Structured Data (20) + Generative Engine (20) = 40 points. Source-only (no rendered HTML).
+Read `references/scan-geo.md`, dispatch `geo-generative` with the file + shared context. Owns Structured Data (20) + Generative Engine (20) = 40 points. Reads source plus the live raw-HTML page-audit records, render-compare and bot-probe results passed above (no WebFetch HTML excerpt).
 
 ### Agent 4: seo-gsc-insights (only when `gsc_mode: enabled`)
-Read `references/gsc-ingestion.md` (the same reference used by the orchestrator in Step 1.6 — the "Finding-type catalog" section is the agent's spec) and dispatch `seo-gsc-insights` with the reference content + shared context + sitemap URL list. Owns `gsc_insights` dimension with **16 sub-dims** and **0 score allocation** (informational only). All findings emit `source: "gsc"` and `score_impact: 0`. **Note:** the subagent emits sub-dims 1-13, 15 and 16 from API output; sub-dim 14 (`deindex_regression`) is orchestrator-emitted in Step 1.6.13 from snapshot diff and added directly to the findings pool — the subagent never sees regression transitions in its input.
+Read `references/gsc-ingestion.md` (the same reference used by the orchestrator in Step 1.6 — the "Finding-type catalog" section is the agent's spec, and the "Update-window overlap annotation" section is passed with it) and dispatch `seo-gsc-insights` with the reference content + shared context + sitemap URL list. Owns `gsc_insights` dimension with **18 sub-dims** and **0 score allocation** (informational only). All findings emit `source: "gsc"` and `score_impact: 0`. **Note:** the subagent emits sub-dims 1-13 and 15-17 from API output and sub-dim 18 (`bing_ai_citations`) from the Bing digest, and sets `update_overlap` on `content_decay`, `ai_overview_compression` and `brand_query_anomaly`; sub-dim 14 (`deindex_regression`) is orchestrator-emitted in Step 1.6.13 from snapshot diff and added directly to the findings pool — the subagent never sees regression transitions in its input.
 
 When `gsc_mode: disabled`, do not dispatch the 4th agent — only dispatch 3.
 
@@ -1252,7 +1349,7 @@ After all subagents return (3 by default, 4 when GSC mode enabled):
 
 ### 6.0 — GSC consolidation passes (only when `gsc_mode: enabled`)
 
-When a 4th `seo-gsc-insights` subagent was dispatched, run these three passes **before** the existing aggregation. Each is a no-op under `gsc_mode: disabled` (no source-tagged findings to act on), so the order of operations stays the same regardless of mode.
+When a 4th `seo-gsc-insights` subagent was dispatched, run these four passes **before** the existing aggregation. Each is a no-op under `gsc_mode: disabled` (no source-tagged findings to act on), so the order of operations stays the same regardless of mode.
 
 **a) Score-impact enforcement.** For every finding with `source == "gsc"`, force `score_impact = 0`. Single point of enforcement per `references/rubric.md` "Score-impact invariant" — the subagent may emit non-zero by mistake; orchestrator overrides. Heuristic findings (`source == "heuristic"`) are untouched.
 
@@ -1262,6 +1359,21 @@ When a 4th `seo-gsc-insights` subagent was dispatched, run these three passes **
 - Sub-dim attribution stays with the probe finding — `technical_seo.url_health` is the source of the non-zero score_impact, so dedup never loses score signal.
 
 **c) gsc_findings count.** Aggregate `gsc_findings_count = count of findings where source == "gsc"` (post-dedup). Stash for the footer's subtotal-check addendum.
+
+**d) Update-window annotation check (2.20.0).** For `content_decay`, `ai_overview_compression` and `brand_query_anomaly` findings, make sure `update_overlap` is set: if the subagent left it out and `update_windows` is available, compute it from the finding's data window (per `gsc-ingestion.md` "Update-window overlap annotation") with the same `update-windows --overlap` call Step 1.6.14 uses; `null` when unavailable. (`deindex_regression` already has it from Step 1.6.13.4.) A non-empty `update_overlap` with a `core` or `spam` update adds `(overlaps <update names> — may be the update, not the site)` to the finding's title and keeps git-change attribution from claiming the drop.
+
+### 6.0.5 — 2.20.0 finding invariants (every run, any `gsc_mode`)
+
+Enforced here, once, whatever the subagents emitted:
+
+- **Info-only ids.** Force `score_impact = 0` on every finding whose id or sub-dim is `ai_overview_compression` or `bing_ai_citations`, in addition to the `source == "gsc"` rule in 6.0 a) and the existing info-only `llms_txt` rule in `references/rubric.md`. They are measurements of the AI-search environment, not defects of the site.
+- **`cdn_waf_block` certainty cap.** A spoofed user agent cannot prove what the real, IP-verified crawler is served. Cap `certainty` at **0.5**; allow up to **0.6** only when the finding's evidence shows that both the control and the bot UA were fetched for the same URL and a challenge marker (`challenge: true` with a `challenge_marker`) was recorded for the bot. Never render it as "confirmed" or "blocked" without "likely"; its `recommended_action` must point to the CDN/WAF dashboard and the vendor's published IP list. The Step 6.7 drop rule does not remove it at 0.5 (the rule drops only `certainty < 0.5`).
+- **Generative Engine `ai_bot_access` split.** Score the two halves separately per `references/rubric.md`: `ai_bot_access_declared` (2 — robots.txt, Content-Signal, `__usage_ai-training` group and Content-Usage consistent with `site_profile.ai_policy`) and `ai_bot_access_delivered` (2 — Step 3.5 bot-probe). (Under a Step 4.5 skip the whole dimension is inherited and this split is not recomputed.) **Bot-probe-skipped redistribution** (`rubric.md`): when the probe did not run (no base URL) or returned `status: unavailable`, `ai_bot_access_delivered` is **0/0** and its 2 points move to `ai_bot_access_declared` (**cap 4** — the pre-2.20.0 allocation, so a source-only run stays comparable with older rows). Never infer delivery from robots.txt. Footer: `Bot probe skipped: <reason> — ai_bot_access judged from robots.txt only (4 pts).` A finding still tagged with the pre-2.20.0 sub-dim `ai_bot_access` is mapped to `ai_bot_access_declared`.
+- **`semantic_content` keeps its id** (it now means "extractable facts" — `rubric.md`); findings carry a `finding_id` field (`keyword_stuffing`, `schema_visible_mismatch`, …) distinct from the sub-dim. Match the info-only and cap rules above on `finding_id` when present, else on the sub-dim.
+- **No double deduction for a JS-changed noindex.** A `rendered_only_directive` finding (seo-technical, from render-compare) and a sub-scan 6 indexability `noindex` finding on the same normalized URL describe one defect: keep the one with the higher `score_impact`, drop the other's deduction (set its `score_impact = 0`) and add `cross_ref` to the kept one.
+- **`geo_raw_html_gap` merges into rendering.** `geo_raw_html_gap` carries `score_impact: 0` and `cross_ref: technical_seo.rendering` (`rubric.md`). Merge it by normalized URL with seo-technical's `rendering` finding for the same page: one finding in the report, the technical one keeps the points, the GEO evidence (which JSON-LD, dates or main content are missing from raw HTML) is appended to its `evidence`. A `geo_raw_html_gap` with no technical counterpart stays as its own info finding. It never consumes `ai_bot_access_delivered`.
+- **Bing cross-links.** When a `bing_ai_citations` finding exists, append to its `cross_link_findings` every same-run `geo_raw_html_gap`, `schema_visible_mismatch` or `cdn_waf_block` finding whose location is a page the Bing digest lists as cited or a `money_pages` entry (`gsc-ingestion.md` sub-dim 18) — the subagent cannot see geo-generative's output.
+- **Bing without GSC.** When `gsc_mode: disabled` (no `seo-gsc-insights` dispatch) and Step 1.6.15 produced a Bing digest, the orchestrator emits the `bing_ai_citations` finding itself here, by the sub-dim 18 rules in `gsc-ingestion.md` (`source: "gsc"`, `origin: "bing_webmaster"`, `score_impact: 0`), before the cross-link pass above. Step 7 then renders the Section 3 Bing-only variant (heading, info line and the Bing sub-block only — `report-template.md`).
 
 ### 6.1 — Aggregate + clamp sub-dimension deductions
 
@@ -1333,8 +1445,10 @@ FINDINGS_JSONL=$(mktemp -t gsc-findings-XXXXXX.jsonl)
 # Orchestrator writes one finding per line:
 # {"sub_dim":"wikidata_sameAs","location":"Wikidata Q139820111","title":"...",
 #  "url":"...","source":"heuristic","impressions":...,"ctr":...,"position":...,
-#  "code_changed_since_gsc_window":false}
+#  "code_changed_since_gsc_window":false,"update_overlap":["<update name>"]}
 ```
+
+`update_overlap` (2.20.0) is written only when non-empty (Step 6.0 d / the subagent). It rides along in the JSONL so the escalation note below can use it; the helpers key findings by `sub_dim` + `location` only, so the field never changes a finding's identity, and a helper that does not read it ignores it.
 
 The orchestrator builds the JSONL via direct Bash redirection from the in-memory findings list — no inline Python. If the orchestrator's findings list is held in a structured form that doesn't trivially serialize to JSONL via Bash, fall back to: write each finding's minimal fields (`sub_dim`, `location`, `title`, optional `url`+`source`+`impressions`+`ctr`+`position`+`code_changed_since_gsc_window`) one per line.
 
@@ -1363,6 +1477,8 @@ Helper output includes per-finding `<hash>|<run_count>|<sub_dim>|<location>|<fir
 ```
 [Stale-finding escalation] This finding has appeared in 3+ consecutive runs without resolution. Three options: (a) schedule the external action this finding requires (most stale findings are external — Wikidata edits, GSC manual removals, third-party platform changes); (b) downgrade severity to acknowledge the user-side blocker (e.g., "deprioritized — waiting on upstream"); (c) if the finding is no longer relevant, document the rationale in CLAUDE.md so future runs don't re-surface it.
 ```
+
+**Update overlap and escalation (2.20.0).** When an `ESCALATE` finding carries a non-empty `update_overlap`, append to the escalation hint: `Note: this finding's window overlaps <update names>; part of the persistence may be the update, not the site — re-check once a run's window is clear of it.` Watchpoint verdicts inside an update window are handled in Step 1.6.14 (`inconclusive — overlaps <update>`), never reported as a failed fix.
 
 **Step 6.8.3 — Emit watchpoints for phase-applied findings** (only runs if 6.8.2 succeeded):
 
@@ -1408,6 +1524,14 @@ Read `references/report-template.md` for exact formatting. The shape:
 If no `docs/seo-history.md` exists yet, drop the delta clause: `**SEO/GEO score: 72/100** — Top 3 opportunities: ...`.
 
 **Sections 1-5** per `references/report-template.md`.
+
+**2.20.0 report blocks** (each per `report-template.md`, rendered only when it has data):
+- Section 2, Generative Engine → **AI crawler delivery** — from the Step 3.5 `bot-probe` `per_bot` verdicts plus its `robots` block (Content-Signal, `__usage_ai-training`, Content-Usage, per-bot allow/disallow) and `policy_conflicts`. Omitted when the probe was skipped (the footer says why).
+- Section 2, Structured Data → **Schema vs visible text** — from `schema_visible_mismatch` findings (page-audit `schema_visible_checks`).
+- Section 3 → **AI Overview compression** (sub-dim 17), **Ranking-update windows** (every finding or due watchpoint with a non-empty `update_overlap`, including `inconclusive` watchpoints; one "overlay unavailable" line when `update_overlap` is `null`), and **Bing AI citations** (sub-dim 18). With `gsc_mode: disabled` and a `bing_ai_citations` finding, render Section 3 as the Bing-only variant (heading, info line, Bing sub-block).
+- Footer — the 2.20.0 lines owned by this file: `AI-crawler probe:` (3.5), `Bot probe skipped:` (6.0.5), the extended `Page audit:` line (3.4), `Bing exports:` (1.6.15), `Ranking-update overlay:` / `Ranking-update overlay unavailable:` (Step 1), `AIO segmentation:` (1.6.6, GSC mode), and the watchpoint overlap variant (1.6.14).
+
+**Section 0 delta clause (2.20.0).** On the run that appends `<!-- methodology:2.20.0 -->` (see "Methodology marker (2.20.0)" below), the headline's delta clause gains `(scoring changed — AI-bot access judged on delivery as well as robots.txt; GEO checks read the live raw HTML)`, the same way the 2.16.0 clause works.
 
 ### Append to docs/seo-history.md
 
@@ -1455,6 +1579,8 @@ The `<!-- commit:abc1234 -->` HTML comment is invisible in the rendered Markdown
 
 **Methodology marker (2.17.0).** Same rule with `<!-- methodology:2.17.0 -->` and the delta clause `(scoring changed — rendering check added, URL health 8 → 5, performance follows field data)`. When both markers are missing (the first run since before 2.16.0), append both and join the two clauses with `; `.
 
+**Methodology marker (2.20.0).** Same rule with `<!-- methodology:2.20.0 -->` and the delta clause `(scoring changed — AI-bot access judged on delivery as well as robots.txt; GEO checks read the live raw HTML)`. Any combination of missing markers is appended in version order, clauses joined with `; `.
+
 **Rules for the history file:**
 - Create if missing — never assume it exists.
 - Append-only — never delete or rewrite past entries.
@@ -1499,12 +1625,22 @@ When Step 1.6.14's `watchpoint-check` produced `due` records, render one banner 
    Status: no_data. URL may be deindexed, lost ranking entirely, or below Q2's impressions threshold — check sub-dim 14 (deindex_regression) if any.
 ```
 
+**status: inconclusive** (2.20.0 — set by Step 1.6.14 when a `regressed` or `unchanged` verdict's window overlaps a ranking update)
+
+```
+⏸ Watchpoint hit — inconclusive. Phase applied <apply date> (commit <sha7>) targeted <url> CTR.
+   Baseline: ctr=<b> / pos=<b> / <b> imp.   Current: ctr=<c> / pos=<c> / <c> imp.
+   Status: inconclusive — overlaps <update names> (<start> → <end|ongoing>). A ranking update moved results during the measurement window, so this says nothing about the fix. Re-check on a run whose window is clear of the update.
+```
+
+An `improved` or `no_data` banner whose window overlaps an update keeps its form and gains the overlap note from Step 1.6.14 on its Status line.
+
 Banners are info-only — they don't affect the score (consistent with the `score_impact:0` invariant on all GSC-side signals).
 
 ### Mode-specific tail
 
-- `--plan` → read `references/plan-mode-seo.md` and emit 6-phase brief.
-- `--fix` → walk findings where `is_fix_eligible: true` per `references/fix-allowlist.md`; per-finding diff preview gate; end with `/rewind` reminder.
+- `--plan` → read `references/plan-mode-seo.md` and emit 6-phase brief. Hand the brief builder, besides the findings, the inputs Phase 6 items 6.4–6.7 test (2.20.0): `cdn_waf_suspects` (Step 3.5 `cdn_waf_suspect` list, empty when the probe was skipped), whether `indexnow_missing` was reported, `utm_survival.kept`, and `site_profile.analytics_ai_channel`, `site_profile.bing_verified` and `site_profile.cdn`. A missing input means the item is skipped, never assumed.
+- `--fix` → walk findings where `is_fix_eligible: true` per `references/fix-allowlist.md`; per-finding diff preview gate; end with `/rewind` reminder. Allowlist **#12 IndexNow key-file scaffold** (2.20.0) comes from an `indexnow_missing` finding with `is_fix_eligible: true`: the gate preview shows the placeholder file plus the allowlist's three manual steps, it never writes a real key or wires the ping, and its score recovery is **+0** (a placeholder key does not change the score — `indexnow_missing` is info/low).
 
 ---
 
@@ -1512,7 +1648,7 @@ Banners are info-only — they don't affect the score (consistent with the `scor
 
 If default mode, end with:
 
-> Run `/bx:seo --plan` to convert top findings into a phased rewrite brief, or `/bx:seo --fix` for safe-allowlist mechanical fixes (placeholders + TODO markers, never fabricated copy). Run `/bx:seo --url https://your-domain.com` to add live HTML diff and sitemap URL probe.
+> Run `/bx:seo --plan` to convert top findings into a phased rewrite brief, or `/bx:seo --fix` for safe-allowlist mechanical fixes (placeholders + TODO markers, never fabricated copy). Run `/bx:seo --url https://your-domain.com` to add live HTML diff, sitemap URL probe and the AI-crawler delivery probe.
 
 ---
 
@@ -1528,6 +1664,10 @@ If default mode, end with:
 | Plan a SEO/GEO improvement effort | `/bx:seo --plan` |
 | Apply safe SEO scaffolds | `/bx:seo --fix` |
 | Live HTML diff + sitemap URL probe | `/bx:seo --url <base>` |
+| Check what each AI crawler is actually served (CDN/WAF blocks, robots/Content-Signal conflicts, utm_source survival, IndexNow key) | `/bx:seo --url <base>` (or `site_base_url` in config.yaml) — Step 3.5 |
+| Find JS-added noindex/canonical and content AI crawlers can't see | `/bx:seo --url <base>` with a Playwright MCP enabled — Step 3.4 render-compare |
+| Track Bing AI citations | Export AI Performance from Bing Webmaster Tools into `.seo-data/bing/exports/` — Step 1.6.15 |
+| Tell an AI Overview CTR squeeze or a Google update from a site regression | GSC API enabled (`.seo-data/gsc/config.yaml`) — `sa-trends` segments + ranking-update windows |
 | Update business context (goals, money pages, markets, AI policy) | `/bx:seo --profile` |
 | Unattended run, no questions | `/bx:seo --no-ask` |
 | Not sure where to start | `/bx:health` |

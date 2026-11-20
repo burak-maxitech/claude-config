@@ -13,7 +13,7 @@ After the report is built, group findings into 6 phases (indexing & crawl hygien
 3. **Phase 3: Structural improvements** (heading hierarchy, internal linking, redirect chains)
 4. **Phase 4: Content rewrites** (titles, meta descriptions, alt text — human judgment required, GSC-prioritized when API is configured)
 5. **Phase 5: Structured data buildout** (JSON-LD per content type)
-6. **Phase 6: Generative-engine optimization** (E-E-A-T + AI-feature eligibility + AI-crawler policy + AI-citability)
+6. **Phase 6: Generative-engine optimization** (E-E-A-T + extractable facts + AI-feature eligibility + AI-crawler policy and delivery + AI-measurement setup)
 
 ## Phase 1 — Indexing & Crawl Hygiene
 
@@ -199,7 +199,7 @@ Hand-off:
 
 ### 4.3 — CTR opportunities (GSC-only, only when GSC enabled)
 
-When `gsc_mode: enabled` AND the GSC scan emitted `ctr_opportunity` findings:
+When `gsc_mode: enabled` AND the GSC scan emitted `ctr_opportunity` findings. Drop any page that also carries an `ai_overview_compression` finding — its CTR fell because an AI Overview answers the query, and a title rewrite will not bring those clicks back; mention it in one line instead:
 
 ```
 **4.3** Rewrite titles + metas on N high-impressions / low-CTR pages
@@ -230,7 +230,7 @@ Hand-off:
 2. 'how to configure widgets' (2,100 imps, position 11.4, 1.5%)
 [...]
 
-For each query: identify the ranking page via GSC > Performance > Pages tab filtered by query. Improve on-page signals — H1/title alignment, content depth, internal links from related pages, schema markup, fresh dates if applicable. Moving from position 8-12 to position 3-5 typically 3-5x's clicks. Highest leverage: '<top query>' alone has potential for 100-400 additional clicks/month if it moves to top 5."
+For each query: identify the ranking page via GSC > Performance > Pages tab filtered by query. Improve on-page signals — H1/title alignment, content depth, internal links from related pages, schema markup (for rich-result eligibility), a visible updated date only where the content genuinely changed. Moving from position 8-12 to position 3-5 typically 3-5x's clicks. Highest leverage: '<top query>' alone has potential for 100-400 additional clicks/month if it moves to top 5."
 \`\`\`
 ```
 
@@ -258,7 +258,13 @@ Hand-off:
 
 ## Phase 6 — Generative-Engine Optimization
 
-The longest-horizon phase. Findings from `geo-generative` for E-E-A-T, semantic content patterns, and AI citation:
+The longest-horizon phase. Findings from `geo-generative` for E-E-A-T, extractable facts, AI-crawler access (declared and delivered) and truthful markup, plus the AI-measurement setup items (6.5–6.7).
+
+**Evidence rules for every Phase 6 hand-off** (they bind the receiving `/bx:plan` session too, so quote them in the snippet when relevant):
+- Frame content items as **"plausible, not proven"**. Never state an expected citation, traffic or visibility lift as a number.
+- Never hand off a refused tactic: FAQPage/HowTo for rich results, chunk-length rules, question-heading quotas, date bumping, llms.txt as a ranking item, schema "for AI citation", treating Content-Signal/aipref as enforcement (full list: `bx/agents/geo-generative.md` "Refused tactics").
+
+**Additive-edit guard for pages already ranking.** Before writing any content hand-off, check each target URL against GSC (`url_impressions_map` / Q2 pages digest). A page with average position ≤ 5 on its top queries, or in the top 10% of the site's pages by clicks, gets **additive edits only**: add a sourced figure, a comparison table, a named quote, a definition, or a visible updated date *on genuinely maintained content*. The hand-off must say: "Do not restructure, rewrite or re-order existing sections, headings or the title — this page already ranks; body-only rewrites can lower AI retrieval (SAGEO Arena, arXiv 2607.14035)." Without GSC data, apply the guard to every `money_pages` entry and the homepage.
 
 ```
 **6.1** Author bio pages for 4 contributors
@@ -270,23 +276,59 @@ Hand-off:
 ```
 
 ```
-**6.2** Add topic sentences + question-format headings to 6 long-form articles
+**6.2** Add extractable, attributed facts to 6 long-form articles (additive only)
 
 Hand-off:
 \`\`\`
-/bx:plan "Improve AI-citability of 6 long-form articles (>1500 words) by (a) adding a clear topic sentence to the first paragraph of each major section, (b) rephrasing 30%+ of H2/H3 headings as questions (How / What / Why), (c) breaking dense factual paragraphs into bulleted lists or tables where it preserves meaning. Pages: src/content/blog/<8 paths from /bx:seo findings>. Goal: increase citation likelihood in ChatGPT/Perplexity/Claude/Google AI Overviews."
+/bx:plan "Add extractable, attributed facts to 6 long-form articles flagged by /bx:seo (semantic_content): src/content/blog/<paths from findings>. Per article, ADD where the owner has real material: (a) a statistic with its source linked in the same sentence, (b) a quote with the speaker's name and role, (c) a one-sentence definition opening any section whose heading names a term, (d) a comparison table where the prose compares three or more items on the same attributes. Attribute the unsourced figures listed in the findings; never invent a figure, source or quote — leave a TODO for the owner. <For pages ranking ≤ position 5 or flagged by the additive-edit guard: 'Do not restructure, rewrite or re-order existing sections, headings or the title — this page already ranks; body-only rewrites can lower AI retrieval.'> Question-format headings are optional; do not convert headings to meet any quota. Success: every listed article has at least one sourced figure or comparison table and no unsourced statistics. This is plausible, not proven, to help AI engines quote the page — do not promise a lift."
 \`\`\`
 ```
 
 ```
-**6.3** Align AI-crawler access with the stated policy (only when `ai_policy_mismatches > 0`)
+**6.3** Align AI-crawler access with the stated policy (only when `ai_policy_mismatches > 0` or `ai_policy_conflicts > 0`)
 
 Hand-off:
 \`\`\`
-/bx:plan "Update robots.txt so AI crawlers match the site's policy '<ai_policy from .seo-data/site-profile.yaml>': <list each mismatched user-agent and the expected allow/block>. Keep Googlebot and Bingbot untouched. Add a comment at the top of robots.txt recording the policy and date. Goal: AI search engines can cite the site while training use follows the owner's decision."
+/bx:plan "Update robots.txt so AI crawlers match the site's policy '<ai_policy from .seo-data/site-profile.yaml>': <list each mismatched user-agent and the expected allow/block>. <For each ai_policy_conflict: the conflicting Content-Signal / __usage_ai-training / Content-Usage line and the per-bot rule or profile answer it contradicts.> Make the rules, the preference signals and the profile say the same thing; if a line comes from the CDN's managed robots.txt (e.g. Cloudflare), change the CDN setting rather than the repo file. Keep Googlebot and Bingbot untouched. Add a comment at the top of robots.txt recording the policy and date. Preference signals are declarations, not blocks. Goal: AI search engines can cite the site while training use follows the owner's decision."
 \`\`\`
 
 (llms.txt is no longer a plan item: Google says Search doesn't use it. Add it only if the user asks.)
+```
+
+```
+**6.4** Verify suspected CDN/WAF blocks of AI search crawlers (only when `cdn_waf_suspects` is non-empty)
+
+Hand-off:
+\`\`\`
+/bx:plan "The /bx:seo bot probe got a 200 for a browser but <status / challenge marker> for <bots> on <urls> (cdn_waf_block, certainty ≤ 0.6 — the probe spoofs user agents, so this is a suspicion, not a confirmed block). In the <site_profile.cdn> dashboard (Cloudflare: Security → Events, AI Crawl Control; Vercel: Firewall; Fastly/Akamai/Imperva: bot manager), filter for these bots and check whether requests from the vendor's published IP ranges were blocked or challenged: <vendor IP files from the finding>. If they were and the policy '<ai_policy>' allows that bot, allow it by verified-bot category or IP list; record the change in robots.txt's header comment. If no real requests were blocked, note it and close. Re-run /bx:seo to confirm the delivered verdict turns ok."
+\`\`\`
+```
+
+```
+**6.5** GA4 custom AI channel (setup item — when `site_profile.analytics_ai_channel` ≠ yes and the site uses GA4)
+
+Hand-off:
+\`\`\`
+/bx:plan "Create a GA4 custom channel group with an 'AI assistants' channel placed above Referral, matching session source by regex on AI hostnames: chatgpt\.com|chat\.openai\.com|perplexity\.ai|claude\.ai|gemini\.google\.com|copilot\.microsoft\.com (extend from current vendor lists). Also match utm_source=chatgpt.com, which ChatGPT adds to its links. Note: a ChatGPT referrer/UTM loss was reported in October 2026 (unconfirmed by OpenAI) that sent this traffic to Direct, so the channel undercounts; compare against server logs if available. Confirm the site's own redirects keep query strings (the /bx:seo utm_stripped check). Then set analytics_ai_channel: yes in .seo-data/site-profile.yaml."
+\`\`\`
+```
+
+```
+**6.6** IndexNow setup (setup item — when `indexnow_missing` was reported and the site publishes or updates pages often)
+
+Hand-off:
+\`\`\`
+/bx:plan "Set up IndexNow so Bing (and Bing-grounded AI answers such as Copilot) pick up new and changed URLs quickly: generate a key, serve it at /<key>.txt with the key as the only content (the /bx:seo --fix scaffold can create the file), and ping https://api.indexnow.org/indexnow with changed URLs from the deploy step or the sitemap-regeneration hook — only for pages that actually changed. Verify with /bx:seo --url <base> (it checks the key file when given the key). Google does not use IndexNow; nothing changes there."
+\`\`\`
+```
+
+```
+**6.7** Verify the site in Bing Webmaster Tools (setup item — when `site_profile.bing_verified` ≠ yes)
+
+Hand-off:
+\`\`\`
+/bx:plan "Verify <base URL> in Bing Webmaster Tools (import from Google Search Console is the fastest route), submit the sitemap, and open the AI Performance report — the only first-party dashboard with citation-level data (citations, cited pages, grounding queries for Copilot and Bing AI summaries). Export its CSVs into .seo-data/bing/exports/ before each /bx:seo run; the skill parses them into an info-only digest. Then set bing_verified: yes in .seo-data/site-profile.yaml."
+\`\`\`
 ```
 
 ## Hand-off contract

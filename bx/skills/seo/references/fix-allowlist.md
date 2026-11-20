@@ -267,6 +267,34 @@ The TODO markers preserve format compliance while making it obvious the user mus
 
 ---
 
+### 12. IndexNow key-file scaffold (2.20.0)
+
+**Detection:** `indexnow_missing` finding from `seo-technical` sub-scan 16 in the "no key file and no ping" state (certainty ≥ 0.7), AND the project has a deterministic static-files directory served at the site root: `public/` (Next.js, Astro, Vite, Nuxt 3, Remix), `static/` (SvelteKit, Hugo, Gatsby), or the site root for plain static sites. Skip when no such directory is certain (e.g. Jekyll or Eleventy without a passthrough-copy rule) — route to `--plan`.
+
+**Fix:** create one file, `<static-dir>/indexnow-key.txt`, whose only line is a placeholder:
+```
+TODO-replace-this-line-with-your-IndexNow-key
+```
+
+The key file must contain the key and nothing else, so there is no room for a comment inside it — the gate preview carries the instructions instead:
+
+```
+This adds a placeholder only. IndexNow will reject it until you:
+  1. Generate your own key (8–128 letters, digits or dashes) — e.g. at
+     https://www.bing.com/indexnow/getstarted or from your password manager.
+     /bx:seo never generates or writes a real key.
+  2. Rename the file to <your-key>.txt and replace its content with the key
+     (or keep the name and send keyLocation=https://<host>/indexnow-key.txt
+     with every submission).
+  3. Add the ping yourself: submit changed URLs to
+     https://api.indexnow.org/indexnow from your deploy step or sitemap
+     regeneration — /bx:seo --plan has the snippet.
+```
+
+**Never** invent, derive or "randomly generate" the key, and never wire the ping (it spans deploy config and secrets — `--plan` work). If a `*.txt` key file or an `indexnow` reference already exists anywhere in scope, the finding is in another state and this fix does not apply.
+
+---
+
 ## Per-finding gate flow
 
 For each fix-eligible finding (in rank order — when `gsc_mode: enabled`, ranking includes `traffic_weight`; when disabled, ranking is heuristic-only):
@@ -352,12 +380,14 @@ When `gsc_mode: disabled`, the summary omits the per-fix traffic-weight column (
 ## What this mode does NOT do
 
 - Run tests after edits
-- Fabricate copy (titles, descriptions, alt text, JSON-LD values, OG values, llms.txt content)
+- Fabricate copy (titles, descriptions, alt text, JSON-LD values, OG values, llms.txt content) or secrets-like values (IndexNow keys)
 - Rewrite existing markup
 - Modify content files (markdown bodies, blog posts) — only page-shell / layout / config files
 - Add internal links (judgment-heavy)
 - Adjust heading hierarchy (judgment-heavy)
 - Update `robots.txt` AI-bot rules (deliberate policy decision)
+- Generate an IndexNow key or add the IndexNow ping (pattern 12 adds a placeholder key file only)
+- Fix rendered-only directives, UTM-stripping redirects or CDN/WAF bot rules (judgment about the framework, middleware and hosting — `--plan`)
 - Run coverage / lighthouse / external audits
 
 All of the above belong to `--plan`, not `--fix`.
