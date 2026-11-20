@@ -79,7 +79,7 @@ has K08 "$FULL" 'covers project-specific sections only' "unshrinkable-by-design 
 
 echo "--- D7 / D8: derivable content, advisory rung ---"
 has K11 "$RULES" 'Derivable facts are recoverable' "doc-structure-rules.md carries the derivable-content clause"
-has K12 "$FULL" 'advisory rung 9k' "Part 1.9 names the 9k advisory rung"
+has K12 "$FULL" 'advisory rung 10k' "Part 1.9 names the 10k advisory rung"
 
 echo "--- final-review fixes: classification, entry shape, progress, liveness ---"
 has K17 "$FULL" 'status form' "resolved test requires a status form, not the bare word"
@@ -95,11 +95,11 @@ has K22 "$UPDATE" 'never the block-replace form' "Known Issues deltas may not bl
 has K22 "$WRITER" 'refuse a block-replace' "save-writer refuses a Known Issues block-replace"
 
 echo "--- size budget (v2.18.0): file-level, one consent, every section reachable ---"
-has B01 "$SCHEMA" '| CLAUDE.md | ~7k | 9k | 10k |' "doc-schema.md owns the CLAUDE.md budget row"
+has B01 "$SCHEMA" '| CLAUDE.md | ~7k | 10k | 12k |' "doc-schema.md owns the CLAUDE.md budget row"
 has B01 "$SCHEMA" '| docs/STATUS.md | ~10k | 13k | 15k |' "doc-schema.md owns the STATUS.md budget row"
-has B02 "$BUDGET_SH" 'CLAUDE_BUDGET=10000; CLAUDE_STOP=9000' "size-budget.sh codes the CLAUDE.md numbers"
+has B02 "$BUDGET_SH" 'CLAUDE_BUDGET=12000; CLAUDE_STOP=10000' "size-budget.sh codes the CLAUDE.md numbers"
 has B02 "$BUDGET_SH" 'STATUS_BUDGET=15000; STATUS_STOP=13000' "size-budget.sh codes the STATUS.md numbers"
-has B03 "$FULL" '| CLAUDE.md | 10k | 9k |' "Part 7 states the CLAUDE.md budget and stop"
+has B03 "$FULL" '| CLAUDE.md | 12k | 10k |' "Part 7 states the CLAUDE.md budget and stop"
 has B03 "$FULL" '| docs/STATUS.md | 15k | 13k |' "Part 7 states the STATUS.md budget and stop"
 has B04 "$FULL" 'largest first' "relocation walks sections largest first"
 has B04 "$FULL" 'unshrinkable by design' "a section with no move is named, not skipped"
@@ -126,6 +126,20 @@ has B11 "$UPDATE" 'are not deltas' "the packet no longer sends Last Updated as a
 has B12 "$RESUME" 'by section, never whole' "/bx:resume reads STATUS.md by section"
 has B12 "$RESUME" 'Size budget:' "/bx:resume prints the size-budget line"
 has B13 "$UPDATE" 'so no content moves' "--silent moves nothing in Part 7"
+
+echo "--- refined budgets (v2.19.0): always-loaded total, density, optional reason strip ---"
+has B15 "$BUDGET_SH" 'LOADED_WARN=25000' "size-budget.sh codes the always-loaded guide"
+has B15 "$BUDGET_SH" 'MEMORY_WARN=12000' "size-budget.sh codes the MEMORY.md guide"
+has B15 "$SCHEMA" '| `MEMORY.md` | 12k chars |' "doc-schema.md owns the MEMORY.md guide"
+has B15 "$SCHEMA" '| 25k chars |' "doc-schema.md owns the always-loaded guide"
+has B16 "$FULL" '**Apply all** does not run it' "the reason strip is optional"
+has B16 "$FULL" 'that is not marked `optional`' "7.4 Apply all skips optional moves"
+has B17 "$FULL" 'A row at or under 400 chars is never shortened' "Key Decisions rows are shortened before they move"
+has B17 "$UPDATE" 'the whole row 400 chars at most' "new decision rows are capped at 400 chars"
+has B18 "$FULL" 'Skip a row the archive already holds byte for byte' "Part 6.3 no longer duplicates mirrored rows"
+lacks B18 "$FULL" 'Do NOT deduplicate' "the unconditional-append rule is gone"
+has B19 "$BX_DIR/scripts/session-start-context.sh" 'n>3000' "the SessionStart hook caps its output"
+has B19 "$BX_DIR/scripts/session-start-context.sh" 'cut -c1-200' "the hook cuts status rows to 200 chars"
 
 echo "--- drift sweep: retired caps and thresholds ---"
 drift=0

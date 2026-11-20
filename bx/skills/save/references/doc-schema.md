@@ -59,7 +59,7 @@ them, and `/bx:resume` prints them; nothing else restates the arithmetic.
 
 | File | Target | Stop | Budget |
 |---|---|---|---|
-| CLAUDE.md | ~7k | 9k | 10k |
+| CLAUDE.md | ~7k | 10k | 12k |
 | docs/STATUS.md | ~10k | 13k | 15k |
 
 - **Budget** — over this, `/bx:save --full` plans moves for the file (Part 7), from the file
@@ -67,6 +67,26 @@ them, and `/bx:resume` prints them; nothing else restates the arithmetic.
 - **Stop** — what a shrink run aims for. The gap below the budget is hysteresis: a file that
   was just shrunk does not trip the budget on the next small edit.
 - **Target** — what a healthy file looks like. Nothing enforces it.
+
+The CLAUDE.md budget was 10k in 2.18.0 and is 12k from 2.19.0. Anthropic's own guidance is in
+lines (under 200 per CLAUDE.md), a 2026 factorial study found no adherence effect from file
+size between 25 and 500 lines, and the cached-token cost of 2k chars is negligible; 10k
+forced standing rules to lose their reasons, which is the content Anthropic's `/doctor` trim
+keeps. What the evidence does support is counting **everything loaded at session start**,
+and watching density:
+
+| Guide | Value | Basis |
+|---|---|---|
+| Loaded at session start (CLAUDE.md + unscoped rules files + `MEMORY.md` + SessionStart hook) | 25k chars | judgment; reported, never a trigger |
+| `MEMORY.md` | 12k chars | half of Claude Code's 25KB / 200-line load limit |
+| SessionStart hook block | 3,000 chars, rows cut to 200 | Claude Code replaces hook output over 10,000 chars with a 2,000-char preview |
+| Path-scoped rules file | 8k chars | Claude Code delivers only the start of one over 40,000 |
+| CLAUDE.md lines | 200 | Anthropic's target; advisory |
+| CLAUDE.md long lines | over 400 chars | dense paragraphs are followed less well than bullets; advisory |
+| Key Decisions row | 400 chars | longer rows are shortened before any row is moved |
+
+docs/STATUS.md stays at 15k: that is about 4k tokens, under the 5,000-token size past which
+Claude Code restores a file after compaction as a path reference only.
 
 A file can stay over its budget when what remains is unshrinkable by design (standing rules,
 doc links, project-authored sections). Part 7 then names those sections with their sizes; it

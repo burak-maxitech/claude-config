@@ -198,7 +198,7 @@ claude_floor="$(awk '
     /^- \*\*Never skip check/ { n += index($0, ".**") + 3; next }
     /^- `FIXVAR_/ { n += 14; next }
     { n += length($0) + 1 } END { print n + 0 }' "$FX/CLAUDE.md")"
-between "CLAUDE.md at its floors" "$claude_floor" 4000 9000
+between "CLAUDE.md at its floors" "$claude_floor" 4000 10000
 
 echo "--- control: the untouched fixture must fail the budget assertion ---"
 if bash "$SCRIPT_DIR/assert-size-budget.sh" "$FX" > /dev/null 2>&1; then
@@ -207,7 +207,7 @@ else pass "assert-size-budget.sh fails on the untouched fixture"; fi
 
 echo "--- size-budget.sh --line, and the skip escalation ---"
 line="$(bash "$BUDGET_SH" "$FX" --line)"
-case "$line" in "Size budget: CLAUDE.md "*" / 10k, STATUS.md "*" / 15k → run /bx:save --full") pass "--line: $line" ;;
+case "$line" in "Size budget: CLAUDE.md "*" / 12k, STATUS.md "*" / 15k → run /bx:save --full") pass "--line: $line" ;;
                 *) fail "--line has the wrong shape: $line" ;; esac
 cp -r "$FX" "$TMP/skips"
 awk '{print} /^Last Updated/{print "<!-- bx-size-skips=3 -->"}' "$FX/docs/STATUS.md" > "$TMP/skips/docs/STATUS.md"
@@ -217,6 +217,19 @@ case "$line" in *"shrink skipped 3 runs in a row"*) pass "three skips escalate t
 line="$(bash "$BUDGET_SH" "$TMP/fx-v2" --line)"
 case "$line" in *"within budget") pass "an under-budget repo reads 'within budget'" ;;
                 *) fail "fx-v2 does not read within budget: $line" ;; esac
+
+echo "--- always-loaded total, density, rules files ---"
+printf '%s\n' "$rep" | grep -q '^loaded CLAUDE.md ' && pass "CLAUDE.md is counted as loaded" || fail "no loaded record for CLAUDE.md"
+printf '%s\n' "$rep" | grep -q '^loaded_total [0-9]* 25000 ' && pass "loaded_total is reported against 25000" || fail "no loaded_total record"
+printf '%s\n' "$rep" | grep -q '^lines CLAUDE.md [0-9]* 200 ok' && pass "CLAUDE.md line count is reported against 200" || fail "no lines record"
+between "CLAUDE.md lines over 400 chars" "$(field 'long_lines CLAUDE.md ' 3)" 1 5
+cp -r "$FX" "$TMP/rules"; mkdir -p "$TMP/rules/.claude/rules"
+printf '%s\n' '---' 'paths:' '  - "src/**"' '---' '# Scoped' '- a rule' > "$TMP/rules/.claude/rules/scoped.md"
+printf '%s\n' '# Unscoped' '- a rule that loads every session' > "$TMP/rules/.claude/rules/unscoped.md"
+rr="$(bash "$BUDGET_SH" "$TMP/rules")"
+printf '%s\n' "$rr" | grep -q '^rules .claude/rules/scoped.md [0-9]* 8000 ok' && pass "a path-scoped rules file is measured on its own" || fail "scoped rules file not reported"
+printf '%s\n' "$rr" | grep -q '^loaded .claude/rules/unscoped.md(unscoped) ' && pass "an unscoped rules file counts as loaded" || fail "unscoped rules file not counted as loaded"
+printf '%s\n' "$rr" | grep -q '^loaded .claude/rules/scoped.md' && fail "a path-scoped rules file was counted as always loaded" || pass "a path-scoped rules file is not counted as always loaded"
 
 echo "--- archive-lines.sh: byte-verbatim, de-duplicating, repeatable ---"
 cp -r "$FX" "$TMP/arch"; A="$TMP/arch"

@@ -29,5 +29,14 @@ case "$out" in *"## Completed"*) fail "v2: leaked into ## Completed (range bug)"
 case "$out" in *"Widget refactor"*) fail "v2: leaked into ## In Progress" ;;
                 *) pass "v2: stops before ## In Progress" ;; esac
 
+# --- caps: a long status table and Last Updated line must not flood the session ---
+out="$(cd "$TMP/fx-size-budget" && BX_HOOK_NO_NETWORK=1 bash "$HOOK" 2>/dev/null)"
+n="$(printf '%s' "$out" | awk '{n+=length($0)+1} END{print n+0}')"
+if [ "$n" -le 3200 ]; then pass "over-budget repo: hook output is $n chars (cap 3000 + notice)"
+else fail "over-budget repo: hook output is $n chars"; fi
+longest="$(printf '%s\n' "$out" | awk '{if(length($0)>m)m=length($0)} END{print m+0}')"
+if [ "$longest" -le 250 ]; then pass "no hook line is longer than 250 chars ($longest)"
+else fail "a hook line is $longest chars"; fi
+
 if [ "$FAILURES" -gt 0 ]; then echo ""; echo "$FAILURES check(s) failed."; exit 1; fi
 echo ""; echo "All checks passed."

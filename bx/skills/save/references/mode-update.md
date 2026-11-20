@@ -57,7 +57,7 @@ New entries are capped — this keeps writing fast and keeps `/bx:resume` lean. 
 
 - **Session-history entry:** ≤5 "What happened" bullets. Detail that doesn't fit becomes a commit-hash reference (`see commit abc1234`), not prose.
 - **docs/STATUS.md last-session block:** ≤5 bullets, the most architecturally significant.
-- **Key Decision rationale:** ≤2–3 sentences. Longer context goes only into `docs/key-decisions.md`, referenced by commit hash.
+- **Key Decision rationale:** ≤2–3 sentences, and the whole row 400 chars at most. Longer context goes only into `docs/key-decisions.md`, referenced by commit hash. A row over 400 chars is the first thing the size budget shortens.
 - **In Progress / Next Steps items:** one line each + file paths; no multi-paragraph narration.
 - **The `Last Updated:` line:** this session only — `Last Updated: <today> (Session <N>)`, optionally ` — ` plus one clause about this session, **250 chars at most**. Never carry the previous line forward and never add an `Earlier, Session …` clause: earlier sessions are in `docs/session-history.md`, and this line is injected into every session by the SessionStart hook. Unlike the caps above, this one applies to the existing line too: it is replaced whole on every save.
 
@@ -109,12 +109,14 @@ Dispatch one `save-writer` subagent via the Agent tool with `subagent_type: "bx:
 >  - [N] sessions in `docs/session-history.md` ready for rollup (count > 5)
 >  - Key Decisions table in CLAUDE.md at [M] rows (cap 20)
 >  - README.md or `docs/*.md` touched in [K] commits since last full sweep
->  - Size budget: CLAUDE.md [X]k / 10k, STATUS.md [Y]k / 15k → run /bx:save --full
->  - CLAUDE.md at [X]k chars — over the 9k advisory rung; largest section `## [name]` ([N] chars); nothing is shrunk below 10k
+>  - Size budget: CLAUDE.md [X]k / 12k, STATUS.md [Y]k / 15k → run /bx:save --full
+>  - CLAUDE.md at [X]k chars — over the 10k advisory rung; largest section `## [name]` ([N] chars); nothing is shrunk below 12k
+>  - Loaded at session start: [T]k chars against a 25k guide — largest: [name] ([N]k)
+>  - MEMORY.md at [M]k chars (guide 12k, hard limit 25KB) — `--full` Part 4.2 moves detail into topic files
 >  - `Last Updated:` line in [file] was [N] chars (cap 250) — replaced with this session's line; the old line is in docs/completed-work.md
 >  - docs/[archive].md at [Z]k chars — rotation fires at 100k on `--full` (Part 7.7)"
 
-The size-budget line is the output of `bash <skill-dir>/scripts/size-budget.sh . --line`, printed verbatim, and shown only when a file is over its budget. From the third consecutive `--full` run in which the shrink was skipped, the script words that line as an escalation; then it is the **first** line of the Change Report, above the per-file lines, not a drift bullet. Show the advisory-rung line when CLAUDE.md is over 9k and at or under 10k — never together with the budget line for CLAUDE.md. Show the `Last Updated:` line when the writer reported replacing an over-long one. Show the archive line only for an archive at ≥90k chars (approaching or over the 100k rotation threshold); `docs/next-steps-backlog.md` is one of the five.
+The size-budget line is the output of `bash <skill-dir>/scripts/size-budget.sh . --line`, printed verbatim, and shown only when a file is over its budget. From the third consecutive `--full` run in which the shrink was skipped, the script words that line as an escalation; then it is the **first** line of the Change Report, above the per-file lines, not a drift bullet. Show the advisory-rung line when CLAUDE.md is over 10k and at or under 12k — never together with the budget line for CLAUDE.md. Show the loaded-at-session-start line when the script's `loaded_total` record reads `over`, and the MEMORY.md line when its `memory` record reads `over`. Show the `Last Updated:` line when the writer reported replacing an over-long one. Show the archive line only for an archive at ≥90k chars (approaching or over the 100k rotation threshold); `docs/next-steps-backlog.md` is one of the five.
 
 If no probe fires, omit the warning entirely.
 

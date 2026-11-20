@@ -269,7 +269,7 @@ on pre-v2 repos. The full breakdown — including what `--full` adds — lives i
 - `docs/STATUS.md` - status table, in progress, next steps, last-session block
 - Appends the detailed session entry to `docs/session-history.md`
 
-**`--full` adds:** README + docs/*.md sync, auto-memory contradiction pruning, session/decision rollups, the size budget (CLAUDE.md over 10k or `docs/STATUS.md` over 15k is planned from the file total down and shown as one consent table: apply all / choose / skip), archive rotation (>100k → `docs/archive/`, the next-steps backlog included). **Flags:** `--silent` (zero prompts, safe defaults), `--skip-migrate`, `--skip-rotation`, `--skip-commit`.
+**`--full` adds:** README + docs/*.md sync, auto-memory contradiction pruning, session/decision rollups, the size budget (CLAUDE.md over 12k or `docs/STATUS.md` over 15k is planned from the file total down and shown as one consent table: apply all / choose / skip), archive rotation (>100k → `docs/archive/`, the next-steps backlog included). **Flags:** `--silent` (zero prompts, safe defaults), `--skip-migrate`, `--skip-rotation`, `--skip-commit`.
 
 ---
 

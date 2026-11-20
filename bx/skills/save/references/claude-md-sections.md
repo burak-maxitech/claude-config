@@ -6,7 +6,7 @@ defines the schema. If they ever disagree, `doc-schema.md` wins.
 
 ## CLAUDE.md — instructions only
 
-Always loaded, every session. **Target ~7k chars, budget 10k** (`doc-schema.md`, Size
+Always loaded, every session. **Target ~7k chars, budget 12k** (`doc-schema.md`, Size
 budget). Contains only facts Claude should hold all the time.
 
 1. `## Project Overview` — name, repo, one-line description, key doc links

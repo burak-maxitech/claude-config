@@ -54,8 +54,8 @@ behind. Because the repo is on the legacy layout, every link written back into C
 - `## Completed` section contains more than 2 `- [x]` checkbox lines
 - `## Key Decisions` table has more than 25 rows
 - `## Session History` contains more than 1 `### Session` entry
-- The un-split CLAUDE.md is over 25k characters — the v1-layout equivalent of the two
-  size budgets (CLAUDE.md 10k + `docs/STATUS.md` 15k), which a v1 CLAUDE.md carries
+- The un-split CLAUDE.md is over 27k characters — the v1-layout equivalent of the two
+  size budgets (CLAUDE.md 12k + `docs/STATUS.md` 15k), which a v1 CLAUDE.md carries
   together in one file
 
 **Split steps:**
@@ -117,15 +117,17 @@ behind. Because the repo is on the legacy layout, every link written back into C
 ### 1.9 Size Check (early advisory)
 
 Measure both files with `size-budget.sh` (Part 7 describes it). CLAUDE.md target ~7k,
-advisory rung 9k, budget 10k. docs/STATUS.md target ~10k, budget 15k. Warn per file when it
+advisory rung 10k, budget 12k. docs/STATUS.md target ~10k, budget 15k. Warn per file when it
 is over its budget, and say that Part 7 will plan it.
 
-**CLAUDE.md over 9k and at or under 10k — the advisory rung.** Nothing fires in this
+**CLAUDE.md over 10k and at or under 12k — the advisory rung.** Nothing fires in this
 band (it is Part 7's stop point), so say so instead of staying silent. Name the largest
 section from the script's `section` records and take no action:
 
-> "CLAUDE.md is [X]k chars — over the 9k advisory rung, under the 10k budget. Largest
->  section: `## [name]` ([N] chars). Nothing is shrunk below 10k."
+> "CLAUDE.md is [X]k chars — over the 10k advisory rung, under the 12k budget. Largest
+>  section: `## [name]` ([N] chars). Nothing is shrunk below 12k."
+
+The same script reports two things about CLAUDE.md's shape, both advisory and never a trigger: `lines` (Anthropic's own target is under 200 lines per CLAUDE.md) and `long_lines` (lines over 400 chars). A file can pass the line target and still be hard to follow: organized bullets are followed better than dense paragraphs, and a 600-char table row is a paragraph. Name the count and the longest line when `long_lines` is above 5.
 
 If `## Project Overview` states derivable facts (`doc-structure-rules.md`, Pruning Is
 Preservation), list them in the same advisory as trim candidates. Do not remove them here:
@@ -136,7 +138,7 @@ them: `/doctor`'s trim check (Claude Code 2.1.206+) proposes cuts of derivable c
 `/doctor prompt-audit` (2.1.283+) reports stale or contradictory instructions across
 CLAUDE.md, rules, skills and subagents. Both only propose; `/bx:save` runs neither.
 
-This is the early advisory only — active enforcement happens in **Part 7 (Size Budget)** after Parts 5/6 have had a chance to bring the files under budget via count-based rollups. If the budget warning fires for a file, expect Part 7 to plan that file; the 9k advisory rung on its own means Part 7 will not.
+This is the early advisory only — active enforcement happens in **Part 7 (Size Budget)** after Parts 5/6 have had a chance to bring the files under budget via count-based rollups. If the budget warning fires for a file, expect Part 7 to plan that file; the 10k advisory rung on its own means Part 7 will not.
 
 ### 1.10 Cap Enforcement
 
@@ -266,9 +268,11 @@ Only two things:
 
 1. **Prune contradictions.** If a memory file states something this session proved wrong,
    correct or delete that file. A stale memory is worse than a missing one.
-2. **Check the index budget.** If `MEMORY.md` is near 200 lines or 25KB, move detail into
-   topic files and keep one line per entry in the index. Over either limit, everything past
-   it is silently dropped at next load.
+2. **Check the index budget.** `MEMORY.md` loads into every session, so it counts toward
+   the always-loaded total (`doc-schema.md`, Size budget). When `size-budget.sh` reports
+   `memory … over` (more than 12k chars, half of Claude Code's 25KB load limit), or the file
+   is near 200 lines, move detail into topic files and keep one line per entry in the index.
+   Over 200 lines or 25KB, everything past the limit is silently dropped at next load.
 
 ### 4.3 What NOT to write
 
@@ -377,7 +381,7 @@ For each row to roll up:
    - If the file doesn't exist, create it first with the header block from `mode-update.md` Part 1.6 (`# Key Decisions` → `> Full decision log. Referenced from [CLAUDE.md](../CLAUDE.md).` → table header).
    - **Anchor at the end of the table block, NOT at end-of-file.** Before appending, find the last consecutive `|`-row in the main table — without a full read: the same Grep (`^\|`, `-n`) + offset-Read technique as `save-writer.md`'s anchor rule. Insert the new row(s) immediately after that line. If the file has non-table content after the table (e.g., a bulleted "Also noted during verification" section, a footer, or any other prose), the new rows MUST land BEFORE that content — appending at literal end-of-file would create an orphan table fragment (a `|`-row with no header context). Implementation: Edit using `(last existing table row)\n\n(first line of trailing non-table content)` as `old_string`, splice the new rows in between. If the table is the only content in the file, end-of-file is the correct anchor.
 2. **Remove the row from CLAUDE.md's `## Key Decisions` table.**
-3. **Do NOT deduplicate.** If the same row already exists in `docs/key-decisions.md` (because an earlier session mirrored it there), leave both — dedup requires judgment. The cost is a duplicate line in the reference file, which is harmless.
+3. **Skip a row the archive already holds byte for byte.** `save-writer` mirrors every decision row into `docs/key-decisions.md` when it is created, so most rows are already there: check each with one whole-line fixed-string match (`bash -c 'grep -cxF -f <rows-file> docs/key-decisions.md'`, or one Grep per row) and append only the rows that are missing. Never match on anything looser than the whole line: a row that was reworded since is a different row and is appended. (Earlier versions appended unconditionally; the first real 2.18.0 run would have written 7 duplicates.)
 4. Preserve the trailing `> Full decision log: [docs/key-decisions.md](docs/key-decisions.md)` link in CLAUDE.md; that link is the whole point of keeping the section lean.
 5. **If an orphan table row is detected at end-of-file** (a `|`-row sitting alone after non-table content, leftover from a prior buggy run before this anchor rule was added), move it into the table block during this run as a one-time repair. The repair and the new rollup land in the same commit.
 
@@ -407,14 +411,14 @@ The numbers are owned by `doc-schema.md` (Size budget) and coded in `scripts/siz
 
 | File | Budget — act above this | Stop — shrink to this |
 |---|---|---|
-| CLAUDE.md | 10k | 9k |
+| CLAUDE.md | 12k | 10k |
 | docs/STATUS.md | 15k | 13k |
 
 The gap between the two is deliberate: a file that has just been shrunk does not trip the budget again on the next small edit.
 
 Two scripts do the mechanical work. Both live in this skill's `scripts/` directory; resolve the path against **this skill's base directory**, not the repo.
 
-- `bash <skill-dir>/scripts/size-budget.sh .` — measures both files, every section, both `Last Updated` lines, the five archives and the skip counter.
+- `bash <skill-dir>/scripts/size-budget.sh .` — measures both files, every section, both `Last Updated` lines, CLAUDE.md's line count and long lines, everything loaded at session start (`loaded` records and `loaded_total`), the auto-memory index, each path-scoped rules file, the five archives and the skip counter.
 - `bash <skill-dir>/scripts/archive-lines.sh . <src> <dest> "<heading>" <line-ranges> [--prefix STR]` — copies source lines into an archive byte for byte and skips every line the archive already holds. It never edits the source.
 
 ### 7.1 Measure
@@ -433,6 +437,8 @@ Planning reads and measures; it changes nothing. For each `over` file, build a l
 1. **Tidy pass — every section, always.** Plan every *tidy* move the section offers. Tidy moves take out only what is finished, duplicated, or scaffolding an earlier trim left behind, so they are proposed whenever the file is over budget, whatever the need.
 2. **Relocation pass — only if the tidy pass does not cover the need.** Walk the sections **largest first** (the `section` records are already in that order) and plan each section's *relocate* move down to its floor. Stop adding moves once the planned savings reach the need. Standing rules in `## Known Issues / Blockers` are planned **last**, after every other section in the file, whatever their size: they are the content CLAUDE.md exists to carry. Among them, path-scoped rules come before global ones. A move is planned whole (one group of rules, one run of rows), so the last move may overshoot the need; that is accepted.
 
+**Optional moves.** Stripping the reasons from global standing rules is planned as an **optional** move: it is listed in the table, marked `optional`, with its saving, but it is not counted toward the need and **Apply all** does not run it. Anthropic's own trim guidance keeps "pitfalls, rationale, and conventions" and cuts what is derivable, and a rule without its reason is followed less reliably than one with it; so this move happens only when the user picks it under **Choose**. If the required moves do not reach the need, say how far the optional ones would take the file.
+
 A move's **saving** is the size of the lines that leave minus the size of the lines that replace them, blank lines included, in the unit `size-budget.sh` reports (it counts what `awk` counts, which is bytes in some locales). Compose the replacement lines while planning, so the saving is measured and not guessed. Drop a relocate move that saves under 200 chars.
 
 Every section of an `over` file ends the plan in exactly one of three states: it has at least one move; it has a relocate move that was not needed this run (say so in one line under the table); or it is listed as **unshrinkable by design** with its size and the reason from 7.3. No section is silently skipped. If the planned savings do not reach the need, say so now, with the projected size: the run still applies what it has.
@@ -446,9 +452,9 @@ Every shrinker triggers on **what the section contains now**. None is switched o
 | Section | Tidy move | Relocate move | Floor — never goes below | Destination |
 |---|---|---|---|---|
 | HEADER (both files) | A `Last Updated:` line over 250 chars is cut to one session | — | title, intro notes, one `Last Updated:` line | `docs/completed-work.md` |
-| CLAUDE.md `## Key Decisions` (any variant: `(condensed)` etc.) | — | Oldest rows leave, top first | newest 8 rows + the `> Full decision log:` link | `docs/key-decisions.md` |
+| CLAUDE.md `## Key Decisions` (any variant: `(condensed)` etc.) | — | Rows over 400 chars are shortened; then oldest rows leave, top first | newest 8 rows + the `> Full decision log:` link | `docs/key-decisions.md` |
 | CLAUDE.md `## Known Issues / Blockers` — issues | Resolved entries leave entirely | Open entries become a one-line summary + link | every open issue keeps a trace | `docs/known-issues.md` |
-| CLAUDE.md `## Known Issues / Blockers` — standing rules | — | Path-scoped rules move to a rules file; global rules keep their lead and lose their reason | every rule keeps its lead sentence or a trace line | `.claude/rules/<topic>.md`, `docs/known-issues.md` |
+| CLAUDE.md `## Known Issues / Blockers` — standing rules | — | Path-scoped rules move to a rules file; optionally, global rules keep their lead and lose their reason | every rule keeps its lead sentence or a trace line | `.claude/rules/<topic>.md`, `docs/known-issues.md` |
 | CLAUDE.md `## Project Overview` | — | Derivable facts leave | name, description, Key Documentation links, every constraint | `docs/architecture.md` |
 | CLAUDE.md `## Environment Variables` | — | Descriptions leave, names stay | every variable name | the project's env doc |
 | docs/STATUS.md `## Current Status` | — | Oldest finished rows merge into one summary row | header rows, every unfinished row, newest 3 finished rows | `docs/completed-work.md` |
@@ -464,7 +470,7 @@ The paragraphs below define each row. S`<N>` is this session's number throughout
 
 **HEADER — the `Last Updated:` line.** The line states one session: `Last Updated: <date> (Session <N>)`, optionally followed by ` — ` and one clause about that session, 250 chars at most in total. It names no earlier session; earlier sessions are in `docs/session-history.md`. When an existing line is over 250 chars: archive it with `archive-lines.sh . <file> docs/completed-work.md "" <line> --prefix '- [x] Last Updated line of <file> before the S<N> trim (verbatim): '` (`<file>` is `CLAUDE.md` or `docs/STATUS.md`), then replace it with `<label as it stood> <date> (Session <number>)`, keeping the date and the session number **the line already carried** and any bold markers around the label; the writer stamps this session's date and number later in the same save. The header is exempt from 7.5 rule 4: the line carries no link. Other header lines (the title, `>` notes, project-authored lines) are never moved; when the header is still over 400 chars afterwards, report it as project-authored preamble.
 
-**Key Decisions.** Move the oldest rows (FIFO from the top, the Part 6.3 procedure and anchor rule) until the need is met or 8 rows remain; the rows the packet will append count toward the 8. Rows move byte for byte: nothing is appended to a moved row. This move uses Part 6.3's anchored append, not `archive-lines.sh`, because the rows must land inside the archive's table and not at the end of the file.
+**Key Decisions.** Two steps, in this order. *Shorten:* a row over 400 chars carries its session's story, not just the decision. Oldest first, until the need is met: make sure the row is in `docs/key-decisions.md` byte for byte (Part 6.3's check; append it if it is missing), then rewrite it in CLAUDE.md as the decision cell unchanged plus a rationale of one or two sentences, 300 chars at most for the whole row, keeping the version tag and any commit hash. A row at or under 400 chars is never shortened, so a shortened row is not touched again. *Move:* if shortening does not cover the need, move the oldest rows (FIFO from the top, the Part 6.3 procedure and anchor rule) until the need is met or 8 rows remain; the rows the packet will append count toward the 8. Rows move byte for byte: nothing is appended to a moved row. This move uses Part 6.3's anchored append, not `archive-lines.sh`, because the rows must land inside the archive's table and not at the end of the file.
 
 **Known Issues — entries, and which kind each is.** Entry boundaries are Part 1.7's; the `> Session state:` pointer line is not an entry. A bold-only line that sits above a run of bullet entries is a **group heading**: it is not an entry, and it travels with its group. A group ends at the next bold-only line or the end of the section; blank lines do not end it. A bullet whose link points into `.claude/rules/` is a **trace line** an earlier run wrote: it is not an entry, it is never stripped or moved, and it is not counted as a rule. Classify every entry as one of three kinds:
 
@@ -478,8 +484,8 @@ Part 7 runs on the orchestrator, so the Known Issues moves edit the files direct
 
 - *Resolved entries (tidy).* All of them move, topmost first, and leave nothing behind. A resolved entry takes the **last** session its lead names (`The S5 deadlock is resolved (S6)` → `S6`), or this session when it names none. A title that repeats the status word (`… is RESOLVED (S3) — Resolved S3`) is fine; do not reword it. An open-classified entry the orchestrator has evidence is fixed (this session's conversation, or a commit the entry names that `git log` shows) is offered in 7.4 under *looks resolved — confirm*: the status-form test is not overridden — the user is. On confirmation the entry goes into `known_issue_moves` as resolved with that commit, and the writer moves it; declined, it stays an open candidate.
 - *Open entries (relocate).* Topmost first, until the need is met. An entry qualifies only when it is at least 500 chars longer than its replacement line; a shorter one would lose its detail to save almost nothing, so it stays. The replacement, in the entry's original position, is `**<lead>** <one sentence, 25 words at most, saying what is still broken> → [docs/known-issues.md](docs/known-issues.md)`. `**<lead>**` is the entry's opening bold phrase exactly as it stood, punctuation included; when the lead was not bold, bold it here. The sentence is written from the entry's own body and names the specific failure; a generic placeholder ("still broken, see archive") is not allowed. State only what the entry itself says: no inferred cause, consequence or fix status. The archive header is `Open, moved S<N>`. A line already in this replacement form is never moved or trimmed again.
-- *Standing rules, path-scoped (relocate).* A rule is **path-scoped** when its own text, or its group heading, confines it to named directories, globs or file types, and following it matters only while reading or editing those files. A rule about deploys, billing, process or people is global whatever paths it mentions; when in doubt it is global. Path-scoped rules move, byte for byte, to `.claude/rules/<topic>.md`: an existing rules file whose `paths:` already cover them, otherwise a new file. Write the new file's top with the Write tool — `---`, `paths:`, one `  - "<glob>"` line per glob, `---`, a blank line, `# <Topic> rules` — then copy the rule lines with `archive-lines.sh . CLAUDE.md .claude/rules/<topic>.md "## Moved from CLAUDE.md in S<N>" <ranges>`. `<topic>` is the group heading in lower-case kebab form without any parenthetical (`Database migrations (…)` → `database-migrations`). The group heading line itself is not copied: the file's title names it, and it stays in CLAUDE.md above the trace line. Claude Code loads such a file only when a matching file is read, which is the whole saving. In CLAUDE.md the moved rules are replaced by **one trace line per rules file**: `- **<K> rules** load with matching files → [.claude/rules/<topic>.md](.claude/rules/<topic>.md)`, as the only bullet under the group heading. Never move a rule into a rules file that has no `paths:`: such a file loads every session, so the move would lower the CLAUDE.md count and save nothing.
-- *Standing rules, global (relocate, planned last).* The rule stays in CLAUDE.md; only its reason leaves. A rule's **lead** is its opening bold phrase (its first sentence when nothing is bold). Work one group at a time, topmost first (a flat list with no group headings is one group titled `Standing rules`), and only on a group where stripping saves at least 500 chars. Archive the group first: one `docs/known-issues.md` entry headed `### <group heading> — Open, moved S<N> (<today>)` whose body is the heading line, a blank line, and every rule in the group, verbatim (step 8a's Edit append; diff the body against the source lines before removing anything). A group saves what its rule lines lose minus the suffix added to its heading. Then reduce each rule line to its lead alone (`- **<lead>**`, byte for byte) and append ` → [reasons](docs/known-issues.md)` to the group heading line. A rule that is already lead-only has nothing to strip.
+- *Standing rules, path-scoped (relocate).* A rule is **path-scoped** when its own text, or its group heading, confines it to named directories, globs or file types, and following it matters only while reading or editing those files. A rule about deploys, billing, process or people is global whatever paths it mentions; when in doubt it is global. Path-scoped rules move, byte for byte, to `.claude/rules/<topic>.md`: an existing rules file whose `paths:` already cover them, otherwise a new file. Write the new file's top with the Write tool — `---`, `paths:`, one `  - "<glob>"` line per glob, `---`, a blank line, `# <Topic> rules` — then copy the rule lines with `archive-lines.sh . CLAUDE.md .claude/rules/<topic>.md "## Moved from CLAUDE.md in S<N>" <ranges>`. `<topic>` is the group heading in lower-case kebab form without any parenthetical (`Database migrations (…)` → `database-migrations`). The group heading line itself is not copied: the file's title names it, and it stays in CLAUDE.md above the trace line. Claude Code loads such a file only when a matching file is read, which is the whole saving. In CLAUDE.md the moved rules are replaced by **one trace line per rules file**: `- **<K> rules** load with matching files → [.claude/rules/<topic>.md](.claude/rules/<topic>.md)`, as the only bullet under the group heading. Keep each rules file under 8k chars (`size-budget.sh` reports them as `rules` records; Claude Code delivers only the start of one over 40,000): when an append would pass 8k, start a second file for the topic. Never move a rule into a rules file that has no `paths:`: such a file loads every session, so the move would lower the CLAUDE.md count and save nothing.
+- *Standing rules, global (optional — see 7.2; never part of **Apply all**).* The rule stays in CLAUDE.md; only its reason leaves. A rule's **lead** is its opening bold phrase (its first sentence when nothing is bold). Work one group at a time, topmost first (a flat list with no group headings is one group titled `Standing rules`), and only on a group where stripping saves at least 500 chars. Archive the group first: one `docs/known-issues.md` entry headed `### <group heading> — Open, moved S<N> (<today>)` whose body is the heading line, a blank line, and every rule in the group, verbatim (step 8a's Edit append; diff the body against the source lines before removing anything). A group saves what its rule lines lose minus the suffix added to its heading. Then reduce each rule line to its lead alone (`- **<lead>**`, byte for byte) and append ` → [reasons](docs/known-issues.md)` to the group heading line. A rule that is already lead-only has nothing to strip.
 
 For this section the 7.4 table lists the titles it will touch, under headings: *resolved — leaves CLAUDE.md entirely*, *open — replaced by a one-line summary*, *looks resolved — confirm*, *path-scoped rule — moves to a rules file, trace line stays*, *global rule — lead stays, reason moves*. The user is approving a classification, so they must see it.
 
@@ -518,13 +524,13 @@ Otherwise print the plan as **one table covering both files**, then ask once:
 > | 2 | CLAUDE.md | Key Decisions | 6 oldest rows → key-decisions.md | yes, link stays | 1,610 |
 > | 3 | docs/STATUS.md | Next Steps | 2 finished items → completed-work.md; 5 scaffolding lines folded | n/a (read on demand) | 1,480 |
 >
-> CLAUDE.md 16.4k → about 9.0k (budget 10k). docs/STATUS.md 20.3k → about 12.8k (budget 15k).
+> CLAUDE.md 16.4k → about 9.8k (budget 12k). docs/STATUS.md 20.3k → about 12.8k (budget 15k).
 > Unshrinkable by design: `## Working Principles` (916 chars, project-authored).
 
 Known Issues rows are followed by the titles per class (7.3). Then one `AskUserQuestion` (numbered fallback), whose text repeats the two projected sizes and the number of moves, because the dialog may be all the user sees:
 
-- **Apply all** → execute every planned move.
-- **Choose** → ask which moves to apply: `AskUserQuestion` with `multiSelect`, the moves as options, 4 options per question and 4 questions per turn; with more than 16 moves, ask in chat for the row numbers instead. Execute the chosen ones.
+- **Apply all** → execute every planned move that is not marked `optional`.
+- **Choose** → ask which moves to apply, optional ones included: `AskUserQuestion` with `multiSelect`, the moves as options, 4 options per question and 4 questions per turn; with more than 16 moves, ask in chat for the row numbers instead. Execute the chosen ones.
 - **Skip** → apply nothing this run.
 
 A dismissed prompt is **Skip**: no move runs without consent. This one prompt replaces the per-section questions of earlier versions; 7.7 keeps its own first-rotation consent, which is asked once per archive, ever.
@@ -544,13 +550,19 @@ A dismissed prompt is **Skip**: no move runs without consent. This one prompt re
 
 Run `size-budget.sh` again and report each file that was planned:
 
-> "CLAUDE.md: 16.4k → 9.1k (budget 10k). docs/STATUS.md: 20.3k → 12.6k (budget 15k). 11 moves applied: [list]. Archived [N] lines, skipped [M] already archived." (`[N]` and `[M]` are the `archive-lines.sh` totals.)
+> "CLAUDE.md: 16.4k → 9.9k (budget 12k). docs/STATUS.md: 20.3k → 12.6k (budget 15k). 11 moves applied: [list]. Archived [N] lines, skipped [M] already archived." (`[N]` and `[M]` are the `archive-lines.sh` totals.)
 
 When a file is still over its budget, follow that line (or replace it, when no move was applied) with what is left, largest first, each with its reason, instead of a generic warning:
 
-> "CLAUDE.md is 11.2k, 1.2k over budget. What remains is unshrinkable by design: `## Known Issues / Blockers` 4.1k (24 standing rules, leads only); `## Project Overview` 2.7k (Key Documentation links); `## Working Principles` 0.9k (project-authored). Moving more is a decision about the project, not a rollup."
+> "CLAUDE.md is 13.2k, 1.2k over budget. What remains is unshrinkable by design: `## Known Issues / Blockers` 4.1k (24 standing rules, leads only); `## Project Overview` 2.7k (Key Documentation links); `## Working Principles` 0.9k (project-authored). Moving more is a decision about the project, not a rollup."
 
-Moves the user declined are listed as declined, with their savings. Never block the commit.
+Moves the user declined, and optional moves nobody picked, are listed with their savings. Never block the commit.
+
+**The always-loaded total.** Close the report with what Claude Code loads before the first prompt, from the script's `loaded` records, whenever `loaded_total` is `over` (more than 25k chars) or `memory` is `over`:
+
+> "Loaded at session start: 36.6k chars (CLAUDE.md 16.5k, MEMORY.md 17.4k, SessionStart hook 2.6k) against a 25k guide. Largest: MEMORY.md, which is Claude's own file — Part 4.2 moves detail into topic files."
+
+Part 7 shrinks only CLAUDE.md and docs/STATUS.md. The total is a report, not a trigger: its other parts have their own owners (Part 4.2 for `MEMORY.md`, the hook's own 3,000-char cap, the user for an unscoped rules file). An unscoped rules file is named here every time, because it loads exactly like CLAUDE.md while escaping its budget.
 
 ### 7.7 Archive rotation
 

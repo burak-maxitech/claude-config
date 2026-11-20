@@ -101,11 +101,13 @@ For UPDATE mode the change report is assembled from the `save-writer` subagent's
 - [ ] docs/STATUS.md status reflects current state
 - [ ] CLAUDE.md and docs/STATUS.md link to actual docs/ files (including reference files)
 - [ ] CLAUDE.md and docs/STATUS.md have all required sections intact
-- [ ] CLAUDE.md is ~7k chars; docs/STATUS.md is ~10k chars (the size-budget drift line fires past 10k / 15k)
+- [ ] CLAUDE.md is ~7k chars; docs/STATUS.md is ~10k chars (the size-budget drift line fires past 12k / 15k)
 - [ ] Cap enforcement (Part 1.10) ran — Current Status ≤10, Next Steps ≤10, In Progress ≤5 (or warnings issued)
-- [ ] Size budget (Part 7) planned each file over its budget post-Parts 5/6 (CLAUDE.md 10k, docs/STATUS.md 15k, checked independently), asked **once** for the whole plan, and either brought the file under budget or named every remaining section as unshrinkable by design — or skipped silently when both were under budget; 7.7 archive rotation still runs on --full (its trigger is archive size, not live-file size)
+- [ ] Size budget (Part 7) planned each file over its budget post-Parts 5/6 (CLAUDE.md 12k, docs/STATUS.md 15k, checked independently), asked **once** for the whole plan, and either brought the file under budget or named every remaining section as unshrinkable by design — or skipped silently when both were under budget; 7.7 archive rotation still runs on --full (its trigger is archive size, not live-file size)
 - [ ] Every Part 7 line move went through `archive-lines.sh` before the source was edited; no line was archived twice
 - [ ] Both `Last Updated:` lines name this session only and are 250 chars or shorter
+- [ ] No global standing rule lost its reason unless the user picked that optional move under **Choose**
+- [ ] The always-loaded total was reported when over 25k, with its largest part named
 - [ ] (Fast path) `save-writer` subagent was dispatched with the update packet and returned a change report — no full-file contents echoed in the response
 - [ ] (Fast path) README.md / docs/*.md / rollups were NOT touched (those are `--full` only) — drift warnings surfaced instead
 - [ ] (`--full` only) README sync, docs/*.md sync, and rollups ran on the orchestrator **before** the writer was dispatched, and the session entry carries a `Full sweep:` bullet when any of them changed a file

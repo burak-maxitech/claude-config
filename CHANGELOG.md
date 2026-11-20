@@ -2,6 +2,31 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.19.0 — 2026-11-20
+
+`/bx:save` and the SessionStart hook: the size budgets are refined against what Anthropic documents and what studies measured, and the budget now counts everything loaded at session start, not CLAUDE.md alone.
+
+### Why
+- Anthropic's guidance is in lines ("under 200 lines per CLAUDE.md"), not characters, and its `/doctor` trim keeps "pitfalls, rationale, and conventions" while cutting what is derivable.
+- A May 2026 factorial study (arXiv 2605.10039, 1,650 Claude Code sessions) found no adherence effect from file size between 25 and 500 lines.
+- On horowell, CLAUDE.md (16.5k) was under half of what loaded: `MEMORY.md` was 17.4k and the hook block 7.0k, against a 10,000-char point where Claude Code replaces hook output with a preview.
+
+### Changed
+- **CLAUDE.md budget: act above 12k, shrink to 10k** (was 10k / 9k). docs/STATUS.md stays at 15k / 13k, under the 5,000-token size past which a file is restored after compaction as a path reference only.
+- **Stripping the reasons from global standing rules is optional.** It is listed in the consent table but **Apply all** does not run it; it happens only when picked under **Choose**.
+- **Key Decisions rows over 400 chars are shortened before any row is moved** (decision unchanged, rationale cut to one or two sentences, full row kept in `docs/key-decisions.md`). New rows are capped at 400 chars.
+- **Part 6.3 skips a row the archive already holds.** `save-writer` mirrors every row at creation, so the unconditional append wrote duplicates (the first real 2.18.0 run would have written 7).
+- **The SessionStart hook caps its output:** 3,000 chars in total, status rows cut to 200, the `Last Updated:` line to 250. Horowell's block goes from 7.0k to 2.6k. `BX_HOOK_NO_NETWORK=1` skips the `gh` lookup.
+- Part 4.2 moves `MEMORY.md` detail into topic files from 12k chars, half of the 25KB load limit.
+
+### Added
+- `size-budget.sh` reports the always-loaded total (CLAUDE.md, rules files without `paths:`, `MEMORY.md`, the hook block) against a 25k guide, CLAUDE.md's line count against 200, its lines over 400 chars, and each path-scoped rules file against 8k. `--line` adds the total when it is over.
+- Part 7.6 and the drift report name the always-loaded total and its largest part. It is a report, not a trigger: Part 7 still shrinks only CLAUDE.md and docs/STATUS.md.
+- Lint checks B15–B19; fixture checks for the new records and the hook caps.
+
+### Not verified by running
+- The Key Decisions shorten step, the optional-move path through **Choose**, and Part 4.2 at 12k have not been executed by an agent or a real save. The 25k total is a judgment, not a published number.
+
 ## 2.18.0 — 2026-11-20
 
 `/bx:save --full` and `/bx:resume`: size control now works from the file total down. On a project with 40+ full saves (Horowell, S1–S321) both live files sat over their caps on every run — CLAUDE.md 16.6k against 12k, docs/STATUS.md 21.6k against 20k — while every shrinker reported nothing to do.

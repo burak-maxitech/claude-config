@@ -9,7 +9,11 @@
 #   - Read-only on the repo: no writes anywhere except the harness-provided
 #     $CLAUDE_ENV_FILE side-channel (session env persistence, CC 2.1.152+)
 #   - Silent on non-repo dirs: emit nothing rather than errors
-#   - Bounded: never emit more than ~50 lines (Claude reads this on every start)
+#   - Bounded: never emit more than ~50 lines or 3,000 chars (Claude reads this on
+#     every start; Claude Code replaces hook output over 10,000 chars with a
+#     2,000-char preview, so an uncapped status table silently loses the rest).
+#     Each status row is cut to 200 chars and the Last Updated line to 250.
+#   - BX_HOOK_NO_NETWORK=1 skips the gh lookup (used when measuring the output)
 #   - Manual /bx:resume still works for deep orientation (deliberate dual-path)
 
 set -e
@@ -27,13 +31,14 @@ if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   } >> "$CLAUDE_ENV_FILE"
 fi
 
+emit() {
 # Only emit context inside a git repo. If we're not in one, the user is probably
 # in their home dir or a one-off chat — no project orientation to emit.
 # One rev-parse for all three facts. This hook runs on every session launch with
 # a <1s budget, so three process spawns to learn three values is two too many.
-git_facts="$(git rev-parse --is-inside-work-tree --show-toplevel --abbrev-ref HEAD 2>/dev/null)" || exit 0
+git_facts="$(git rev-parse --is-inside-work-tree --show-toplevel --abbrev-ref HEAD 2>/dev/null)" || return 0
 [ "$(printf '%s
-' "$git_facts" | sed -n 1p)" = "true" ] || exit 0
+' "$git_facts" | sed -n 1p)" = "true" ] || return 0
 
 repo_root="$(printf '%s
 ' "$git_facts" | sed -n 2p)"
@@ -69,11 +74,11 @@ fi
 if [ -n "$state_file" ]; then
   echo ""
   echo "**Project status** (from \`$state_file\`):"
-  grep -i "^Last Updated" "$repo_root/$state_file" | head -1
+  grep -i "^[*]*Last Updated" "$repo_root/$state_file" | head -1 | cut -c1-250
   # Single-section extractor. The old range /^## Current Status/,/^## [^C]/
   # could not stop at "## Completed" and ran on into "## In Progress".
   awk '/^## Current Status/{f=1; print; next} /^## /{f=0} f' \
-      "$repo_root/$state_file" 2>/dev/null | head -12 || true
+      "$repo_root/$state_file" 2>/dev/null | head -12 | cut -c1-200 || true
 
   # Stale-doc check against the file that actually carries the state.
   # Run git from the repo root: $state_file is a repo-root-relative pathspec, so
@@ -94,7 +99,7 @@ if [ -n "$state_file" ]; then
 fi
 
 # Open PR for this branch (best-effort via gh)
-if command -v gh >/dev/null 2>&1; then
+if [ -z "${BX_HOOK_NO_NETWORK:-}" ] && command -v gh >/dev/null 2>&1; then
   pr_info="$(gh pr view --json number,state,title 2>/dev/null || true)"
   if [ -n "$pr_info" ]; then
     echo ""
@@ -106,3 +111,7 @@ fi
 
 echo ""
 echo "_(Orientation auto-injected by \`session-start-context.sh\`. For full task hydration + docs scan, run \`/bx:resume\` explicitly.)_"
+}
+
+# Cap the whole block. Line-granular, so no multi-byte character is split.
+emit | awk '{n+=length($0)+1; if(n>3000){print "_(orientation cut at 3,000 chars - run /bx:resume for the rest)_"; exit} print}'

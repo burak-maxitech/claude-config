@@ -174,12 +174,12 @@ for weeks while state churns daily, so comparing against CLAUDE.md reports false
   commits since then."
 
 **Size budget — one line, always.** From the pre-injected state-file sizes in Step 2, print
-exactly one line in the summary. The budgets are CLAUDE.md 10k and docs/STATUS.md 15k
+exactly one line in the summary. The budgets are CLAUDE.md 12k and docs/STATUS.md 15k
 (owner: `../save/references/doc-schema.md`, Size budget):
 
 - Either file over its budget →
-  `Size budget: CLAUDE.md 16.6k / 10k, STATUS.md 21.6k / 15k → run /bx:save --full`
-- Both within → `Size budget: CLAUDE.md 8.2k / 10k, STATUS.md 11.0k / 15k — within budget`
+  `Size budget: CLAUDE.md 16.6k / 12k, STATUS.md 21.6k / 15k → run /bx:save --full`
+- Both within → `Size budget: CLAUDE.md 8.2k / 12k, STATUS.md 11.0k / 15k — within budget`
 
 `wc -c` counts bytes, which runs a few percent over the char count on a file with many
 non-ASCII characters; close enough for this line. If Step 1's Grep returned a
