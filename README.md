@@ -254,7 +254,7 @@ The `bx/agents/` folder contains 20 subagent definitions used by skills (namespa
 
 ## Optional: SessionStart hook for auto-orientation
 
-The repo ships `bx/scripts/session-start-context.sh` — a cheap (<1s) read-only script that emits project orientation as system context at the start of every Claude Code session, before the user's first prompt. It eliminates the need to type `/bx:resume` for routine starts (deep orientation still works via the explicit slash command).
+The repo ships `bx/scripts/session-start-context.sh` — a cheap (<1s) read-only script that emits project orientation (capped at 3,000 chars, status rows cut to 200) as system context at the start of every Claude Code session, before the user's first prompt. It eliminates the need to type `/bx:resume` for routine starts (deep orientation still works via the explicit slash command).
 
 **What it emits:**
 - Branch + uncommitted-file count + age of last commit

@@ -271,3 +271,18 @@
 **Next session should:**
 - Run `/bx:save --full` on horowell with 2.18.0 and fix what the first real over-budget run finds
 - Then the `/bx:seo` end-to-end run on burakarik.com (still owed from S69)
+
+### Session 70 (cont.) - 2026-11-20
+**What happened:**
+- Researched whether 10k is the right CLAUDE.md budget: Anthropic's guidance is in lines (under 200), a 2026 factorial study (arXiv 2605.10039) found no adherence effect from file size, and `/doctor` keeps rationale. Hard limits found: hook output 10,000 chars, MEMORY.md 200 lines / 25KB, path-scoped rules 40,000 chars, 5,000 tokens for post-compaction re-reads.
+- Measured what loads at session start: horowell 40.9k chars, of which CLAUDE.md was 16.5k, MEMORY.md 17.4k and the hook block 7.0k.
+- Shipped bx 2.19.0 (`ce6adcf`): CLAUDE.md 12k / 10k; `size-budget.sh` reports the always-loaded total (25k guide), MEMORY.md (12k), rules files (8k), line count and long lines; hook capped at 3,000 chars (horowell 7.0k → 2.6k); reason strip optional; Key Decisions shorten step; Part 6.3 de-duplication; lint B15–B19.
+- Second real `--full` on this repo with 2.19.0: both files within budget, Part 7 planned nothing and asked nothing.
+
+**Files created/modified:**
+- `bx/skills/save/scripts/size-budget.sh`, `bx/scripts/session-start-context.sh`
+- `bx/skills/save/references/{mode-update-full,mode-update,doc-schema,claude-md-sections,verification-checklists}.md`, `bx/skills/resume/SKILL.md`
+- `bx/skills/save/tests/{check-known-issues-governance,test-hook-layout,test-size-budget-fixture}.sh`; `plugin.json` 2.19.0; `CHANGELOG.md`; `README.md`, `workflow.md`
+
+**Next session should:**
+- Run `/bx:save --full` on horowell with 2.19.0 (first real over-budget run; MEMORY.md there is 17.4k against the 12k guide)

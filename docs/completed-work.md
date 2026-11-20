@@ -295,3 +295,4 @@
 - [x] `/bx:save` size budget (bx 2.18.0, S70): Part 7 file-level budget, content-triggered shrinkers for every required section, one consent, skip counter, backlog rotation - `bx/skills/save/references/mode-update-full.md`, `bx/skills/save/scripts/`, `bx/agents/save-writer.md`
 - [x] `/bx:resume` reads docs/STATUS.md by section and prints one size-budget line (S70) - `bx/skills/resume/SKILL.md`
 - [x] Size-budget fixture, assertion scripts and blind rehearsals (S70) - `bx/skills/save/tests/`
+- [x] Size budgets refined from research (bx 2.19.0, S70): CLAUDE.md 12k / 10k, always-loaded total, hook cap, optional reason strip, Key Decisions shorten step, Part 6.3 de-duplication - `bx/skills/save/scripts/size-budget.sh`, `bx/scripts/session-start-context.sh`, `bx/skills/save/references/mode-update-full.md`
