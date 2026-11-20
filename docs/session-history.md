@@ -177,52 +177,13 @@
 
 ### Session 64 - 2026-10-23: first real `/bx:clean` run (maxitech-concierge, Python) found six defects incl. a `sign_off` dead-config false positive; clean-vs-unavailable normalisation moved to the orchestrator; bx 2.13.1 (commits: 8e964eb, 3783a5c)
 
-### Session 64 (cont.) - 2026-10-23
-**What happened:**
-- Ran `/bx:clean` (report-only) on horowell, the first JS/TS run. The orchestration was done by hand against the 2.13.1 scan files in the repo. Results: deps, CSS, assets and tests are clean; 3 dead symbols (`cacheStats`, `matchMovement`, `NewUserWatchRow`), 15 test-only helpers, about 200 de-export candidates, and 1 dead env line.
-- Found 6 defects in that report and 4 more during verification, all fixed in 2.13.2 (commit 4e2dc8a). The worst: locally used exports were rated `unused_export`/`safe`, so Safe to Delete would have broken their files. Also, a scanner's `tsc --noEmit` rewrote `tsconfig.tsbuildinfo` in a repo another session was working in.
-- Verification took four pairs of files-code reruns (A/B through G/H). Failures in order: doc mentions counted as uses; comments counted as local uses; scanners wrote and ran `.mjs` helpers; and my pinned command dropped every `export` line, giving about 48 false `safe` types (caught by spot-checking 11 symbols). G/H passed.
-- User decision: scratch files are allowed in OS temp, deleted before returning, and never in the repo. The strict rule had failed 4 runs in a row.
-- Pushed v2.13.2. horowell was left untouched; its 13:26 `tsbuildinfo` change matches the other session's 13:27 `next build`.
+### Session 64 (cont.) - 2026-10-23: first JS/TS `/bx:clean` run (horowell, report-only) found 10 defects incl. locally used exports rated `safe` and a scanner's `tsc --noEmit` rewriting `tsconfig.tsbuildinfo`; `export_only` + De-export block, pinned local-use command, "exclusion removes candidates, not evidence" in `scan-exclusions.md`; bx 2.13.2 (commits: 4e2dc8a, ae9cc70)
 
-**Files created/modified:**
-- `bx/skills/clean/references/scan-files-code.md`: `export_only` and the De-export block, measured extents, the pinned local-use command, code-only references, the tsc rule, test-only rule, shadcn, scratch-write rule
-- `bx/skills/arch/references/scan-exclusions.md`: "exclusion removes candidates, not evidence" (shared with `/bx:arch` and `/bx:tests`)
-- `bx/skills/clean/SKILL.md`: keep `export_only` out of Safe to Delete; de-export line in the report
-- `bx/.claude-plugin/plugin.json`, `CHANGELOG.md`: 2.13.2
-
-**Next session should:**
-- Install 2.13.2; run `--dry-run` and `--fix` (throwaway branch) and a directory scope on a real repo
-- Re-run deps-config and styles-tests on horowell after 2.13.2; consider a `/bx:arch` re-check that the new exclusion rule changes nothing there
-
-### Session 64 (cont.²) - 2026-10-23
-**What happened:**
-- Full sweep (`/bx:save --full`): no session rollup (sessions 60–64 are already the full-prose window), no Key Decisions rollup (14 rows), no size shrinkers (CLAUDE.md 11.8k, STATUS.md 11.4k) and no archive rotation (largest archive 68.5k). Part 1.10 warnings: Next Steps has 11 items (target 10) and In Progress has 6 (target 5). Part 7: CLAUDE.md re-measured at 12.1k after the S64 (cont.) Known Issues addition, so the Known Issues shrinker fired (4,334 > 4,000; user approved). It moved the open plugin-versioning entry (S54) to `docs/known-issues.md` and left a one-line summary in its place. CLAUDE.md is now 11.5k.
-- Part 3 doc sync: `docs/architecture.md` now describes `scan-exclusions.md` as the rule for what a scan must never *report* on, and notes that references from excluded trees still count (2.13.2).
-
-**Files created/modified:**
-- `docs/architecture.md`: cross-skill contract owners line updated for the 2.13.2 exclusion rule
-
-**Next session should:**
-- See Session 64 (cont.) above
+### Session 64 (cont.²) - 2026-10-23: `/bx:save --full` sweep moved the open plugin-versioning Known Issues entry to `docs/known-issues.md` (CLAUDE.md 12.1k → 11.5k); `docs/architecture.md` synced for the 2.13.2 exclusion rule (commit: 6a47777)
 
 ### Session 65 - 2026-10-26: `/bx:tests` read in full (15 defects) and run report-only on horowell + maxitech-concierge (29 defects); test-suite growth investigated (horowell 0.49 → 0.88 test/source LOC, dead `build_reply_all_recipients` kept alive by 5 tests); upkeep spec written and 2.13.3 shipped (T01a/T01b split, gated suite-verified `--fix`). (commit: c72a98d)
 
-### Session 65 (cont.) - 2026-10-26
-**What happened:**
-- Implemented `/bx:tests` 2.14.0 in four phases: `test_bodies.py` (T01 = 0 on horowell, recall 100%), `leverage.py` + `references.py` (verify_request ranks #1, life support with successor), then scan files/catalog/SKILL/template rewired onto script output, then `--fix` extension, D6 and docs (see commit 9f7624a).
-- Eight Sonnet scanner runs from the new files on both repos passed every acceptance control; their friction found 13 script defects (successor/helper deletable counts, double-counted clusters, import-based module attribution, migrations/types as code, toBeInstanceOf weak, URL-routed handlers untested, ORM classes as gaps, priority ties, stem-only successors), all fixed in scripts.
-- `--fix` dogfood on a throwaway maxitech clone with planted controls: red baseline aborted (tzdata + Calendly token), scoped command 210 passed; bad merge dropping a row stayed green, count check reverted it; final 207 = 210 − 1 − 2. Found two more defects: Python def names hid mechanical clusters; `git checkout` revert would undo earlier items (now per-item snapshots).
-- Consolidate threshold calibrated on horowell (0.9 kept, ≥4 saved lines floor).
-- Two heredoc escaping slips broke a script mid-run; the manifest flagged each failed step, so neither produced silent zeros.
-- Full sweep: rolled up S62–S63 (55.3k → 45.7k); Part 7 moved 6 Key Decisions rows (8.5k → 5.8k) and the open bx 2.12.x Known Issues entry (4.6k → 3.8k), CLAUDE.md 13.9k → 10.4k; memory `feedback-edit-tool-for-escapes`; archives under 100k, no rotation.
-
-**Files created/modified:**
-- `bx/skills/tests/scripts/` (new: test_bodies.py, leverage.py, references.py, consolidate.py, run.py)
-- `bx/skills/tests/{SKILL.md,references/*}`, `bx/agents/test-*.md`, `bx/skills/clean/{SKILL.md,references/scan-files-code.md}`, `bx/skills/arch/references/scale-strategy.md`, `README.md`, `docs/architecture.md`, spec implementation notes, `CHANGELOG.md`, `plugin.json` 2.14.0
-
-**Next session should:**
-- Install 2.14.0 and run `/bx:tests` with the installed agents; try one JS merge under `--fix` on horowell.
+### Session 65 (cont.) - 2026-10-26: `/bx:tests` 2.14.0 — committed scripts (`test_bodies.py`, `leverage.py`, `references.py`, `consolidate.py`, `run.py`), reduction lane, suite-verified `--fix` with the case-count check and per-item snapshots; eight scanner runs passed every acceptance control and found 13 script defects, all fixed; full sweep rolled up S62–S63 and moved 6 Key Decisions rows (commits: 9f7624a, a8dfd29, 7c3f09e)
 
 ### Session 66 - 2026-10-28
 **What happened:**
@@ -293,3 +254,20 @@
 **Next session should:**
 - Install bx 2.17.0 and run `/bx:seo` end to end on burakarik.com
 - Update site-profile.md effects table and Step 4.5.2 inheritance table for 2.17.0
+
+### Session 70 - 2026-11-20
+**What happened:**
+- Diagnosed why `/bx:save --full` never shrank horowell's docs (16.6k / 12k and 21.6k / 20k after 40+ saves): per-section thresholds that did not sum to the file cap, a Known Issues shrinker that assumed resolvable bugs, a sentinel link that froze sections, no shrinker for Current Status or the header, whole-section re-archiving into a 441k backlog, and per-section consent.
+- Shipped bx 2.18.0 (`f7e402f`): Part 7 rewritten as a file-level budget with tidy and relocation passes, one consent, a skip counter; standing rules as a third Known Issues kind (path-scoped → `.claude/rules/` with `paths:`, global → lead stays, reason moves); `Last Updated:` capped at 250 chars and composed by `save-writer`; backlog rotation; `/bx:resume` section reads and budget line.
+- Added `size-budget.sh`, `archive-lines.sh`, fixture `fx-size-budget`, `assert-size-budget.sh`, `test-size-budget-fixture.sh`, lint checks B01–B14.
+- Blind rehearsals: first run 16.4k / 20.3k → 7.9k / 12.7k with every moved line found verbatim; repeat run and an unshrinkable-remainder variant were no-ops. The first-run path was rehearsed on the pre-clarification text only.
+- Full sweep: first real Part 7 run on this repo (7 Key Decisions rows, all already mirrored in the archive, so nothing was appended); rolled up three S64–S65 continuation entries; README, workflow.md, architecture.md synced.
+
+**Files created/modified:**
+- `bx/skills/save/references/{mode-update-full,mode-update,doc-schema,claude-md-sections,doc-structure-rules,verification-checklists}.md`, `bx/skills/save/SKILL.md`, `bx/agents/save-writer.md`
+- `bx/skills/save/scripts/{size-budget,archive-lines}.sh` (new), `bx/skills/save/tests/{assert-size-budget,test-size-budget-fixture}.sh` (new), `make-fixtures.sh`, `check-known-issues-governance.sh`
+- `bx/skills/resume/SKILL.md`, `references/summary-template.md`; `plugin.json` 2.18.0; `CHANGELOG.md`
+
+**Next session should:**
+- Run `/bx:save --full` on horowell with 2.18.0 and fix what the first real over-budget run finds
+- Then the `/bx:seo` end-to-end run on burakarik.com (still owed from S69)

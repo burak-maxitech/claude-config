@@ -292,3 +292,6 @@
 - [x] /bx:seo 2.15.3 — snapshot retention after write, auth cause classification, run-scoped snapshots, indexed-caveat diff fix (S68) - bx/skills/seo/references/gsc-parse-helper.py, bx/skills/seo/SKILL.md, bx/skills/seo/tests/test_auth_and_snapshots.py
 - [x] `/bx:seo` 2.16.0 — site-profile intake, CrUX field CWV, GEO rescoring - bx/skills/seo/**, bx/agents/seo-*.md
 - [x] `/bx:seo` 2.17.0 — page-audit, rendering, 2 MB limit, back-button hijacking, cannibalization + decay - bx/skills/seo/**, bx/agents/seo-*.md
+- [x] `/bx:save` size budget (bx 2.18.0, S70): Part 7 file-level budget, content-triggered shrinkers for every required section, one consent, skip counter, backlog rotation - `bx/skills/save/references/mode-update-full.md`, `bx/skills/save/scripts/`, `bx/agents/save-writer.md`
+- [x] `/bx:resume` reads docs/STATUS.md by section and prints one size-budget line (S70) - `bx/skills/resume/SKILL.md`
+- [x] Size-budget fixture, assertion scripts and blind rehearsals (S70) - `bx/skills/save/tests/`

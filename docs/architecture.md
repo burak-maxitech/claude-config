@@ -16,7 +16,7 @@ claude-config/                         # marketplace repo
 │   └── skills/                        # 11 skills (SKILL.md + references/) → /bx:<name>
 │       ├── arch/    clean/   evolve/  health/   # evolve also: capabilities.json (pinned inventory), scripts/, tests/ (2.12.0); clean also: evals/ (3 evals, planted fixtures, 60 assertions since 2.13.0)
 │       ├── plan/    resume/  review/
-│       ├── save/    seo/     tests/   # save = /bx:save; save/tests/ holds the doc-schema suite
+│       ├── save/    seo/     tests/   # save = /bx:save; save/tests/ holds the doc-schema suite, save/scripts/ the size-budget and archive-lines helpers
 │       └── webdesign/                  # /bx:webdesign — visual re-skin via Stitch MCP
 ├── .claude/
 │   ├── scripts/             # start-claude.{sh,ps1} launchers (not plugin components)
