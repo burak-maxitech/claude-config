@@ -25,6 +25,7 @@ make_repo() {
     git -C "$dir" init -q -b main
     git -C "$dir" config user.email t@example.com
     git -C "$dir" config user.name tester
+    git -C "$dir" config core.autocrlf false
     echo hi > "$dir/README.md"
     git -C "$dir" add README.md
     git -C "$dir" commit -q -m init
@@ -510,8 +511,105 @@ test_two_branches_land_in_turn() {
     expect_eq "main has B" "$(git -C "$r" show main:b.txt)" b
 }
 
+# --- Task 4: save helpers ---
+# put_main <repo> <path> <content> <msg>: commit a file on the current branch (LF, no CRLF noise).
+put_main() {
+    git -C "$1" config core.autocrlf false
+    mkdir -p "$(dirname "$1/$2")"
+    printf '%s
+' "$3" > "$1/$2"
+    git -C "$1" add "$2"
+    git -C "$1" commit -q -m "$4"
+}
+
+test_next_session_forms() {
+    echo "test_next_session_forms"
+    local r; r="$(make_repo ns1)"
+    put_main "$r" docs/STATUS.md "Last Updated: 2026-11-20 (Session 70)" status
+    px "$r" next-session
+    expect_eq "plain Session 70" "$OUT" "current=70 next=71 source=docs/STATUS.md"
+    r="$(make_repo ns2)"
+    put_main "$r" docs/STATUS.md "**Last Updated:** 2026-11-20 (Session 70 (cont.))" status
+    px "$r" next-session
+    expect_has "cont. form" "$OUT" "current=70 next=71"
+    r="$(make_repo ns3)"
+    put_main "$r" docs/STATUS.md "Last Updated: 2026-11-20" status
+    px "$r" next-session
+    expect_eq "no number" "$OUT" "next=unknown"
+    expect_eq "no number exits 0" "$RC" 0
+    r="$(make_repo ns4)"
+    put_main "$r" CLAUDE.md "Last Updated: 2026-11-20 (Session 12)" claude
+    px "$r" next-session
+    expect_eq "STATUS.md absent reads CLAUDE.md" "$OUT" "current=12 next=13 source=CLAUDE.md"
+    r="$(make_repo ns5)"
+    px "$r" next-session
+    expect_eq "neither file" "$OUT" "next=unknown"
+    # reads committed main, not the working tree
+    r="$(make_repo ns6)"
+    put_main "$r" docs/STATUS.md "Last Updated: 2026-11-20 (Session 70)" status
+    git -C "$r" checkout -q -b feat
+    put_main "$r" docs/STATUS.md "Last Updated: 2026-11-21 (Session 99)" branch
+    px "$r" next-session
+    expect_has "reads main, not branch" "$OUT" "current=70 next=71"
+}
+
+# plugin_json <version>
+plugin_json() { printf '{
+  "name": "bx",
+  "version": "%s",
+  "x": 1
+}' "$1"; }
+PJ="bx/.claude-plugin/plugin.json"
+
+test_version_check() {
+    echo "test_version_check"
+    local r; r="$(make_repo vc1)"
+    px "$r" version-check
+    expect_eq "no plugin.json" "$OUT" "version=n/a"
+    expect_eq "n/a exits 0" "$RC" 0
+    # branch ahead of main
+    put_main "$r" "$PJ" "$(plugin_json 2.20.0)" base
+    git -C "$r" checkout -q -b feat
+    put_main "$r" "$PJ" "$(plugin_json 2.21.0)" minor
+    px "$r" version-check
+    expect_eq "branch ahead" "$OUT" "main=2.20.0 branch=2.21.0 ok=yes suggest=2.21.0"
+    # another session landed 2.21.0 on main
+    git -C "$r" checkout -q main
+    put_main "$r" "$PJ" "$(plugin_json 2.21.0)" "other session"
+    git -C "$r" checkout -q feat
+    px "$r" version-check
+    expect_eq "same version, minor bump" "$OUT" "main=2.21.0 branch=2.21.0 ok=no suggest=2.22.0"
+    # patch-level base bump
+    r="$(make_repo vc2)"
+    put_main "$r" "$PJ" "$(plugin_json 2.20.0)" base
+    git -C "$r" checkout -q -b feat
+    put_main "$r" "$PJ" "$(plugin_json 2.20.1)" patch
+    git -C "$r" checkout -q main
+    put_main "$r" "$PJ" "$(plugin_json 2.21.0)" "other session"
+    git -C "$r" checkout -q feat
+    px "$r" version-check
+    expect_eq "patch bump" "$OUT" "main=2.21.0 branch=2.20.1 ok=no suggest=2.21.1"
+    # major bump, and numeric (not string) comparison
+    r="$(make_repo vc3)"
+    put_main "$r" "$PJ" "$(plugin_json 2.9.0)" base
+    git -C "$r" checkout -q -b feat
+    put_main "$r" "$PJ" "$(plugin_json 3.0.0)" major
+    git -C "$r" checkout -q main
+    put_main "$r" "$PJ" "$(plugin_json 2.10.0)" "other session"
+    git -C "$r" checkout -q feat
+    px "$r" version-check
+    expect_eq "major, 3.0.0 > 2.10.0" "$OUT" "main=2.10.0 branch=3.0.0 ok=yes suggest=3.0.0"
+    # branch made no bump: suggest patch
+    r="$(make_repo vc4)"
+    put_main "$r" "$PJ" "$(plugin_json 2.20.0)" base
+    git -C "$r" checkout -q -b feat
+    commit_file "$r" f.txt f work
+    px "$r" version-check
+    expect_eq "no bump equal to main" "$OUT" "main=2.20.0 branch=2.20.0 ok=no suggest=2.20.1"
+}
+
 # --- Task 1 + 2 tests (later tasks append their tests above the runner) ---
-TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race test_lock_break_race test_lock_ownerless_held test_live_refs_empty_rejected test_members_lock_stale_takeover test_ensure_ignore_idempotent test_worktree_requires_ignore test_worktree_based_on_local_main test_catch_up_dirty test_catch_up_conflict_aborts test_catch_up_interrupted test_catch_up_nonconflict_failure test_catch_up_success test_ff_main_refuses_checked_out test_ff_main_success test_ff_main_not_ff test_two_branches_land_in_turn"
+TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race test_lock_break_race test_lock_ownerless_held test_live_refs_empty_rejected test_members_lock_stale_takeover test_ensure_ignore_idempotent test_worktree_requires_ignore test_worktree_based_on_local_main test_catch_up_dirty test_catch_up_conflict_aborts test_catch_up_interrupted test_catch_up_nonconflict_failure test_catch_up_success test_ff_main_refuses_checked_out test_ff_main_success test_ff_main_not_ff test_two_branches_land_in_turn test_next_session_forms test_version_check"
 [ $# -gt 0 ] && TESTS="$*"
 
 for t in $TESTS; do "$t"; done

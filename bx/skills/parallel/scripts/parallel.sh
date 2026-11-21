@@ -15,6 +15,8 @@
 #   worktree <ref>                create .claude/worktrees/<ref> on s/<ref> from local main
 #   catch-up                      rebase current branch onto main (exit 5/6/7)
 #   ff-main                       fast-forward main to current branch (exit 7/8)
+#   next-session                  current/next session number from main's STATUS.md or CLAUDE.md
+#   version-check                 plugin.json version on main vs this branch (ok=yes|no suggest=<v>)
 #
 # State lives under $(git rev-parse --git-common-dir)/bx-parallel/ so every worktree
 # sees the same files. Output is key=value lines. BXP_NOW overrides epoch "now" (tests).
@@ -324,6 +326,67 @@ cmd_ff_main() {
     echo "landed=$(git rev-parse --short main)"
 }
 
+# Session number from the committed main: first "Last Updated" line of STATUS.md, else CLAUDE.md.
+cmd_next_session() {
+    local f line n
+    for f in docs/STATUS.md CLAUDE.md; do
+        line="$(git show "main:$f" 2>/dev/null | grep -m 1 'Last Updated')" || line=""
+        [ -n "$line" ] || continue
+        n="$(printf '%s\n' "$line" | sed -n 's/.*Session[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n 1)"
+        if [ -n "$n" ]; then
+            echo "current=$n next=$((n + 1)) source=$f"
+        else
+            echo "next=unknown"
+        fi
+        return 0
+    done
+    echo "next=unknown"
+}
+
+# Numeric field N (1-3) of a x.y.z version; non-digits after the number are dropped.
+ver_field() { # <version> <n>
+    local v; v="$(printf '%s' "$1" | cut -d. -f"$2")"
+    v="${v%%[!0-9]*}"
+    echo "${v:-0}"
+}
+
+# "version" value from plugin.json text on stdin.
+json_version() { sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1; }
+
+cmd_version_check() {
+    local top; top="$(git rev-parse --show-toplevel)"
+    local rel="bx/.claude-plugin/plugin.json"
+    if [ ! -f "$top/$rel" ]; then echo "version=n/a"; return 0; fi
+    local branch main base basesha
+    branch="$(json_version < "$top/$rel")"
+    basesha="$(git merge-base main HEAD 2>/dev/null)" || basesha=""
+    base=""
+    [ -n "$basesha" ] && base="$(git show "$basesha:$rel" 2>/dev/null | json_version)"
+    main="$(git show "main:$rel" 2>/dev/null | json_version)"
+    [ -n "$main" ] || main="${base:-0.0.0}"
+    [ -n "$base" ] || base="$main"
+    [ -n "$branch" ] || branch="0.0.0"
+    local i ok=no b m
+    for i in 1 2 3; do
+        b="$(ver_field "$branch" $i)"; m="$(ver_field "$main" $i)"
+        if [ "$b" -gt "$m" ]; then ok=yes; break; fi
+        [ "$b" -lt "$m" ] && break
+    done
+    local M1 M2 M3 level
+    M1="$(ver_field "$main" 1)"; M2="$(ver_field "$main" 2)"; M3="$(ver_field "$main" 3)"
+    if [ "$(ver_field "$branch" 1)" != "$(ver_field "$base" 1)" ]; then level=major
+    elif [ "$(ver_field "$branch" 2)" != "$(ver_field "$base" 2)" ]; then level=minor
+    else level=patch; fi
+    local suggest
+    case "$level" in
+        major) suggest="$((M1 + 1)).0.0" ;;
+        minor) suggest="$M1.$((M2 + 1)).0" ;;
+        *)     suggest="$M1.$M2.$((M3 + 1))" ;;
+    esac
+    [ "$ok" = yes ] && suggest="$branch"
+    echo "main=$main branch=$branch ok=$ok suggest=$suggest"
+}
+
 sub="${1:-}"
 [ $# -gt 0 ] && shift
 case "$sub" in
@@ -340,5 +403,7 @@ case "$sub" in
     worktree) cmd_worktree "$@" ;;
     catch-up) cmd_catch_up "$@" ;;
     ff-main) cmd_ff_main "$@" ;;
-    *) echo "usage: parallel.sh <on|join|leave|off|status|member|lock|touch-lock|unlock|ensure-ignore|worktree|catch-up|ff-main> [args]"; exit 2 ;;
+    next-session) cmd_next_session "$@" ;;
+    version-check) cmd_version_check "$@" ;;
+    *) echo "usage: parallel.sh <on|join|leave|off|status|member|lock|touch-lock|unlock|ensure-ignore|worktree|catch-up|ff-main|next-session|version-check> [args]"; exit 2 ;;
 esac
