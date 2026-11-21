@@ -347,13 +347,33 @@ commit_file() { # <repo> <file> <content> <msg>
 test_ensure_ignore_idempotent() {
     echo "test_ensure_ignore_idempotent"
     local r; r="$(make_repo ign)"
+    local ex="$r/.git/info/exclude"
+    rm -rf "$r/.git/info"
     px "$r" ensure-ignore
     expect_eq "first run exits 0" "$RC" 0
     expect_has "first run adds" "$OUT" "ignore=added"
     px "$r" ensure-ignore
     expect_has "second run present" "$OUT" "ignore=present"
-    expect_eq "entry written once" "$(grep -c '^\.claude/worktrees/$' "$r/.gitignore")" 1
+    expect_eq "exclude entry written once" "$(grep -c '^\.claude/worktrees/$' "$ex")" 1
+    [ ! -e "$r/.gitignore" ] && pass "no .gitignore written" || fail ".gitignore written"
     expect_eq "nothing committed" "$(git -C "$r" rev-list --count HEAD)" 1
+    expect_eq "tree stays clean" "$(git -C "$r" status --porcelain)" ""
+    # the shared exclude file covers a linked worktree's view too
+    git -C "$r" worktree add -q -b other "$TMP_ROOT/ign_other" main
+    px "$TMP_ROOT/ign_other" ensure-ignore
+    expect_has "present from a linked worktree" "$OUT" "ignore=present"
+}
+
+test_ensure_ignore_gitignore_counts() {
+    echo "test_ensure_ignore_gitignore_counts"
+    local r; r="$(make_repo ign_gi)"
+    echo ".claude/worktrees/" > "$r/.gitignore"
+    git -C "$r" add .gitignore; git -C "$r" commit -q -m ignore
+    local before; before="$(cat "$r/.git/info/exclude" 2>/dev/null)"
+    px "$r" ensure-ignore
+    expect_eq "exits 0" "$RC" 0
+    expect_has "existing .gitignore rule is present" "$OUT" "ignore=present"
+    expect_eq "exclude untouched" "$(cat "$r/.git/info/exclude" 2>/dev/null)" "$before"
 }
 
 test_worktree_requires_ignore() {
@@ -369,7 +389,7 @@ test_worktree_based_on_local_main() {
     echo "test_worktree_based_on_local_main"
     local r; r="$(make_repo wt_base)"
     px "$r" ensure-ignore
-    git -C "$r" add .gitignore; git -C "$r" commit -q -m ignore
+    echo two > "$r/two.txt"; git -C "$r" add two.txt; git -C "$r" commit -q -m two
     git -C "$r" update-ref refs/remotes/origin/main "$(git -C "$r" rev-parse HEAD~1)"
     px "$r" worktree s71
     expect_eq "exit 0" "$RC" 0
@@ -382,11 +402,10 @@ test_worktree_based_on_local_main() {
     expect_has "existing=yes" "$OUT" "existing=yes"
 }
 
-# branch_setup <name>: repo with ignore committed and a worktree on s/a; sets WT.
+# branch_setup <name>: repo with the exclude entry and a worktree on s/a; sets WT.
 # Call as: r="$(make_repo x)"; branch_setup "$r"
 branch_setup() {
     px "$1" ensure-ignore
-    git -C "$1" add .gitignore; git -C "$1" commit -q -m ignore
     px "$1" worktree a
     WT="$1/.claude/worktrees/a"
 }
@@ -659,7 +678,7 @@ test_help() {
 }
 
 # --- Task 1 + 2 tests (later tasks append their tests above the runner) ---
-TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race test_lock_break_race test_lock_ownerless_held test_live_refs_empty_rejected test_members_lock_stale_takeover test_ensure_ignore_idempotent test_worktree_requires_ignore test_worktree_based_on_local_main test_catch_up_dirty test_catch_up_conflict_aborts test_catch_up_interrupted test_catch_up_nonconflict_failure test_catch_up_success test_ff_main_refuses_checked_out test_ff_main_success test_ff_main_not_ff test_two_branches_land_in_turn test_next_session_forms test_version_check test_help"
+TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race test_lock_break_race test_lock_ownerless_held test_live_refs_empty_rejected test_members_lock_stale_takeover test_ensure_ignore_idempotent test_ensure_ignore_gitignore_counts test_worktree_requires_ignore test_worktree_based_on_local_main test_catch_up_dirty test_catch_up_conflict_aborts test_catch_up_interrupted test_catch_up_nonconflict_failure test_catch_up_success test_ff_main_refuses_checked_out test_ff_main_success test_ff_main_not_ff test_two_branches_land_in_turn test_next_session_forms test_version_check test_help"
 [ $# -gt 0 ] && TESTS="$*"
 
 for t in $TESTS; do "$t"; done

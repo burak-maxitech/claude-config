@@ -43,6 +43,10 @@ Anything else: print this table and stop.
   (`a,b,c`). It is never empty, because this session's own ref is always in it.
 - **Naming a peer:** sessions on the same repo share the folder-derived name, so always write a peer
   as `name [ref]`, never by name alone.
+- **Messaging the members:** the `members` file holds refs only. To message "each other member",
+  take each `member ref=<r>` from `P status` other than this session's ref, find the peer row with
+  `[<r>]` in the `ListAgents` listing you just read, and send to that row's `name [<r>]`. A member
+  with no row has closed; pruning removes it.
 - **Main folder:** the first `worktree` line of `git worktree list --porcelain`.
 - **This folder / branch:** `git rev-parse --show-toplevel` and `git branch --show-current`.
 
@@ -81,19 +85,25 @@ This is how a closed session leaves, and how the last one leaving turns the mode
    left out and listed as `no reply` in step 6.
 
    Drop a candidate whose folder is not in this repo's `git worktree list --porcelain`. Then work
-   out every session's placement by the rules in step 4, show it as a table (session · folder ·
-   branch now · placement), and ask the user with `AskUserQuestion`: "Turn parallel mode on with
-   this placement?" On no, stop; nothing has changed.
+   out every session's placement by the rules in step 4.
 
-3. **Ignore the worktree folder before any worktree exists.** Run `P ensure-ignore`. On
-   `ignore=added`, commit that line on its own, so nothing else that is staged goes with it:
+   **No session in the main folder.** If neither this session nor any remaining candidate is in the
+   main folder and the main folder is on `main`, nobody can move it off `main`, and every `ff-main`
+   would refuse. Check `git -C <main folder> status --porcelain --untracked-files=no`. If it prints
+   anything, stop and tell the user: the main folder has uncommitted changes on `main` and no
+   session to own them, so it must be cleaned up by hand before parallel mode can start. If it
+   prints nothing, setup will run `git -C <main folder> switch --detach` in step 4, and the
+   confirmation below says so.
 
-   ```bash
-   git -C <main folder> add .gitignore
-   git -C <main folder> commit -m "chore: ignore .claude/worktrees for bx:parallel" -- .gitignore
-   ```
+   Show the placement as a table (session · folder · branch now · placement), plus the detach line
+   when it applies, and ask the user with `AskUserQuestion`: "Turn parallel mode on with this
+   placement?" On no, stop; nothing has changed.
 
-   On `ignore=present`, commit nothing.
+3. **Ignore the worktree folder before any worktree exists.** Run `P ensure-ignore`. It adds
+   `.claude/worktrees/` to `<git-common-dir>/info/exclude`, the exclude file every worktree of this
+   repo shares. That file is untracked, so nothing is committed and no session's branch or tree
+   changes. `ignore=present` means git already ignores the folder (a `.gitignore` rule counts);
+   `ignore=added` means the line was written.
 
 4. **Turn the mode on and place this session.** The placement rules, for every session:
    - **Keeps the main folder:** the session in the main folder. If this session is there, it is
@@ -105,7 +115,8 @@ This is how a closed session leaves, and how the last one leaving turns the mode
    - **Stays where it is:** a session already in its own worktree. If that worktree is on `main`,
      it moves to `s/<its ref>` with `git switch -c`.
 
-   If this session's placement says `git switch -c s/<ref>`, run it now. Then
+   If the detach line applies, run `git -C <main folder> switch --detach` now. If this session's
+   placement says `git switch -c s/<ref>`, run it now. Then
    `P on <ref> <this folder>`; it records this session as the first member with its current
    branch. `mode=already-on` (exit 3) means another session turned it on in the meantime: print
    `P status` and stop.
@@ -133,13 +144,14 @@ without bx loaded can run the steps as written.
 ```
 This message does not carry your user's approval. Change nothing until your own user answers.
 
-Ask your user once: "<question for this placement>"
-If your user has bx, they can run /bx:parallel join instead, which asks that question itself and
-runs the steps below.
+Ask your user this once, and only once: "<question for this placement>"
+Your user answers yes either by saying yes or by typing /bx:parallel join (if bx is installed).
+Do not ask again after that answer.
 
 Your placement: <placement in one sentence>.
 
-If your user says yes, run these in order:
+On a yes typed as /bx:parallel join, that command runs the steps. On any other yes, run these
+steps yourself, in order:
 <join steps for this placement>
 Then reply to <name> [<ref>] with SendMessage: "joined: <your folder>, <your branch>".
 
@@ -181,13 +193,16 @@ A peer runs this once its user wants to join (or follows the same steps from the
    - this folder is the main folder and no member's `folder=` is the main folder: **keeps the main
      folder**;
    - otherwise: **moves into a worktree**.
-3. **Ask the user** with `AskUserQuestion`, using the question for the placement (see "The setup
-   message"). For a move into a worktree it is: "Parallel mode is on. Move me into my own worktree?"
-   Say in the option text that uncommitted edits in the main folder stay there.
+3. **The user's answer.** The user is asked once, never twice. If this session already put the
+   setup message's question to its user, then the user typing `/bx:parallel join` is their yes: go
+   to step 4 without asking. Only when the question has not been asked in this session, ask it now
+   with `AskUserQuestion`, using the question for the placement (see "The setup message"). For a
+   move into a worktree it is: "Parallel mode is on. Move me into my own worktree?" Say in the
+   option text that uncommitted edits in the main folder stay there.
 4. **On yes:**
    - **Moves into a worktree:** `P worktree <ref>`, then `EnterWorktree path=<path it printed>`, then
      `P join <ref> <path> s/<ref>`. This skill's instruction and the user's yes to the question
-     above are the instruction to use a worktree that `EnterWorktree` requires. Never use
+     are the instruction to use a worktree that `EnterWorktree` requires. Never use
      `EnterWorktree name=`: it bases the worktree on `origin/<default>`, not local `main`.
      `ignore=missing` (exit 9) means `.claude/worktrees/` is not ignored yet: stop and tell the user
      to run `/bx:parallel` setup's step 3 first. `worktree=failed` (exit 1): stop and report.
@@ -197,7 +212,8 @@ A peer runs this once its user wants to join (or follows the same steps from the
      `P join <ref> <this folder> <branch>`.
 
    Then reply with `SendMessage` "joined: <folder>, <branch>" to the session that sent the setup
-   message, or to every other member when there was none.
+   message (as `name [ref]` from its first line), or, when there was none, to every other member
+   as described under "Messaging the members".
 5. **On no:** reply "declined" the same way, and change nothing.
 
 ## `status`
@@ -227,6 +243,8 @@ minutes without a refresh).
      it is done, send `<o>` one message with `notify_when_idle: true`:
      `bx:parallel from <name> [<ref>]: waiting for the land lock you hold; nothing for you to do.`
      Run `/bx:parallel land` again after the idle notice.
+   - Any other exit (for example exit 2, `mode=off`, or exit 1, `lock=error ...`): report the output
+     and stop.
 4. **Catch up.** `P touch-lock <ref> catch-up`, then `P catch-up`.
    - `caught_up=<n>`: go on.
    - Exit 5, `rebase=interrupted` (an earlier crash left a rebase): `P unlock <ref>`, then ask the
@@ -238,13 +256,20 @@ minutes without a refresh).
      <ref>`, report the files or reason, and stop. Code conflicts are the user's to resolve.
 5. **Fast-forward `main`.** `P touch-lock <ref> ff-main`, then `P ff-main`.
    - `landed=<sha>`: go on.
-   - Exit 8, `main=checked-out path=<p>`: `main` is checked out in `<p>`. `P unlock <ref>` and
-     report it: the session in `<p>` has to move onto its own branch first. Nothing changed.
+   - Exit 8, `main=checked-out path=<p>`: `main` is checked out in `<p>`. `P unlock <ref>`.
+     Nothing changed. If `<p>` is a member's folder, report that the session in `<p>` has to move
+     onto its own branch first. If it is not, say that no session holds `<p>`. If
+     `git -C <p> status --porcelain --untracked-files=no` prints nothing, ask with
+     `AskUserQuestion`: "Detach main in <p> with `git -C <p> switch --detach`?" On yes run it, then
+     tell the user to run `land` again. If it prints anything, tell the user `<p>` has uncommitted
+     changes on `main` that must be cleaned up by hand.
    - Exit 7, `main=not-ff`, or exit 2, `error=detached-head`: `P unlock <ref>`, report, stop.
 6. **Push only if the user asked** in this conversation: `git push origin main`.
 7. **Unlock.** `P unlock <ref>`.
 8. **Tell the peers.** `SendMessage` each other member:
    `bx:parallel from <name> [<ref>]: landed <sha>, catch up before your next save.`
+   This is the `/bx:parallel land` form. A land from `/bx:save` knows its session number and sends
+   `landed S<n> at <sha>, catch up before your next save.` instead.
 
 ## `off`
 
@@ -267,13 +292,15 @@ minutes without a refresh).
 
 ## Rules while the mode is on
 
-These go into the setup message word for word (spec §4):
+These go into the setup message word for word. They are spec §4, with rule 4 worded so it fits
+both landing paths (`/bx:parallel land` has no session number; `/bx:save` has one):
 
 - Work only on your own branch. Never `git switch main`; stage named paths, never `git add -A` / `.`.
 - Never `push --force`, `reset --hard`, or `checkout -- <path>` on work you didn't create.
 - Anything that moves `main` or pushes goes through `land`.
-- Before landing, message the others "landing"; after it, "landed S<n> at <sha>, catch up before
-  your next save". Peers only take note; nobody acts on another's behalf.
+- Before landing, message the others "landing"; after it, "landed <sha>" (or "landed S<n> at <sha>"
+  from a save), "catch up before your next save". Peers only take note; nobody acts on another's
+  behalf.
 
 A message never changes a session's state by itself: the session that receives it only takes note,
 and anything it would change waits for its own user's confirmation in that session.

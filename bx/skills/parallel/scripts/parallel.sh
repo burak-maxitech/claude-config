@@ -11,7 +11,7 @@
 #   lock <ref> <step> [--live-refs a,b,c]   take the land lock (exit 4 if held)
 #   touch-lock <ref> <step>       refresh the lock heartbeat (exit 4 if not owner)
 #   unlock <ref> [--force]        release the lock (exit 4 if not owner)
-#   ensure-ignore                 add .claude/worktrees/ to .gitignore (never commits)
+#   ensure-ignore                 add .claude/worktrees/ to the shared info/exclude (no commit)
 #   worktree <ref>                create .claude/worktrees/<ref> on s/<ref> from local main
 #   catch-up                      rebase current branch onto main (exit 5/6/7)
 #   ff-main                       fast-forward main to current branch (exit 7/8)
@@ -273,15 +273,19 @@ cmd_unlock() {
 # First entry of `git worktree list --porcelain` is the main worktree.
 main_root() { git worktree list --porcelain | sed -n '1s/^worktree //p'; }
 
+# Ignore .claude/worktrees/ through the shared, untracked info/exclude file: every worktree
+# reads it, it needs no commit, and it touches no session's branch or tree.
 cmd_ensure_ignore() {
     local root; root="$(main_root)"
-    local gi="$root/.gitignore"
-    if [ -f "$gi" ] && grep -qxE '/?\.claude/worktrees/?' "$gi"; then
+    # Present = git already ignores it from the main root, by any rule (.gitignore or exclude).
+    if git -C "$root" check-ignore -q .claude/worktrees/x 2>/dev/null; then
         echo "ignore=present"; return 0
     fi
+    local ex="$common_dir/info/exclude"
+    mkdir -p "$common_dir/info"
     # keep the file's last line intact if it lacks a trailing newline
-    [ -s "$gi" ] && [ -n "$(tail -c 1 "$gi")" ] && echo >> "$gi"
-    echo ".claude/worktrees/" >> "$gi"
+    [ -s "$ex" ] && [ -n "$(tail -c 1 "$ex")" ] && echo >> "$ex"
+    echo ".claude/worktrees/" >> "$ex"
     echo "ignore=added"
 }
 
