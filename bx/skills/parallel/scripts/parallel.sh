@@ -11,6 +11,10 @@
 #   lock <ref> <step> [--live-refs a,b,c]   take the land lock (exit 4 if held)
 #   touch-lock <ref> <step>       refresh the lock heartbeat (exit 4 if not owner)
 #   unlock <ref> [--force]        release the lock (exit 4 if not owner)
+#   ensure-ignore                 add .claude/worktrees/ to .gitignore (never commits)
+#   worktree <ref>                create .claude/worktrees/<ref> on s/<ref> from local main
+#   catch-up                      rebase current branch onto main (exit 5/6/7)
+#   ff-main                       fast-forward main to current branch (exit 7/8)
 #
 # State lives under $(git rev-parse --git-common-dir)/bx-parallel/ so every worktree
 # sees the same files. Output is key=value lines. BXP_NOW overrides epoch "now" (tests).
@@ -255,6 +259,65 @@ cmd_unlock() {
     echo "lock=not-owner owner=$owner"; exit 4
 }
 
+# First entry of `git worktree list --porcelain` is the main worktree.
+main_root() { git worktree list --porcelain | sed -n '1s/^worktree //p'; }
+
+cmd_ensure_ignore() {
+    local root; root="$(main_root)"
+    local gi="$root/.gitignore"
+    if [ -f "$gi" ] && grep -qxE '/?\.claude/worktrees/?' "$gi"; then
+        echo "ignore=present"; return 0
+    fi
+    # keep the file's last line intact if it lacks a trailing newline
+    [ -s "$gi" ] && [ -n "$(tail -c 1 "$gi")" ] && echo >> "$gi"
+    echo ".claude/worktrees/" >> "$gi"
+    echo "ignore=added"
+}
+
+cmd_worktree() {
+    [ $# -eq 1 ] || { echo "usage: parallel.sh worktree <ref>"; exit 2; }
+    local ref="$1" root path
+    root="$(main_root)"
+    path="$root/.claude/worktrees/$ref"
+    if [ -d "$path" ]; then
+        echo "path=$path"; echo "branch=s/$ref"; echo "existing=yes"; return 0
+    fi
+    if ! git -C "$root" check-ignore -q ".claude/worktrees/$ref" 2>/dev/null; then
+        echo "ignore=missing"; exit 9
+    fi
+    if ! git -C "$root" worktree add -q -b "s/$ref" "$path" main >/dev/null 2>&1; then
+        echo "worktree=failed"; exit 1
+    fi
+    echo "path=$path"; echo "branch=s/$ref"
+}
+
+# Rebase the current branch onto local main. Caller holds the land lock.
+cmd_catch_up() {
+    local d
+    for d in rebase-merge rebase-apply; do
+        if [ -e "$(git rev-parse --git-path $d)" ]; then echo "rebase=interrupted"; exit 5; fi
+    done
+    if [ -n "$(git status --porcelain --untracked-files=no)" ]; then echo "tree=dirty"; exit 6; fi
+    local n; n="$(git rev-list --count HEAD..main 2>/dev/null || echo 0)"
+    if ! git rebase main >/dev/null 2>&1; then
+        local files; files="$(git diff --name-only --diff-filter=U | paste -sd, -)"
+        git rebase --abort >/dev/null 2>&1
+        echo "conflict files=$files"; exit 7
+    fi
+    echo "caught_up=$n"
+}
+
+# Fast-forward local main to the current branch. Caller holds the land lock.
+cmd_ff_main() {
+    local br; br="$(git symbolic-ref --short -q HEAD)" || { echo "error=detached-head"; exit 2; }
+    local co
+    co="$(git worktree list --porcelain | awk '/^worktree /{p=substr($0,10)} /^branch refs\/heads\/main$/{print p; exit}')"
+    if [ -n "$co" ]; then echo "main=checked-out path=$co"; exit 8; fi
+    if ! git merge-base --is-ancestor main "$br" 2>/dev/null; then echo "main=not-ff"; exit 7; fi
+    if ! git fetch -q . "$br:main" >/dev/null 2>&1; then echo "main=not-ff"; exit 7; fi
+    echo "landed=$(git rev-parse --short main)"
+}
+
 sub="${1:-}"
 [ $# -gt 0 ] && shift
 case "$sub" in
@@ -267,5 +330,9 @@ case "$sub" in
     lock)   cmd_lock "$@" ;;
     touch-lock) cmd_touch_lock "$@" ;;
     unlock) cmd_unlock "$@" ;;
-    *) echo "usage: parallel.sh <on|join|leave|off|status|member|lock|touch-lock|unlock> [args]"; exit 2 ;;
+    ensure-ignore) cmd_ensure_ignore "$@" ;;
+    worktree) cmd_worktree "$@" ;;
+    catch-up) cmd_catch_up "$@" ;;
+    ff-main) cmd_ff_main "$@" ;;
+    *) echo "usage: parallel.sh <on|join|leave|off|status|member|lock|touch-lock|unlock|ensure-ignore|worktree|catch-up|ff-main> [args]"; exit 2 ;;
 esac

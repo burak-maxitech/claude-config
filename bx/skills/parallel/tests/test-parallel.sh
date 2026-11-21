@@ -326,7 +326,8 @@ test_live_refs_empty_rejected() {
 }
 
 test_members_lock_stale_takeover() {
-    echo "test_members_lock_stale_takeover"
+    echo "test_members_lock_stale_takeover test_ensure_ignore_idempotent test_worktree_requires_ignore test_worktree_based_on_local_main test_catch_up_dirty test_catch_up_conflict_aborts test_catch_up_interrupted test_catch_up_success test_ff_main_refuses_checked_out test_ff_main_success test_ff_main_not_ff test_two_branches_land_in_turn"
+[ $# -gt 0 ] && TESTS="$*"
     local r; r="$(lock_setup members_stale)"
     mkdir "$r/.git/bx-parallel/members.lock"
     touch -d '1 minute ago' "$r/.git/bx-parallel/members.lock"
@@ -336,8 +337,168 @@ test_members_lock_stale_takeover() {
     expect_has "row written" "$OUT" "member ref=s71 "
 }
 
+# --- Task 3: git steps ---
+commit_file() { # <repo> <file> <content> <msg>
+    echo "$3" > "$1/$2"
+    git -C "$1" add "$2"
+    git -C "$1" commit -q -m "$4"
+}
+
+test_ensure_ignore_idempotent() {
+    echo "test_ensure_ignore_idempotent"
+    local r; r="$(make_repo ign)"
+    px "$r" ensure-ignore
+    expect_eq "first run exits 0" "$RC" 0
+    expect_has "first run adds" "$OUT" "ignore=added"
+    px "$r" ensure-ignore
+    expect_has "second run present" "$OUT" "ignore=present"
+    expect_eq "entry written once" "$(grep -c '^\.claude/worktrees/$' "$r/.gitignore")" 1
+    expect_eq "nothing committed" "$(git -C "$r" rev-list --count HEAD)" 1
+}
+
+test_worktree_requires_ignore() {
+    echo "test_worktree_requires_ignore"
+    local r; r="$(make_repo wt_noignore)"
+    px "$r" worktree s71
+    expect_eq "exit 9" "$RC" 9
+    expect_has "ignore=missing" "$OUT" "ignore=missing"
+    [ ! -d "$r/.claude/worktrees/s71" ] && pass "no worktree created" || fail "worktree created"
+}
+
+test_worktree_based_on_local_main() {
+    echo "test_worktree_based_on_local_main"
+    local r; r="$(make_repo wt_base)"
+    px "$r" ensure-ignore
+    git -C "$r" add .gitignore; git -C "$r" commit -q -m ignore
+    git -C "$r" update-ref refs/remotes/origin/main "$(git -C "$r" rev-parse HEAD~1)"
+    px "$r" worktree s71
+    expect_eq "exit 0" "$RC" 0
+    expect_has "branch printed" "$OUT" "branch=s/s71"
+    expect_has "path printed" "$OUT" "path="
+    expect_eq "branch base is local main" "$(git -C "$r" rev-parse s/s71)" "$(git -C "$r" rev-parse main)"
+    [ -d "$r/.claude/worktrees/s71" ] && pass "folder exists" || fail "folder missing"
+    px "$r" worktree s71
+    expect_eq "existing exits 0" "$RC" 0
+    expect_has "existing=yes" "$OUT" "existing=yes"
+}
+
+# branch_setup <name>: repo with ignore committed and a worktree on s/a; sets WT.
+# Call as: r="$(make_repo x)"; branch_setup "$r"
+branch_setup() {
+    px "$1" ensure-ignore
+    git -C "$1" add .gitignore; git -C "$1" commit -q -m ignore
+    px "$1" worktree a
+    WT="$1/.claude/worktrees/a"
+}
+
+test_catch_up_dirty() {
+    echo "test_catch_up_dirty"
+    local r; r="$(make_repo cu_dirty)"; branch_setup "$r"
+    commit_file "$WT" a.txt a "a work"
+    echo changed >> "$WT/a.txt"
+    local before; before="$(git -C "$WT" rev-parse HEAD)"
+    px "$WT" catch-up
+    expect_eq "exit 6" "$RC" 6
+    expect_has "tree=dirty" "$OUT" "tree=dirty"
+    expect_eq "branch unchanged" "$(git -C "$WT" rev-parse HEAD)" "$before"
+    expect_eq "no auto-stash" "$(git -C "$WT" stash list | wc -l | tr -d ' ')" 0
+    expect_has "edit kept" "$(cat "$WT/a.txt")" "changed"
+}
+
+test_catch_up_conflict_aborts() {
+    echo "test_catch_up_conflict_aborts"
+    local r; r="$(make_repo cu_conf)"; branch_setup "$r"
+    commit_file "$WT" README.md "branch side" "branch edit"
+    commit_file "$r" README.md "main side" "main edit"
+    local before; before="$(git -C "$WT" rev-parse HEAD)"
+    px "$WT" catch-up
+    expect_eq "exit 7" "$RC" 7
+    expect_has "conflict files" "$OUT" "conflict files=README.md"
+    expect_eq "branch unchanged" "$(git -C "$WT" rev-parse HEAD)" "$before"
+    [ ! -d "$(cd "$WT" && git rev-parse --git-path rebase-merge)" ] && pass "no rebase-merge dir" || fail "rebase-merge left behind"
+}
+
+test_catch_up_interrupted() {
+    echo "test_catch_up_interrupted"
+    local r; r="$(make_repo cu_int)"; branch_setup "$r"
+    commit_file "$WT" README.md "branch side" "branch edit"
+    commit_file "$r" README.md "main side" "main edit"
+    git -C "$WT" rebase main >/dev/null 2>&1
+    px "$WT" catch-up
+    expect_eq "exit 5" "$RC" 5
+    expect_has "rebase=interrupted" "$OUT" "rebase=interrupted"
+    git -C "$WT" rebase --abort >/dev/null 2>&1
+}
+
+test_catch_up_success() {
+    echo "test_catch_up_success"
+    local r; r="$(make_repo cu_ok)"; branch_setup "$r"
+    commit_file "$WT" a.txt a "a work"
+    commit_file "$r" m1.txt 1 m1
+    commit_file "$r" m2.txt 2 m2
+    px "$WT" catch-up
+    expect_eq "exit 0" "$RC" 0
+    expect_has "two commits from main" "$OUT" "caught_up=2"
+    expect_eq "main is ancestor" "$(git -C "$WT" merge-base --is-ancestor main HEAD && echo y)" y
+}
+
+test_ff_main_refuses_checked_out() {
+    echo "test_ff_main_refuses_checked_out"
+    local r; r="$(make_repo ff_co)"; branch_setup "$r"
+    commit_file "$WT" a.txt a "a work"
+    local before; before="$(git -C "$r" rev-parse main)"
+    px "$WT" ff-main
+    expect_eq "exit 8" "$RC" 8
+    expect_has "names checked-out" "$OUT" "main=checked-out path="
+    expect_has "names the main folder" "$OUT" "ff_co"
+    expect_eq "main unchanged" "$(git -C "$r" rev-parse main)" "$before"
+}
+
+test_ff_main_success() {
+    echo "test_ff_main_success"
+    local r; r="$(make_repo ff_ok)"; branch_setup "$r"
+    commit_file "$WT" a.txt a "a work"
+    git -C "$r" checkout -q -b parked
+    px "$WT" ff-main
+    expect_eq "exit 0" "$RC" 0
+    expect_has "landed sha" "$OUT" "landed=$(git -C "$WT" rev-parse --short HEAD)"
+    expect_eq "main == branch head" "$(git -C "$r" rev-parse main)" "$(git -C "$WT" rev-parse HEAD)"
+}
+
+test_ff_main_not_ff() {
+    echo "test_ff_main_not_ff"
+    local r; r="$(make_repo ff_nff)"; branch_setup "$r"
+    commit_file "$WT" a.txt a "a work"
+    commit_file "$r" m.txt m "main moves"
+    git -C "$r" checkout -q -b parked
+    local before; before="$(git -C "$r" rev-parse main)"
+    px "$WT" ff-main
+    expect_eq "exit 7" "$RC" 7
+    expect_has "main=not-ff" "$OUT" "main=not-ff"
+    expect_eq "main unchanged" "$(git -C "$r" rev-parse main)" "$before"
+}
+
+test_two_branches_land_in_turn() {
+    echo "test_two_branches_land_in_turn"
+    local r; r="$(make_repo two)"; branch_setup "$r"
+    local wa="$WT"
+    px "$r" worktree b
+    local wb="$r/.claude/worktrees/b"
+    commit_file "$wa" a.txt a "A"
+    commit_file "$wb" b.txt b "B"
+    git -C "$r" checkout -q -b parked
+    px "$wa" catch-up; expect_eq "A catch-up" "$RC" 0
+    px "$wa" ff-main;  expect_eq "A lands" "$RC" 0
+    px "$wb" catch-up; expect_eq "B catch-up" "$RC" 0
+    expect_has "B caught up 1" "$OUT" "caught_up=1"
+    px "$wb" ff-main;  expect_eq "B lands" "$RC" 0
+    expect_eq "main has A" "$(git -C "$r" show main:a.txt)" a
+    expect_eq "main has B" "$(git -C "$r" show main:b.txt)" b
+}
+
 # --- Task 1 + 2 tests (later tasks append their tests above the runner) ---
-TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race test_lock_break_race test_lock_ownerless_held test_live_refs_empty_rejected test_members_lock_stale_takeover"
+TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race test_lock_break_race test_lock_ownerless_held test_live_refs_empty_rejected test_members_lock_stale_takeover test_ensure_ignore_idempotent test_worktree_requires_ignore test_worktree_based_on_local_main test_catch_up_dirty test_catch_up_conflict_aborts test_catch_up_interrupted test_catch_up_success test_ff_main_refuses_checked_out test_ff_main_success test_ff_main_not_ff test_two_branches_land_in_turn"
+[ $# -gt 0 ] && TESTS="$*"
 
 for t in $TESTS; do "$t"; done
 
