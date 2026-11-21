@@ -728,8 +728,6 @@ If a save stops with "saved on branch, not landed", the lock was lost (its owner
 
 ---
 
----
-
 ## Documentation Structure
 
 Every project should have:

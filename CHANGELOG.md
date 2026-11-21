@@ -13,7 +13,7 @@ Sessions sharing one folder commit each other's half-done edits, switch branch u
 - `EnterWorktree` creates `.claude/worktrees/<name>` on `worktree-<name>`, and that folder is not git-ignored: `git add -A` in the main folder would stage a peer's worktree.
 
 ### Added
-- **`/bx:parallel`** (setup, `join`, `status`, `land`, `off`, `unlock --force`) with `scripts/parallel.sh`, `tests/test-parallel.sh` and `check-skill-commands.sh`. Shared state (`mode.json`, `land.lock/`) lives under `<git-common-dir>/bx-parallel/`, so nothing is tracked.
+- **`/bx:parallel`** (setup, `join`, `status`, `land`, `off`, `unlock --force`) with `scripts/parallel.sh`, `tests/test-parallel.sh` and `check-skill-commands.sh`. Shared state (`mode`, `members`, `land.lock/`) lives under `<git-common-dir>/bx-parallel/`, so nothing is tracked.
 - `/bx:save --no-land` and the `## Parallel Path` in `mode-update.md`.
 
 ### Changed
