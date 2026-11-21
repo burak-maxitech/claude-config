@@ -1,6 +1,6 @@
 # Claude Config
 
-**Burak's personal Claude Code toolkit**, packaged as the **`bx` plugin** — 11 custom skills, 20 subagents, cross-platform startup scripts, and a workflow guide, installed from this repo's own `burak-tools` marketplace.
+**Burak's personal Claude Code toolkit**, packaged as the **`bx` plugin** — 12 custom skills, 20 subagents, cross-platform startup scripts, and a workflow guide, installed from this repo's own `burak-tools` marketplace.
 
 The plugin bundles a full engineering workflow into namespaced `/bx:*` slash commands:
 
@@ -67,6 +67,8 @@ cc my-project    # launch a project directly
 `cc` refreshes the `bx` plugin from the marketplace, opens (and pulls) your chosen project, checks for Claude Code updates, and launches Claude Code.
 
 Each session is launched **named after the project and color-coded**, so parallel sessions stay distinguishable: the project name shows on the prompt bar, in the `/resume` picker, and in the terminal tab title, and the prompt bar takes a per-project color. Colors are assigned automatically on a project's first launch and remembered in `~/.claude/cc-session-colors` (a plain `name=color` file — delete it to reshuffle every project). `/color` supports eight colors, so past eight projects colors start repeating; the name is what stays unique.
+
+**Parallel sessions.** Names keep sessions apart on screen; `/bx:parallel` keeps them apart on disk. Run it once in any one session when you want two or more on the same repo: each peer is asked once, in its own session, and a relayed approval is never acted on. Every session gets its own worktree (under `.claude/worktrees/`, ignored through `.git/info/exclude`) or branch, and `/bx:save` ends with a locked land onto `main`. The lock frees itself when its owner leaves or after 900 s without a refresh.
 
 ### Updating to the latest version
 
@@ -164,6 +166,7 @@ Then refresh your install with the two `/plugin …` commands from [Updating](#u
 | Command | Purpose | Format |
 |---------|---------|--------|
 | `/bx:resume` | Start session - get up to speed | Skill |
+| `/bx:parallel` | Run several sessions on one repo without them damaging each other. Run once, in any one session: it finds the others via `ListAgents`, and each session moves into its own worktree or branch only after **its own user** says yes there. `main` then moves only through `land` (rebase + fast-forward under a lock; `/bx:save` lands automatically, `--no-land` skips it, and the version bump + CHANGELOG entry are written under that lock). Sessions message each other with `SendMessage`; `status`, `off`, `join`, `unlock --force`. Shared state lives in the git common dir, so nothing is committed on anyone's branch. | Skill |
 | `/bx:plan` | Interview before building features | Skill |
 | `/bx:review` | Thorough senior-engineer code review (in-session, with `--security`/`--verify`/`--fix`/`--last-commit`). Slots between built-in `/code-review` (quick) and `/code-review ultra` (cloud, pre-merge). | Skill |
 | `/bx:clean` | Find dead code & cruft (parallel subagents): unused files, exports, types, assets and dirs; dead code and CSS; unused deps and lockfile drift; stale flags, dead i18n/config keys, stale tests. Adds CVE scanning with `--vulns` (runs `npm audit` / `pip-audit` / `cargo audit` / equivalents per detected stack; report-only, never auto-fixed). | Skill |

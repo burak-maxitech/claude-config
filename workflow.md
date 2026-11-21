@@ -707,6 +707,29 @@ It's useful when you'd otherwise stare at the prompt for 30 seconds wondering wh
 
 ---
 
+### Scenario 7: Two Sessions on One Repo
+
+```bash
+# 1. In either session
+/bx:parallel
+# Each other session is asked once, in its own window - answer yes there.
+# Each gets its own worktree/branch; peers can message each other.
+
+# 2. Work normally in each session
+/bx:save              # saves on the session's branch, then lands onto main under the lock
+/bx:save --no-land    # save only; land later with /bx:parallel land
+
+# 3. When done
+/bx:parallel status   # who is in, who holds the lock, which worktrees are safe to remove
+/bx:parallel off
+```
+
+If a save stops with "saved on branch, not landed", the lock was lost (its owner left or 900 s passed): run `/bx:parallel land`.
+
+---
+
+---
+
 ## Documentation Structure
 
 Every project should have:
