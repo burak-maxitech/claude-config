@@ -135,6 +135,17 @@ session's name and ref, the live refs, and how to message the members are define
 `/bx:parallel`'s SKILL.md ("Values every step uses", "Messaging the members"); use them as written
 there. `<n>` below is the session field as step 3 settles it.
 
+**A lost lock stops the save.** A lock that goes 15 minutes without a refresh is dead, and a peer may
+break it. So on any non-zero exit from a `P touch-lock` below (exit 4, `lock=not-owner`), stop at once
+and report "lock lost; saved on branch, not landed", naming any doc edits left uncommitted in the
+tree. Do **not** run `P unlock`: the lock is no longer this session's.
+
+**Version and CHANGELOG.** Every session that changes `bx/` bumps the same `version` line and adds
+its entry in the same place at the top of `CHANGELOG.md`, so a code commit carrying them conflicts
+with the first peer that lands its own. On this path the code commit therefore never touches
+`bx/.claude-plugin/plugin.json` or `CHANGELOG.md`: step 1 records the bump level and the entry text,
+and step 4 writes both under the lock, on top of `main`'s version.
+
 **Flags.** `--no-land` stops after the docs commit: the lock is released and nothing lands
 (`/bx:parallel land` lands it later). `--skip-commit` cannot be honoured, because this path saves
 through commits on the branch: say so and stop before step 1, with nothing changed. Every other flag
@@ -146,28 +157,39 @@ means what it means on the Save Path, and `--silent` keeps its binding rule.
    - Drain the task list (Save Path step 1).
    - Session number preview: `P next-session`. On `next=unknown`, ask the user for this session's
      number now (in `--silent`, do not ask). Step 3 uses the answer only if the number is still unknown.
-   - Commit the code onto the branch: Part 8 steps 1, 2, 2b and 3, in Part 8's order, with one change
-     to step 3's question. Ask it once, covering the whole save: "Commit these to s/<ref>, then write
-     the docs, commit them and land on main?" (drop "and land on main" under `--no-land`; with no
-     uncommitted changes, ask "Write the docs, commit them to s/<ref> and land on main?"). Stage the
-     listed files by name, never `git add -A` or `.`. On no: stop, nothing changed.
-     `--silent` commits without asking, as Part 8 says.
+   - Version files untouched (only when `bx/.claude-plugin/plugin.json` exists). If `git status`
+     shows either `bx/.claude-plugin/plugin.json` or `CHANGELOG.md` modified, or
+     `git diff --quiet main...HEAD -- bx/.claude-plugin/plugin.json CHANGELOG.md` exits 1 (this
+     branch already committed a change to them), stop with nothing changed. Tell the user that the
+     parallel path writes the version and the CHANGELOG entry itself, under the lock; they undo their
+     own edits to those files (keeping the entry text to give this save) and run `/bx:save` again.
+   - Commit the code onto the branch: Part 8 steps 1, 2b and 3, in Part 8's order, with two changes.
+     **Step 2 is replaced** (same repo-only condition): when an uncommitted file is under `bx/`, or
+     `git diff --quiet main...HEAD -- bx/` exits 1, record the bump **level** (patch, minor or major,
+     by Part 8 step 2's semver rule) and the CHANGELOG **entry text** (the body under the version
+     heading, without the heading); edit neither file now. In `--silent`, the level is patch and the
+     text comes from the suggested commit message, as Part 8 step 2 says. **Step 3's question** is
+     asked once, covering the whole save: "Commit these to s/<ref>, then write the docs, commit them
+     and land on main?" (drop "and land on main" under `--no-land`; with no uncommitted changes, ask
+     "Write the docs, commit them to s/<ref> and land on main?"). Stage the listed files by name,
+     never `git add -A` or `.`. On no: stop, nothing changed. `--silent` commits without asking, as
+     Part 8 says.
    - `--full`: read Step 0.3, settle the packet's lists (Full Path step 3), and work out the plan of
      each sweep Part that asks for consent (5.2, 6.2, 1.10.1, 7.4, 7.7). Ask those questions now and
      keep the answers. Record a 7.4 **Choose** answer by file, section and move, not by row number.
 2. **Lock and catch up.**
-   - Unless `--no-land`, send each other member
-     `bx:parallel from <name> [<ref>]: landing s/<ref> onto main now; nothing for you to do.`
    - `P lock <ref> save --live-refs <live refs>`.
      - `lock=acquired`: go on. Report a `lock=broken prev_owner=… reason=…` line printed before it.
+       Unless `--no-land`, now send each other member
+       `bx:parallel from <name> [<ref>]: landing s/<ref> onto main now; nothing for you to do.`
      - Exit 4 (`lock=held owner=<o> …`), interactive: report the holder and stop. The code commit
        stays on the branch. Send `<o>` one message with `notify_when_idle: true`:
        `bx:parallel from <name> [<ref>]: waiting for the land lock you hold; nothing for you to do.`
        and tell the user to run `/bx:save` again after the idle notice.
      - Exit 4 in `--silent`: retry every 15 s for up to 120 s, as one Bash call (timeout 150000):
        `bash -c 'for i in 1 2 3 4 5 6 7 8 9; do bash "$0" lock "$1" save --live-refs "$2"; rc=$?; [ "$rc" -ne 4 ] && exit "$rc"; [ "$i" -lt 9 ] && sleep 15; done; exit 4' <script> <ref> <live refs>`,
-       where `<script>` is the resolved path of `parallel.sh`. Still exit 4: stop with
-       "saved on branch, not landed: lock held by <owner>".
+       where `<script>` is the resolved path of `parallel.sh`. Exit 0: go on as for `lock=acquired`,
+       message included. Still exit 4: stop with "saved on branch, not landed: lock held by <owner>".
      - Any other exit (exit 2 `mode=off`, exit 1 `lock=error …`): report the output and stop.
    - `P catch-up`. It rebases this branch onto `main`, which brings in only what has already landed.
      - `caught_up=<k>`: go on.
@@ -188,18 +210,18 @@ means what it means on the Save Path, and `--silent` keeps its binding rule.
      this conversation, write `<c> cont.`. On `next=unknown`, use the user's answer from step 1; in
      `--silent`, or with no answer, pass the session in the form the `Last Updated` line on `main`
      already has, and add a warning line to the report: session number unknown.
-4. **Version (only when this branch changes `bx/`).** If `git diff --quiet main HEAD -- bx/` exits 1,
-   run `P version-check`.
-   - `version=n/a` or `ok=yes`: nothing to do.
-   - `ok=no` (a peer landed the same or a higher version): set `version` in
-     `bx/.claude-plugin/plugin.json` to `suggest`, and change the heading of the `CHANGELOG.md` entry
-     this branch added (`## <branch> — <date>`) to `## <suggest> — <date>`. Both edits go into the
-     docs commit in step 5. Report the change: `version <branch> → <suggest>`.
+4. **Version (only when step 1 recorded a level).** `P version-check --level <level>`.
+   - `main=<v> level=<level> next=<x>`: set `version` in `bx/.claude-plugin/plugin.json` to `<x>`.
+     Insert the entry at the top of `CHANGELOG.md`, directly above the first `## ` version heading
+     (newest first): `## <x> — <today>`, a blank line, then the recorded entry text. Both edits go
+     into the docs commit in step 5. Report `version <v> → <x>`.
+   - `version=n/a`: nothing to do.
    - Exit 1, `version=error …`: `P unlock <ref>`, report, and stop.
 5. **Write the docs.** `P touch-lock <ref> write`.
    - `--full`: run the sweep (Full Path step 4) on the latest files, with the answers kept in step 1.
      A move answered yes runs if it still applies; one the latest files no longer need is skipped and
      reported. A consent that step 1 did not ask resolves to its safe default, as under `--silent`.
+     Then `P touch-lock <ref> dispatch`: the sweep can be long.
    - Compose the packet (Save Path step 2), with every `old` string taken from step 3's read (or
      from the files as the sweep left them, as Full Path step 5 says), the commit list from step 3,
      and `session` from step 3. Dispatch `save-writer` and handle its report (Save Path step 3,

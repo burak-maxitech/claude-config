@@ -652,6 +652,35 @@ test_version_check() {
     expect_eq "unparseable exits 1" "$RC" 1
 }
 
+test_version_check_level() {
+    echo "test_version_check_level"
+    local r; r="$(make_repo vl1)"
+    px "$r" version-check --level minor
+    expect_eq "level: no plugin.json" "$OUT" "version=n/a"
+    put_main "$r" "$PJ" "$(plugin_json 2.20.0)" base
+    git -C "$r" checkout -q -b feat
+    put_main "$r" "$PJ" "$(plugin_json 2.25.3)" "branch bump is ignored"
+    git -C "$r" checkout -q main
+    put_main "$r" "$PJ" "$(plugin_json 2.21.0)" "other session"
+    git -C "$r" checkout -q feat
+    px "$r" version-check --level patch
+    expect_eq "level patch from main" "$OUT" "main=2.21.0 level=patch next=2.21.1"
+    px "$r" version-check --level minor
+    expect_eq "level minor from main" "$OUT" "main=2.21.0 level=minor next=2.22.0"
+    px "$r" version-check --level major
+    expect_eq "level major from main" "$OUT" "main=2.21.0 level=major next=3.0.0"
+    expect_eq "level exits 0" "$RC" 0
+    px "$r" version-check --level huge
+    expect_eq "bad level exits 2" "$RC" 2
+    px "$r" version-check --level
+    expect_eq "missing level exits 2" "$RC" 2
+    px "$r" version-check --bogus
+    expect_eq "unknown flag exits 2" "$RC" 2
+    # no-flag behaviour unchanged
+    px "$r" version-check
+    expect_eq "no-flag form unchanged" "$OUT" "main=2.21.0 branch=2.25.3 ok=yes suggest=2.25.3"
+}
+
 test_help() {
     echo "test_help"
     local out rc
@@ -678,7 +707,7 @@ test_help() {
 }
 
 # --- Task 1 + 2 tests (later tasks append their tests above the runner) ---
-TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race test_lock_break_race test_lock_ownerless_held test_live_refs_empty_rejected test_members_lock_stale_takeover test_ensure_ignore_idempotent test_ensure_ignore_gitignore_counts test_worktree_requires_ignore test_worktree_based_on_local_main test_catch_up_dirty test_catch_up_conflict_aborts test_catch_up_interrupted test_catch_up_nonconflict_failure test_catch_up_success test_ff_main_refuses_checked_out test_ff_main_success test_ff_main_not_ff test_two_branches_land_in_turn test_next_session_forms test_version_check test_help"
+TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race test_lock_break_race test_lock_ownerless_held test_live_refs_empty_rejected test_members_lock_stale_takeover test_ensure_ignore_idempotent test_ensure_ignore_gitignore_counts test_worktree_requires_ignore test_worktree_based_on_local_main test_catch_up_dirty test_catch_up_conflict_aborts test_catch_up_interrupted test_catch_up_nonconflict_failure test_catch_up_success test_ff_main_refuses_checked_out test_ff_main_success test_ff_main_not_ff test_two_branches_land_in_turn test_next_session_forms test_version_check test_version_check_level test_help"
 [ $# -gt 0 ] && TESTS="$*"
 
 for t in $TESTS; do "$t"; done

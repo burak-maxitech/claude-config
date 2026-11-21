@@ -17,6 +17,7 @@
 #   ff-main                       fast-forward main to current branch (exit 7/8)
 #   next-session                  current/next session number from main's STATUS.md or CLAUDE.md
 #   version-check                 plugin.json version on main vs this branch (ok=yes|no suggest=<v>)
+#   version-check --level <l>     main's version bumped by patch|minor|major (main= level= next=)
 #   help                          print every subcommand name, one per line
 #
 # State lives under $(git rev-parse --git-common-dir)/bx-parallel/ so every worktree
@@ -368,8 +369,33 @@ ver_field() { # <version> <n>
 json_version() { grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' | head -n 1 | sed 's/.*:[[:space:]]*"\(.*\)"/\1/'; }
 
 cmd_version_check() {
+    local usage="usage: parallel.sh version-check [--level patch|minor|major]"
+    local level_arg=""
+    if [ $# -gt 0 ]; then
+        [ "$1" = "--level" ] && [ $# -eq 2 ] || { echo "$usage"; exit 2; }
+        case "$2" in patch|minor|major) level_arg="$2" ;; *) echo "$usage"; exit 2 ;; esac
+    fi
     local top; top="$(git rev-parse --show-toplevel)"
     local rel="bx/.claude-plugin/plugin.json"
+    if [ -n "$level_arg" ]; then
+        # main's version bumped by the given level; the branch's version is ignored.
+        local mv; mv="$(git show "main:$rel" 2>/dev/null | json_version)"
+        if [ -z "$mv" ]; then
+            if [ ! -f "$top/$rel" ] && ! git cat-file -e "main:$rel" 2>/dev/null; then
+                echo "version=n/a"; return 0
+            fi
+            echo "version=error reason=unparseable"; exit 1
+        fi
+        local a b c next
+        a="$(ver_field "$mv" 1)"; b="$(ver_field "$mv" 2)"; c="$(ver_field "$mv" 3)"
+        case "$level_arg" in
+            major) next="$((a + 1)).0.0" ;;
+            minor) next="$a.$((b + 1)).0" ;;
+            patch) next="$a.$b.$((c + 1))" ;;
+        esac
+        echo "main=$mv level=$level_arg next=$next"
+        return 0
+    fi
     if [ ! -f "$top/$rel" ]; then echo "version=n/a"; return 0; fi
     local branch main base basesha
     branch="$(json_version < "$top/$rel")"
