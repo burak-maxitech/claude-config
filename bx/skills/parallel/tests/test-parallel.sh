@@ -282,8 +282,62 @@ test_lock_race() {
     expect_eq "20 iterations: exactly one winner each time" "$bad" 0
 }
 
+test_lock_break_race() {
+    echo "test_lock_break_race"
+    local r; r="$(lock_setup lock_break_race)"
+    local i bad=0 d="$TMP_ROOT/brk_out" k
+    mkdir -p "$d"
+    for i in $(seq 1 20); do
+        rm -rf "$r/.git/bx-parallel/land.lock" "$r/.git/bx-parallel/land.lock.break" "$d"/*
+        mkdir "$r/.git/bx-parallel/land.lock"
+        printf 'ref=dead\nsince=1\nstep=land\n' > "$r/.git/bx-parallel/land.lock/owner"
+        for k in a b c; do
+            ( cd "$r" && bash "$SCRIPT" lock "$k" land >"$d/$k.out" 2>&1; echo $? > "$d/$k.rc" ) &
+        done
+        wait
+        local zeros; zeros="$(cat "$d"/*.rc | grep -c '^0$')"
+        [ "$zeros" = 1 ] || { bad=$((bad + 1)); echo "    iteration $i: $zeros winners"; }
+    done
+    expect_eq "20 iterations: exactly one breaker wins" "$bad" 0
+}
+
+test_lock_ownerless_held() {
+    echo "test_lock_ownerless_held"
+    local r; r="$(lock_setup lock_ownerless)"
+    mkdir "$r/.git/bx-parallel/land.lock"
+    px "$r" lock s71 land
+    expect_eq "owner-less fresh lock is held (exit 4)" "$RC" 4
+    expect_has "held with unknown owner" "$OUT" "lock=held owner= age=?"
+    touch -d '2 hours ago' "$r/.git/bx-parallel/land.lock"
+    px "$r" lock s71 land
+    expect_eq "owner-less lock 900 s old is broken" "$RC" 0
+    expect_has "broken stale" "$OUT" "reason=stale"
+}
+
+test_live_refs_empty_rejected() {
+    echo "test_live_refs_empty_rejected"
+    local r; r="$(lock_setup lock_emptylive)"
+    px "$r" lock s70 land
+    px "$r" lock s71 land --live-refs ""
+    expect_eq "empty --live-refs exits 2" "$RC" 2
+    px "$r" lock s71 land --live-refs
+    expect_eq "missing --live-refs value exits 2" "$RC" 2
+    expect_eq "lock untouched" "$(grep '^ref=' "$r/.git/bx-parallel/land.lock/owner")" "ref=s70"
+}
+
+test_members_lock_stale_takeover() {
+    echo "test_members_lock_stale_takeover"
+    local r; r="$(lock_setup members_stale)"
+    mkdir "$r/.git/bx-parallel/members.lock"
+    touch -d '1 minute ago' "$r/.git/bx-parallel/members.lock"
+    px "$r" join s71 /x/one s/s71
+    expect_eq "join takes over dead members lock" "$RC" 0
+    px "$r" status
+    expect_has "row written" "$OUT" "member ref=s71 "
+}
+
 # --- Task 1 + 2 tests (later tasks append their tests above the runner) ---
-TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race"
+TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race test_lock_break_race test_lock_ownerless_held test_live_refs_empty_rejected test_members_lock_stale_takeover"
 
 for t in $TESTS; do "$t"; done
 

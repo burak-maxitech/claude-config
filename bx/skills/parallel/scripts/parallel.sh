@@ -35,14 +35,25 @@ log_line() { mkdir -p "$STATE"; echo "$(now) $*" >> "$LOG"; }
 is_on() { [ -f "$MODE_FILE" ] && grep -qx 'mode=on' "$MODE_FILE"; }
 
 # Short-lived mkdir lock guarding the members read-modify-write (separate from land.lock).
-# Retries ~5 s, then assumes the holder died and takes over.
+# A holder that has not released within 10 s (by directory age) is presumed dead.
 MEMBERS_LOCK="$STATE/members.lock"
+# Age in seconds of a directory's own mtime (real clock, not BXP_NOW).
+dir_age() {
+    local m
+    m="$(stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null)" || m=""
+    [ -n "$m" ] || { echo 0; return; }
+    echo $(( $(date +%s) - m ))
+}
+
+# Takeover is judged by the lock directory's age (held for milliseconds, so 10 s = dead holder),
+# never by the retry count; after a takeover we loop back to mkdir.
 members_lock() {
-    local i=0
     mkdir -p "$STATE"
     while ! mkdir "$MEMBERS_LOCK" 2>/dev/null; do
-        i=$((i + 1))
-        if [ "$i" -ge 100 ]; then rm -rf "$MEMBERS_LOCK"; mkdir "$MEMBERS_LOCK" 2>/dev/null; break; fi
+        if [ -d "$MEMBERS_LOCK" ] && [ "$(dir_age "$MEMBERS_LOCK")" -ge 10 ]; then
+            rm -rf "$MEMBERS_LOCK"
+            continue
+        fi
         sleep 0.05 2>/dev/null || sleep 1
     done
 }
@@ -138,17 +149,20 @@ write_owner() { # <ref> <step>
         && mv "$LOCK_DIR/owner.tmp.$$" "$LOCK_DIR/owner"
 }
 
+# Fresh acquisition: owner write must succeed or the new lock dir is removed and we fail.
+acquire_fresh() { # <ref> <step>
+    if ! write_owner "$1" "$2"; then
+        rm -rf "$LOCK_DIR"; echo "lock=error reason=owner-write-failed"; exit 1
+    fi
+}
+
 print_held() {
+    if [ ! -f "$LOCK_DIR/owner" ]; then echo "lock=held owner= age=? step="; return; fi
     local since; since="$(lock_field since)"
     echo "lock=held owner=$(lock_field ref) age=$(( $(now) - ${since:-0} )) step=$(lock_field step)"
 }
 
-wait_owner() { # give a just-created lock dir a moment to get its owner file
-    local i=0
-    while [ ! -f "$LOCK_DIR/owner" ] && [ "$i" -lt 20 ]; do
-        i=$((i + 1)); sleep 0.05 2>/dev/null || sleep 1
-    done
-}
+BREAK_DIR="$STATE/land.lock.break"
 
 cmd_lock() {
     local usage="usage: parallel.sh lock <ref> <step> [--live-refs a,b,c]"
@@ -157,42 +171,69 @@ cmd_lock() {
     shift 2
     while [ $# -gt 0 ]; do
         case "$1" in
-            --live-refs) have_live=1; live="${2:-}"; shift; [ $# -gt 0 ] && shift ;;
+            --live-refs)
+                [ -n "${2:-}" ] || { echo "$usage (--live-refs needs a non-empty list)"; exit 2; }
+                have_live=1; live="$2"; shift 2 ;;
             *) echo "$usage"; exit 2 ;;
         esac
     done
     if ! is_on; then echo "mode=off"; exit 2; fi
-    if mkdir "$LOCK_DIR" 2>/dev/null; then
-        write_owner "$ref" "$step"; echo "lock=acquired"; return 0
-    fi
-    wait_owner
-    local owner since reason=""
-    owner="$(lock_field ref)"; since="$(lock_field since)"
-    if [ -n "$owner" ] && [ "$owner" = "$ref" ]; then
-        write_owner "$ref" "$step"; echo "lock=acquired"; return 0
-    fi
-    if [ ! -f "$LOCK_DIR/owner" ] || [ $(( $(now) - ${since:-0} )) -ge 900 ]; then
-        reason=stale
-    elif [ "$have_live" -eq 1 ]; then
-        case ",$live," in *",$owner,"*) ;; *) reason=gone ;; esac
-    fi
-    if [ -z "$reason" ]; then print_held; exit 4; fi
-    rm -rf "$LOCK_DIR"
-    if mkdir "$LOCK_DIR" 2>/dev/null; then
-        write_owner "$ref" "$step"
-        log_line "lock-broken prev_owner=$owner reason=$reason by=$ref"
-        echo "lock=broken prev_owner=$owner reason=$reason"
-        echo "lock=acquired"
-        return 0
-    fi
-    wait_owner   # lost the single retry to another session
+    local attempt=0 owner since reason
+    while [ "$attempt" -lt 200 ]; do
+        attempt=$((attempt + 1))
+        if mkdir "$LOCK_DIR" 2>/dev/null; then
+            acquire_fresh "$ref" "$step"; echo "lock=acquired"; return 0
+        fi
+        owner="$(lock_field ref)"; since="$(lock_field since)"
+        if [ -n "$owner" ] && [ "$owner" = "$ref" ]; then
+            write_owner "$ref" "$step" || { echo "lock=error reason=owner-write-failed"; exit 1; }
+            echo "lock=acquired"; return 0
+        fi
+        reason=""
+        if [ ! -f "$LOCK_DIR/owner" ]; then
+            # Owner-less: the winner may still be between mkdir and its owner write.
+            [ -d "$LOCK_DIR" ] && [ "$(dir_age "$LOCK_DIR")" -ge 900 ] && reason=stale
+        elif [ $(( $(now) - ${since:-0} )) -ge 900 ]; then
+            reason=stale
+        elif [ "$have_live" -eq 1 ]; then
+            case ",$live," in *",$owner,"*) ;; *) reason=gone ;; esac
+        fi
+        if [ -z "$reason" ]; then print_held; exit 4; fi
+        # Dead lock: serialise breakers behind land.lock.break (held for milliseconds).
+        if ! mkdir "$BREAK_DIR" 2>/dev/null; then
+            if [ -d "$BREAK_DIR" ] && [ "$(dir_age "$BREAK_DIR")" -ge 10 ]; then rm -rf "$BREAK_DIR"; fi
+            sleep 0.05 2>/dev/null || sleep 1
+            continue
+        fi
+        # Re-read under the mutex; break only the exact lock we judged dead.
+        if [ "$(lock_field ref)" != "$owner" ] || [ "$(lock_field since)" != "$since" ]; then
+            rmdir "$BREAK_DIR" 2>/dev/null; continue
+        fi
+        rm -rf "$LOCK_DIR"
+        if mkdir "$LOCK_DIR" 2>/dev/null; then
+            if ! write_owner "$ref" "$step"; then
+                rm -rf "$LOCK_DIR"; rmdir "$BREAK_DIR" 2>/dev/null
+                echo "lock=error reason=owner-write-failed"; exit 1
+            fi
+            rmdir "$BREAK_DIR" 2>/dev/null
+            log_line "lock-broken prev_owner=$owner reason=$reason by=$ref"
+            echo "lock=broken prev_owner=$owner reason=$reason"
+            echo "lock=acquired"
+            return 0
+        fi
+        rmdir "$BREAK_DIR" 2>/dev/null
+        # A plain acquirer slipped in between our rm and mkdir: report what it holds.
+        sleep 0.05 2>/dev/null || sleep 1
+        print_held; exit 4
+    done
     print_held; exit 4
 }
 
 cmd_touch_lock() {
     [ $# -eq 2 ] || { echo "usage: parallel.sh touch-lock <ref> <step>"; exit 2; }
     if [ -f "$LOCK_DIR/owner" ] && [ "$(lock_field ref)" = "$1" ]; then
-        write_owner "$1" "$2"; echo "lock=touched"; return 0
+        write_owner "$1" "$2" || { echo "lock=error reason=owner-write-failed"; exit 1; }
+        echo "lock=touched"; return 0
     fi
     echo "lock=not-owner"; exit 4
 }
