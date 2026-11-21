@@ -19,7 +19,9 @@ Sessions sharing one folder commit each other's half-done edits, switch branch u
 ### Changed
 - `.claude/worktrees/` is ignored through the shared, untracked `.git/info/exclude`, not a `.gitignore` commit, so setup never commits on another session's branch.
 - In parallel mode the plugin version bump and the CHANGELOG entry are written under the land lock, on top of `main`'s version, in the save's docs commit (or by `/bx:parallel land`); `--no-land` makes no bump.
-- The land lock frees itself when its owner leaves `ListAgents` or after 900 s without a refresh; a lost lock stops a save/land with "saved on branch, not landed".
+- The land lock frees itself when its owner leaves `ListAgents` or after 900 s without a refresh; a lost lock stops a save/land with "saved on branch, not landed: lock lost".
+- A save or land checks `parallel.sh ff-main --check` right after catching up, before writing the version or docs, so a refused fast-forward (`main` checked out elsewhere, or not a fast-forward) leaves nothing to undo. Every "saved on branch, not landed" stop names its cause (lock held, main checked out, not a fast-forward, lock lost) and its recovery. A `--no-land` save warns that a later land can conflict on the `Last Updated` lines, and says how to recover.
+- `parallel.sh off` refuses with exit 4 while the land lock is held (`off --force` overrides, after the user confirms); `status` reports an owner-less lock as held; outside a git repo every subcommand exits 10, not 4; a failed `worktree` prints git's reason.
 
 ## 2.20.0 — 2026-11-20
 

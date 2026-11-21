@@ -132,13 +132,20 @@ the lock; nothing under the lock asks the user anything.
 **Values.** `P` is `bash <skill-dir>/../parallel/scripts/parallel.sh`, with `<skill-dir>` resolved
 against this skill's base directory. Its output is `key=value` lines; read the exit code too. This
 session's name and ref, the live refs, and how to message the members are defined in
-`/bx:parallel`'s SKILL.md ("Values every step uses", "Messaging the members"); use them as written
-there. `<n>` below is the session field as step 3 settles it.
+`<skill-dir>/../parallel/SKILL.md`, section `## Values every step uses` (its "Messaging the members"
+bullet); use them as written there. `<n>` below is the session field as step 3 settles it.
 
 **A lost lock stops the save.** A lock that goes 15 minutes without a refresh is dead, and a peer may
 break it. So on any non-zero exit from a `P touch-lock` below (exit 4, `lock=not-owner`), stop at once
-and report "lock lost; saved on branch, not landed", naming any doc edits left uncommitted in the
-tree. Do **not** run `P unlock`: the lock is no longer this session's.
+and report "saved on branch, not landed: lock lost", naming any doc edits left uncommitted in the
+tree, and tell the user to commit or undo those edits and then run `/bx:save` again. When the lock
+was lost after step 5's docs commit, give step 6's recovery for the docs commit instead. Do **not**
+run `P unlock`: the lock is no longer this session's.
+
+**Every stop says why.** A save that does not land reports "saved on branch, not landed: <cause>",
+with one of four causes, each with its own recovery: `lock held` (run `/bx:save` again), `main is
+checked out in <p>` (free it, then `/bx:save` again), `not a fast-forward` (`/bx:save` again; it
+catches up first) and `lock lost` (above).
 
 **Version and CHANGELOG.** Every session that changes `bx/` bumps the same `version` line and adds
 its entry in the same place at the top of `CHANGELOG.md`, so a code commit carrying them conflicts
@@ -164,9 +171,14 @@ means what it means on the Save Path, and `--silent` keeps its binding rule.
      `git diff --quiet main...HEAD -- bx/.claude-plugin/plugin.json CHANGELOG.md` exits 1 (this
      branch already committed a change to them), stop with nothing changed. Tell the user: "Found
      changes to `bx/.claude-plugin/plugin.json` and/or `CHANGELOG.md` on s/<ref>, either your own
-     edits or edits from an interrupted parallel save. In parallel mode these two files are rewritten
-     under the land lock, on top of main's version. Undo those changes (keep any entry text and give it
-     to the save) and run `/bx:save` again."
+     edits or edits from an interrupted parallel save or land. In parallel mode these two files are
+     rewritten under the land lock, on top of main's version. Undo those changes (keep any entry text
+     and give it to the save) and run `/bx:save` again." When the change is committed, also name the
+     commit to drop: `git log --oneline main..HEAD -- bx/.claude-plugin/plugin.json CHANGELOG.md`
+     lists it. An interrupted save left it in `docs: S<n> save (parallel)` (dropping it also drops
+     that save's docs, which this save writes again), an interrupted land in `chore: v<x> — …`.
+     Give its sha and subject and the command that drops it, `git rebase --onto <sha>^ <sha>`; never
+     rewrite the branch yourself.
    - Commit the code onto the branch: Part 8 steps 1, 2b and 3, in Part 8's order, with two changes.
      **Step 2 is replaced** (same repo-only condition; skipped entirely under `--no-land`): when an uncommitted file is under `bx/`, or
      `git diff --quiet main...HEAD -- bx/` exits 1, record the bump **level** (patch, minor or major,
@@ -186,14 +198,15 @@ means what it means on the Save Path, and `--silent` keeps its binding rule.
      - `lock=acquired`: go on. Report a `lock=broken prev_owner=… reason=…` line printed before it.
        Unless `--no-land`, now send each other member
        `bx:parallel from <name> [<ref>]: landing s/<ref> onto main now; nothing for you to do.`
-     - Exit 4 (`lock=held owner=<o> …`), interactive: report the holder and stop. The code commit
-       stays on the branch. Send `<o>` one message with `notify_when_idle: true`:
+     - Exit 4 (`lock=held owner=<o> …`), interactive: report "saved on branch, not landed: lock
+       held by <o>" and stop. The code commit stays on the branch. Send `<o>` one message with `notify_when_idle: true`:
        `bx:parallel from <name> [<ref>]: waiting for the land lock you hold; nothing for you to do.`
        and tell the user to run `/bx:save` again after the idle notice.
      - Exit 4 in `--silent`: retry every 15 s for up to 120 s, as one Bash call (timeout 150000):
        `bash -c 'for i in 1 2 3 4 5 6 7 8 9; do bash "$0" lock "$1" save --live-refs "$2"; rc=$?; [ "$rc" -ne 4 ] && exit "$rc"; [ "$i" -lt 9 ] && sleep 15; done; exit 4' <script> <ref> <live refs>`,
        where `<script>` is the resolved path of `parallel.sh`. Exit 0: go on as for `lock=acquired`,
-       message included. Still exit 4: stop with "saved on branch, not landed: lock held by <owner>".
+       message included. Still exit 4: stop with "saved on branch, not landed: lock held by
+       <owner>; run `/bx:save` again".
      - Any other exit (exit 2 `mode=off`, exit 1 `lock=error …`): report the output and stop.
    - `P catch-up`. It rebases this branch onto `main`, which brings in only what has already landed.
      - `caught_up=<k>`: go on.
@@ -203,7 +216,22 @@ means what it means on the Save Path, and `--silent` keeps its binding rule.
      - Exit 6, `tree=dirty`: `P unlock <ref>`. Tell the user to commit or stash first; never stash
        for them. Stop.
      - Exit 7, `conflict files=…` or `rebase=failed reason=…`: the rebase was aborted.
-       `P unlock <ref>`, report the files or reason, and stop. No docs are written.
+       `P unlock <ref>`, report the files or reason, and stop. No docs are written. When every
+       conflicting file is a docs file (`CLAUDE.md`, `docs/…`) and the branch carries an earlier
+       `docs: S<n> save (parallel)` commit (a `--no-land` save), say that this commit is the cause:
+       its `Last Updated` lines collide with a peer's landed save. Give the command that drops it,
+       `git rebase --onto <sha>^ <sha>`, and say `/bx:save` then writes the docs again on top of
+       `main`.
+   - Unless `--no-land`: `P ff-main --check`. It runs step 6's two tests and moves nothing, so a
+     save that cannot land stops before any docs or version file is written.
+     - `ok=1`: go on.
+     - Exit 8, `main=checked-out path=<p>`: `P unlock <ref>`, then follow `/bx:parallel`'s `land`
+       step 5 for exit 8 (the member-folder report or the detach offer). In `--silent`, ask
+       nothing. Report "saved on branch, not landed: main is checked out in <p>; free it, then run
+       `/bx:save` again", and say that only the code commit is on the branch: no docs or version
+       commit was made. Stop.
+     - Exit 7 `main=not-ff`, or exit 2 `error=detached-head`: `P unlock <ref>`, report "saved on
+       branch, not landed: not a fast-forward" (or the detached-head output) and stop.
 3. **Read the latest docs.** `P touch-lock <ref> read`. When `caught_up` is above 0, read
    `docs/STATUS.md` and `CLAUDE.md` again: the Step 0.1 copies predate what landed. Then:
    - **Own work only.** The filtered commit list is
@@ -236,14 +264,24 @@ means what it means on the Save Path, and `--silent` keeps its binding rule.
 6. **Land.**
    - `--no-land`: `P unlock <ref>`, report "saved on s/<ref>, not landed (`--no-land`)", and stop.
      When the branch changes `bx/`, add: "no version bump yet; `/bx:parallel land` asks for it when
-     the branch lands".
+     the branch lands". Always add: "this docs commit rewrote the `Last Updated` lines in CLAUDE.md
+     and docs/STATUS.md; if a peer lands a save first, the later land conflicts on them. Then drop
+     this `docs: S<n> save (parallel)` commit and run `/bx:save` to write the docs again on top of
+     main and land."
    - `P touch-lock <ref> ff-main`, then `P ff-main`.
      - `landed=<sha>`: go on.
-     - Exit 8, `main=checked-out path=<p>`: `P unlock <ref>`, then follow `/bx:parallel`'s `land`
-       step 5 for exit 8. In `--silent`, ask nothing: report
-       "saved on branch, not landed: main is checked out in <p>". Stop.
+     - Exit 8, `main=checked-out path=<p>`: rare after step 2's check (`main` was checked out
+       since). `P unlock <ref>`, then follow `/bx:parallel`'s `land` step 5 for exit 8. In
+       `--silent`, ask nothing. Report "saved on branch, not landed: main is checked out in <p>",
+       then the recovery for the docs commit just made (see below). Stop.
      - Exit 7 `main=not-ff`, or exit 2 `error=detached-head`: `P unlock <ref>`, report
-       "saved on branch, not landed" with the output, and stop.
+       "saved on branch, not landed: not a fast-forward" (or the detached-head output), then the
+       recovery for the docs commit, and stop.
+
+     The recovery for the docs commit: when step 4 wrote a version, the commit carries the bump and
+     the next save or land refuses until it is gone, so name it with the command that drops it (as
+     step 1's guard does) and say `/bx:save` then saves again. Without a version, the docs are
+     already committed: say to land with `/bx:parallel land` once `main` is free, not to save again.
    - Push only if the user asked in this conversation: `git push origin main`.
    - `P unlock <ref>`.
    - Send each other member

@@ -35,7 +35,8 @@ Anything else: print this table and stop.
 
 - **`P`** is `bash <skill-dir>/scripts/parallel.sh`, with `<skill-dir>` resolved against **this
   skill's base directory** to an absolute path. Run every script call as `P <subcommand> ...`. Its
-  output is `key=value` lines; read the exit code too. `P help` lists the subcommands.
+  output is `key=value` lines; read the exit code too. `P help` lists the subcommands. Exit 10,
+  `error=not-a-git-repo`, from any subcommand: this folder is not in a git repo; say so and stop.
 - **This session's name and ref:** call `ListAgents`. Its first line is
   `This session is <name> [<ref>]`. Peer rows follow as
   `<name> [<ref>] · interactive · busy|idle · started …`.
@@ -211,7 +212,8 @@ A peer runs this once its user wants to join (or follows the same steps from the
      are the instruction to use a worktree that `EnterWorktree` requires. Never use
      `EnterWorktree name=`: it bases the worktree on `origin/<default>`, not local `main`.
      `ignore=missing` (exit 9) means `.claude/worktrees/` is not ignored yet: stop and tell the user
-     to run `/bx:parallel` setup's step 3 first. `worktree=failed` (exit 1): stop and report.
+     to run `/bx:parallel` setup's step 3 first. `worktree=failed reason=<git's message>` (exit 1):
+     stop and report the reason (for example, a branch `s/<ref>` that already exists).
    - **Keeps the main folder:** if on `main`, `git switch -c s/<ref>`; then
      `P join <ref> <main folder> <branch>`.
    - **Stays in its worktree:** if on `main`, `git switch -c s/<ref>`; then
@@ -253,16 +255,20 @@ the same when it lands, and leaves the bump to this command under `--no-land`.
      `git diff --quiet main...HEAD -- bx/.claude-plugin/plugin.json CHANGELOG.md` exits 1, stop
      with nothing changed and tell the user: "Found changes to `bx/.claude-plugin/plugin.json`
      and/or `CHANGELOG.md` on s/<ref>, either your own edits or edits from an interrupted parallel
-     save. In parallel mode these two files are rewritten under the land lock, on top of main's
-     version. Undo those changes (keep any entry text) and run `/bx:parallel land` again."
+     save or land. In parallel mode these two files are rewritten under the land lock, on top of
+     main's version. Undo those changes (keep any entry text) and run `/bx:parallel land` again."
+     When the change is committed, also name the commit to drop: the commits that touch the files
+     are listed by `git log --oneline main..HEAD -- bx/.claude-plugin/plugin.json CHANGELOG.md`.
+     An interrupted save left them in `docs: S<n> save (parallel)` (its docs are rewritten by the
+     next save), an interrupted land in `chore: v<x> — …`. Name that commit's sha and subject, and
+     give the user the command that drops it, `git rebase --onto <sha>^ <sha>`. Never rewrite the
+     branch yourself.
    - Draft one CHANGELOG line from `git log --format=%s main..HEAD`. Ask one `AskUserQuestion`
      whose text shows that draft: "Version bump for this land, and its CHANGELOG line?", with the
      options patch, minor and major (PATCH for fixes and doc corrections, MINOR for a new
      skill/agent/flag, MAJOR for breaking renames or removed behavior). A typed answer may change
      the line. Keep the level and the line.
-2. **Tell the peers.** `SendMessage` each other member:
-   `bx:parallel from <name> [<ref>]: landing s/<ref> onto main now; nothing for you to do.`
-3. **Lock.** `P lock <ref> land --live-refs <live refs>`.
+2. **Lock.** `P lock <ref> land --live-refs <live refs>`.
    - `lock=acquired`: go on. A `lock=broken prev_owner=… reason=stale|gone` line before it means a
      dead lock was broken; report that line.
    - Exit 4, `lock=held owner=<o> age=<s> step=<step>`: report the holder and stop. To be told when
@@ -271,6 +277,8 @@ the same when it lands, and leaves the bump to this command under `--no-land`.
      Run `/bx:parallel land` again after the idle notice.
    - Any other exit (for example exit 2, `mode=off`, or exit 1, `lock=error ...`): report the output
      and stop.
+3. **Tell the peers**, now that the lock is held. `SendMessage` each other member:
+   `bx:parallel from <name> [<ref>]: landing s/<ref> onto main now; nothing for you to do.`
 4. **Catch up.** `P touch-lock <ref> catch-up`, then `P catch-up`.
    - `caught_up=<n>`: go on.
    - Exit 5, `rebase=interrupted` (an earlier crash left a rebase): `P unlock <ref>`, then ask the
@@ -280,6 +288,20 @@ the same when it lands, and leaves the bump to this command under `--no-land`.
      for them.
    - Exit 7, `conflict files=…` or `rebase=failed reason=…`: the rebase was aborted. `P unlock
      <ref>`, report the files or reason, and stop. Code conflicts are the user's to resolve.
+     When every conflicting file is a docs file (`CLAUDE.md`, `docs/…`) and the branch carries a
+     `docs: S<n> save (parallel)` commit from a `/bx:save --no-land`, that commit is the cause: its
+     `Last Updated` lines collide with a save a peer landed since. Name it, give the command that
+     drops it, `git rebase --onto <sha>^ <sha>`, and say to run `/bx:save`, which writes the docs
+     again on top of `main` and lands.
+
+   **Can `main` move?** Before anything is written, `P ff-main --check`. It runs step 5's two
+   tests and moves nothing.
+   - `ok=1`: go on.
+   - Exit 8, `main=checked-out path=<p>`: handle it exactly as step 5's exit 8 (unlock first, then
+     the member-folder report or the detach offer). Nothing has been written or committed, so the
+     user frees `main` and runs `land` again.
+   - Exit 7, `main=not-ff`, or exit 2, `error=detached-head`: `P unlock <ref>`, report, stop.
+     Nothing has been written.
 
    **Version steps, under the lock** (only when step 1 kept a level): `P touch-lock <ref> version`,
    then `P version-check --level <level>`.
@@ -293,8 +315,11 @@ the same when it lands, and leaves the bump to this command under `--no-land`.
 5. **Fast-forward `main`.** `P touch-lock <ref> ff-main`, then `P ff-main`.
    - `landed=<sha>`: go on.
    - Exit 8, `main=checked-out path=<p>`: `main` is checked out in `<p>`. `P unlock <ref>`.
-     Nothing changed. If `<p>` is a member's folder, report that the session in `<p>` has to move
-     onto its own branch first, and stop. Otherwise:
+     `main` did not move. Step 4's check makes this rare (`main` was checked out after it ran), but
+     a version commit made under the lock is now on the branch: name it and the command that drops
+     it, as step 1's guard does, because the next `land` refuses until it is gone. If `<p>` is a
+     member's folder, report that the session in `<p>` has to move onto its own branch first, and
+     stop. Otherwise:
      1. Say "`<p>` is not a parallel-mode member's folder". Never say that no session holds it: a
         live session that declined the mode can be working there on `main`.
      2. Read `ListAgents` again and list the live peer sessions on this repo (the candidate rule
@@ -316,14 +341,21 @@ the same when it lands, and leaves the bump to this command under `--no-land`.
 
 ## `off`
 
-1. After pruning, if `P status` says `mode=off`, say so and stop.
-2. `SendMessage` each other member:
+1. After pruning, run `P status` and show it. If it says `mode=off`, say so and stop.
+2. **A held lock.** If `P status` printed `lock=held owner=<o> age=<s> step=<step>`, a land may be
+   in progress. Ask with `AskUserQuestion`: "<o> holds the land lock (step <step>, <age> minutes
+   old). Turn parallel mode off anyway? A land in progress there would lose its lock." Make
+   "Do nothing" the first, default option. On anything but an explicit yes, stop; nothing changed.
+3. `P off`, or `P off --force` only when step 2's answer was yes. Exit 4 with `lock=held …`
+   means a lock was taken after step 1: show it and go back to step 2. Branches are landed or left
+   as they are; nothing is deleted.
+4. `SendMessage` each other member, taking the members from step 1's `P status` (the state is gone
+   now):
    `bx:parallel from <name> [<ref>]: parallel mode off. Your folder and branch stay as they are; nothing for you to do.`
-3. `P off`. Branches are landed or left as they are; nothing is deleted.
-4. If this session is in the main folder, on `s/<ref>`, that branch is already on `main`
+5. If this session is in the main folder, on `s/<ref>`, that branch is already on `main`
    (`git merge-base --is-ancestor HEAD main` exits 0), and `git status --porcelain` prints nothing,
    ask with `AskUserQuestion`: "Switch this folder back to main?" On yes, `git switch main`.
-5. Mention that worktrees whose branch is on `main` can be removed by hand; `/bx:parallel status`
+6. Mention that worktrees whose branch is on `main` can be removed by hand; `/bx:parallel status`
    lists them while the mode is on, and `git worktree list` shows them after.
 
 ## `unlock --force`

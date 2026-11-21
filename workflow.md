@@ -724,7 +724,16 @@ It's useful when you'd otherwise stare at the prompt for 30 seconds wondering wh
 /bx:parallel off
 ```
 
-If a save stops with "saved on branch, not landed", the lock was lost (its owner left or 900 s passed): run `/bx:parallel land`.
+If a save stops with "saved on branch, not landed", the message names the cause:
+
+- **lock held** by a peer's land (under `--silent`, after 2 minutes of retries): run `/bx:save` again once it is done.
+- **main is checked out** in another folder: free it there (the save offers `git switch --detach` when no member works in that folder), then run `/bx:save` again. The save checks this before it writes the docs or the version, so only your code commit is on the branch.
+- **not a fast-forward** (`main` moved after the catch-up): run `/bx:save` again; it catches up first.
+
+In the rare case `main` is taken or moves after the save's check, the docs are already committed: the stop message says whether to land with `/bx:parallel land` or, when the docs commit carries a version bump, to drop it and save again.
+- **lock lost** (a peer broke it as dead, or a user force-released it): commit or undo the uncommitted edits the message names, then run `/bx:save` again.
+
+After `/bx:save --no-land`, expect the later land to conflict on `CLAUDE.md` and `docs/STATUS.md`: the `--no-land` docs commit rewrote their `Last Updated` lines, and any save a peer lands in the meantime edits the same lines. When the conflict names only docs files, drop this branch's `docs: S<n> save (parallel)` commit (`git rebase --onto <sha>^ <sha>`) and run `/bx:save` to write the docs again on top of `main` and land.
 
 ---
 
@@ -792,7 +801,7 @@ Claude Code ships a built-in `/loop` skill for running a prompt or slash command
 
 Two important caveats: `/loop` is **session-scoped** — it dies when the Claude Code session closes — and recurring jobs **auto-expire after 3 days** even if the session lives longer. Don't use it as a replacement for a real cron job or scheduled remote agent (see `/schedule` for persistent scheduling).
 
-**Partially confirmed caveat — smoke-test `/loop` before relying on it.** Nine of the eleven `bx` skills set `disable-model-invocation: true` (`/bx:plan` and `/bx:save` are model-invocable, so Claude can run them itself). Anthropic's code-review docs now state this outright for scheduled tasks: "`/code-review` is marked `disable-model-invocation`, so if you set it as a scheduled task's prompt, Claude reads it as plain text instead of running the review" — for `/schedule`-style scheduled tasks this is documented behavior, not speculation. Whether `/loop` (session-scoped, a different mechanism) shares it is still unverified — but if `/loop /bx:review` or `/loop /bx:clean --dry-run` appears to do nothing, that flag is the first thing to check.
+**Partially confirmed caveat — smoke-test `/loop` before relying on it.** Ten of the twelve `bx` skills set `disable-model-invocation: true` (`/bx:plan` and `/bx:save` are model-invocable, so Claude can run them itself). Anthropic's code-review docs now state this outright for scheduled tasks: "`/code-review` is marked `disable-model-invocation`, so if you set it as a scheduled task's prompt, Claude reads it as plain text instead of running the review" — for `/schedule`-style scheduled tasks this is documented behavior, not speculation. Whether `/loop` (session-scoped, a different mechanism) shares it is still unverified — but if `/loop /bx:review` or `/loop /bx:clean --dry-run` appears to do nothing, that flag is the first thing to check.
 
 **Do not build a custom `/loop` skill in this repo.** The built-in already covers this use case; re-implementing it in the `bx` plugin would be waste.
 
@@ -862,7 +871,7 @@ Commands live in the `bx/` plugin directory of the repo:
 │   ├── .claude-plugin/plugin.json   # Manifest (semver = update cache key)
 │   ├── agents/              # 20 subagents → bx:<agent>
 │   ├── hooks/ + scripts/    # SessionStart orientation hook
-│   └── skills/              # 11 skills → /bx:<name> (each: SKILL.md + references/)
+│   └── skills/              # 12 skills → /bx:<name> (each: SKILL.md + references/)
 ├── .claude/scripts/         # cc launchers (start-claude.{sh,ps1}) — not plugin components
 ├── Workflow.md              # This file
 └── README.md                # Full repository layout lives here

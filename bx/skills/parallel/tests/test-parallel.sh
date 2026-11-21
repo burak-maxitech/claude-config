@@ -706,8 +706,90 @@ test_help() {
     done
 }
 
+# --- Final-review fixes ---
+test_ff_main_check() {
+    echo "test_ff_main_check"
+    # main checked out in the main folder: exit 8, nothing moves
+    local r; r="$(make_repo ffc_co)"; branch_setup "$r"
+    commit_file "$WT" a.txt a "a work"
+    local before; before="$(git -C "$r" rev-parse main)"
+    px "$WT" ff-main --check
+    expect_eq "check: checked-out exits 8" "$RC" 8
+    expect_has "check: names checked-out" "$OUT" "main=checked-out path="
+    expect_eq "check: main unchanged (8)" "$(git -C "$r" rev-parse main)" "$before"
+    # main moved ahead: exit 7, nothing moves
+    r="$(make_repo ffc_nff)"; branch_setup "$r"
+    commit_file "$WT" a.txt a "a work"
+    commit_file "$r" m.txt m "main moves"
+    git -C "$r" checkout -q -b parked
+    before="$(git -C "$r" rev-parse main)"
+    px "$WT" ff-main --check
+    expect_eq "check: not-ff exits 7" "$RC" 7
+    expect_has "check: main=not-ff" "$OUT" "main=not-ff"
+    expect_eq "check: main unchanged (7)" "$(git -C "$r" rev-parse main)" "$before"
+    # fast-forward possible: ok=1, exit 0, main still not moved
+    r="$(make_repo ffc_ok)"; branch_setup "$r"
+    commit_file "$WT" a.txt a "a work"
+    git -C "$r" checkout -q -b parked
+    before="$(git -C "$r" rev-parse main)"
+    px "$WT" ff-main --check
+    expect_eq "check: ok exits 0" "$RC" 0
+    expect_eq "check: prints ok=1" "$OUT" "ok=1"
+    expect_eq "check: main not moved" "$(git -C "$r" rev-parse main)" "$before"
+    px "$WT" ff-main --bogus
+    expect_eq "ff-main unknown flag exits 2" "$RC" 2
+}
+
+test_worktree_failure_reason() {
+    echo "test_worktree_failure_reason"
+    local r; r="$(make_repo wt_fail)"
+    px "$r" ensure-ignore
+    git -C "$r" branch s/x main
+    px "$r" worktree x
+    expect_eq "existing branch exits 1" "$RC" 1
+    expect_has "worktree=failed" "$OUT" "worktree=failed"
+    expect_has "reason printed" "$OUT" "reason="
+    expect_has "reason is git's message" "$OUT" "s/x"
+}
+
+test_off_refuses_held_lock() {
+    echo "test_off_refuses_held_lock"
+    local r; r="$(lock_setup off_held)"
+    px "$r" join s71 /x/one s/s71
+    BXP_NOW=1000 px "$r" lock s71 land
+    BXP_NOW=1060 px "$r" off
+    expect_eq "off with a held lock exits 4" "$RC" 4
+    expect_has "off reports the holder" "$OUT" "lock=held owner=s71 age=60 step=land"
+    px "$r" status
+    expect_has "mode still on" "$OUT" "mode=on"
+    [ -d "$r/.git/bx-parallel/land.lock" ] && pass "lock kept" || fail "lock deleted"
+    px "$r" off --force
+    expect_eq "off --force exits 0" "$RC" 0
+    expect_has "off --force turns off" "$OUT" "mode=off"
+    [ -e "$r/.git/bx-parallel/land.lock" ] && fail "lock left after --force" || pass "lock removed by --force"
+    px "$r" off --bogus
+    expect_eq "off unknown flag exits 2" "$RC" 2
+}
+
+test_status_ownerless_lock() {
+    echo "test_status_ownerless_lock"
+    local r; r="$(lock_setup st_ownerless)"
+    mkdir "$r/.git/bx-parallel/land.lock"
+    px "$r" status
+    expect_has "owner-less lock shows held" "$OUT" "lock=held owner= age=? step="
+    case "$OUT" in *lock=free*) fail "owner-less lock reported free" ;; *) pass "not reported free" ;; esac
+}
+
+test_not_a_git_repo() {
+    echo "test_not_a_git_repo"
+    local d="$TMP_ROOT/norepo"; mkdir -p "$d"
+    OUT="$(cd "$d" && GIT_CEILING_DIRECTORIES="$TMP_ROOT" bash "$SCRIPT" status 2>&1)"; RC=$?
+    expect_eq "outside a repo exits 10" "$RC" 10
+    expect_has "error=not-a-git-repo" "$OUT" "error=not-a-git-repo"
+}
+
 # --- Task 1 + 2 tests (later tasks append their tests above the runner) ---
-TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race test_lock_break_race test_lock_ownerless_held test_live_refs_empty_rejected test_members_lock_stale_takeover test_ensure_ignore_idempotent test_ensure_ignore_gitignore_counts test_worktree_requires_ignore test_worktree_based_on_local_main test_catch_up_dirty test_catch_up_conflict_aborts test_catch_up_interrupted test_catch_up_nonconflict_failure test_catch_up_success test_ff_main_refuses_checked_out test_ff_main_success test_ff_main_not_ff test_two_branches_land_in_turn test_next_session_forms test_version_check test_version_check_level test_help"
+TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race test_lock_break_race test_lock_ownerless_held test_live_refs_empty_rejected test_members_lock_stale_takeover test_ensure_ignore_idempotent test_ensure_ignore_gitignore_counts test_worktree_requires_ignore test_worktree_based_on_local_main test_catch_up_dirty test_catch_up_conflict_aborts test_catch_up_interrupted test_catch_up_nonconflict_failure test_catch_up_success test_ff_main_refuses_checked_out test_ff_main_success test_ff_main_not_ff test_two_branches_land_in_turn test_next_session_forms test_version_check test_version_check_level test_help test_ff_main_check test_worktree_failure_reason test_off_refuses_held_lock test_status_ownerless_lock test_not_a_git_repo"
 [ $# -gt 0 ] && TESTS="$*"
 
 for t in $TESTS; do "$t"; done

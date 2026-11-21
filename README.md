@@ -350,7 +350,7 @@ claude-config/                         # marketplace repo
 │   │   └── hooks.json                 # SessionStart project-orientation injection
 │   ├── scripts/
 │   │   └── session-start-context.sh   # SessionStart hook (bash; runs on Windows via Git Bash)
-│   └── skills/                        # 11 skills → /bx:<name> (each: SKILL.md + references/)
+│   └── skills/                        # 12 skills → /bx:<name> (each: SKILL.md + references/)
 │       ├── arch/                      # /bx:arch      — repo-wide architecture audit
 │       ├── clean/                     # /bx:clean     — codebase cleanup audit
 │       │   └── evals/                 # regression suite: 3 evals, planted-hit/trap fixtures (node, python)

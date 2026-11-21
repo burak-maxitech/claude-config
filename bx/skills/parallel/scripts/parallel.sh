@@ -5,16 +5,16 @@
 #   on <ref> <folder>             turn the mode on; caller becomes first member
 #   join <ref> <folder> <branch>  add or replace a member row
 #   leave <ref>                   remove a member (releases its lock; last one turns mode off)
-#   off                           turn the mode off and delete the state
+#   off [--force]                 turn the mode off and delete the state (exit 4 while a lock is held)
 #   status                        mode, members, lock
 #   member <ref>                  exit 0 if member, 1 if not (no output)
 #   lock <ref> <step> [--live-refs a,b,c]   take the land lock (exit 4 if held)
 #   touch-lock <ref> <step>       refresh the lock heartbeat (exit 4 if not owner)
 #   unlock <ref> [--force]        release the lock (exit 4 if not owner)
 #   ensure-ignore                 add .claude/worktrees/ to the shared info/exclude (no commit)
-#   worktree <ref>                create .claude/worktrees/<ref> on s/<ref> from local main
+#   worktree <ref>                create .claude/worktrees/<ref> on s/<ref> from local main (exit 1/9)
 #   catch-up                      rebase current branch onto main (exit 5/6/7)
-#   ff-main                       fast-forward main to current branch (exit 7/8)
+#   ff-main [--check]             fast-forward main to current branch (exit 7/8); --check moves nothing
 #   next-session                  current/next session number from main's STATUS.md or CLAUDE.md
 #   version-check                 plugin.json version on main vs this branch (ok=yes|no suggest=<v>)
 #   version-check --level <l>     main's version bumped by patch|minor|major (main= level= next=)
@@ -22,6 +22,7 @@
 #
 # State lives under $(git rev-parse --git-common-dir)/bx-parallel/ so every worktree
 # sees the same files. Output is key=value lines. BXP_NOW overrides epoch "now" (tests).
+# Outside a git repo every subcommand but help prints error=not-a-git-repo and exits 10.
 # bash 3.2 compatible.
 
 set -uo pipefail
@@ -36,7 +37,7 @@ if [ "${1:-}" = "help" ]; then
     exit 0
 fi
 
-common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || { echo "error=not-a-git-repo"; exit 4; }
+common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || { echo "error=not-a-git-repo"; exit 10; }
 common_dir="$(cd "$common_dir" && pwd)"
 STATE="$common_dir/bx-parallel"
 MODE_FILE="$STATE/mode"
@@ -134,7 +135,18 @@ cmd_leave() {
 }
 
 cmd_off() {
-    if [ -d "$STATE" ]; then log_line "off"; wipe_state; fi
+    local force=0
+    case "${1:-}" in
+        "") ;;
+        --force) force=1 ;;
+        *) echo "usage: parallel.sh off [--force]"; exit 2 ;;
+    esac
+    # A held lock means a land may be in progress: refuse unless forced.
+    if [ -d "$LOCK_DIR" ] && [ "$force" -eq 0 ]; then print_held; exit 4; fi
+    if [ -d "$STATE" ]; then
+        if [ -d "$LOCK_DIR" ]; then log_line "off-forced lock_owner=$(lock_field ref)"; else log_line "off"; fi
+        wipe_state
+    fi
     echo "mode=off"
 }
 
@@ -147,12 +159,7 @@ cmd_status() {
             echo "member ref=$ref folder=$folder branch=$branch"
         done < "$MEMBERS"
     fi
-    if [ -f "$LOCK_DIR/owner" ]; then
-        local since; since="$(lock_field since)"
-        echo "lock=held owner=$(lock_field ref) age=$(( $(now) - ${since:-0} )) step=$(lock_field step)"
-    else
-        echo "lock=free"
-    fi
+    if [ -d "$LOCK_DIR" ]; then print_held; else echo "lock=free"; fi
 }
 
 cmd_member() {
@@ -301,8 +308,9 @@ cmd_worktree() {
     if ! git -C "$root" check-ignore -q ".claude/worktrees/$ref" 2>/dev/null; then
         echo "ignore=missing"; exit 9
     fi
-    if ! git -C "$root" worktree add -q -b "s/$ref" "$path" main >/dev/null 2>&1; then
-        echo "worktree=failed"; exit 1
+    local err
+    if ! err="$(git -C "$root" worktree add -q -b "s/$ref" "$path" main 2>&1 >/dev/null)"; then
+        echo "worktree=failed reason=$(printf '%s\n' "$err" | sed -n '1p')"; exit 1
     fi
     echo "path=$path"; echo "branch=s/$ref"
 }
@@ -330,12 +338,20 @@ cmd_catch_up() {
 }
 
 # Fast-forward local main to the current branch. Caller holds the land lock.
+# --check runs the same two tests (main checked out, fast-forward possible) and moves nothing.
 cmd_ff_main() {
+    local check=0
+    case "${1:-}" in
+        "") ;;
+        --check) check=1 ;;
+        *) echo "usage: parallel.sh ff-main [--check]"; exit 2 ;;
+    esac
     local br; br="$(git symbolic-ref --short -q HEAD)" || { echo "error=detached-head"; exit 2; }
     local co
     co="$(git worktree list --porcelain | awk '/^worktree /{p=substr($0,10)} /^branch refs\/heads\/main$/{print p; exit}')"
     if [ -n "$co" ]; then echo "main=checked-out path=$co"; exit 8; fi
     if ! git merge-base --is-ancestor main "$br" 2>/dev/null; then echo "main=not-ff"; exit 7; fi
+    if [ "$check" -eq 1 ]; then echo "ok=1"; return 0; fi
     if ! git fetch -q . "$br:main" >/dev/null 2>&1; then echo "main=not-ff"; exit 7; fi
     echo "landed=$(git rev-parse --short main)"
 }
