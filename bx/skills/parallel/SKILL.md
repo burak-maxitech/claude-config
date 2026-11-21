@@ -87,13 +87,19 @@ This is how a closed session leaves, and how the last one leaving turns the mode
    Drop a candidate whose folder is not in this repo's `git worktree list --porcelain`. Then work
    out every session's placement by the rules in step 4.
 
-   **No session in the main folder.** If neither this session nor any remaining candidate is in the
-   main folder and the main folder is on `main`, nobody can move it off `main`, and every `ff-main`
-   would refuse. Check `git -C <main folder> status --porcelain --untracked-files=no`. If it prints
-   anything, stop and tell the user: the main folder has uncommitted changes on `main` and no
-   session to own them, so it must be cleaned up by hand before parallel mode can start. If it
-   prints nothing, setup will run `git -C <main folder> switch --detach` in step 4, and the
-   confirmation below says so.
+   **The main folder is on `main` and no session here keeps it.** Then nobody in the mode will
+   move it off `main`, and every `ff-main` would refuse. What to do depends on whether every
+   candidate answered step 2:
+   - **Some candidate did not reply.** It may be working in the main folder on `main`, so its
+     owner is unknown. Offer no detach and leave the folder alone. Tell the user that the main
+     folder's owner is unknown and that landing will need `main` freed there later (`land` reports
+     it when `ff-main` refuses).
+   - **Every candidate replied and none is in the main folder** (and neither is this session).
+     Check `git -C <main folder> status --porcelain --untracked-files=no`. If it prints anything,
+     stop and tell the user: the main folder has uncommitted changes on `main` and no session to
+     own them, so it must be cleaned up by hand before parallel mode can start. If it prints
+     nothing, setup will run `git -C <main folder> switch --detach` in step 4, and the
+     confirmation below says so.
 
    Show the placement as a table (session · folder · branch now · placement), plus the detach line
    when it applies, and ask the user with `AskUserQuestion`: "Turn parallel mode on with this
@@ -258,11 +264,18 @@ minutes without a refresh).
    - `landed=<sha>`: go on.
    - Exit 8, `main=checked-out path=<p>`: `main` is checked out in `<p>`. `P unlock <ref>`.
      Nothing changed. If `<p>` is a member's folder, report that the session in `<p>` has to move
-     onto its own branch first. If it is not, say that no session holds `<p>`. If
-     `git -C <p> status --porcelain --untracked-files=no` prints nothing, ask with
-     `AskUserQuestion`: "Detach main in <p> with `git -C <p> switch --detach`?" On yes run it, then
-     tell the user to run `land` again. If it prints anything, tell the user `<p>` has uncommitted
-     changes on `main` that must be cleaned up by hand.
+     onto its own branch first, and stop. Otherwise:
+     1. Say "`<p>` is not a parallel-mode member's folder". Never say that no session holds it: a
+        live session that declined the mode can be working there on `main`.
+     2. Read `ListAgents` again and list the live peer sessions on this repo (the candidate rule
+        from setup step 1) whose refs are not members, as `name [ref]`.
+     3. If `git -C <p> status --porcelain --untracked-files=no` prints anything, tell the user `<p>`
+        has uncommitted changes on `main` that must be cleaned up by hand, and stop.
+     4. Otherwise ask with `AskUserQuestion`: "Detach main in <p> with
+        `git -C <p> switch --detach`? If any of these sessions works in <p>, it would be left on a
+        detached HEAD: <the list, or 'none listed'>." Make "Do nothing" the first, default
+        option. Only on an explicit detach answer run it, then tell the user to run `land` again.
+        On anything else, change nothing.
    - Exit 7, `main=not-ff`, or exit 2, `error=detached-head`: `P unlock <ref>`, report, stop.
 6. **Push only if the user asked** in this conversation: `git push origin main`.
 7. **Unlock.** `P unlock <ref>`.
