@@ -20,6 +20,7 @@ Gather only what the orchestrator needs to *route* and *compose the packet*. The
 - `git log -20 --name-only --pretty=format:'@%h %ad %s' --date=short` — commits and the files each touched, in one call
 - `git log -1 --format=%h -- docs/STATUS.md` — the **save anchor**: the last commit that wrote the state file (on a v1 repo where STATUS.md does not exist, use `-- CLAUDE.md`)
 - `git status`
+- `bash <skill-dir>/../parallel/scripts/parallel.sh status` — the parallel-mode check for Path Routing (prints `mode=off`, or `mode=on` with the members and the lock)
 
 **Other:**
 - `TaskList` — only if the task tools are present (`references/task-tools.md`); skip silently if not.
@@ -44,6 +45,7 @@ From the gathered context:
 
 After Step 0:
 
+- **Parallel mode, checked first.** When the Step 0.1 `status` read printed `mode=on`, learn this session's ref the way `/bx:parallel` does (its SKILL.md, "Values every step uses") and run `bash <skill-dir>/../parallel/scripts/parallel.sh member <ref>`. Exit 0 → run the **Parallel Path** below in place of the Save Path, whatever the path flag (with `--full`, still read `references/mode-update-full.md` now). When `status` printed `mode=off` or failed, or `member` exits non-zero, check nothing more: route exactly as the bullets below say.
 - **Default (no path flag), or `--fast`** → run the **Save Path** below. (`--fast` is a no-op alias kept for muscle memory; it now matches the default.)
 - **`--full`** → run the **Full Path**: the Save Path with the heavy sweep (README + `docs/*.md` sync + rollups) spliced in **before** the writer dispatch, so the session entry records it. **Read `references/mode-update-full.md` now** — it holds the Full Path sequence, Step 0.3, Part 0.5, Parts 1.9–1.10 and Parts 2–7. The default path never loads it.
 
@@ -119,6 +121,176 @@ Dispatch one `save-writer` subagent via the Agent tool with `subagent_type: "bx:
 The size-budget line is the output of `bash <skill-dir>/scripts/size-budget.sh . --line`, printed verbatim, and shown only when a file is over its budget. From the third consecutive `--full` run in which the shrink was skipped, the script words that line as an escalation; then it is the **first** line of the Change Report, above the per-file lines, not a drift bullet. Show the advisory-rung line when CLAUDE.md is over 10k and at or under 12k — never together with the budget line for CLAUDE.md. Show the loaded-at-session-start line when the script's `loaded_total` record reads `over`, and the MEMORY.md line when its `memory` record reads `over`. Show the `Last Updated:` line when the writer reported replacing an over-long one. Show the archive line only for an archive at ≥90k chars (approaching or over the 100k rotation threshold); `docs/next-steps-backlog.md` is one of the five.
 
 If no probe fires, omit the warning entirely.
+
+## Parallel Path
+
+Runs only when Path Routing found parallel mode on and this session a member. Several sessions share
+this repo, each on its own branch `s/<ref>`, and `main` moves only under the land lock. This path saves
+**this session's own work only**, under that lock, and lands it. Everything that can prompt runs before
+the lock; nothing under the lock asks the user anything.
+
+**Values.** `P` is `bash <skill-dir>/../parallel/scripts/parallel.sh`, with `<skill-dir>` resolved
+against this skill's base directory. Its output is `key=value` lines; read the exit code too. This
+session's name and ref, the live refs, and how to message the members are defined in
+`<skill-dir>/../parallel/SKILL.md`, section `## Values every step uses` (its "Messaging the members"
+bullet); use them as written there. `<n>` below is the session field as step 3 settles it.
+
+**A lost lock stops the save.** A lock that goes 15 minutes without a refresh is dead, and a peer may
+break it. So on any non-zero exit from a `P touch-lock` below (exit 4, `lock=not-owner`), stop at once
+and report "saved on branch, not landed: lock lost", naming any doc edits left uncommitted in the
+tree, and tell the user to commit or undo those edits and then run `/bx:save` again. When the lock
+was lost after step 5's docs commit, give step 6's recovery for the docs commit instead. Do **not**
+run `P unlock`: the lock is no longer this session's.
+
+**Every stop says why.** A save that does not land reports "saved on branch, not landed: <cause>",
+with one of four causes, each with its own recovery: `lock held` (run `/bx:save` again), `main is
+checked out in <p>` (free it, then `/bx:save` again), `not a fast-forward` (`/bx:save` again; it
+catches up first) and `lock lost` (above).
+
+**Version and CHANGELOG.** Every session that changes `bx/` bumps the same `version` line and adds
+its entry in the same place at the top of `CHANGELOG.md`, so a code commit carrying them conflicts
+with the first peer that lands its own. On this path the code commit therefore never touches
+`bx/.claude-plugin/plugin.json` or `CHANGELOG.md`: step 1 records the bump level and the entry text,
+and step 4 writes both under the lock, on top of `main`'s version.
+
+**Flags.** `--no-land` stops after the docs commit: the lock is released and nothing lands. It also
+skips the version bump and the CHANGELOG entry entirely, so nothing on the branch touches those two
+files: the bump happens when the branch lands, and `/bx:parallel land` asks for it (its `land`
+section, the version steps). `--skip-commit` cannot be honoured, because this path saves
+through commits on the branch: say so and stop before step 1, with nothing changed. Every other flag
+means what it means on the Save Path, and `--silent` keeps its binding rule.
+
+**Sequence:**
+
+1. **Prompts, before the lock.**
+   - Drain the task list (Save Path step 1).
+   - Session number preview: `P next-session`. On `next=unknown`, ask the user for this session's
+     number now (in `--silent`, do not ask). Step 3 uses the answer only if the number is still unknown.
+   - Version files untouched (only when `bx/.claude-plugin/plugin.json` exists). If `git status`
+     shows either `bx/.claude-plugin/plugin.json` or `CHANGELOG.md` modified, or
+     `git diff --quiet main...HEAD -- bx/.claude-plugin/plugin.json CHANGELOG.md` exits 1 (this
+     branch already committed a change to them), stop with nothing changed. Tell the user: "Found
+     changes to `bx/.claude-plugin/plugin.json` and/or `CHANGELOG.md` on s/<ref>, either your own
+     edits or edits from an interrupted parallel save or land. In parallel mode these two files are
+     rewritten under the land lock, on top of main's version. Undo those changes (keep any entry text
+     and give it to the save) and run `/bx:save` again." When the change is committed, also name the
+     commit to drop: `git log --oneline main..HEAD -- bx/.claude-plugin/plugin.json CHANGELOG.md`
+     lists it. An interrupted save left it in `docs: S<n> save (parallel)` (dropping it also drops
+     that save's docs, which this save writes again), an interrupted land in `chore: v<x> — …`.
+     Give its sha and subject and the command that drops it, `git rebase --onto <sha>^ <sha>`; never
+     rewrite the branch yourself.
+   - Commit the code onto the branch: Part 8 steps 1, 2b and 3, in Part 8's order, with two changes.
+     **Step 2 is replaced** (same repo-only condition; skipped entirely under `--no-land`): when an uncommitted file is under `bx/`, or
+     `git diff --quiet main...HEAD -- bx/` exits 1, record the bump **level** (patch, minor or major,
+     by Part 8 step 2's semver rule) and the CHANGELOG **entry text** (the body under the version
+     heading, without the heading); edit neither file now. In `--silent`, the level is patch and the
+     text comes from the suggested commit message, as Part 8 step 2 says. **Step 3's question** is
+     asked once, covering the whole save: "Commit these to s/<ref>, then write the docs, commit them
+     and land on main?" (drop "and land on main" under `--no-land`; with no uncommitted changes, ask
+     "Write the docs, commit them to s/<ref> and land on main?"). Stage the listed files by name,
+     never `git add -A` or `.`. On no: stop, nothing changed. `--silent` commits without asking, as
+     Part 8 says.
+   - `--full`: read Step 0.3, settle the packet's lists (Full Path step 3), and work out the plan of
+     each sweep Part that asks for consent (5.2, 6.2, 1.10.1, 7.4, 7.7). Ask those questions now and
+     keep the answers. Record a 7.4 **Choose** answer by file, section and move, not by row number.
+2. **Lock and catch up.**
+   - `P lock <ref> save --live-refs <live refs>`.
+     - `lock=acquired`: go on. Report a `lock=broken prev_owner=… reason=…` line printed before it.
+       Unless `--no-land`, now send each other member
+       `bx:parallel from <name> [<ref>]: landing s/<ref> onto main now; nothing for you to do.`
+     - Exit 4 (`lock=held owner=<o> …`), interactive: report "saved on branch, not landed: lock
+       held by <o>" and stop. The code commit stays on the branch. Send `<o>` one message with `notify_when_idle: true`:
+       `bx:parallel from <name> [<ref>]: waiting for the land lock you hold; nothing for you to do.`
+       and tell the user to run `/bx:save` again after the idle notice.
+     - Exit 4 in `--silent`: retry every 15 s for up to 120 s, as one Bash call (timeout 150000):
+       `bash -c 'for i in 1 2 3 4 5 6 7 8 9; do bash "$0" lock "$1" save --live-refs "$2"; rc=$?; [ "$rc" -ne 4 ] && exit "$rc"; [ "$i" -lt 9 ] && sleep 15; done; exit 4' <script> <ref> <live refs>`,
+       where `<script>` is the resolved path of `parallel.sh`. Exit 0: go on as for `lock=acquired`,
+       message included. Still exit 4: stop with "saved on branch, not landed: lock held by
+       <owner>; run `/bx:save` again".
+     - Any other exit (exit 2 `mode=off`, exit 1 `lock=error …`): report the output and stop.
+   - `P catch-up`. It rebases this branch onto `main`, which brings in only what has already landed.
+     - `caught_up=<k>`: go on.
+     - Exit 5, `rebase=interrupted`: `P unlock <ref>`. Then ask the user to continue or abort the
+       rebase and run the choice (`git rebase --continue` or `--abort`); in `--silent`, report it
+       and do not ask. Stop; the user runs `/bx:save` again.
+     - Exit 6, `tree=dirty`: `P unlock <ref>`. Tell the user to commit or stash first; never stash
+       for them. Stop.
+     - Exit 7, `conflict files=…` or `rebase=failed reason=…`: the rebase was aborted.
+       `P unlock <ref>`, report the files or reason, and stop. No docs are written. When every
+       conflicting file is a docs file (`CLAUDE.md`, `docs/…`) and the branch carries an earlier
+       `docs: S<n> save (parallel)` commit (a `--no-land` save), say that this commit is the cause:
+       its `Last Updated` lines collide with a peer's landed save. Give the command that drops it,
+       `git rebase --onto <sha>^ <sha>`, and say `/bx:save` then writes the docs again on top of
+       `main`.
+   - Unless `--no-land`: `P ff-main --check`. It runs step 6's two tests and moves nothing, so a
+     save that cannot land stops before any docs or version file is written.
+     - `ok=1`: go on.
+     - Exit 8, `main=checked-out path=<p>`: `P unlock <ref>`, then follow `/bx:parallel`'s `land`
+       step 5 for exit 8 (the member-folder report or the detach offer). In `--silent`, ask
+       nothing. Report "saved on branch, not landed: main is checked out in <p>; free it, then run
+       `/bx:save` again", and say that only the code commit is on the branch: no docs or version
+       commit was made. Stop.
+     - Exit 7 `main=not-ff`, or exit 2 `error=detached-head`: `P unlock <ref>`, report "saved on
+       branch, not landed: not a fast-forward" (or the detached-head output) and stop.
+3. **Read the latest docs.** `P touch-lock <ref> read`. When `caught_up` is above 0, read
+   `docs/STATUS.md` and `CLAUDE.md` again: the Step 0.1 copies predate what landed. Then:
+   - **Own work only.** The filtered commit list is
+     `git log --name-only --pretty=format:'@%h %ad %s' --date=short main..HEAD`. It replaces the save
+     anchor's list from Step 0.2, for the packet and for the drift probes.
+   - **Session number.** `P next-session`. `current=<c> next=<x> source=…`: the session is `<x>`. A
+     `cont.` save stays your judgment: when `<c>` is a save this session already landed earlier in
+     this conversation, write `<c> cont.`. On `next=unknown`, use the user's answer from step 1; in
+     `--silent`, or with no answer, pass the session in the form the `Last Updated` line on `main`
+     already has, and add a warning line to the report: session number unknown.
+4. **Version (only when step 1 recorded a level).** `P version-check --level <level>`.
+   - `main=<v> level=<level> next=<x>`: set `version` in `bx/.claude-plugin/plugin.json` to `<x>`.
+     Insert the entry at the top of `CHANGELOG.md`, directly above the first `## ` version heading
+     (newest first): `## <x> — <today>`, a blank line, then the recorded entry text. Both edits go
+     into the docs commit in step 5. Report `version <v> → <x>`.
+   - `version=n/a`: nothing to do.
+   - Exit 1, `version=error …`: `P unlock <ref>`, report, and stop.
+5. **Write the docs.** `P touch-lock <ref> write`.
+   - `--full`: run the sweep (Full Path step 4) on the latest files, with the answers kept in step 1.
+     A move answered yes runs if it still applies; one the latest files no longer need is skipped and
+     reported. A consent that step 1 did not ask resolves to its safe default, as under `--silent`.
+     Then `P touch-lock <ref> dispatch`: the sweep can be long.
+   - Compose the packet (Save Path step 2), with every `old` string taken from step 3's read (or
+     from the files as the sweep left them, as Full Path step 5 says), the commit list from step 3,
+     and `session` from step 3. Dispatch `save-writer` and handle its report (Save Path step 3,
+     "Dispatch"). Run the drift probes (Save Path step 4).
+   - Commit the docs: stage by name the files the writer and the sweep changed, plus the two files
+     step 4 changed, and run `git commit -m "docs: S<n> save (parallel)"`. This is the commit the
+     step 1 answer covered; do not ask again.
+6. **Land.**
+   - `--no-land`: `P unlock <ref>`, report "saved on s/<ref>, not landed (`--no-land`)", and stop.
+     When the branch changes `bx/`, add: "no version bump yet; `/bx:parallel land` asks for it when
+     the branch lands". Always add: "this docs commit rewrote the `Last Updated` lines in CLAUDE.md
+     and docs/STATUS.md; if a peer lands a save first, the later land conflicts on them. Then drop
+     this `docs: S<n> save (parallel)` commit and run `/bx:save` to write the docs again on top of
+     main and land."
+   - `P touch-lock <ref> ff-main`, then `P ff-main`.
+     - `landed=<sha>`: go on.
+     - Exit 8, `main=checked-out path=<p>`: rare after step 2's check (`main` was checked out
+       since). `P unlock <ref>`, then follow `/bx:parallel`'s `land` step 5 for exit 8. In
+       `--silent`, ask nothing. Report "saved on branch, not landed: main is checked out in <p>",
+       then the recovery for the docs commit just made (see below). Stop.
+     - Exit 7 `main=not-ff`, or exit 2 `error=detached-head`: `P unlock <ref>`, report
+       "saved on branch, not landed: not a fast-forward" (or the detached-head output), then the
+       recovery for the docs commit, and stop.
+
+     The recovery for the docs commit: when step 4 wrote a version, the commit carries the bump and
+     the next save or land refuses until it is gone, so name it with the command that drops it (as
+     step 1's guard does) and say `/bx:save` then saves again. Without a version, the docs are
+     already committed: say to land with `/bx:parallel land` once `main` is free, not to save again.
+   - Push only if the user asked in this conversation: `git push origin main`.
+   - `P unlock <ref>`.
+   - Send each other member
+     `bx:parallel from <name> [<ref>]: landed S<n> at <sha>, catch up before your next save.`
+7. **Report** as Save Path step 6, plus the branch, `landed <sha>` or the reason it did not land,
+   any lock break, and any version change.
+
+Step 0.2's save anchor is not used on this path, and Part 8 does not run a second time: its prompts
+ran in step 1 and its commit is step 5's.
 
 ## Part 0: Drain Task List into docs/STATUS.md
 

@@ -2,6 +2,27 @@
 
 All notable changes to the `bx` plugin, newest first. Versioning follows [semver](https://semver.org). The `version` field in `bx/.claude-plugin/plugin.json` is the plugin's **update cache key**: users receive an update only when it changes, so every change under `bx/` must bump it (automated by `/bx:save`'s commit checkpoint).
 
+## 2.21.0 — 2026-11-20
+
+New `/bx:parallel`: several Claude Code sessions on one repo get their own worktree or branch, and `main` moves only through a locked land step. `/bx:save` gains `--no-land` and a parallel path.
+
+### Why
+Sessions sharing one folder commit each other's half-done edits, switch branch under each other and take the same session number. A two-session spike on 2026-11-20 settled what the platform allows (spec: `docs/superpowers/specs/2026-11-20-bx-parallel-design.md`, "Verified platform behaviour"):
+- A busy peer still gets a `SendMessage`, at its next tool call (it arrived on file 4 of 11), so messaging needs no idle wait; `notify_when_idle` gives one idle notice.
+- A peer never acts on a relayed approval; it waits for its own user. Each session is therefore asked once, in its own session.
+- `EnterWorktree` creates `.claude/worktrees/<name>` on `worktree-<name>`, and that folder is not git-ignored: `git add -A` in the main folder would stage a peer's worktree.
+
+### Added
+- **`/bx:parallel`** (setup, `join`, `status`, `land`, `off`, `unlock --force`) with `scripts/parallel.sh`, `tests/test-parallel.sh` and `check-skill-commands.sh`. Shared state (`mode`, `members`, `land.lock/`) lives under `<git-common-dir>/bx-parallel/`, so nothing is tracked.
+- `/bx:save --no-land` and the `## Parallel Path` in `mode-update.md`.
+
+### Changed
+- `.claude/worktrees/` is ignored through the shared, untracked `.git/info/exclude`, not a `.gitignore` commit, so setup never commits on another session's branch.
+- In parallel mode the plugin version bump and the CHANGELOG entry are written under the land lock, on top of `main`'s version, in the save's docs commit (or by `/bx:parallel land`); `--no-land` makes no bump.
+- The land lock frees itself when its owner leaves `ListAgents` or after 900 s without a refresh; a lost lock stops a save/land with "saved on branch, not landed: lock lost".
+- A save or land checks `parallel.sh ff-main --check` right after catching up, before writing the version or docs, so a refused fast-forward (`main` checked out elsewhere, or not a fast-forward) leaves nothing to undo. Every "saved on branch, not landed" stop names its cause (lock held, main checked out, not a fast-forward, lock lost) and its recovery. A `--no-land` save warns that a later land can conflict on the `Last Updated` lines, and says how to recover.
+- `parallel.sh off` refuses with exit 4 while the land lock is held (`off --force` overrides, after the user confirms); `status` reports an owner-less lock as held; outside a git repo every subcommand exits 10, not 4; a failed `worktree` prints git's reason.
+
 ## 2.20.0 — 2026-11-20
 
 `/bx:seo`: the audit checks what crawlers are actually served, not only what the repo declares, and its GEO advice now follows the 2026 evidence base. Source: the S71 research report (Google Search Central, Bing, OpenAI/Anthropic/Perplexity crawler docs, the CrUX release notes, the arXiv 2607.14035 GEO survey, Pew).
