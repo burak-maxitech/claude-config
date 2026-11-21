@@ -299,9 +299,15 @@ cmd_catch_up() {
     done
     if [ -n "$(git status --porcelain --untracked-files=no)" ]; then echo "tree=dirty"; exit 6; fi
     local n; n="$(git rev-list --count HEAD..main 2>/dev/null || echo 0)"
-    if ! git rebase main >/dev/null 2>&1; then
+    local err; err="$(git rebase main 2>&1 >/dev/null)"
+    if [ $? -ne 0 ]; then
         local files; files="$(git diff --name-only --diff-filter=U | paste -sd, -)"
+        local first; first="$(printf '%s\n' "$err" | sed -n '1p')"
         git rebase --abort >/dev/null 2>&1
+        for d in rebase-merge rebase-apply; do
+            if [ -e "$(git rev-parse --git-path $d)" ]; then echo "rebase=interrupted"; exit 5; fi
+        done
+        if [ -z "$files" ]; then echo "rebase=failed reason=$first"; exit 7; fi
         echo "conflict files=$files"; exit 7
     fi
     echo "caught_up=$n"
