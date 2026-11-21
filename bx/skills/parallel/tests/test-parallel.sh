@@ -633,8 +633,33 @@ test_version_check() {
     expect_eq "unparseable exits 1" "$RC" 1
 }
 
+test_help() {
+    echo "test_help"
+    local out rc
+    out="$(cd "$TMP_ROOT" && bash "$SCRIPT" help 2>&1)"; rc=$?
+    expect_eq "help exits 0 outside a repo" "$rc" 0
+    expect_eq "help lists one name per line" "$(printf '%s\n' "$out" | tr '\n' ' ')" \
+        "on join leave off status member lock touch-lock unlock ensure-ignore worktree catch-up ff-main next-session version-check help "
+    # every dispatch label in the script is listed by help
+    local labels w
+    labels="$(sed -n '/^case "\$sub" in/,/^esac/p' "$SCRIPT" | sed -n 's/^    \([a-z-][a-z-]*\)).*/\1/p')"
+    for w in $labels; do
+        if printf '%s\n' "$out" | grep -qx -- "$w"; then pass "help lists dispatch label $w"
+        else fail "help misses dispatch label $w"; fi
+    done
+    # every listed name reaches its own handler, not the unknown-subcommand usage line
+    local r; r="$(make_repo help_dispatch)"
+    for w in $out; do
+        px "$r" "$w"
+        case "$OUT" in
+            "usage: parallel.sh <"*) fail "help name $w is not dispatched" ;;
+            *) pass "help name $w is dispatched" ;;
+        esac
+    done
+}
+
 # --- Task 1 + 2 tests (later tasks append their tests above the runner) ---
-TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race test_lock_break_race test_lock_ownerless_held test_live_refs_empty_rejected test_members_lock_stale_takeover test_ensure_ignore_idempotent test_worktree_requires_ignore test_worktree_based_on_local_main test_catch_up_dirty test_catch_up_conflict_aborts test_catch_up_interrupted test_catch_up_nonconflict_failure test_catch_up_success test_ff_main_refuses_checked_out test_ff_main_success test_ff_main_not_ff test_two_branches_land_in_turn test_next_session_forms test_version_check"
+TESTS="test_on_status test_on_twice test_join_requires_on test_join_replace test_member test_state_shared_across_worktrees test_leave_and_off test_leave_releases_lock_and_last_turns_off test_leave_hand_written_lock test_join_concurrent_no_lost_rows test_lock_acquire_and_held test_lock_stale_broken test_lock_gone_broken test_touch_extends test_unlock_not_owner test_unlock_force test_lock_race test_lock_break_race test_lock_ownerless_held test_live_refs_empty_rejected test_members_lock_stale_takeover test_ensure_ignore_idempotent test_worktree_requires_ignore test_worktree_based_on_local_main test_catch_up_dirty test_catch_up_conflict_aborts test_catch_up_interrupted test_catch_up_nonconflict_failure test_catch_up_success test_ff_main_refuses_checked_out test_ff_main_success test_ff_main_not_ff test_two_branches_land_in_turn test_next_session_forms test_version_check test_help"
 [ $# -gt 0 ] && TESTS="$*"
 
 for t in $TESTS; do "$t"; done

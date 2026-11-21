@@ -17,6 +17,7 @@
 #   ff-main                       fast-forward main to current branch (exit 7/8)
 #   next-session                  current/next session number from main's STATUS.md or CLAUDE.md
 #   version-check                 plugin.json version on main vs this branch (ok=yes|no suggest=<v>)
+#   help                          print every subcommand name, one per line
 #
 # State lives under $(git rev-parse --git-common-dir)/bx-parallel/ so every worktree
 # sees the same files. Output is key=value lines. BXP_NOW overrides epoch "now" (tests).
@@ -25,6 +26,14 @@
 set -uo pipefail
 
 TAB="$(printf '\t')"
+
+SUBCOMMANDS="on join leave off status member lock touch-lock unlock ensure-ignore worktree catch-up ff-main next-session version-check help"
+
+# help works outside a git repo, so it runs before the repo check.
+if [ "${1:-}" = "help" ]; then
+    for s in $SUBCOMMANDS; do echo "$s"; done
+    exit 0
+fi
 
 common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" || { echo "error=not-a-git-repo"; exit 4; }
 common_dir="$(cd "$common_dir" && pwd)"
@@ -406,5 +415,5 @@ case "$sub" in
     ff-main) cmd_ff_main "$@" ;;
     next-session) cmd_next_session "$@" ;;
     version-check) cmd_version_check "$@" ;;
-    *) echo "usage: parallel.sh <on|join|leave|off|status|member|lock|touch-lock|unlock|ensure-ignore|worktree|catch-up|ff-main|next-session|version-check> [args]"; exit 2 ;;
+    *) echo "usage: parallel.sh <$(echo $SUBCOMMANDS | tr ' ' '|')> [args]"; exit 2 ;;
 esac
