@@ -4,7 +4,7 @@ description: "Turns on parallel mode for several Claude Code sessions on one rep
 disable-model-invocation: true
 effort: low
 argument-hint: "[status|land|off|join|unlock --force]"
-allowed-tools: Read, Bash(bash:*), Bash(git:*), ListAgents, SendMessage, EnterWorktree, AskUserQuestion
+allowed-tools: Read, Edit, Bash(bash:*), Bash(git:*), ListAgents, SendMessage, EnterWorktree, AskUserQuestion
 ---
 
 # /bx:parallel - simultaneous sessions on one repo
@@ -236,10 +236,30 @@ A peer runs this once its user wants to join (or follows the same steps from the
 
 `land` is the only way onto `main`. Once the lock is taken, run `P touch-lock <ref> <step>` between
 steps, as written below, so a slow land never looks dead to the others (a lock is dead after 15
-minutes without a refresh).
+minutes without a refresh). On any non-zero exit from `P touch-lock` (exit 4, `lock=not-owner`:
+a peer broke the lock as dead), stop at once and report "lock lost; not landed", naming any edits
+left uncommitted in the tree. Do **not** run `P unlock`: the lock is no longer this session's.
+
+**Version steps** apply only when `bx/.claude-plugin/plugin.json` exists and
+`git diff --quiet main...HEAD -- bx/` exits 1 (this branch changes `bx/`). Every such branch bumps
+the same `version` line and adds its entry at the same place in `CHANGELOG.md`, so the bump is
+written under the lock, on top of `main`'s version, never earlier. `/bx:save`'s Parallel Path does
+the same when it lands, and leaves the bump to this command under `--no-land`.
 
 1. After pruning, `P member <ref>` must exit 0; otherwise say this session is not in parallel mode
    and stop. If `git rev-list --count main..HEAD` is 0, say "Nothing to land." and stop.
+   **Version steps, before the lock:**
+   - If `git status` shows `bx/.claude-plugin/plugin.json` or `CHANGELOG.md` modified, or
+     `git diff --quiet main...HEAD -- bx/.claude-plugin/plugin.json CHANGELOG.md` exits 1, stop
+     with nothing changed and tell the user: "Found changes to `bx/.claude-plugin/plugin.json`
+     and/or `CHANGELOG.md` on s/<ref>, either your own edits or edits from an interrupted parallel
+     save. In parallel mode these two files are rewritten under the land lock, on top of main's
+     version. Undo those changes (keep any entry text) and run `/bx:parallel land` again."
+   - Draft one CHANGELOG line from `git log --format=%s main..HEAD`. Ask one `AskUserQuestion`
+     whose text shows that draft: "Version bump for this land, and its CHANGELOG line?", with the
+     options patch, minor and major (PATCH for fixes and doc corrections, MINOR for a new
+     skill/agent/flag, MAJOR for breaking renames or removed behavior). A typed answer may change
+     the line. Keep the level and the line.
 2. **Tell the peers.** `SendMessage` each other member:
    `bx:parallel from <name> [<ref>]: landing s/<ref> onto main now; nothing for you to do.`
 3. **Lock.** `P lock <ref> land --live-refs <live refs>`.
@@ -260,6 +280,16 @@ minutes without a refresh).
      for them.
    - Exit 7, `conflict files=…` or `rebase=failed reason=…`: the rebase was aborted. `P unlock
      <ref>`, report the files or reason, and stop. Code conflicts are the user's to resolve.
+
+   **Version steps, under the lock** (only when step 1 kept a level): `P touch-lock <ref> version`,
+   then `P version-check --level <level>`.
+   - `main=<v> level=<level> next=<x>`: set `version` in `bx/.claude-plugin/plugin.json` to `<x>`.
+     Insert at the top of `CHANGELOG.md`, directly above the first `## ` version heading (newest
+     first): `## <x> — <today>`, a blank line, then the kept line. Stage the two files by name and
+     commit them with `git commit -m "chore: v<x> — <the line, shortened to a summary>"`. Then
+     `P touch-lock <ref> version-done`.
+   - `version=n/a`: nothing to do.
+   - Exit 1, `version=error …`: `P unlock <ref>`, report, and stop.
 5. **Fast-forward `main`.** `P touch-lock <ref> ff-main`, then `P ff-main`.
    - `landed=<sha>`: go on.
    - Exit 8, `main=checked-out path=<p>`: `main` is checked out in `<p>`. `P unlock <ref>`.

@@ -146,8 +146,10 @@ with the first peer that lands its own. On this path the code commit therefore n
 `bx/.claude-plugin/plugin.json` or `CHANGELOG.md`: step 1 records the bump level and the entry text,
 and step 4 writes both under the lock, on top of `main`'s version.
 
-**Flags.** `--no-land` stops after the docs commit: the lock is released and nothing lands
-(`/bx:parallel land` lands it later). `--skip-commit` cannot be honoured, because this path saves
+**Flags.** `--no-land` stops after the docs commit: the lock is released and nothing lands. It also
+skips the version bump and the CHANGELOG entry entirely, so nothing on the branch touches those two
+files: the bump happens when the branch lands, and `/bx:parallel land` asks for it (its `land`
+section, the version steps). `--skip-commit` cannot be honoured, because this path saves
 through commits on the branch: say so and stop before step 1, with nothing changed. Every other flag
 means what it means on the Save Path, and `--silent` keeps its binding rule.
 
@@ -160,11 +162,13 @@ means what it means on the Save Path, and `--silent` keeps its binding rule.
    - Version files untouched (only when `bx/.claude-plugin/plugin.json` exists). If `git status`
      shows either `bx/.claude-plugin/plugin.json` or `CHANGELOG.md` modified, or
      `git diff --quiet main...HEAD -- bx/.claude-plugin/plugin.json CHANGELOG.md` exits 1 (this
-     branch already committed a change to them), stop with nothing changed. Tell the user that the
-     parallel path writes the version and the CHANGELOG entry itself, under the lock; they undo their
-     own edits to those files (keeping the entry text to give this save) and run `/bx:save` again.
+     branch already committed a change to them), stop with nothing changed. Tell the user: "Found
+     changes to `bx/.claude-plugin/plugin.json` and/or `CHANGELOG.md` on s/<ref>, either your own
+     edits or edits from an interrupted parallel save. In parallel mode these two files are rewritten
+     under the land lock, on top of main's version. Undo those changes (keep any entry text and give it
+     to the save) and run `/bx:save` again."
    - Commit the code onto the branch: Part 8 steps 1, 2b and 3, in Part 8's order, with two changes.
-     **Step 2 is replaced** (same repo-only condition): when an uncommitted file is under `bx/`, or
+     **Step 2 is replaced** (same repo-only condition; skipped entirely under `--no-land`): when an uncommitted file is under `bx/`, or
      `git diff --quiet main...HEAD -- bx/` exits 1, record the bump **level** (patch, minor or major,
      by Part 8 step 2's semver rule) and the CHANGELOG **entry text** (the body under the version
      heading, without the heading); edit neither file now. In `--silent`, the level is patch and the
@@ -231,6 +235,8 @@ means what it means on the Save Path, and `--silent` keeps its binding rule.
      step 1 answer covered; do not ask again.
 6. **Land.**
    - `--no-land`: `P unlock <ref>`, report "saved on s/<ref>, not landed (`--no-land`)", and stop.
+     When the branch changes `bx/`, add: "no version bump yet; `/bx:parallel land` asks for it when
+     the branch lands".
    - `P touch-lock <ref> ff-main`, then `P ff-main`.
      - `landed=<sha>`: go on.
      - Exit 8, `main=checked-out path=<p>`: `P unlock <ref>`, then follow `/bx:parallel`'s `land`
