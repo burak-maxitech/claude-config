@@ -551,6 +551,19 @@ test_next_session_forms() {
     put_main "$r" docs/STATUS.md "Last Updated: 2026-11-21 (Session 99)" branch
     px "$r" next-session
     expect_has "reads main, not branch" "$OUT" "current=70 next=71"
+    # first "Session N" wins, not the last
+    r="$(make_repo ns7)"
+    put_main "$r" docs/STATUS.md "Last Updated: 2026-11-20 (Session 70, follows Session 69)" status
+    px "$r" next-session
+    expect_has "first Session number wins" "$OUT" "current=70 next=71"
+    # large file: grep -m 1 must not lose the match to SIGPIPE under pipefail
+    r="$(make_repo ns8)"
+    mkdir -p "$r/docs"
+    { echo "# Status"; echo "Last Updated: 2026-11-20 (Session 70)"; yes "filler line to push the file well past the pipe buffer size" | head -n 8000; } > "$r/docs/STATUS.md"
+    git -C "$r" add docs/STATUS.md; git -C "$r" commit -q -m big
+    expect_eq "STATUS.md is >= 400 KB" "$([ "$(wc -c < "$r/docs/STATUS.md")" -ge 400000 ] && echo y)" y
+    px "$r" next-session
+    expect_eq "large STATUS.md still found" "$OUT" "current=70 next=71 source=docs/STATUS.md"
 }
 
 # plugin_json <version>
@@ -606,6 +619,18 @@ test_version_check() {
     commit_file "$r" f.txt f work
     px "$r" version-check
     expect_eq "no bump equal to main" "$OUT" "main=2.20.0 branch=2.20.0 ok=no suggest=2.20.1"
+    # minified plugin.json: version not at the start of a line
+    r="$(make_repo vc5)"
+    put_main "$r" "$PJ" '{"name":"bx","version":"2.20.0","x":1}' base
+    git -C "$r" checkout -q -b feat
+    put_main "$r" "$PJ" '{"name":"bx","version":"2.21.0","x":1}' minor
+    px "$r" version-check
+    expect_eq "minified json parsed" "$OUT" "main=2.20.0 branch=2.21.0 ok=yes suggest=2.21.0"
+    # unparseable branch version: error, not a fake 0.0.0
+    put_main "$r" "$PJ" '{"name":"bx"}' broken
+    px "$r" version-check
+    expect_eq "unparseable" "$OUT" "version=error reason=unparseable"
+    expect_eq "unparseable exits 1" "$RC" 1
 }
 
 # --- Task 1 + 2 tests (later tasks append their tests above the runner) ---

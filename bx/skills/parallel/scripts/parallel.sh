@@ -328,11 +328,12 @@ cmd_ff_main() {
 
 # Session number from the committed main: first "Last Updated" line of STATUS.md, else CLAUDE.md.
 cmd_next_session() {
-    local f line n
+    local f txt line n
     for f in docs/STATUS.md CLAUDE.md; do
-        line="$(git show "main:$f" 2>/dev/null | grep -m 1 'Last Updated')" || line=""
+        txt="$(git show "main:$f" 2>/dev/null)" || txt=""
+        line="$(printf '%s' "$txt" | grep 'Last Updated' | head -n 1)" || line=""
         [ -n "$line" ] || continue
-        n="$(printf '%s\n' "$line" | sed -n 's/.*Session[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -n 1)"
+        n="$(printf '%s' "$line" | grep -o 'Session[[:space:]]*[0-9][0-9]*' | head -n 1 | grep -o '[0-9][0-9]*$')" || n=""
         if [ -n "$n" ]; then
             echo "current=$n next=$((n + 1)) source=$f"
         else
@@ -351,7 +352,7 @@ ver_field() { # <version> <n>
 }
 
 # "version" value from plugin.json text on stdin.
-json_version() { sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1; }
+json_version() { grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' | head -n 1 | sed 's/.*:[[:space:]]*"\(.*\)"/\1/'; }
 
 cmd_version_check() {
     local top; top="$(git rev-parse --show-toplevel)"
@@ -365,7 +366,7 @@ cmd_version_check() {
     main="$(git show "main:$rel" 2>/dev/null | json_version)"
     [ -n "$main" ] || main="${base:-0.0.0}"
     [ -n "$base" ] || base="$main"
-    [ -n "$branch" ] || branch="0.0.0"
+    [ -n "$branch" ] || { echo "version=error reason=unparseable"; exit 1; }
     local i ok=no b m
     for i in 1 2 3; do
         b="$(ver_field "$branch" $i)"; m="$(ver_field "$main" $i)"
